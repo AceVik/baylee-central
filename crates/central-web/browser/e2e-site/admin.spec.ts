@@ -261,7 +261,7 @@ async function back(page: Page, account: number[]) {
 test("without the role there is no page and no link, and nothing is asked", async ({ page }) => {
   const w = world({ admin: false });
   const { seen, problems } = await open(page, w, { path: "/en/account" });
-  await expect(page.locator(".account-who")).toBeVisible();
+  await expect(page.locator("section.me")).toBeVisible();
   await expect(page.locator("a[href$='/account/admin']")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Reset a login" })).toHaveCount(0);
 
@@ -283,7 +283,7 @@ test("an administrator is led there and finds accounts, page by page; a search C
   const link = page.getByRole("link", { name: "Reset a login" });
   await expect(link).toHaveAttribute("href", "/en/account/admin");
   // and to the rest of the administration, on this site
-  await expect(page.getByRole("link", { name: "Administration", exact: true })).toHaveAttribute("href", "/en/account/admin/overview");
+  await expect(page.locator(".admin-card").getByRole("link", { name: "Overview", exact: true })).toHaveAttribute("href", "/en/account/admin/overview");
   const start = seen.length;
   await link.click();
   await expect(page).toHaveURL(/\/en\/account\/admin$/);

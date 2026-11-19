@@ -4,64 +4,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Central's public calendar, rendered before hydration and refreshed by the browser.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChallengeFeed {
-    /// Public expedition metadata only; personal progression is never server-cached.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tower: Option<central_api::tower::Season>,
-    /// Public Ascent standings for `tower`, without account-specific `own` flags.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tower_standings: Vec<central_api::tower::Standing>,
-    /// Central's clock at this snapshot, in Unix seconds.
-    pub now: i64,
-    /// Current tasks and the first archive page; no private execution material.
-    pub challenges: Vec<central_api::challenges::Challenge>,
-    /// Exclusive cursor for older tasks.
-    pub before: Option<i64>,
-}
-
-/// Whether two Tower standing rows carry identical public fields.
-#[must_use]
-pub fn standing_eq(a: &central_api::tower::Standing, b: &central_api::tower::Standing) -> bool {
-    (
-        a.rank,
-        &a.name,
-        a.tag,
-        a.own,
-        a.floors,
-        a.losses,
-        a.turns,
-        a.milliseconds,
-    ) == (
-        b.rank,
-        &b.name,
-        b.tag,
-        b.own,
-        b.floors,
-        b.losses,
-        b.turns,
-        b.milliseconds,
-    )
-}
-
-impl PartialEq for ChallengeFeed {
-    fn eq(&self, other: &Self) -> bool {
-        self.tower == other.tower
-            && self.now == other.now
-            && self.challenges == other.challenges
-            && self.before == other.before
-            && self.tower_standings.len() == other.tower_standings.len()
-            && self
-                .tower_standings
-                .iter()
-                .zip(&other.tower_standings)
-                .all(|(a, b)| standing_eq(a, b))
-    }
-}
-
-impl Eq for ChallengeFeed {}
-
 /// A platform Baylee's client is built for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Platform {
@@ -499,6 +441,121 @@ pub struct Views {
     pub since: String,
 }
 
+/// The places the developer is given to (Baylee `docs/legal.md`,
+/// "Donations"), each under his developer name and not the project's: the
+/// platform's own name and the address, in the order they are shown.
+pub const GIVING: [(&str, &str); 3] = [
+    ("GitHub Sponsors", "https://github.com/sponsors/AceVik"),
+    ("Liberapay", "https://liberapay.com/AceVik"),
+    ("Ko-fi", "https://ko-fi.com/acevik"),
+];
+
+/// What is given through one donation platform regularly: the amount a
+/// month, in euro cents, and by how many. Nothing else of a platform's
+/// answer is kept, and nothing in it names anybody.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Monthly {
+    /// What is given a month, in euro cents (another currency converted).
+    pub month: u64,
+    /// How many people give.
+    pub supporters: u64,
+}
+
+/// The donations given once, added up: each in euro cents at the rate of
+/// the day it came.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Once {
+    /// Their sum, in euro cents.
+    pub total: u64,
+    /// How many there were.
+    pub count: u64,
+    /// The day the count began, `YYYY-MM-DD`.
+    pub since: String,
+}
+
+impl Once {
+    /// The day the count began, where [`Once::since`] is a date of the shape
+    /// `YYYY-MM-DD`: a page shows nothing else of this text.
+    #[must_use]
+    pub fn day(&self) -> Option<&str> {
+        let bytes = self.since.as_bytes();
+        let digits = |range: std::ops::Range<usize>| bytes[range].iter().all(u8::is_ascii_digit);
+        let shaped = bytes.len() == 10
+            && bytes[4] == b'-'
+            && bytes[7] == b'-'
+            && digits(0..4)
+            && digits(5..7)
+            && digits(8..10);
+        let part = |range: std::ops::Range<usize>| self.since[range].parse::<u8>().ok();
+        (shaped
+            && part(5..7).is_some_and(|month| (1..=12).contains(&month))
+            && part(8..10).is_some_and(|day| (1..=31).contains(&day)))
+        .then_some(self.since.as_str())
+    }
+}
+
+/// How much of the monthly goal is covered, by platform, and what was
+/// given once. A platform is absent until its figure is known: Liberapay
+/// publishes one for anybody; GitHub Sponsors' needs a token and Ko-fi's a
+/// webhook, which Baylee Central holds and this site never does.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Funding {
+    /// GitHub Sponsors: the estimated monthly income.
+    #[serde(default)]
+    pub github: Option<Monthly>,
+    /// Liberapay: what is received a week, as a month's amount.
+    #[serde(default)]
+    pub liberapay: Option<Monthly>,
+    /// Ko-fi: the memberships' payments of the last month.
+    #[serde(default)]
+    pub kofi: Option<Monthly>,
+    /// The donations given once, on any platform.
+    #[serde(default)]
+    pub once: Option<Once>,
+}
+
+impl Funding {
+    /// The goal the owner set on every platform (18.11.2026): what
+    /// development and operation cost a month, in euro cents.
+    pub const GOAL: u64 = 80_000;
+
+    /// The three platforms in the order they are shown ([`GIVING`]'s),
+    /// each with its key, its name and its figure if it is known.
+    #[must_use]
+    pub const fn platforms(&self) -> [(&'static str, &'static str, Option<Monthly>); 3] {
+        [
+            ("github", GIVING[0].0, self.github),
+            ("liberapay", GIVING[1].0, self.liberapay),
+            ("kofi", GIVING[2].0, self.kofi),
+        ]
+    }
+
+    /// What is covered a month, in euro cents, and by how many people,
+    /// over the platforms whose figure is known; `None` while none is.
+    #[must_use]
+    pub fn covered(&self) -> Option<(u64, u64)> {
+        self.platforms()
+            .into_iter()
+            .filter_map(|(_, _, monthly)| monthly)
+            .map(|monthly| (monthly.month, monthly.supporters))
+            .reduce(|sum, part| (sum.0.saturating_add(part.0), sum.1.saturating_add(part.1)))
+    }
+
+    /// The share of the goal that `month` euro cents cover, in whole per
+    /// cent, at most a hundred; anything given at all shows as one.
+    #[must_use]
+    pub const fn percent(month: u64) -> u64 {
+        let percent = month.saturating_mul(100) / Self::GOAL;
+        if percent > 100 {
+            100
+        } else if percent == 0 && month > 0 {
+            1
+        } else {
+            percent
+        }
+    }
+}
+
 /// A page of the signed-in area (`/{lang}/account/…`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Section {
@@ -695,6 +752,61 @@ pub struct Repo {
 mod tests {
     use super::*;
 
+    /// A funding file says each platform's month; a field it does not
+    /// know is passed over, and a file of the first shape (a week's amount
+    /// under other names) is no funding at all rather than a wrong figure.
+    #[test]
+    fn a_funding_file_of_another_shape_is_not_read_as_figures() {
+        let now: Funding = serde_json::from_str(
+            r#"{"liberapay":{"month":10010,"supporters":3,"later":true},"other":1}"#,
+        )
+        .expect("today's shape, with fields of a later one");
+        assert_eq!(
+            now.liberapay,
+            Some(Monthly {
+                month: 10_010,
+                supporters: 3
+            })
+        );
+        assert_eq!(now.covered(), Some((10_010, 3)));
+        assert!(
+            serde_json::from_str::<Funding>(r#"{"liberapay":{"week":2310,"patrons":3}}"#).is_err()
+        );
+        assert_eq!(
+            serde_json::from_str::<Funding>("{}").expect("empty"),
+            Funding::default()
+        );
+    }
+
+    /// Of the one-time sum's date only a date is shown: four digits, two,
+    /// two, a month and a day that exist on a calendar's face.
+    #[test]
+    fn the_one_time_sum_s_day_is_a_date_or_nothing() {
+        let once = |since: &str| Once {
+            total: 1,
+            count: 1,
+            since: since.to_owned(),
+        };
+        assert_eq!(once("2026-11-18").day(), Some("2026-11-18"));
+        for other in [
+            "",
+            "2026-11-1",
+            "2026-11-181",
+            "2026/11/18",
+            "2026-13-01",
+            "2026-00-10",
+            "2026-11-00",
+            "2026-11-32",
+            "20x6-11-18",
+            "2026-11-18T00:00:00Z",
+            "<b>2026</b>",
+            "٢٠٢٦-١١-١٨",
+            "2026-1é-18",
+        ] {
+            assert_eq!(once(other).day(), None, "{other:?}");
+        }
+    }
+
     /// One account's page has one address: 32 lowercase hex digits, read
     /// back to the same id; anything else is no page.
     #[test]
@@ -776,6 +888,41 @@ mod tests {
                 "baylee-client-0.2.0-x86_64-pc-windows-msvc.zip.sha256",
                 None,
             ),
+            (
+                "baylee-client-0.2.0-x86_64-unknown-linux-gnu-v2.tar.gz",
+                Some((Platform::LinuxX64, Kind::Fallback)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-unknown-linux-gnu.tar.gz",
+                Some((Platform::LinuxX64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-beta.o1-x86_64-apple-darwin.zip",
+                Some((Platform::MacX64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-aarch64-apple-darwin.zip",
+                Some((Platform::MacArm64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-aarch64-pc-windows-msvc.zip",
+                Some((Platform::WindowsArm64, Kind::Archive)),
+            ),
+            (
+                "baylee-client-0.2.0-x86_64-pc-windows-msvc-v2.zip.sig",
+                None,
+            ),
+            // a fallback exists for the three x86-64 systems only, and only
+            // as the archive: no other level, no ARM, no installer
+            ("baylee-client-0.2.0-x86_64-pc-windows-msvc-v3.zip", None),
+            (
+                "baylee-client-0.2.0-aarch64-unknown-linux-gnu-v2.tar.gz",
+                None,
+            ),
+            ("baylee-client-0.2.0-aarch64-apple-darwin-v2.zip", None),
+            ("Baylee-0.2.0-x86_64-v2.AppImage", None),
+            ("baylee_0.2.0_amd64-v2.deb", None),
+            ("Baylee-Setup-0.2.0-x64-v2.exe", None),
             ("Baylee-Setup--x64.exe", None),
             ("Baylee-Setup-1 2-x64.exe", None),
             ("evil-Baylee-0.2.0-aarch64.dmg", None),

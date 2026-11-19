@@ -82,6 +82,12 @@ milestone marks; the summit is visually distinct. Upgrade offers are equal-sized
 cards with a precise before/after summary and an explicit confirmation. Rankings
 and permanent medals remain separate from gameplay instructions.
 
+*Status, 18.11.2026: the website's page was removed with `/{lang}/challenges`
+([website design](website-design.md#areas)); the native interface is the only
+one. The website keeps the Tower's part of the account's data export and of
+the privacy notice. What this document says of the web page records it as it
+was built and checked.*
+
 Native and web interfaces share the same authority and terminology. The web
 page shows the current expedition, public rankings and signed-in progress,
 with an explicit client launch link. Loading, unavailable capacity, empty scores,

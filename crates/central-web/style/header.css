@@ -179,11 +179,31 @@ body:has(dialog[open]) .top {
   object-fit: cover;
 }
 
-.nav-account span {
-  max-width: 14ch;
+/* Whose account it is (boot.js): the display name, cut with an ellipsis
+   where it is long, and the tag after it, always whole, in gold. Before a
+   page noted them the link says "Your account" in the same place. */
+.nav-account > span:not(.nav-face) {
+  display: inline-flex;
+  align-items: baseline;
+  min-inline-size: 0;
+  max-inline-size: 22ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nav-account .nav-name {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-account .nav-tag {
+  flex: none;
+  color: var(--gold);
+  font: 600 0.86em / 1 var(--mono);
+  letter-spacing: 0.01em;
 }
 
 /* ---- the tools: the colour switch and the language menu ------------------- */
@@ -577,7 +597,7 @@ body:has(dialog[open]) .top {
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* Below this the sections fold into the menu: eight of them, the account and
+/* Below this the sections fold into the menu: five of them, the account and
    the tools stand side by side from here on in every language (Spanish and
    French are the widest). */
 @media (max-width: 1080px) {
@@ -656,14 +676,14 @@ body:has(dialog[open]) .top {
 }
 
 /* beside the sections the language's code stands for it until there is room
-   for its name ("Português (Brasil)") */
+   for its name */
 @media (min-width: 1081px) and (max-width: 1279px) {
   .lang-name {
     display: none;
   }
 
-  /* Challenges and the Tower also fit in the first unfolded row, including
-     the longer translated labels. Keep their full height and readable type. */
+  /* The sections stand closer in the first unfolded row, so the longer
+     translated labels fit in it at their full height and readable type. */
   .nav a {
     padding-inline: 0.5em;
   }
@@ -700,20 +720,18 @@ body:has(dialog[open]) .top {
 }
 
 /* ---- the strip: Baylee in numbers, under the bar on the start page --------
-   A cell a figure: a glyph and a value whose words say what it counts; the
-   label is for a screen reader and the pointer's tooltip. Nothing is
-   underlined (owner, 11.11.2026); a value that leads somewhere takes the
-   gold under the pointer.
+   A cell a figure: its value, and with it a glyph and a short label (owner,
+   18.11.2026: compact labels with glyphs, evenly spread, on a phone above
+   all). The server writes how many cells there are (data-count, 1 to 6: a
+   number nobody reported is no cell, so it leaves no hole).
 
-   The rows are even for any number of cells (owner, 12.11.2026). The server
-   writes how many there are (data-count, 1 to 8: a number nobody reported is
-   no cell, so it leaves no hole), and a line holds --cols of them, as many as
-   the width allows and chosen so that the lines differ by one at most, the
-   shorter centred, and no cell is left alone on a line. A cell is as wide as
-   its share of the line, so the columns of two lines stand in line; a cell's
-   own --cols is its share where one line holds more than the next. On a wide
-   screen they all stand in one line, each as wide as its words and the room
-   shared out evenly between them. ------------------------------------------ */
+   A phone stands them three to a line (four as two and two), the value over
+   its label, every cell as wide as its share of the line: the columns of two
+   lines stand in line and a shorter line is centred. From 600 px they share
+   one line evenly, a hairline between neighbours, and from 1100 px a cell is
+   one line itself: glyph, value, label. Nothing is underlined (owner,
+   11.11.2026); a value that leads somewhere takes the gold under the
+   pointer. ----------------------------------------------------------------- */
 
 .strip {
   position: relative;
@@ -730,182 +748,155 @@ body:has(dialog[open]) .top {
 .strip-inner {
   max-width: var(--wrap);
   margin: 0 auto;
-  padding: 0.35rem var(--gutter);
+  padding: 0.55rem var(--gutter);
 }
 
 .strip-list {
-  --gap-x: 1.25rem;
-  --cols: var(--n, 1);
+  --gap-x: 0.5rem;
+  --cols: 3;
 
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: center;
-  gap: 0.25rem var(--gap-x);
+  gap: 0.6rem var(--gap-x);
   margin: 0;
   padding: 0;
 }
 
-.strip-list[data-count="2"] {
-  --n: 2;
+.strip-list[data-count="1"] {
+  --cols: 1;
 }
 
-.strip-list[data-count="3"] {
-  --n: 3;
+.strip-list:is([data-count="2"], [data-count="4"]) {
+  --cols: 2;
 }
 
-.strip-list[data-count="4"] {
-  --n: 4;
-}
-
-.strip-list[data-count="5"] {
-  --n: 5;
-}
-
-.strip-list[data-count="6"] {
-  --n: 6;
-}
-
-.strip-list[data-count="7"] {
-  --n: 7;
-}
-
-.strip-list[data-count="8"] {
-  --n: 8;
-}
-
-/* the gateways' four counts: one term, four values, each value a cell */
-.strip-live {
-  display: contents;
-}
-
-/* A cell's glyph runs with its words, centred: where a narrow cell breaks
-   them, the glyph stays beside the first line and every line is centred. */
 .strip-cell {
+  display: flex;
   flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap-x)) / var(--cols));
+  flex-direction: column;
+  gap: 0.05rem;
+  align-items: center;
   min-width: 0;
-  margin: 0;
-  color: var(--ink);
-  font: 600 0.76rem/1.6 var(--sans);
   text-align: center;
-  text-wrap: pretty;
 }
 
-/* a Japanese count breaks between phrases where the browser can tell them,
-   not inside a word */
-:root:lang(ja) .strip-cell {
-  word-break: auto-phrase;
+/* the term: a glyph and a short label, quiet under its value */
+.strip dt {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  max-width: 100%;
+  color: var(--ink-soft);
+  font: 500 0.7rem/1.3 var(--sans);
+}
+
+.strip-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .strip dd {
+  order: -1;
   margin: 0;
-}
-
-.strip .icon {
-  display: inline-block;
-  width: 0.85rem;
-  height: 0.85rem;
-  margin-inline-end: 0.4rem;
-  color: color-mix(in srgb, var(--gold) 72%, var(--ink-faint));
-  vertical-align: -0.14em;
-}
-
-/* the links look as small as their line, and reach the 44 px every control
-   is given: height that negative margins take back */
-.strip dd > a {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0 0.4rem;
-  min-width: var(--target);
-  min-height: var(--target);
-  margin-block: -0.6rem;
   color: var(--title);
-  text-decoration: none;
-  vertical-align: middle;
-  transition: color var(--dur-fast) ease;
-}
-
-.strip dd > a > .icon {
-  margin: 0;
-}
-
-.strip dd > a:hover {
-  color: var(--link-hover);
-}
-
-.strip .small {
-  color: var(--ink-soft);
-  font-size: 0.72rem;
-  font-weight: 400;
-}
-
-/* the gateways online and not: each part stays whole */
-.stat-part {
-  display: inline-flex;
-  align-items: center;
+  font: 700 1rem/1.3 var(--sans);
   white-space: nowrap;
 }
 
-.stat-part > .dot {
-  margin-inline-end: 0.35rem;
+.strip .icon {
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+  color: color-mix(in srgb, var(--gold) 72%, var(--ink-faint));
 }
 
-/* a wide screen: one line, the room shared out evenly */
-@media (min-width: 1100px) {
+.strip dd > .dot {
+  margin-inline-end: 0.4rem;
+  vertical-align: 0.12em;
+}
+
+/* "5 / 7": the second number steps back */
+.strip-of {
+  margin-inline-start: 0.25em;
+  color: var(--ink-soft);
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+/* a link looks as small as its words, and reaches the 44 px every control
+   is given: room around them that negative margins take back */
+.strip dd > a {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  min-width: var(--target);
+  min-height: var(--target);
+  margin: -0.75rem -0.5rem;
+  padding-inline: 0.5rem;
+  color: inherit;
+  line-height: var(--target);
+  text-decoration: none;
+  transition: color var(--dur-fast) ease;
+}
+
+.strip dd > a:hover,
+.strip dd > a:hover > .strip-of {
+  color: var(--link-hover);
+}
+
+/* words in a value's place (the way to the directory) are set as words */
+.strip dd > .strip-way {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* from a tablet on: one line, shared out evenly */
+@media (min-width: 600px) {
   .strip-list {
+    --gap-x: 0;
+
     flex-wrap: nowrap;
   }
 
   .strip-cell {
-    flex: 1 1 auto;
-    min-width: auto;
+    flex: 1 1 0;
+    padding-inline: 0.5rem;
+  }
+
+  .strip-cell + .strip-cell {
+    border-inline-start: 1px solid var(--edge-soft);
   }
 }
 
-/* a tablet and a narrow desk: at most four to a line, five and six as three
-   and two or three and three, seven and eight as four and three or four */
-@media (min-width: 600px) and (max-width: 1099px) {
-  .strip-list[data-count="5"],
-  .strip-list[data-count="6"] {
-    --cols: 3;
-  }
-
-  .strip-list[data-count="7"],
-  .strip-list[data-count="8"] {
-    --cols: 4;
-  }
-}
-
-/* a phone: two to a line. Three stand in one line, each as wide as its words
-   (the gateways' cell needs more room than a third); five and seven start
-   with a line of the gateways' first three short counts, so that every line
-   after it holds two and the gateways' cell has half a line. */
-@media (max-width: 599px) {
+/* a wide screen: a cell is one line, glyph, value, label */
+@media (min-width: 1100px) {
   .strip-inner {
-    padding-block: 0.4rem;
+    padding-block: 0.45rem;
   }
 
-  .strip-list {
-    --gap-x: 0.75rem;
-    --cols: 2;
+  .strip-cell {
+    flex-direction: row;
+    gap: 0.45rem;
+    align-items: baseline;
+    justify-content: center;
   }
 
-  .strip-list[data-count="1"] {
-    --cols: 1;
+  .strip dt {
+    display: contents;
   }
 
-  .strip-list[data-count="3"] {
-    flex-wrap: nowrap;
+  .strip dt > .icon {
+    align-self: center;
+    order: -2;
   }
 
-  .strip-list[data-count="3"] .strip-cell {
-    flex: 1 1 auto;
-    min-width: auto;
+  .strip dd {
+    font-size: 0.92rem;
   }
 
-  .strip-list:is([data-count="5"], [data-count="7"]) .strip-live > .strip-cell:nth-of-type(-n + 3) {
-    --cols: 3;
+  .strip-label {
+    font-size: 0.76rem;
+    white-space: nowrap;
   }
 }

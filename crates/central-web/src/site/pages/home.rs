@@ -95,13 +95,14 @@ pub fn page(cx: &Context<'_>) -> Built {
     let body = view! {
         {strip(cx)}
         {hero(cx)}
-        {gateways(lang, cx.data.gateways.as_deref())}
+        {gateways(cx)}
         {screens(cx)}
         {about(lang)}
         {super::security::teaser(lang)}
         {cards(lang, cx.data.cards.as_ref())}
         {contact(lang)}
         {source(cx)}
+        {super::donate::band(lang)}
         {album(cx)}
     }
     .into_any();
@@ -192,116 +193,115 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
     }
 }
 
-/// One of the strip's figures, a cell of its own: its value, glyph first,
-/// whose words say what it counts; the label is for a screen reader and the
-/// pointer's tooltip. The glyph runs with the words, so where a narrow cell
-/// breaks them it stays beside the first.
-fn strip_stat(label: &str, value: AnyView) -> impl IntoView + use<> {
-    let label = label.to_owned();
-    let title = label.clone();
+/// One of the strip's figures, a cell of its own: the term is a glyph with
+/// a short label, the value stands apart so that the stylesheet can set it
+/// above the label or between glyph and label. `title` says the figure in
+/// full under the pointer.
+fn strip_cell(title: &str, glyph: &'static str, label: &'static str, value: AnyView) -> AnyView {
     view! {
-        <div class="strip-cell" title=title>
-            <dt class="visually-hidden">{label}</dt>
-            <dd>{value}</dd>
+        <div class="strip-cell" title=title.to_owned()>
+            <dt>{icon(glyph)}<span class="strip-label">{label}</span></dt>
+            <dd class="num">{value}</dd>
         </div>
     }
+    .into_any()
 }
 
-/// The strip under the bar: Baylee in numbers, the most telling first.
-/// What the online gateways say is happening on them, added up (players,
-/// of them in a game, running games, open tables: the three short ones
-/// first, which a phone puts on a line of their own where the count is
-/// odd), the gateways online and not, Central's accounts, the playable
-/// cards and how often the site's pages were opened. Only what a source
-/// said is shown: a number nobody reported is left out, never drawn as a
-/// zero, and while the directory has not answered the strip links to it
-/// instead. Nothing here is GitHub's any more (owner, 12.11.2026); the
-/// project's state is in the source section. The server counts the cells
-/// (`data-count`), and the stylesheet
-/// lays that many out in even lines at every width (`header.css`).
+/// The strip under the bar: Baylee in numbers, the six the owner named
+/// (18.11.2026) and in his order. What the online gateways say is
+/// happening on them, added up (players, running games, open tables), the
+/// gateways online of all that are listed, Central's accounts, and how
+/// often the site's pages were opened. Only what a source said is shown: a
+/// number nobody reported is left out, never drawn as a zero, and while
+/// the directory has not answered the strip links to it instead. Nothing
+/// here is GitHub's (owner, 12.11.2026), and the cards' numbers stand in
+/// their own section. The server counts the cells (`data-count`), and the
+/// stylesheet lays that many out in even lines at every width
+/// (`header.css`).
 fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
-    let mut cells = 0_usize;
-    // the gateways' own counts: one claim of theirs, so one term for the
-    // four values, each a cell
-    let now = cx
-        .data
-        .gateways
-        .as_deref()
-        .and_then(data::activity_of)
-        .map(|(players, playing, tables, games)| {
-            cells += 4;
-            let live = words::strip_live(lang);
-            view! {
-                <div class="strip-live" title=live>
-                    <dt class="visually-hidden">{live}</dt>
-                    <dd class="strip-cell"><span class="dot ok live" aria-hidden="true"></span><span class="num">{words::live_players(lang, players)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::SWORDS)}<span class="num">{words::live_playing(lang, playing)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::GAMEPAD_2)}<span class="num">{words::live_games(lang, games)}</span></dd>
-                    <dd class="strip-cell">{icon(icons::LAYOUT_DASHBOARD)}<span class="num">{words::live_tables(lang, tables)}</span></dd>
-                </div>
-            }
-        });
-    let gateways = match cx.data.gateways.as_deref() {
+    let number = |n: u64| words::number(lang, n);
+    let mut cells: Vec<AnyView> = Vec::with_capacity(6);
+    // the gateways' own counts: their claim, as the tooltip says
+    if let Some((players, _, tables, games)) =
+        cx.data.gateways.as_deref().and_then(data::activity_of)
+    {
+        let live = words::strip_live(lang);
+        cells.push(strip_cell(
+            live,
+            icons::USERS,
+            words::strip_l_players(lang),
+            view! { <span class="dot ok live" aria-hidden="true"></span>{number(players)} }
+                .into_any(),
+        ));
+        cells.push(strip_cell(
+            live,
+            icons::SWORDS,
+            words::strip_l_games(lang),
+            number(games).into_any(),
+        ));
+        cells.push(strip_cell(
+            live,
+            icons::LAYOUT_DASHBOARD,
+            words::strip_l_tables(lang),
+            number(tables).into_any(),
+        ));
+    }
+    let gateways = words::strip_gateways(lang);
+    cells.push(match cx.data.gateways.as_deref() {
         Some(all) => {
             let online = all.iter().filter(|g| g.online).count();
-            let offline = all.len() - online;
-            let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
-            let dot = if online > 0 { "dot ok live" } else { "dot off" };
-            view! {
-                <a href="#gateways">
-                    {icon(icons::SERVER)}
-                    <span class="stat-part num"><span class=dot aria-hidden="true"></span>{format!("{} {}", count(online), words::strip_online(lang))}</span>
-                    <span class="stat-part num"><span class="dot off" aria-hidden="true"></span>{format!("{} {}", count(offline), words::strip_offline(lang))}</span>
-                </a>
-            }
-            .into_any()
+            let count = |n: usize| number(u64::try_from(n).unwrap_or(u64::MAX));
+            let title = format!(
+                "{gateways}: {} {}, {} {}",
+                count(online),
+                words::strip_online(lang),
+                count(all.len() - online),
+                words::strip_offline(lang),
+            );
+            strip_cell(
+                &title,
+                icons::SERVER,
+                gateways,
+                view! {
+                    <a href="#gateways">
+                        <span>{count(online)}</span>
+                        <span class="strip-of">{format!("/ {}", count(all.len()))}</span>
+                    </a>
+                }
+                .into_any(),
+            )
         }
-        None => view! { <a href=Page::Gateways.path(lang)>{icon(icons::SERVER)}<span>{words::strip_directory(lang)}</span></a> }
-            .into_any(),
-    };
-    cells += 1;
-    let gateways = strip_stat(words::strip_gateways(lang), gateways);
-    let accounts = cx.data.accounts.map(|accounts| {
-        cells += 1;
-        strip_stat(
+        None => strip_cell(
+            gateways,
+            icons::SERVER,
+            gateways,
+            view! { <a class="strip-way" href=Page::Gateways.path(lang)>{words::strip_directory(lang)}</a> }
+                .into_any(),
+        ),
+    });
+    if let Some(accounts) = cx.data.accounts {
+        cells.push(strip_cell(
             words::strip_accounts(lang),
-            view! { {icon(icons::USERS)}<span class="num">{words::live_accounts(lang, accounts)}</span> }.into_any(),
-        )
-    });
-    let cards = cx.data.cards.as_ref().map(|status| {
-        cells += 1;
-        let s = status.stats;
-        let playable = s
-            .implemented
-            .saturating_add(s.generated)
-            .saturating_add(s.partial);
-        strip_stat(
-            words::strip_cards(lang),
-            view! {
-                <a href="#cards">{icon(icons::LAYERS)}<span class="num">{words::number(lang, playable)}</span><span class="small">{words::strip_cards_unit(lang)}</span></a>
-            }
-            .into_any(),
-        )
-    });
+            icons::USER_CHECK,
+            words::strip_l_accounts(lang),
+            number(accounts).into_any(),
+        ));
+    }
     // how often the site's pages were opened, where the deployment counts it
-    let views = cx.data.views.as_ref().map(|views| {
-        cells += 1;
-        strip_stat(
+    if let Some(views) = cx.data.views.as_ref() {
+        cells.push(strip_cell(
             &words::strip_views(lang, &format::date(lang, &views.since)),
-            view! { {icon(icons::EYE)}<span class="num">{words::live_views(lang, views.count)}</span> }.into_any(),
-        )
-    });
+            icons::EYE,
+            words::strip_l_views(lang),
+            number(views.count).into_any(),
+        ));
+    }
+    let count = cells.len().to_string();
     view! {
         <section class="strip" aria-label=words::status_label(lang)>
             <div class="strip-inner">
-                <dl class="strip-list" data-count=cells.to_string()>
-                    {now}
-                    {gateways}
-                    {accounts}
-                    {cards}
-                    {views}
-                </dl>
+                <dl class="strip-list" data-count=count>{cells}</dl>
             </div>
         </section>
     }
@@ -589,12 +589,6 @@ fn ai(lang: Lang) -> impl IntoView + use<> {
     }
 }
 
-/// A gateway's card, shared with the directory page: its name and version
-/// are the operator's words, shown as text. No gateway is marked as
-/// official (owner, 12.11.2026). Copying the address (`boot.js`,
-/// `[data-copy]`) shows only where the browser can copy.
-/// `h2` names the card with a second-level heading (the directory, right
-/// under the page's title), else a third (the start page's section).
 /// `baylee://gateway/add?origin=` and the origin, percent-encoded: the link
 /// Baylee's client reads since 0.1.1-beta.9b (Baylee `docs/client.md`, "The
 /// links"; it shows the origin and asks before it adds anything). Only for
@@ -615,82 +609,352 @@ fn client_link(origin: &str) -> Option<String> {
     Some(link)
 }
 
-pub fn gateway_card(lang: Lang, gateway: &Gateway, h2: bool) -> impl IntoView + use<> {
+/// The directory in the order the pages recommend it: the gateways online
+/// before those that are not, among each Central's own order (the origin
+/// it calls official first, unmarked), then the busier before the quieter.
+/// The sort is stable, so what ties stays as Central listed it. This is the
+/// order without script and what `directory.js` calls "Recommended".
+#[must_use]
+pub fn recommended(all: &[Gateway]) -> Vec<&Gateway> {
+    let mut order: Vec<&Gateway> = all.iter().collect();
+    order.sort_by_key(|gateway| {
+        let players = gateway
+            .activity
+            .filter(|_| gateway.online)
+            .map_or(0, |now| now.players);
+        (
+            !gateway.online,
+            !gateway.official,
+            std::cmp::Reverse(players),
+        )
+    });
+    order
+}
+
+/// The version of the newest release (`v0.2.0-beta.o1` without its `v`),
+/// which a gateway's own version is held against: one that says exactly
+/// this is marked current. Nothing is ever marked old: a gateway may run
+/// a build newer than the release, and the suffixes do not order.
+#[must_use]
+pub fn newest<'a>(cx: &Context<'a>) -> Option<&'a str> {
+    let tag = cx.data.release.as_ref()?.tag.as_str();
+    Some(tag.strip_prefix('v').unwrap_or(tag))
+}
+
+/// A number as a tile (`.dir-stat`): its glyph and value over its label,
+/// and after the value what it is a part of ("5 / 7").
+pub fn stat_tile(
+    glyph: &'static str,
+    label: &str,
+    value: String,
+    of: Option<String>,
+) -> impl IntoView + use<> {
+    let of = of.map(|all| view! { <span class="dir-stat-of">{format!("/ {all}")}</span> });
+    view! {
+        <div class="dir-stat glass">
+            <dt>{label.to_owned()}</dt>
+            <dd><span class="dir-stat-mark">{icon(glyph)}</span><span class="num">{value}</span>{of}</dd>
+        </div>
+    }
+}
+
+/// The directory in four numbers, on the start page and above the
+/// directory: the gateways online of those listed, and what the online
+/// ones say is happening on them, added up (only while one says so: a
+/// number nobody reported is never drawn as a zero).
+pub fn gateway_totals(lang: Lang, all: &[Gateway]) -> impl IntoView + use<> {
+    let count = |n: usize| words::number(lang, u64::try_from(n).unwrap_or(u64::MAX));
+    let tile = stat_tile;
+    let online = all.iter().filter(|gateway| gateway.online).count();
+    let now = data::activity_of(all).map(|(players, _, tables, games)| {
+        view! {
+            {tile(icons::USERS, words::gw_stat_players(lang), words::number(lang, players), None)}
+            {tile(icons::SWORDS, words::gw_stat_games(lang), words::number(lang, games), None)}
+            {tile(icons::LAYOUT_DASHBOARD, words::gw_stat_tables(lang), words::number(lang, tables), None)}
+        }
+    });
+    let tiles = if now.is_some() { "4" } else { "1" };
+    view! {
+        <dl class="dir-stats" data-count=tiles aria-label=words::gw_stats(lang)>
+            {tile(icons::SERVER, words::gw_stat_online(lang), count(online), Some(count(all.len())))}
+            {now}
+        </dl>
+    }
+}
+
+/// The share of a gateway's players who sit in a game, in whole per cent
+/// and in twentieths for the bar (`data-load`, which the stylesheet turns
+/// into a width: a page of this site carries no inline style). A gateway
+/// that claims more players in games than players is held at all of them.
+fn load(players: u32, playing: u32) -> (u64, u64) {
+    let players = u64::from(players.max(1));
+    let playing = u64::from(playing).min(players);
+    (
+        (playing * 100 + players / 2) / players,
+        (playing * 20 + players / 2) / players,
+    )
+}
+
+/// A gateway's mark: the first letter or digit of its name on one of six
+/// tints, the same for the same address everywhere (as a person's face is
+/// in the chat); the server glyph where a name has neither.
+fn mark(gateway: &Gateway) -> impl IntoView + use<> {
+    let tint = gateway.origin.bytes().fold(0_u32, |sum, byte| {
+        sum.wrapping_mul(31).wrapping_add(u32::from(byte))
+    }) % 6;
+    let letter = gateway
+        .name
+        .chars()
+        .find(|c| c.is_alphanumeric())
+        .map(|c| c.to_uppercase().collect::<String>());
+    let class = if gateway.online {
+        format!("gw-mark gw-tint-{tint}")
+    } else {
+        "gw-mark".to_owned()
+    };
+    view! {
+        <span class=class aria-hidden="true">
+            {match letter {
+                Some(letter) => letter.into_any(),
+                None => icon(icons::SERVER).into_any(),
+            }}
+        </span>
+    }
+}
+
+/// An address as it may break: before a dot and before a port's colon,
+/// never inside a name (its end often tells two apart, so it is never cut).
+fn address(host: &str) -> impl IntoView + use<> {
+    let mut parts = vec![String::new()];
+    for c in host.chars() {
+        if matches!(c, '.' | ':') && parts.last().is_some_and(|part| !part.is_empty()) {
+            parts.push(String::new());
+        }
+        if let Some(part) = parts.last_mut() {
+            part.push(c);
+        }
+    }
+    parts
+        .into_iter()
+        .enumerate()
+        .map(|(at, part)| view! { {(at > 0).then(|| view! { <wbr /> })}{part} })
+        .collect_view()
+}
+
+/// The list's head: what each column of a row is. In the directory
+/// (`sortable`) the columns it sorts by are buttons that sort by them (the
+/// menu's choices, so a press here shows there), and `directory.js` shows
+/// the head while the list is asked for; on the start page it is words
+/// alone, for the eye (each figure of a row keeps its own word for a
+/// screen reader). Drawn only over rows (`gateways.css`).
+pub fn gateway_columns(lang: Lang, sortable: bool) -> impl IntoView + use<> {
+    let by = move |value: &'static str, label: &'static str| {
+        if sortable {
+            view! {
+                <button type="button" class="dir-col" aria-pressed="false" data-sort-by=value>
+                    <span>{label}</span>{icon(icons::ARROW_UP_DOWN)}
+                </button>
+            }
+            .into_any()
+        } else {
+            view! { <span class="dir-col">{label}</span> }.into_any()
+        }
+    };
+    let plain = |label: &'static str| view! { <span class="dir-col">{label}</span> };
+    let cells = view! {
+        {by("name", words::gw_col_gateway(lang))}
+        {plain(words::gw_col_state(lang))}
+        <span class="dir-cols-now">
+            {by("players", words::gw_fig_players(lang))}
+            {plain(words::gw_fig_playing(lang))}
+            {by("tables", words::gw_fig_tables(lang))}
+            {plain(words::gw_fig_games(lang))}
+        </span>
+        {by("version", words::gws_version(lang))}
+        <span class="dir-col"></span>
+    };
+    if sortable {
+        view! { <div class="dir-cols" hidden=true role="group" aria-label=words::gw_sort(lang) data-columns="">{cells}</div> }
+            .into_any()
+    } else {
+        view! { <div class="dir-cols" aria-hidden="true">{cells}</div> }.into_any()
+    }
+}
+
+/// A gateway, on the start page and in the directory: a card, and where
+/// the list is asked for and has the room, a row of it (`gateways.css`).
+/// Its name and version are the operator's words, shown as text. No
+/// gateway is marked as official (owner, 12.11.2026).
+///
+/// What it shows is what Central has: the name, the address (the host
+/// alone under a lock where it is `https`, which the copy button gives
+/// whole), whether a heartbeat arrived lately, the four counts it reports
+/// with the share of its players in a game, its version, marked current
+/// when it is exactly `newest`, and three actions: the client's link (only
+/// while it is online: an offline gateway's link would open a client that
+/// then finds nobody there), copying the address (`boot.js`, `[data-copy]`,
+/// shown only where the browser can copy) and its website.
+///
+/// `at` makes the card's id, by which its actions are described with its
+/// name; `h2` names the card with a second-level heading (the directory,
+/// right under the page's title), else a third (the start page's section).
+pub fn gateway_card(
+    lang: Lang,
+    gateway: &Gateway,
+    at: usize,
+    newest: Option<&str>,
+    h2: bool,
+) -> impl IntoView + use<> {
+    let id = format!("gw-{at}");
     let state = if gateway.online {
         view! { <p class="gw-state pill ok"><span class="dot ok live" aria-hidden="true"></span>{words::gws_online(lang)}</p> }.into_any()
     } else {
         view! { <p class="gw-state pill off"><span class="dot off" aria-hidden="true"></span>{words::gws_offline(lang)}</p> }.into_any()
     };
-    let website = gateway.website.clone();
-    // an offline gateway cannot be joined: its link would open a client
-    // that then finds nobody there
-    let open = client_link(&gateway.origin)
-        .filter(|_| gateway.online)
-        .map(|link| {
-            view! {
-                <a class="button gw-join" href=link>
-                    {solid::icon(solid::EXTERNAL)}<span>{words::gws_open_client(lang)}</span>
-                </a>
-            }
-        });
-    // what the gateway itself says is happening on it, while it says so
-    let now = gateway.activity.filter(|_| gateway.online).map(|activity| {
-        view! {
-            <div class="gw-now">
-                <dt>{words::gws_now(lang)}</dt>
-                <dd class="num">
-                    <span>{words::live_players(lang, u64::from(activity.players))}</span>
-                    <span>{words::live_playing(lang, u64::from(activity.playing))}</span>
-                    <span>{words::live_tables(lang, u64::from(activity.tables))}</span>
-                    <span>{words::live_games(lang, u64::from(activity.games))}</span>
-                </dd>
-            </div>
-        }
-    });
+    let current = newest.is_some_and(|newest| newest == gateway.version);
+    let version = view! {
+        <p class="gw-version">
+            <span class="gw-label">{words::gws_version(lang)}</span>
+            <code translate="no">{gateway.version.clone()}</code>
+            {current.then(|| view! {
+                <span class="pill ok gw-current" title=words::gw_current_title(lang)>{icon(icons::CHECK)}{words::gw_current(lang)}</span>
+            })}
+        </p>
+    };
     let find = format!("{} {}", gateway.name, gateway.origin).to_lowercase();
     // what the directory sorts and narrows by (`directory.js`)
     let flag = |on: bool| if on { "true" } else { "false" };
     let counted = gateway.activity.filter(|_| gateway.online);
+    // a long name is held to two lines beside others (`gateways.css`); the
+    // pointer shows it whole
     let name = gateway.name.clone();
+    let whole = gateway.name.clone();
     let name = if h2 {
-        view! { <h2 class="gw-name"><bdi>{name}</bdi></h2> }.into_any()
+        view! { <h2 class="gw-name" id=id.clone() title=whole><bdi>{name}</bdi></h2> }.into_any()
     } else {
-        view! { <h3 class="gw-name"><bdi>{name}</bdi></h3> }.into_any()
+        view! { <h3 class="gw-name" id=id.clone() title=whole><bdi>{name}</bdi></h3> }.into_any()
     };
     view! {
-        <li class="gw card card-link reveal" data-find=find data-online=flag(gateway.online)
-            data-name=gateway.name.clone() data-version=gateway.version.clone()
+        <li class="gw reveal" class:gw-off={!gateway.online} data-find=find data-online=flag(gateway.online)
+            data-current=flag(current) data-name=gateway.name.clone() data-version=gateway.version.clone()
             data-players=counted.map(|a| a.players.to_string()) data-tables=counted.map(|a| a.tables.to_string())>
-            <div class="gw-head">
-                {name}
+            <div class="gw-id">
+                {mark(gateway)}
+                <div class="gw-title">
+                    {name}
+                    {gateway_host(lang, &gateway.origin)}
+                </div>
             </div>
             {state}
-            <dl class="gw-facts">
-                <div>
-                    <dt>{words::gws_address(lang)}</dt>
-                    <dd class="gw-address"><code translate="no">{gateway.origin.clone()}</code></dd>
-                </div>
-                <div>
-                    <dt>{words::gws_version(lang)}</dt>
-                    <dd><code translate="no">{gateway.version.clone()}</code></dd>
-                </div>
-                {now}
-            </dl>
-            <div class="gw-actions">
-                {open}
-                <button type="button" class="button button-ghost gw-open" hidden=true
-                    data-copy=gateway.origin.clone() data-copied-label=words::gws_copied_short(lang) data-copied-said=words::gws_copied(lang) data-copy-failed=words::gws_copy_failed(lang)>
-                    {solid::icon_as(solid::COPY, "copy-idle")}{solid::icon_as(solid::CHECK, "copy-done")}<span>{words::gws_copy(lang)}</span>
-                </button>
-                <a class="button button-ghost" href=website target="_blank" rel="noopener noreferrer nofollow">
-                    {solid::icon(solid::EXTERNAL)}<span>{words::gws_website(lang)}</span>
-                </a>
-            </div>
+            {gateway_now(lang, gateway)}
+            {version}
+            {gateway_actions(lang, gateway, &id)}
         </li>
     }
 }
 
-fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
+/// A gateway's address as a person reads it: the host, and that it is
+/// reached encrypted (a lock, with the words for a screen reader); any
+/// other origin whole.
+fn gateway_host(lang: Lang, origin: &str) -> impl IntoView + use<> {
+    let host = match origin.strip_prefix("https://") {
+        Some(host) => view! {
+            <span class="gw-lock" title=words::gw_secure(lang)>{icon(icons::LOCK)}<span class="visually-hidden">{words::gw_secure(lang)}</span></span>
+            <code translate="no">{address(host)}</code>
+        }
+        .into_any(),
+        None => view! { <code translate="no">{address(origin)}</code> }.into_any(),
+    };
+    view! {
+        <p class="gw-host"><span class="visually-hidden">{format!("{}: ", words::gws_address(lang))}</span>{host}</p>
+    }
+}
+
+/// What a gateway says is happening on it, while it is online and says so:
+/// its four counts, and the share of its players in a game as a bar and a
+/// sentence (a sentence alone while nobody is there). One that reports
+/// nothing, or is offline, has a line in words instead: a number nobody
+/// reported is never drawn as a zero.
+fn gateway_now(lang: Lang, gateway: &Gateway) -> AnyView {
+    let Some(now) = gateway.activity.filter(|_| gateway.online) else {
+        let (glyph, said) = if gateway.online {
+            (icons::INFO, words::gw_silent(lang))
+        } else {
+            (icons::WIFI_OFF, words::gw_away(lang))
+        };
+        return view! { <p class="gw-silent">{icon(glyph)}<span>{said}</span></p> }.into_any();
+    };
+    let figure = |glyph: &'static str, label: &'static str, value: u32| {
+        view! {
+            <div class="gw-fig" class:is-none={value == 0} title=label>
+                <dt>{label}</dt>
+                <dd>{icon(glyph)}<span class="num">{words::number(lang, u64::from(value))}</span></dd>
+            </div>
+        }
+    };
+    let share = if now.players == 0 {
+        view! { <p class="gw-load">{words::gw_load_empty(lang)}</p> }.into_any()
+    } else {
+        let (percent, steps) = load(now.players, now.playing);
+        view! {
+            <p class="gw-load">
+                <span class="gw-load-bar" data-load=steps.to_string() aria-hidden="true"></span>
+                <span class="gw-load-say num">{words::gw_load(lang, &words::number(lang, percent))}</span>
+            </p>
+        }
+        .into_any()
+    };
+    view! {
+        <dl class="gw-now" aria-label=words::gws_now(lang)>
+            {figure(icons::USERS, words::gw_fig_players(lang), now.players)}
+            {figure(icons::SWORDS, words::gw_fig_playing(lang), now.playing)}
+            {figure(icons::LAYOUT_DASHBOARD, words::gw_fig_tables(lang), now.tables)}
+            {figure(icons::GAMEPAD_2, words::gw_fig_games(lang), now.games)}
+        </dl>
+        {share}
+    }
+    .into_any()
+}
+
+/// What to do with a gateway: the client's link, only while it is online
+/// (an offline gateway's link would open a client that then finds nobody
+/// there) and only for an origin the client takes; copying its address
+/// (`boot.js`, `[data-copy]`: shown only where the browser can copy, its
+/// hidden words are the button's name and say "Copied" for a moment); and
+/// its website. Each is described by the gateway's name (`id`).
+fn gateway_actions(lang: Lang, gateway: &Gateway, id: &str) -> impl IntoView + use<> {
+    let open = client_link(&gateway.origin)
+        .filter(|_| gateway.online)
+        .map(|link| {
+            view! {
+                <a class="button gw-join" href=link aria-describedby=id.to_owned()>
+                    {icon(icons::PLAY)}<span>{words::gws_open_client(lang)}</span>
+                </a>
+            }
+        });
+    view! {
+        <div class="gw-actions">
+            {open}
+            <button type="button" class="round-btn gw-copy" hidden=true title=words::gws_copy(lang) aria-describedby=id.to_owned()
+                data-copy=gateway.origin.clone() data-copied-label=words::gws_copied_short(lang) data-copied-said=words::gws_copied(lang) data-copy-failed=words::gws_copy_failed(lang)>
+                {solid::icon_as(solid::COPY, "copy-idle")}{solid::icon_as(solid::CHECK, "copy-done")}<span class="visually-hidden">{words::gws_copy(lang)}</span>
+            </button>
+            <a class="round-btn gw-site" href=gateway.website.clone() target="_blank" rel="noopener noreferrer nofollow"
+                title=words::gws_website(lang) aria-label=words::gws_website(lang) aria-describedby=id.to_owned()>
+                {icon(icons::EXTERNAL_LINK)}
+            </a>
+        </div>
+    }
+}
+
+/// The start page's gateways: what playing online takes, the directory in
+/// four numbers, its first four gateways in the recommended order (those
+/// online, Central's own order, the busiest) as the directory shows them,
+/// rows where the screen is wide and cards below, and the way to all of
+/// them. Nothing here needs script: `directory.js` is the directory's.
+fn gateways(cx: &Context<'_>) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let all = cx.data.gateways.as_deref();
     let host = format!("{}#host", Page::Gateways.path(lang));
     let offline = rich(words::hero_offline(lang), move |tag| {
         (tag == "host").then(|| host.clone())
@@ -702,24 +966,34 @@ fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
         _ => None,
     });
     let listed = all.unwrap_or_default();
-    let online = listed.iter().filter(|gateway| gateway.online).count();
-    let count = match all {
-        Some([]) => words::gw_none(lang).to_owned(),
-        Some(all) => words::gw_count(
-            lang,
-            u64::try_from(all.len()).unwrap_or(u64::MAX),
-            &words::number(lang, u64::try_from(online).unwrap_or(u64::MAX)),
-        ),
-        None => words::gws_failed(lang).to_owned(),
-    };
-    let shown: Vec<_> = listed.iter().take(4).collect();
-    let n = shown.len();
-    let grid = (n > 0).then(|| {
+    let said = match all {
+        Some([]) => Some(words::gw_none(lang)),
+        Some(_) => None,
+        None => Some(words::gws_failed(lang)),
+    }
+    .map(|said| view! { <p class="small hgw-count">{said}</p> });
+    let newest = newest(cx);
+    let shown: Vec<_> = recommended(listed).into_iter().take(4).collect();
+    let board = (!shown.is_empty()).then(|| {
+        let n = shown.len();
         let cards = shown
             .into_iter()
-            .map(|gateway| gateway_card(lang, gateway, false))
+            .enumerate()
+            .map(|(at, gateway)| gateway_card(lang, gateway, at, newest, false))
             .collect_view();
-        view! { <ul class="gateways hgw-grid stagger" data-count=n.to_string()>{cards}</ul> }
+        let download = Page::Download.path(lang);
+        let hint = rich(words::gw_play_hint(lang), move |tag| {
+            (tag == "download").then(|| download.clone())
+        });
+        view! {
+            {gateway_totals(lang, listed)}
+            {gateway_columns(lang, false)}
+            <ul class="gateways hgw-list stagger" data-view="list" data-count=n.to_string()>{cards}</ul>
+            <p class="small gw-hint">{hint}</p>
+        }
+    });
+    let every = all.filter(|all| !all.is_empty()).map(|all| {
+        view! { <span class="chip-n num">{words::number(lang, u64::try_from(all.len()).unwrap_or(u64::MAX))}</span> }
     });
     view! {
         <section class="band" id="gateways" aria-labelledby="gw-title">
@@ -732,11 +1006,12 @@ fn gateways(lang: Lang, all: Option<&[Gateway]>) -> impl IntoView + use<> {
                     <p class="play-note glass">{icon(icons::WIFI_OFF)}<span>{offline}</span></p>
                     <p class="play-note glass" data-signed-out="">{icon(icons::USER_PLUS)}<span>{account}</span></p>
                 </div>
-                <p class="small hgw-count">{count}</p>
-                {grid}
-                <p class="small hgw-help">{words::gws_open_client_help(lang)}</p>
+                {said}
+                {board}
                 <p class="hgw-foot">
-                    <a class="button" href=Page::Gateways.path(lang)>{words::beta_open(lang)}</a>
+                    <a class="button button-ghost hgw-all" href=Page::Gateways.path(lang)>
+                        <span>{words::beta_open(lang)}</span>{every}{icon(icons::ARROW_RIGHT)}
+                    </a>
                     <a class="button button-ghost" href=format!("{}#host", Page::Gateways.path(lang))>{words::beta_own(lang)}</a>
                 </p>
             </div>

@@ -229,6 +229,45 @@
   font-weight: 600;
 }
 
+/* Which build this is: the footer's last line, for whoever looks for it.
+   The release, the commit and its day, in the faintest ink, a dot between
+   them; the commit is a link that shows itself as one on hover and focus. */
+.foot-build {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem 0.55rem;
+  margin: 0;
+  color: var(--ink-faint);
+  font: 0.72rem / 1.6 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.foot-build > * + *:not(.visually-hidden + *)::before {
+  content: "·";
+  margin-inline-end: 0.55rem;
+  opacity: 0.6;
+}
+
+.foot-build time {
+  font-family: var(--sans);
+  letter-spacing: 0;
+}
+
+.foot-build a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.foot-build a:hover,
+.foot-build a:focus-visible {
+  color: var(--title);
+  text-decoration: underline;
+}
+
 @media (max-width: 900px) {
   .foot-top {
     grid-template-columns: 1fr;

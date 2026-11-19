@@ -11,4 +11,5 @@ description = "Explicit versioned PostgreSQL migrations for Baylee Central"
 workspace = true
 
 [dependencies]
-sea-orm-migration = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+# The runner is first-party (src/lib.rs); SeaORM only connects and executes.
+sea-orm = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls"] }

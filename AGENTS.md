@@ -69,5 +69,12 @@ performance policy. Do not import its permission to write unsafe or assembly.
   standalone scanner waiver (`docs/crypto-proposal/bigint-advisory.md`).
 - Keep protocol specs, migrations, threat model and operator runbooks in sync.
   Do not assert anonymity, audit completion or legal compliance without evidence.
+- An agent may merge a pull request into `main` itself, without asking the
+  owner first (owner, 18.11.2026), when the checks named above ran on the pull
+  request's tip and every check `main` requires is green on GitHub. It says
+  afterwards what it merged. `main`'s protection stays as it is (a pull
+  request, the required checks, linear history, for administrators too): an
+  agent does not change or bypass it and never pushes to `main` directly.
+  This covers the merge alone, not what the next rule names.
 - External release, production migration and processing human training replays
   require the explicit gates in the implementation plan. No silent deployment.

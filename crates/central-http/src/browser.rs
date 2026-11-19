@@ -607,6 +607,7 @@ impl Budgets {
             // figures are read beside it and spend from the same budget.
             Request::GatewayDirectory { .. }
             | Request::PublicFigures { .. }
+            | Request::PublicFunding {}
             | Request::Challenges {
                 request:
                     central_api::challenges::Request::Catalogue { .. }
@@ -1663,6 +1664,45 @@ mod tests {
             now + Duration::from_secs(59)
         ));
         assert!(budgets.charge(&read, client, now + MINUTE));
+    }
+
+    /// The donation figures are public like the figures, and read beside them from
+    /// the same budget.
+    #[tokio::test]
+    async fn the_donation_figures_are_served_without_a_session_from_the_directory_s_budget() {
+        let (app, mock) = listener();
+        let from = |address: &str| with("x-forwarded-for", &[address]);
+        let funding = body(&Request::PublicFunding {});
+        assert_eq!(funding, r#"{"operation":"public_funding"}"#);
+        let figures = body(&Request::PublicFigures { after: None });
+        let sent = send(&app, &from("198.51.100.60"), funding.clone()).await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert!(sent.headers.get(header::SET_COOKIE).is_none());
+        assert_eq!(
+            mock.calls.lock().unwrap()[0],
+            ("public_funding".to_owned(), None)
+        );
+        for sent in 1..60 {
+            let next = if sent % 2 == 0 { &funding } else { &figures };
+            assert_eq!(
+                send(&app, &from("198.51.100.60"), next.clone())
+                    .await
+                    .status,
+                StatusCode::OK
+            );
+        }
+        for refused in [&funding, &figures] {
+            assert_eq!(
+                send(&app, &from("198.51.100.60"), refused.clone())
+                    .await
+                    .status,
+                StatusCode::TOO_MANY_REQUESTS
+            );
+        }
+        assert_eq!(
+            send(&app, &from("198.51.100.61"), funding).await.status,
+            StatusCode::OK
+        );
     }
 
     #[test]

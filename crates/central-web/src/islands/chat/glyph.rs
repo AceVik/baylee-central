@@ -34,6 +34,8 @@ pub const SEND: &[Shape] = &[
 ];
 /// `arrow-left`.
 pub const BACK: &[Shape] = &[Path("m12 19-7-7 7-7"), Path("M19 12H5")];
+/// `arrow-right`.
+pub const FORWARD: &[Shape] = &[Path("M5 12h14"), Path("m12 5 7 7-7 7")];
 /// `users`.
 pub const USERS: &[Shape] = &[
     Path("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"),
@@ -128,6 +130,8 @@ pub const COPY: &[Shape] = &[
     Rect("14", "14", "8", "8", "2"),
     Path("M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"),
 ];
+/// `circle-check`.
+pub const CIRCLE_CHECK: &[Shape] = &[Circle("12", "12", "10"), Path("m9 12 2 2 4-4")];
 
 /// The icon, hidden from assistive technology: its control names itself.
 pub fn glyph(shapes: &'static [Shape]) -> AnyView {

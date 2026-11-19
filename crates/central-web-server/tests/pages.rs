@@ -289,9 +289,38 @@ async fn the_download_follows_the_machine() {
     let (_, _, html) = get(&app, "/de/download", &phone).await;
     assert!(html.contains("Für Handys und Tablets gibt es noch keine Version."));
     assert!(
-        html.contains("Archiv für ältere Prozessoren"),
+        html.contains("Ältere Prozessoren (x86-64-v2)"),
         "the -v2 fallback is offered"
     );
+    assert!(
+        html.contains("Für Prozessoren, die älter sind als etwa 2013–2015"),
+        "and says who needs it"
+    );
+    // every variant of the release is on the page, once in the menu and
+    // once in its system's card, the main build and its fallback apart
+    for name in [
+        "baylee-client-0.2.0-beta.o1-x86_64-pc-windows-msvc-v2.zip",
+        "baylee-client-0.2.0-beta.o1-x86_64-apple-darwin-v2.zip",
+        "baylee-client-0.2.0-beta.o1-x86_64-unknown-linux-gnu-v2.tar.gz",
+    ] {
+        assert!(html.contains(name), "{name}");
+    }
+    for slug in [
+        "windows-x64",
+        "mac-arm64",
+        "mac-x64",
+        "linux-x64",
+        "linux-arm64",
+    ] {
+        assert!(html.contains(&format!("id=\"{slug}\"")), "{slug} card");
+    }
+    // the visitor's own system leads the cards
+    let (_, _, html) = get(&app, "/en/download", &windows).await;
+    let first = html
+        .find("class=\"plat glass reveal mine\"")
+        .or_else(|| html.find("plat glass reveal"));
+    assert!(first.is_some());
+    assert!(html.contains("Coming later"), "what has no download yet");
 }
 
 #[tokio::test]
@@ -303,10 +332,76 @@ async fn operator_text_is_never_markup() {
         "a gateway's name is text"
     );
     assert!(!html.contains("Kitchen <Table>"));
-    // the server's order: the origin Central's API calls official first
-    let first = html.find("Sanctuary").expect("first");
-    let other = html.find("Kitchen").expect("other");
-    assert!(first < other, "the server's order");
+    // the recommended order: the gateways online before those that are
+    // not, among them the origin Central's API calls official first, then
+    // the busier before the quieter
+    let at = |name: &str| {
+        html.find(name)
+            .unwrap_or_else(|| panic!("{name} is listed"))
+    };
+    let order = [
+        "Sanctuary",
+        "Tavern of the Seven Lands",
+        "Commander Night",
+        "Mondschein-Runde",
+        "猫の卓",
+        "Kitchen",
+        "Atelier",
+    ];
+    for pair in order.windows(2) {
+        assert!(at(pair[0]) < at(pair[1]), "{} before {}", pair[0], pair[1]);
+    }
+}
+
+/// A gateway's card says what Central has, and nothing it has not: the
+/// client's link only while the gateway is online, the share of its players
+/// in a game only while it reports players, "current" only for the version
+/// of the newest release, and a line in words where there are no figures.
+#[tokio::test]
+async fn a_gateway_card_shows_what_central_has() {
+    let app = app(true);
+    let (_, _, html) = get(&app, "/en/gateways", &[]).await;
+    // seven listed, five online, each a card with a heading of its own
+    assert_eq!(count(&html, "<li data-find=\""), 7);
+    assert_eq!(count(&html, "class=\"gw-name\""), 7);
+    assert_eq!(count(&html, "class=\"gw reveal\""), 5);
+    assert_eq!(count(&html, "class=\"gw reveal gw-off\""), 2);
+    // the client's link: the origin percent-encoded, a port with it, and
+    // none for a gateway that is offline
+    assert_eq!(count(&html, "href=\"baylee://gateway/add?origin="), 5);
+    assert!(html.contains("href=\"baylee://gateway/add?origin=https%3A%2F%2Fgateway.baylee.app\""));
+    assert!(html.contains("origin=https%3A%2F%2Fmondschein.example%3A8443\""));
+    assert!(!html.contains("origin=https%3A%2F%2Fmagic.example.org"));
+    // 8 of 12, 22 of 27 and 4 of 5 players in a game; nobody on a fourth
+    for (share, steps) in [("67%", "13"), ("81%", "16"), ("80%", "16")] {
+        assert!(
+            html.contains(&format!("{share} of its players are in a game")),
+            "{share}"
+        );
+        assert!(html.contains(&format!("data-load=\"{steps}\"")), "{steps}");
+    }
+    assert_eq!(count(&html, "class=\"gw-load-bar\""), 3);
+    assert_eq!(count(&html, "Nobody is here right now."), 1);
+    // one online reports nothing, two are offline: said in words
+    assert_eq!(count(&html, "Reports no figures."), 1);
+    assert_eq!(count(&html, "Central has not heard from it lately."), 2);
+    // the newest release is v0.2.0-beta.o1: four run exactly that
+    assert_eq!(count(&html, "data-current=\"true\""), 4);
+    assert_eq!(count(&html, "pill ok gw-current"), 4);
+    // every card copies its whole address and links its website safely
+    assert_eq!(count(&html, "data-copy=\"https://"), 7);
+    assert_eq!(count(&html, "rel=\"noopener noreferrer nofollow\""), 7);
+    // where to get the client, for whoever has none
+    assert!(html.contains("href=\"/en/download\">Download Baylee</a>"));
+
+    // without a release nothing is called current, and no chip offers it
+    let state = central_web_server::app(Config::development(site(), Some(data()))).expect("app");
+    let app = router(Arc::clone(&state));
+    install(&state.data, |snapshot| snapshot.release = None);
+    let (_, _, html) = get(&app, "/en/gateways", &[]).await;
+    assert!(!html.contains("gw-current"));
+    assert!(!html.contains("data-show=\"current\""));
+    assert_eq!(count(&html, "data-current=\"false\""), 7);
 }
 
 /// There are no official gateways (owner, 12.11.2026): no card, list,
@@ -432,6 +527,56 @@ async fn addresses_and_status_codes() {
     let (status, headers, _) = get(&app, "/en/no-such-page", &[("accept-language", "de")]).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(!headers.contains_key("vary"));
+}
+
+/// The challenges page left the site for good (Daily and Weekly tasks and
+/// the Tower are the game client's): its address says so in the reader's
+/// language instead of leading somewhere else, and nothing the site sends
+/// still leads to it.
+#[tokio::test]
+async fn the_removed_challenges_page_is_gone_and_linked_from_nowhere() {
+    let app = app(true);
+    assert!(Page::REMOVED.contains(&"challenges"));
+    for lang in Lang::ALL {
+        let path = format!("/{}/challenges", lang.code());
+        let (status, headers, html) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::GONE, "{path}");
+        assert!(!headers.contains_key("location"), "{path}: no redirect");
+        assert_eq!(headers["x-robots-tag"], "noindex, noarchive, nosnippet");
+        secured(&headers);
+        assert!(
+            html.contains(&format!("<html lang=\"{}\"", lang.tag())),
+            "{path}: in its language"
+        );
+        assert_eq!(count(&html, "<h1"), 1, "{path}: one h1");
+        assert!(html.contains(">410<"), "{path}: says what it is");
+        let home = format!(" href=\"{}\"", Page::Home.path(lang));
+        assert!(
+            tags(&html, "a")
+                .iter()
+                .any(|a| a.contains("class=\"button primary\"") && a.contains(&home)),
+            "{path}: leads to the start page"
+        );
+        assert!(
+            !html.contains("rel=\"canonical\"") && !html.contains("hreflang=\"x-default\""),
+            "{path}: no address of its own for a search engine"
+        );
+    }
+    // It never had an address without a language, and has none now.
+    let (status, _, _) = get(&app, "/challenges", &[("accept-language", "de")]).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    for lang in Lang::ALL {
+        for page in Page::LISTED {
+            let (_, _, html) = get(&app, &page.path(lang), &[]).await;
+            assert!(
+                !html.contains("/challenges"),
+                "{page:?} {}: a link to the removed page",
+                lang.code()
+            );
+        }
+    }
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    assert!(!sitemap.contains("challenges"), "the sitemap");
 }
 
 #[tokio::test]
@@ -838,11 +983,12 @@ async fn the_feedback_moderation_is_two_pages_linked_from_nowhere() {
     assert_eq!(headers["location"], "/de/account/admin/feedback?status=new");
 }
 
-/// The reset page (`docs/account-reset.md`): a form page as signing in is,
-/// complete in the first response with every field labelled and the
-/// warning before a new vault; reached by a plain link from the sign-in
-/// form (on its page and in its dialog) and from the FAQ; in no sitemap.
-/// Without script it says that it needs script, of the recovery code too.
+/// The reset form (`docs/account-reset.md`): a dialog as signing in is, at
+/// an address of its own that shows the start page with it open; complete
+/// in the first response with every field labelled and the warning before a
+/// new vault; reached by a plain link from the sign-in form and from the
+/// FAQ; in no sitemap. Without script its address says that it needs
+/// script, of the recovery code too.
 #[tokio::test]
 async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
     let app = app(true);
@@ -893,19 +1039,48 @@ async fn the_reset_page_is_linked_from_signing_in_and_listed_nowhere() {
         .collect();
     assert_eq!(named, Vec::<&str>::new());
     let noscript = html.split("<noscript>").nth(1).expect("a noscript");
-    assert!(noscript.starts_with("<p class=\"notice\">Setting a new password needs JavaScript"));
-    // a form page of its own has no dialogs over it
-    assert!(!html.contains("id=\"auth-signin\""));
+    assert!(noscript.starts_with(
+        "<p class=\"notice auth-noscript wrap\">Setting a new password needs JavaScript"
+    ));
+    // the address is the start page with this dialog named as the open one;
+    // the three dialogs are each there once, and it stays out of the index
+    assert!(html.contains("<html lang=\"en\" dir=\"ltr\" data-auth=\"reset\">"));
+    assert!(html.contains("id=\"hero-title\""));
+    for id in ["auth-signin", "auth-register", "auth-reset"] {
+        assert_eq!(count(&html, &format!(" id=\"{id}\"")), 1, "{id}");
+    }
+    assert!(html.contains("<meta name=\"robots\" content=\"noindex"));
+    assert!(!html.contains("rel=\"canonical\""));
 
     let (status, headers, _) = get(&app, "/reset", &[("accept-language", "de")]).await;
     assert_eq!(status, StatusCode::FOUND);
     assert_eq!(headers["location"], "/de/reset");
 
-    // the sign-in form's link, on its page and in the dialog over a page
+    // the other two forms' addresses likewise, and a page that is not a
+    // form names none
+    for (path, form) in [("/de/signin", "signin"), ("/de/register", "register")] {
+        let (status, _, html) = get(&app, path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert!(
+            html.contains(&format!(
+                "<html lang=\"de\" dir=\"ltr\" data-auth=\"{form}\">"
+            )),
+            "{path}"
+        );
+        assert!(html.contains("id=\"hero-title\""), "{path}");
+        assert!(
+            html.contains("<meta name=\"robots\" content=\"noindex"),
+            "{path}"
+        );
+    }
+
+    // the sign-in form's link, in the dialog every page carries
     let (_, _, signin) = get(&app, "/de/signin", &[]).await;
     assert_eq!(count(&signin, "href=\"/de/reset\""), 1);
     let (_, _, home) = get(&app, "/de/", &[]).await;
     assert_eq!(count(&home, "href=\"/de/reset\""), 1, "in the dialog");
+    assert!(home.contains("<html lang=\"de\" dir=\"ltr\">"));
+    assert_eq!(count(&home, " id=\"auth-reset\""), 1);
     // the FAQ's answer, beside the dialog's
     let (_, _, faq) = get(&app, "/en/faq", &[]).await;
     assert_eq!(count(&faq, "href=\"/en/reset\""), 2);
@@ -945,7 +1120,7 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("An e-mail address is optional; an account needs none."));
     assert!(english.contains("you need no e-mail address"));
-    assert!(english.contains("As of 13 November 2026"));
+    assert!(english.contains("As of 18 November 2026"));
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
     assert!(german.contains("Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine."));
     assert!(german.contains("eine E-Mail-Adresse brauchst du nicht"));
@@ -959,25 +1134,41 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
 async fn the_figures_are_shown_only_while_a_source_reports_them() {
     let reported = app(true);
     let (_, _, home) = get(&reported, "/de/", &[]).await;
-    for number in [
-        "1.234 Konten",
-        "12 Spieler",
-        "8 im Spiel",
-        "3 offene Tische",
-        "4 Partien",
+    // the strip adds up what the four reporting gateways say: a short
+    // label, and the value apart from it
+    for (label, value) in [
+        (
+            "Spieler",
+            "<span aria-hidden=\"true\" class=\"dot ok live\"></span>44",
+        ),
+        ("Partien", "12"),
+        ("Offene Tische", "4"),
+        ("Konten", "1.234"),
     ] {
-        assert_eq!(
-            count(&home, number),
-            2 - usize::from(number.contains("Konten")),
-            "{number}"
+        let cell = format!(
+            "<span class=\"strip-label\">{label}</span></dt><dd class=\"num\">{value}</dd>"
         );
+        assert_eq!(count(&home, &cell), 1, "{label}");
     }
+    // the gateways online, of all that are listed
+    assert_eq!(
+        count(&home, "<span>5</span><span class=\"strip-of\">/ 7</span>"),
+        1
+    );
+    assert!(home.contains("title=\"Gateways: 5 online, 2 offline\""));
+    // the section's four tiles: 5 of 7 online, and the same sums
+    assert_eq!(count(&home, "class=\"dir-stat glass\""), 4);
+    assert!(home.contains("<span class=\"num\">5</span><span class=\"dir-stat-of\">/ 7</span>"));
+    assert_eq!(count(&home, "<span class=\"num\">44</span>"), 1);
+    // its first four gateways, each with its counts
+    assert_eq!(count(&home, "<li data-find=\""), 4);
+    assert_eq!(count(&home, "class=\"gw-now\""), 4);
     let (_, _, gateways) = get(&reported, "/en/gateways", &[]).await;
-    // the online gateway that reports, not the offline one beside it
-    assert_eq!(count(&gateways, "class=\"gw-now\""), 1);
-    for number in ["12 players", "8 in a game", "3 open tables", "4 games"] {
-        assert_eq!(count(&gateways, number), 1, "{number}");
-    }
+    // the online gateways that report, not the silent and the offline ones
+    assert_eq!(count(&gateways, "class=\"gw-now\""), 4);
+    assert_eq!(count(&gateways, "class=\"dir-stat glass\""), 4);
+    assert_eq!(count(&gateways, "<span class=\"num\">44</span>"), 1);
+    assert_eq!(count(&gateways, "<dt>Players</dt>"), 4);
 
     let silent = app(false);
     for path in ["/de/", "/en/", "/en/gateways"] {
@@ -985,13 +1176,14 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
         for never in [
             "gw-now",
             "Konten",
-            " accounts<",
             "Spieler<",
-            " players<",
-            " im Spiel<",
-            " in a game<",
-            "0 Partien",
-            "0 games",
+            "strip-label\">Players",
+            "strip-label\">Accounts",
+            "strip-label\">Partien",
+            "strip-label\">Games",
+            "strip-label\">Offene Tische",
+            "strip-label\">Open tables",
+            "<dd class=\"num\">0</dd>",
         ] {
             assert!(!html.contains(never), "{path}: {never}");
         }
@@ -1005,15 +1197,14 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
 /// them out in even lines).
 #[tokio::test]
 async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
-    for silent in 0_u8..16 {
+    for silent in 0_u8..8 {
         let mut config = Config::development(site(), Some(data()));
         config.origin = "https://baylee.app".into();
         let state = central_web_server::app(config).expect("app");
         let app = router(Arc::clone(&state));
         let live = silent & 1 == 0;
         let accounts = silent & 2 == 0;
-        let cards = silent & 4 == 0;
-        let views = silent & 8 == 0;
+        let views = silent & 4 == 0;
         install(&state.data, |snapshot| {
             if !live {
                 for gateway in snapshot.gateways.iter_mut().flatten() {
@@ -1023,9 +1214,6 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
             if !accounts {
                 snapshot.accounts = None;
             }
-            if !cards {
-                snapshot.cards = None;
-            }
             if !views {
                 snapshot.views = None;
             }
@@ -1034,26 +1222,22 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
         let mark = home.find("class=\"strip\"").expect("the strip");
         let start = home[..mark].rfind("<section").expect("its section");
         let strip = &home[start..start + home[start..].find("</section>").expect("its end")];
-        let cells = 1
-            + 4 * usize::from(live)
-            + usize::from(accounts)
-            + usize::from(cards)
-            + usize::from(views);
+        let cells = 1 + 3 * usize::from(live) + usize::from(accounts) + usize::from(views);
         assert_eq!(count(strip, "class=\"strip-cell\""), cells, "{silent:04b}");
         assert!(
             strip.contains(&format!("data-count=\"{cells}\"")),
             "{silent:04b}"
         );
         assert!(strip.contains("aria-label=\"Baylee in numbers\""));
-        // the most telling first: what is played, the gateways, the
-        // accounts, the cards, the views
+        // the owner's six, in his order: players, running games, open
+        // tables, the gateways online of all, the accounts, the views
         let order: Vec<usize> = [
-            (live, "12 players"),
-            (live, "4 games"),
-            (true, "1 online"),
-            (accounts, "1,234 accounts"),
-            (cards, "8,348"),
-            (views, "48,213 views"),
+            (live, ">Players</span></dt><dd class=\"num\"><span aria-hidden=\"true\" class=\"dot ok live\"></span>44</dd>"),
+            (live, ">Games</span></dt><dd class=\"num\">12</dd>"),
+            (live, ">Open tables</span></dt><dd class=\"num\">4</dd>"),
+            (true, ">Gateways</span></dt><dd class=\"num\"><a href=\"#gateways\"><span>5</span><span class=\"strip-of\">/ 7</span></a></dd>"),
+            (accounts, ">Accounts</span></dt><dd class=\"num\">1,234</dd>"),
+            (views, ">Views</span></dt><dd class=\"num\">48,213</dd>"),
         ]
         .iter()
         .map(|(shown, words)| {
@@ -1072,6 +1256,10 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
             "Commit",
             "Stars",
             "GitHub",
+            // the cards' numbers stand in their own section (18.11.2026)
+            "8,348",
+            "cards",
+            "in a game",
         ] {
             assert!(!strip.contains(never), "{silent:04b}: {never}");
         }
@@ -1085,10 +1273,22 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
 async fn page_views_are_shown_and_told_only_where_they_are_counted() {
     let counted = app(true);
     let (_, _, home) = get(&counted, "/de/", &[]).await;
-    assert_eq!(count(&home, "48.213 Aufrufe"), 1);
+    assert_eq!(
+        count(
+            &home,
+            "<span class=\"strip-label\">Aufrufe</span></dt><dd class=\"num\">48.213</dd>"
+        ),
+        1
+    );
     assert!(home.contains("Seitenaufrufe seit 1. November 2026"));
     let (_, _, english) = get(&counted, "/en/", &[]).await;
-    assert_eq!(count(&english, "48,213 views"), 1);
+    assert_eq!(
+        count(
+            &english,
+            "<span class=\"strip-label\">Views</span></dt><dd class=\"num\">48,213</dd>"
+        ),
+        1
+    );
     let (_, _, privacy) = get(&counted, "/de/privacy", &[]).await;
     assert_eq!(count(&privacy, "id=\"views\""), 1);
     assert_eq!(count(&privacy, "href=\"#views\""), 1);
@@ -1097,7 +1297,7 @@ async fn page_views_are_shown_and_told_only_where_they_are_counted() {
     let silent = app(false);
     for path in ["/de/", "/en/", "/de/privacy", "/en/privacy"] {
         let (_, _, html) = get(&silent, path, &[]).await;
-        for never in ["Aufruf", " views<", "id=\"views\"", "#views"] {
+        for never in ["Aufruf", ">Views<", "id=\"views\"", "#views"] {
             assert!(!html.contains(never), "{path}: {never}");
         }
     }
@@ -1128,7 +1328,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     let (status, first_headers, first) = get(&app, "/en/", &visit).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(views.now().count, 42);
-    assert_eq!(count(&first, "41 views"), 1);
+    assert_eq!(
+        count(&first, ">Views</span></dt><dd class=\"num\">41</dd>"),
+        1
+    );
     // the second visit counts, and gets the very same page
     let (_, again_headers, again) = get(&app, "/en/", &visit).await;
     assert_eq!(views.now().count, 43);
@@ -1166,7 +1369,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     // installed, the pages show it; saved, the file holds it and no more
     install(&state.data, |snapshot| snapshot.views = Some(views.now()));
     let (_, _, later) = get(&app, "/en/", &[]).await;
-    assert_eq!(count(&later, "44 views"), 1);
+    assert_eq!(
+        count(&later, ">Views</span></dt><dd class=\"num\">44</dd>"),
+        1
+    );
     views.save();
     assert_eq!(
         std::fs::read_to_string(&file).expect("the file").trim(),
@@ -1663,6 +1869,369 @@ fn a_page_is_a_pure_function_of_what_it_is_rendered_from() {
                     "{page:?} {lang:?} {machine:?}: elsewhere"
                 );
             }
+        }
+    }
+}
+
+/// The donation page: the goal with what the platforms said, the three
+/// places as links that tell the other site nothing about where the reader
+/// came from, each with its code as a file of this site, and the sentences
+/// every place a donation is asked for must carry (Baylee `docs/legal.md`,
+/// "Donations"): nothing is bought, nobody is named, not tax-deductible,
+/// and Wizards is not put beside the request.
+#[tokio::test]
+async fn the_donation_page_names_three_places_and_sells_nothing() {
+    let with = app(true);
+    for lang in Lang::ALL {
+        let (status, _, html) = get(&with, &format!("/{}/donate", lang.code()), &[]).await;
+        assert_eq!(status, StatusCode::OK, "{lang:?}");
+        let (_, own) = html
+            .split_once("id=\"donate-title\"")
+            .unwrap_or_else(|| panic!("{lang:?}: the page's head"));
+        let own = own.split_once("</main>").map_or(own, |(own, _)| own);
+        for (name, address) in central_web::data::GIVING {
+            assert_eq!(
+                count(
+                    own,
+                    &format!("href=\"{address}\" target=\"_blank\" rel=\"noopener noreferrer\"")
+                ),
+                2,
+                "{lang:?}: {name} is linked from its code and its button"
+            );
+            assert!(
+                own.contains(address.trim_start_matches("https://")),
+                "{lang:?}: {name}'s address is in sight"
+            );
+        }
+        assert_eq!(count(own, "class=\"way card glass\""), 3, "{lang:?}");
+        for code in [
+            "img/qr-github.svg",
+            "img/qr-liberapay.svg",
+            "img/qr-ko-fi.svg",
+        ] {
+            assert_eq!(count(own, code), 1, "{lang:?}: {code}");
+        }
+        assert!(!own.contains("Wizards"), "{lang:?}");
+        assert!(!own.contains("Magic"), "{lang:?}");
+        // the bar and the footer lead here from every page
+        let (_, _, home) = get(&with, &format!("/{}/", lang.code()), &[]).await;
+        assert!(
+            count(&home, &format!("href=\"/{}/donate\"", lang.code())) >= 2,
+            "{lang:?}"
+        );
+    }
+    let (_, _, en) = get(&with, "/en/donate", &[]).await;
+    for said in [
+        "not tax-deductible",
+        "no name on a list",
+        "about €800 a month",
+        // the three platforms' months added up: 46 + 100.10 + 15
+        "€161 of €800 a month",
+        "20 % covered",
+        "Supporters: 6.",
+        // what was given once is a figure of its own
+        "One-time donations",
+        "<strong class=\"num\">€235</strong>",
+        "since 18 November 2026",
+        "Donations: 12",
+    ] {
+        assert!(en.contains(said), "{said}");
+    }
+    assert_eq!(count(&en, "class=\"give-meter\""), 1);
+    // the bar has a part for each platform, and the amounts stand under it
+    for (key, name, amount) in [
+        ("github", "GitHub Sponsors", "€46"),
+        ("liberapay", "Liberapay", "€100"),
+        ("kofi", "Ko-fi", "€15"),
+    ] {
+        assert_eq!(
+            count(&en, &format!("class=\"give-part give-part-{key}\"")),
+            1,
+            "{key}"
+        );
+        assert!(
+            en.contains(&format!(
+                "<span>{name}</span><strong class=\"num\">{amount}</strong>"
+            )),
+            "{key}"
+        );
+    }
+    assert!(!en.contains("Not counted yet"));
+    let (_, _, de) = get(&with, "/de/donate", &[]).await;
+    for said in [
+        "steuerlich nicht absetzbar",
+        "161\u{a0}€ von 800\u{a0}€ im Monat",
+        "Einmalige Spenden",
+    ] {
+        assert!(de.contains(said), "{said}");
+    }
+    // a figure nobody reported is not drawn as a zero
+    let (_, _, bare) = get(&app(false), "/en/donate", &[]).await;
+    assert_eq!(count(&bare, "class=\"give-meter\""), 0);
+    assert!(bare.contains("not told us a figure yet"));
+    assert!(!bare.contains("One-time donations"));
+    assert!(bare.contains("about €800 a month"));
+    // the privacy notice has its part
+    let (_, _, privacy) = get(&with, "/en/privacy", &[]).await;
+    assert!(privacy.contains("<h2 id=\"donate\">"));
+    assert!(privacy.contains("href=\"#donate\""));
+}
+
+/// `/funding.json`: the goal and what is covered, for the game client; and
+/// the short address a program or a printed line can name.
+#[tokio::test]
+async fn the_goal_s_figures_are_a_small_document() {
+    let (status, headers, body) = get(&app(true), "/funding.json", &[]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers["content-type"], "application/json");
+    assert_eq!(headers["x-content-type-options"], "nosniff");
+    let json: serde_json::Value = serde_json::from_str(&body).expect("JSON");
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "version": 1,
+            "currency": "EUR",
+            "goal": 80_000,
+            "covered": 16_110,
+            "percent": 20,
+            "supporters": 6,
+            "counted": ["github", "liberapay", "kofi"],
+            "platforms": [
+                { "name": "github", "month": 4600, "supporters": 2 },
+                { "name": "liberapay", "month": 10_010, "supporters": 3 },
+                { "name": "kofi", "month": 1500, "supporters": 1 },
+            ],
+            "once": { "total": 23_500, "count": 12, "since": "2026-11-18" },
+            "page": "https://baylee.app/donate",
+            "ways": [
+                { "name": "GitHub Sponsors", "address": "https://github.com/sponsors/AceVik" },
+                { "name": "Liberapay", "address": "https://liberapay.com/AceVik" },
+                { "name": "Ko-fi", "address": "https://ko-fi.com/acevik" },
+            ],
+        })
+    );
+    let (_, _, bare) = get(&app(false), "/funding.json", &[]).await;
+    let bare: serde_json::Value = serde_json::from_str(&bare).expect("JSON");
+    assert_eq!(bare.get("covered"), None);
+    assert_eq!(bare.get("percent"), None);
+    assert_eq!(bare["counted"], serde_json::json!([]));
+    assert_eq!(bare["platforms"], serde_json::json!([]));
+    assert_eq!(bare.get("once"), None);
+    assert_eq!(bare["goal"], 80_000);
+    let (status, headers, _) = get(&app(true), "/donate", &[("accept-language", "de")]).await;
+    assert!(status.is_redirection());
+    assert_eq!(headers["location"], "/de/donate");
+}
+
+/// The goal's card with less than everything known: one platform alone
+/// is one part of the bar and the others are named as not counted; before
+/// anybody gives, the card invites and does not count nobody; a goal more
+/// than met is drawn full, not beyond; and nothing given once is no block.
+#[test]
+fn the_goal_s_card_draws_only_what_is_known() {
+    use central_web::data::{Funding, Monthly};
+    let mut data = fallback(Some(&data()));
+    let assets = Assets::default();
+    let mut page = |month, supporters| {
+        data.funding = Some(Funding {
+            liberapay: Some(Monthly { month, supporters }),
+            ..Funding::default()
+        });
+        render(
+            Page::Donate,
+            &Context {
+                lang: Lang::En,
+                origin: "https://baylee.app",
+                assets: &assets,
+                data: &data,
+                machine: machine("", None, None, None),
+                verification: None,
+            },
+        )
+    };
+    let none = page(0, 0);
+    assert!(none.contains("€0 of €800 a month"));
+    assert!(none.contains("Yours would be the first."));
+    assert!(none.contains("Not counted yet: GitHub Sponsors, Ko-fi."));
+    assert!(!none.contains("Supporters:"));
+    assert!(!none.contains("One-time donations"));
+    assert_eq!(count(&none, "class=\"give-meter\""), 1);
+    assert_eq!(
+        count(&none, "class=\"give-part give-part-"),
+        0,
+        "nothing given is no part of the bar"
+    );
+    let some = page(10_010, 3);
+    assert!(some.contains("€100 of €800 a month"));
+    assert!(some.contains("12 % covered"));
+    assert!(some.contains("Supporters: 3."));
+    assert!(some.contains("width=\"1251\""), "an eighth of the bar");
+    assert_eq!(count(&some, "class=\"give-part give-part-liberapay\""), 1);
+    assert_eq!(count(&some, "give-part-github"), 0);
+    // a goal more than met fills the bar and no more
+    let over = page(216_666, 40);
+    assert!(over.contains("100 % covered"));
+    assert!(over.contains("Supporters: 40."));
+    assert!(over.contains("width=\"10000\""));
+    assert!(!over.contains("Yours would be the first."));
+}
+
+/// What Baylee Central says with nothing configured but Liberapay, and what
+/// it says before any platform answered: the page with Liberapay's part and
+/// the other two not counted yet, and the goal without a bar. The figures
+/// come from Central's answer (`PublicFunding`), never from a platform the
+/// site asks itself.
+#[test]
+fn central_s_figures_are_drawn_as_they_come() {
+    use central_web::data::{Funding, Monthly};
+    let mut data = fallback(Some(&data()));
+    let assets = Assets::default();
+    let mut page = |funding: Option<Funding>| {
+        data.funding = funding;
+        render(
+            Page::Donate,
+            &Context {
+                lang: Lang::En,
+                origin: "https://baylee.app",
+                assets: &assets,
+                data: &data,
+                machine: machine("", None, None, None),
+                verification: None,
+            },
+        )
+    };
+    // a Central with Liberapay alone: one part, the others not counted yet,
+    // no sum of what was given once
+    let liberapay = page(Some(Funding {
+        liberapay: Some(Monthly {
+            month: 10_010,
+            supporters: 3,
+        }),
+        ..Funding::default()
+    }));
+    assert_eq!(
+        count(&liberapay, "class=\"give-part give-part-liberapay\""),
+        1
+    );
+    assert!(liberapay.contains("Not counted yet: GitHub Sponsors, Ko-fi."));
+    assert!(!liberapay.contains("One-time donations"));
+    // a Central that knows the figures and has none yet, and a Central from
+    // before them: the goal without a bar, alike
+    for nothing in [Some(Funding::default()), None] {
+        let html = page(nothing);
+        assert!(html.contains("€800"));
+        assert_eq!(count(&html, "class=\"give-meter\""), 0);
+        assert_eq!(count(&html, "give-part-"), 0);
+    }
+}
+
+/// The start page asks once, after the open-source section, and leads to
+/// the donation page; it names the amount and nothing a donation would buy.
+#[tokio::test]
+async fn the_start_page_asks_once_and_leads_to_the_donation_page() {
+    let app = app(true);
+    for lang in Lang::ALL {
+        let (_, _, home) = get(&app, &format!("/{}/", lang.code()), &[]).await;
+        assert_eq!(count(&home, "id=\"support\""), 1, "{lang:?}");
+        let at = |id: &str| home.find(&format!("id=\"{id}\"")).expect("a section");
+        assert!(at("source") < at("support"), "{lang:?}");
+        let (_, band) = home.split_at(at("support"));
+        let band = band.split_once("</section>").expect("its end").0;
+        assert_eq!(
+            count(band, &format!("href=\"/{}/donate\"", lang.code())),
+            1,
+            "{lang:?}"
+        );
+        assert!(!band.contains("Wizards"), "{lang:?}");
+    }
+    let (_, _, english) = get(&app, "/en/", &[]).await;
+    assert!(english.contains("cost about €800 a month"));
+    let (_, _, german) = get(&app, "/de/", &[]).await;
+    assert!(german.contains("kosten etwa 800\u{a0}€ im Monat"));
+}
+
+/// The account's overview shows Baylee in numbers: the public figures the
+/// site holds, the same for every reader, and only those a source
+/// reported. Without any, the part is not there.
+#[tokio::test]
+async fn the_account_s_overview_shows_the_public_figures() {
+    let (_, _, html) = get(&app(true), "/en/account", &[]).await;
+    assert_eq!(count(&html, "id=\"numbers-title\""), 1);
+    // its own class: `.numbers` is the start page's grid of four, which once
+    // laid this part's title, lead and tiles out in one row
+    assert_eq!(
+        count(
+            &html,
+            "<section aria-labelledby=\"numbers-title\" class=\"in-numbers\">"
+        ),
+        1
+    );
+    let (_, numbers) = html.split_once("id=\"numbers-title\"").expect("the part");
+    let numbers = numbers.split_once("</section>").expect("its end").0;
+    // the directory's four, then accounts, cards and visits
+    assert_eq!(count(numbers, "class=\"dir-stat glass\""), 7);
+    for said in [
+        "<span class=\"num\">5</span><span class=\"dir-stat-of\">/ 7</span>",
+        "<dt>Accounts at Baylee Central</dt>",
+        "<span class=\"num\">1,234</span>",
+        "<dt>Playable cards</dt>",
+        "<span class=\"num\">8,348</span><span class=\"dir-stat-of\">/ ",
+        "<dt>Page views since 1 November 2026</dt>",
+        "<span class=\"num\">48,213</span>",
+    ] {
+        assert!(numbers.contains(said), "{said}");
+    }
+    let (_, _, bare) = get(&app(false), "/en/account", &[]).await;
+    assert_eq!(count(&bare, "id=\"numbers-title\""), 0);
+    assert_eq!(count(&bare, "dir-stat"), 0);
+}
+
+/// A page's title says the site's name after its own, unless its own
+/// already does; the preview a link gets elsewhere keeps the bare title,
+/// since it names the site in a field of its own. And the footer's three
+/// columns are lists with a name under one landmark, not three landmarks
+/// more on every page.
+#[tokio::test]
+async fn a_title_names_the_site_and_the_footer_is_one_landmark() {
+    let app = app(true);
+    for (path, title, bare) in [
+        ("/en/contact", "Contact – Baylee", "Contact"),
+        (
+            "/de/terms",
+            "Nutzungsbedingungen – Baylee",
+            "Nutzungsbedingungen",
+        ),
+        ("/en/download", "Download Baylee", "Download Baylee"),
+        // the account area names the site itself, and so its title stays
+        ("/en/account", "Overview – Baylee", "Overview – Baylee"),
+    ] {
+        let (_, _, html) = get(&app, path, &[]).await;
+        assert!(html.contains(&format!("<title>{title}</title>")), "{path}");
+        assert!(
+            html.contains(&format!("property=\"og:title\" content=\"{bare}\"")),
+            "{path}"
+        );
+        let (_, foot) = html.split_once("<footer").expect("the footer");
+        let foot = foot.split_once("</footer>").expect("its end").0;
+        assert_eq!(count(foot, "<section"), 0, "{path}");
+        assert_eq!(count(foot, "<nav"), 1, "{path}");
+        for id in ["foot-play", "foot-project", "foot-legal"] {
+            assert_eq!(
+                count(
+                    foot,
+                    &format!("<ul aria-labelledby=\"{id}\" class=\"foot-list\">")
+                ),
+                1,
+                "{path}: {id}"
+            );
+        }
+    }
+    for lang in Lang::ALL {
+        for page in ["", "faq", "privacy", "donate", "account"] {
+            let (_, _, html) = get(&app, &format!("/{}/{page}", lang.code()), &[]).await;
+            let (_, rest) = html.split_once("<title>").expect("a title");
+            let title = rest.split_once("</title>").expect("its end").0;
+            assert_eq!(count(title, "Baylee"), 1, "{lang:?} {page}: {title}");
         }
     }
 }

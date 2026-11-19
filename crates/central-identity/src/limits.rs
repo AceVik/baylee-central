@@ -186,6 +186,7 @@ fn class(request: &Request) -> Class {
             | Request::EnrollmentFinish { .. }
             | Request::GatewayDirectory { .. }
             | Request::PublicFigures { .. }
+            | Request::PublicFunding {}
             | Request::Challenges {
                 request: central_api::challenges::Request::Catalogue { .. }
                     | central_api::challenges::Request::Detail { .. }

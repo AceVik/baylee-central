@@ -122,12 +122,10 @@ dl-linux-unsure = 你的瀏覽器沒有說明處理器；我們先假設是 x86-
 dl-missing = 這個版本沒有適用於你系統的檔案。較舊的版本在<releases>版本頁面</releases>。
 dl-none = GitHub 暫時沒有回應。所有版本都在<releases>版本頁面</releases>。
 dl-yours = 你的系統
-dl-more-files = 更多檔案（{ $count }）
 dl-installer = 安裝程式
 dl-deb = Debian 套件
 dl-archive = 壓縮檔
 dl-fallback = 適用較舊處理器的壓縮檔
-dl-fallback-help = 適用於沒有 AVX2 的 x86-64 處理器（約 2013 年以前）。Baylee 的主要版本需要 AVX2，沒有的話無法啟動。
 plat-windows-x64 = Windows
 plat-windows-x64-sub = 多數電腦：64 位元 Intel 或 AMD
 plat-windows-arm64 = Windows on ARM
@@ -255,7 +253,7 @@ privacy-hosting = 本站執行在我們向德國 netcup GmbH 租用的伺服器�
 privacy-views-title = 統計頁面瀏覽次數
 privacy-views = 本站會統計其頁面被開啟的次數：所有頁面、所有訪客合在一起只有一個數字，顯示在首頁上。在瀏覽器中開啟一個頁面，就會使它加一。為此不會儲存任何關於你的資料：沒有 IP 位址，沒有 Cookie，沒有識別碼，也不儲存是哪個頁面。
 privacy-device-title = 你的瀏覽器保存了什麼
-privacy-device = 在你登入之前，本站不設定任何 Cookie。你的瀏覽器會在你的裝置上保存以下內容，而且只有在啟用 JavaScript 時才會：你的色彩選擇（若你有選）（<code>baylee-site-theme</code>）；在你登入期間，你的工作階段何時結束及用於偵測登入切換的隨機標記（<code>baylee-central-session</code>）、你的聊天金鑰，以及聯絡人的受信任金鑰（見「聊天」）；若你開啟了通知，一組代表這台裝置的隨機數字（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）；以及，只有在你已登入、將本站安裝為應用程式或開啟通知之後，才會有一份本站公開檔案（頁面外框、字型、指令碼）的副本，讓本站可以在沒有連線時啟動，也讓通知能夠送達。如果這三種情況都不再成立，這份副本會在你下次開啟本站時移除。除非下方某一節另有說明，這些內容都不會傳送給我們。聊天與工作階段的項目會在你登出時刪除；其餘一切，你可以在瀏覽器中清除本站資料來移除。法律基礎：TDDDG（《電信數位服務資料保護法》）第 25 條第 2 項第 2 款（為你所使用的功能所絕對必要）；至於通知所用的隨機數字，則是你的同意（TDDDG 第 25 條第 1 項）。
+privacy-device = 在你登入之前，本站不設定任何 Cookie。你的瀏覽器會在你的裝置上保存以下內容，而且只有在啟用 JavaScript 時才會：你的色彩選擇（若你有選）（<code>baylee-site-theme</code>）；在你登入期間，你的工作階段何時結束及用於偵測登入切換的隨機標記（<code>baylee-central-session</code>）、你的顯示名稱、標籤，以及取得大頭貼所用的金鑰，讓頁首顯示目前登入的是誰（<code>baylee-central-own</code>；在你登出時，或工作階段結束後下次開啟本站時移除）、你的聊天金鑰，以及聯絡人的受信任金鑰（見「聊天」）；若你開啟了通知，一組代表這台裝置的隨機數字（<code>baylee-push-installation-v1</code>、<code>baylee-push</code>）；以及，只有在你已登入、將本站安裝為應用程式或開啟通知之後，才會有一份本站公開檔案（頁面外框、字型、指令碼）的副本，讓本站可以在沒有連線時啟動，也讓通知能夠送達。如果這三種情況都不再成立，這份副本會在你下次開啟本站時移除。除非下方某一節另有說明，這些內容都不會傳送給我們。聊天與工作階段的項目會在你登出時刪除；其餘一切，你可以在瀏覽器中清除本站資料來移除。法律基礎：TDDDG（《電信數位服務資料保護法》）第 25 條第 2 項第 2 款（為你所使用的功能所絕對必要）；至於通知所用的隨機數字，則是你的同意（TDDDG 第 25 條第 1 項）。
 privacy-device-manager = 如果你把救援碼存在瀏覽器的密碼管理員、用電子郵件寄給自己、存成檔案，或在顯示它的那一步列印出來，保存它的是你的瀏覽器、郵件程式、檔案或紙張，而不是本站：這組碼在你的瀏覽器中產生，絕不會傳送給我們。清除本站資料並不會把它從那些地方移除。
 privacy-github-title = GitHub
 privacy-github = 下載頁面與首頁會顯示最新版本、測試狀態與卡牌數量。是我們的伺服器向 GitHub 取得這些資料，不是你的瀏覽器；GitHub 不會因此得知任何關於你的事。只有在你點擊下載或 GitHub 連結時，你的瀏覽器才會連線到 GitHub（GitHub, Inc.，美國），並把你的 IP 位址與每個請求都帶有的資訊傳給它；之後適用 GitHub 自己的隱私權聲明。
@@ -485,7 +483,6 @@ register-error-taken = 這個登入名稱已被使用。請選另一個。
 ## The recovery code
 
 code-title = 你的救援碼
-code-handle = 你的代號：{ $handle }
 code-lead = 如果你忘記密碼，只有靠這組救援碼，你的加密資料才保得住。我們不知道它，也無法恢復。請把它存放在安全的地方，遠離這台裝置。
 code-shown-once = 只顯示這一次
 code-download = 儲存為文字檔
@@ -882,38 +879,22 @@ strip-gateways = Gateways
 strip-online = 在線
 strip-offline = 離線
 strip-directory = 目錄
-strip-cards = 可玩的牌
-strip-cards-unit = 張
 strip-accounts = Baylee Central 的帳號
 strip-live = 各 Gateway 回報的目前數字
 strip-views = 自 { $date } 起的頁面瀏覽次數
-live-views = { $n ->
-   *[other] { $n } 次瀏覽
-}
-live-accounts = { $n ->
-   *[other] { $n } 個帳號
-}
-live-players = { $n ->
-   *[other] { $n } 位玩家
-}
-live-playing = { $n ->
-   *[other] { $n } 位遊戲中
-}
-live-tables = { $n ->
-   *[other] { $n } 張開放牌桌
-}
-live-games = { $n ->
-   *[other] { $n } 場遊戲
-}
+strip-l-players = 玩家
+strip-l-games = 遊戲
+strip-l-tables = 開放牌桌
+strip-l-accounts = 帳號
+strip-l-views = 瀏覽
+stat-cards = 可玩的牌
 hero-badges = 一覽
 hero-badge-beta = 公開測試
 hero-badge-free = 免費
 hero-badge-open = 開放原始碼
 hero-badge-fan = 非官方同好內容
 gws-open-client = 在 Baylee 中開啟
-gws-open-client-help = 「在 Baylee 中開啟」會啟動已安裝的用戶端（0.1.1-beta.9b 或更新版本）。它會顯示位址，並在新增 Gateway 之前先詢問你。
 dl-menu-title = 所有系統
-dl-old-cpu = 較舊的處理器（無 AVX2）
 ci-passing = 通過
 ci-failing = 失敗
 dl-button = 下載 Baylee
@@ -974,15 +955,11 @@ source-repoTitle = 儲存庫目前的狀況
 source-stars = 星數
 source-issues = 未解決的 issue 與 pull request
 source-note = 由本站伺服器每十分鐘從 GitHub 的公開 API 讀取。你的瀏覽器不會向 GitHub 查詢任何東西。
-gw-count =
-    { $n ->
-       *[other] 已列出 { $n } 個 Gateways，其中 { $online } 個在線。
-    }
 gw-none = 目前還沒有列出任何 Gateway。
 contact-intro = 一個問題、一個想法、一款你想看到的遊戲，或是你不想公開張貼的事：這個表單會直接送到 Baylee 背後的那個人手上。如果想要回覆，請留下電子郵件地址；沒有的話，我們只能閱讀。
 contact-f8 = 結算錯誤的牌，最好在遊戲中按 <kbd>F8</kbd> 回報，因為報告可以附上整場遊戲。
 contact-discord = 聊天、找對手、搶先知道新版本
-contact-issues = GitHub issues
+contact-issues = GitHub 議題
 contact-issuesSub = 錯誤與想法，公開討論
 contact-operator = 誰經營本站，以及郵寄地址：見<impressum>法律聲明</impressum>。
 contact-whatsappSub = 社群群組與快速對戰
@@ -1000,17 +977,14 @@ ai-hostingLink = Gateway 託管與 LLM 設定
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Gateway 是線上牌桌所在的伺服器：帳號、牌組、房間，以及每場遊戲各一個引擎程序。這裡列出的是已向 Baylee Central 註冊並經其管理員核准的 Gateway。每一個都由其營運者為自己的群組經營，那裡適用他們自己的規則。列出並不代表對 Gateway 的作為作出任何保證。
-gw-howTo = 想在其中一個上面遊玩，請把它的位址複製到用戶端的入口畫面。在線表示 Central 在最近一分半鐘內收到過該 Gateway 的訊息；並不保證它會回應。名稱與版本由各營運者自行回報。
 gw-find = 尋找 Gateway
 gw-findHint = 名稱或位址
 gw-shown = 顯示 { $n } / { $all }
 gw-noMatch = 目前已載入的 Gateways 中沒有符合的。
 gw-showAll = 顯示全部
 gw-stats = 目錄概況
-gw-stat-listed = 已列出的 Gateway
 gw-stat-online = 目前線上
 gw-stat-players = 線上玩家
-gw-stat-playing = 其中遊戲中
 gw-stat-tables = 開放牌桌
 gw-stat-games = 進行中的遊戲
 gw-show = 顯示
@@ -1349,7 +1323,6 @@ chat-write-first = 寫下第一則訊息
 people-copy-handle = 複製你的代號
 people-copy-failed = 這裡無法複製。請選取上方你的代號，手動複製。
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = 帳號
@@ -1458,8 +1431,6 @@ admin-legacy-restored = 已還原
 admin-legacy-banned = 已停權
 admin-legacy-must-change = 需要新密碼
 admin-legacy-locked = 鎖定到 { $until }
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1759,93 +1730,122 @@ fb-json-base64 = base64 的 { $n } 個字元
 fb-json-more = 顯示接下來的 { $n } 個（剩餘：{ $left }）
 fb-json-items = 項目：{ $n }
 fb-json-keys = 鍵：{ $n }
-## Global daily and weekly challenges
-ch-title = 挑戰
-ch-lead = 無論在哪個閘道遊玩，所有人面對的都是同一道挑戰。尋找自己的解法，刷新成績，收集永久徽章。
-ch-eyebrow = 值得再次回來的挑戰
-ch-daily = 每日挑戰
-ch-weekly = 每週挑戰
-ch-loading = 正在載入…
-ch-play-help = 連結會在 Baylee 中開啟這道挑戰。你也可以在客戶端的「挑戰」頁面找到它。
-ch-unavailable = 無法載入挑戰，請重試。
-ch-empty = 目前還沒有經過驗證的挑戰。
-ch-archive = 往期挑戰
-ch-older = 更早的挑戰
-ch-withdrawn = 已撤回——無法再開始此挑戰或計入排名。
-ch-current = 進行中的挑戰
-ch-details = 挑戰與排行榜
-ch-play = 在 Baylee 中遊玩
-ch-ends = 即時排名截止時間
-ch-estimated = 預計時間
-ch-target = 目標回合數
-ch-deck = 提供的牌組
-ch-progress = 你的進度
-ch-attempts = 已開始的嘗試
-ch-failures = 失敗次數
-ch-best-turns = 最少回合
-ch-completed = 已完成——進度已儲存。
-ch-assisted = 已使用提示：新的嘗試會標記為使用輔助，不參與競技排名。
-ch-consent = 在這道挑戰的排行榜上顯示我的公開名稱和標籤。
-ch-hint-one = 提示 1
-ch-hint-two = 提示 2
-ch-hint-confirm = 查看提示
-ch-hint-warning = 查看提示後，你的帳號在此挑戰中的後續嘗試也會標記為使用輔助。仍可獲得完成徽章。先前未使用輔助的成績依然有效。
-ch-first-win = 首次勝利
-ch-sprint = 競速
-ch-rankings = 全球排行榜
-ch-ranking-rules = 首次勝利：先比較失敗次數，再比較回合數，越少越好。最少回合：未使用輔助的最佳勝利。競速：由伺服器計時，且沒有暫停或斷線。相同成績並列。只有在挑戰進行期間結束的勝利才參與排名。
-ch-no-scores = 還沒有符合條件的公開成績。
-ch-more = 下一頁
-ch-rank = 名次
-ch-player = 玩家
-ch-turn = 回合
-ch-time = 時間
-ch-badges = 你的徽章收藏
-ch-badges-lead = 每道挑戰只計數一次。徽章等級永久保留，漏玩幾天也不會失去進度。往期挑戰的勝利也計入每日、每週和戰術家徽章。
-ch-active = 繼續進行中的嘗試
-ch-badge-daily = 每日探索者
-ch-badge-weekly = 每週探索者
-ch-badge-tactician = 戰術家
-ch-badge-first-try = 一次成功
-ch-badge-regular = 常來常往
-ch-badge-locked = 尚未獲得
-ch-bronze = 青銅
-ch-silver = 白銀
-ch-gold = 黃金
-ch-platinum = 鉑金
-ch-obsidian = 黑曜石
+## The privacy notice: what Central keeps of Daily and Weekly tasks
 privacy-challenges-title = Daily 與 Weekly 挑戰
 privacy-challenges = Central 將嘗試、結果、已用提示、排行榜公開設定和永久徽章進度儲存在你的帳戶中。官方伺服器傳送對局結果和測量的時間。名稱、識別碼和成績僅在你開啟該任務的排行榜公開設定後公開；關閉後會從排行榜移除。紀錄保留至帳戶刪除，備份期限見帳戶部分。挑戰中繼資料包含在帳戶資料匯出中。
 
-# Tower expeditions
+# The privacy notice: what Central keeps of Tower expeditions
 tower-title = 翠綠之塔
-tower-lead = 五場對決，三條生命。你的選擇塑造牌組。
-tower-rules = 使用提供的牌組親自進行每場對決。前四次勝利後，各選擇一項強化。每次失敗損失一條生命，三次失敗結束遠征。重新連線會保留對局，技術原因造成的無效對局不會消耗生命。所有人挑戰同一座每週之塔。本週結束後，練習仍可獲得永久徽章。
-tower-floors = 層數
-tower-lives = 生命
-tower-rewards = 登塔遺物
-tower-reward-rules = 開拓者記錄每週不同樓層的勝利，王冠守護者記錄每週登頂，不屈者記錄每週無敗登頂。同一週重複相同成就不會增加進度。遺物永不失效，也不要求連續遊玩。
-tower-conquered = 王冠屬於你
-tower-choosing = 請在遊戲中選擇下一項強化
-tower-ended = 遠征結束
-tower-pathfinder = 開拓者
-tower-summit = 王冠守護者
-tower-unbroken = 不屈者
-tower-tiers = 查看全部五個等級
-tower-ascent = 登塔
-tower-sprint = 完美衝刺
-tower-scoring = 登塔依序比較通過的樓層、較少的失敗次數及獲勝對局的較少回合數。衝刺記錄無敗且獲勝對局未中斷時登頂所用的實際思考時間。只顯示你最佳的有效成績，相同成績共享名次。
 tower-privacy = Central 會在你的帳戶中儲存遠征、所選強化、剩餘生命、結果、排行榜公開設定和遺物的永久進度。只有啟用賽季排行榜時，才會公開你的顯示名稱、標籤和有效最佳成績。關閉後，該項目會從排行榜移除。帳戶資料匯出包含遠征和嘗試紀錄。刪除帳戶也會刪除這些進度，但仍適用「帳戶」部分所述的備份保留期限。
-tower-guide = 遠征規則
 
-echoes-title = 高塔迴響
-echoes-permanent = 你的永久收藏
-echoes-lead = 每場勝利都會留下印記。在多次遠征中收集獨特勳章，探索五個愈加華麗的等級。
-echoes-confirmed = 僅計入已確認的結果。這些外觀獎勵永不過期，也不會帶來對戰優勢。
-echoes-pending = 正在取得已確認的收藏。連線中斷不會清除已獲得的進度。
-echoes-victories = 決鬥大師
-echoes-victories-goal = 在高塔迴響中贏得對戰。
-echoes-ascents = 王冠征服者
-echoes-ascents-goal = 取得八場勝利並完成遠征。
-echoes-unbroken = 完美無瑕
-echoes-unbroken-goal = 在沒有失敗或平手的情況下取得八場勝利。
+## the steps after signing in (code and terms, redesign)
+code-created = 帳號已建立
+code-handle-label = 你的代號
+code-keep-title = 現在就用下列至少一種方式存放好
+code-mail-opened = 你的郵件程式現在應該會開啟一封草稿。如果沒有反應，表示這個瀏覽器沒有設定郵件程式：請用其他方式存放救援碼。
+terms-step-version = 版本 { $version }
+terms-read-hint = 把內文讀到最後，就可以接受了。
+terms-read-done = 已讀到最後。
+
+## the contact form (redesign)
+contact-again = 再寫一則訊息
+
+## the footer's last line (which build this is)
+foot-build = 本站建置版本：
+
+## download (variants and page)
+dl-v2-name = 較舊的處理器（x86-64-v2）
+dl-v2-help = 適用於 2013 至 2015 年前後之前的處理器，或主要版本無法啟動時使用。
+dl-os-windows = Windows 10 或 11
+dl-os-mac = macOS 11 或更新版本
+dl-os-linux = glibc 2.35 或更新版本，以及 Vulkan 驅動程式
+dl-howto-title = 安裝
+dl-howto-windows-1 = 下載安裝程式並執行。
+dl-howto-windows-2 = 如果 Windows 發出警告，選擇<i>更多資訊</i>，再選<i>仍要執行</i>：這些版本沒有程式碼簽署。
+dl-howto-windows-3 = 從開始功能表啟動 Baylee。
+dl-howto-mac-1 = 開啟 <code>.dmg</code>，把 Baylee 拖進<i>應用程式</i>。
+dl-howto-mac-2 = 第一次啟動時，開啟<i>系統設定 → 隱私權與安全性</i>，選擇<i>仍要打開</i>。
+dl-howto-mac-3 = 不確定你的 Mac 用的是哪種晶片？<i>蘋果選單 → 關於這部 Mac</i> 會告訴你。
+dl-howto-linux-1 = 用 <code>chmod +x</code> 讓 AppImage 可執行，然後執行它。
+dl-howto-linux-2 = 或者安裝套件：<code>sudo apt install ./baylee_*.deb</code>。
+dl-howto-linux-3 = 壓縮檔不需要安裝：解壓縮後啟動 <code>baylee</code> 即可。
+dl-soon-title = 之後推出
+dl-soon-text = Baylee 目前在電腦上執行。以下是計畫中的版本，現在還沒有可下載的內容。
+dl-soon-web = 在瀏覽器中
+
+## the account overview and its navigation (redesign)
+account-group-account = 帳號
+account-play-title = 遊玩
+account-play-lead = 取得遊戲，並在遊戲裡用這個帳號登入。
+account-numbers-lead = 公開數字，是各個 Gateway 與 Baylee Central 目前回報的數字。
+account-chat-lead = 訊息與你的聯絡人，端對端加密。
+account-push-lead = 讓這台裝置通知你有新訊息。
+
+## donations (the page, the bar's entry, the start page's band)
+nav-donate = 捐款
+donate-title = 讓 Baylee 繼續開發下去
+donate-eyebrow = 支持
+donate-description = Baylee 免費，而且會一直免費。如果你喜歡它，可以幫忙分擔每月的開銷：透過 GitHub Sponsors、Liberapay 或 Ko-fi。
+donate-lead = Baylee 免費，而且會一直免費：沒有付費牆，沒有付費功能，沒有廣告。它是利用業餘時間做出來的，但每個月仍然要花錢。如果你喜歡它，可以幫忙分擔。
+donate-goal-title = 目標
+donate-goal-amount = 每月約 { $amount }
+donate-goal-lead = 這大致就是開發與營運每月的開銷。
+donate-progress = 每月 { $goal } 中已有 { $have }
+donate-progress-label = 每月目標已經涵蓋了多少
+donate-progress-percent = 已涵蓋 { $percent } %
+donate-progress-supporters = 支持者：{ $n } 位。
+donate-progress-missing = 尚未計入：{ $platforms }。
+donate-progress-first = 還沒有定期捐款。你的會是第一筆。
+donate-progress-none = 各平台還沒有告訴我們數字。
+donate-once-title = 一次性捐款
+donate-once-since = 自 { $date } 起
+donate-once-count = 捐款：{ $n } 筆
+donate-once-note = 只捐一次，所以不計入每月目標。其他貨幣按收到當天的匯率換算成歐元。
+donate-costs-title = 用在哪裡
+donate-costs-lead = 每月金額，取整數。
+donate-cost-ai = AI 助手
+donate-cost-ai-note = Claude 與 Gemini。沒有它們，這個專案就無法再繼續開發。
+donate-cost-servers = 伺服器
+donate-cost-servers-note = 公共 Gateway、Baylee Central 與本網站。
+donate-cost-art = 圖片、影片與音樂
+donate-cost-art-note = 製作背景與音樂所用的工具。
+donate-cost-tools = 開發工具
+donate-cost-tools-note = GitHub、編輯器、針對 Apple 裝置的開發者計畫、網域與電子郵件。
+donate-cost-fees = 手續費
+donate-cost-fees-note = 平台與支付服務留下的部分，約十分之一。
+donate-cost-about = 約 { $amount }
+donate-ways-title = 三種捐款方式
+donate-ways-lead = 三種方式都通向 Baylee 的開發者 AceVik，這些開銷由他支付。選你喜歡的一種。
+donate-github-lead = 按月或一次性，使用你的 GitHub 帳號。
+donate-liberapay-lead = 定期捐款，用信用卡或 PayPal。Liberapay 由一個非營利組織營運。
+donate-kofi-lead = 一次性小費，不需要帳號，用信用卡或 PayPal。
+donate-open = 開啟 { $platform }
+donate-qr-alt = { $address } 的 QR 碼
+donate-nothing-title = 捐款能換來什麼
+donate-nothing = 什麼也換不來，而且這是刻意的。沒有功能，沒有遊戲中的優勢，沒有更早或專屬的使用權，沒有徽章，名字也不會出現在任何名單上：每個人得到的都是同一個 Baylee。捐款是一份感謝，是送給個人的禮物；它不可抵稅。
+donate-other-title = 其他幫忙的方式
+donate-other = 玩遊戲，回報哪裡壞了，再告訴你的朋友。這同樣有幫助。
+donate-privacy = 付款在你選擇的平台上、透過它的支付服務完成。本網站不收款，也不會知道是誰捐的。
+donate-band-title = Baylee 是免費的。請幫助它繼續下去。
+donate-band-lead = 伺服器與工具每月約需 { $amount }。捐款換不來任何東西，但幫助很大。
+donate-band-button = 捐款方式
+privacy-donate-title = 捐款
+privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site. The page shows how much of the monthly goal is covered and what was given once. Baylee Central collects these figures, not your browser: it asks Liberapay for its public total and GitHub Sponsors for the account's own totals and one-time sponsorships, without the sponsors' names, takes the euro exchange rates from the European Central Bank, and is notified by Ko-fi of each payment. Of a payment Central keeps only the amount, the currency, the time, whether it was given once or regularly, and a fingerprint of the platform's transaction number so that a notice that comes twice counts once; everything else in a notice, such as a name, an e-mail address or a message, is discarded without being stored or logged. After 40 days the amounts are added to a total and the single records are deleted. The figures name nobody, and we publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = 「在 Baylee 中開啟」會把這個 Gateway 交給已安裝的用戶端，用戶端會顯示位址，並在加入前詢問你。你在用戶端裡登入，而不是在這裡。還沒有用戶端？<download>下載 Baylee</download>。
+gw-fineprint = 在線表示 Central 在最近一分半鐘內收到過該 Gateway 的訊息，並不保證它會回應。名稱、版本與數字都是各營運方自己回報的。
+gw-fig-players = 玩家
+gw-fig-playing = 遊戲中
+gw-fig-tables = 空閒牌桌
+gw-fig-games = 對局
+gw-load = 其玩家中有 { $n }% 正在遊戲中
+gw-load-empty = 現在這裡沒有人。
+gw-silent = 沒有回報數字。
+gw-away = Central 最近沒有收到它的訊息。
+gw-current = 已是最新
+gw-current-title = 執行的是最新版本。
+gw-secure = 加密連線（HTTPS）
+gw-show-current = 最新版本
+gw-col-gateway = Gateway
+gw-col-state = 狀態

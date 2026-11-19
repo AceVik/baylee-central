@@ -41,19 +41,20 @@ pub const STYLES: [&str; 18] = [
     "pages.css",
     "home.css",
     "gateways.css",
-    "challenges.css",
     "album.css",
     "footer.css",
     "app.css",
     "chat.css",
     "security.css",
+    "donate.css",
     "admin.css",
     "feedback.css",
 ];
 
 /// The scripts served under hashed names.
-const SCRIPTS: [&str; 7] = [
+const SCRIPTS: [&str; 8] = [
     "boot.js",
+    "nav.js",
     "pwa.js",
     "hint.js",
     "clouds.js",
@@ -143,7 +144,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     fs::write(out.join("notices.txt"), notices(root)?)
         .or_fail("notices.txt could not be written")?;
     compress(&out)?;
-    let manifest = json!({ "files": site.files });
+    let manifest = json!({ "files": site.files, "build": build(root, &site.files) });
     fs::write(out.join("manifest.json"), format!("{manifest:#}\n"))
         .or_fail("manifest.json could not be written")?;
     println!(
@@ -214,6 +215,47 @@ impl Site {
     }
 }
 
+/// A build's stamp: the digest of every asset's address, shortened.
+fn stamp(files: &BTreeMap<String, Value>) -> String {
+    let every: String = files
+        .values()
+        .filter_map(|f| f.get("url").and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n");
+    random::to_hex(&Sha256::digest(every.as_bytes()))[..16].to_owned()
+}
+
+/// What this build is called, for the manifest and the footer's last line:
+/// its stamp, and from the checkout the newest release tag the commit
+/// descends from, how far past it the commit is, the commit and its day.
+/// Whatever git cannot say (a build outside a checkout, a checkout without
+/// tags) is left out; the site is built all the same. Nothing of the clock
+/// goes in, so the same commit gives the same manifest.
+fn build(root: &Path, files: &BTreeMap<String, Value>) -> Value {
+    let git = |args: &[&str]| -> Option<String> {
+        let output = process::capture(
+            Command::new("git").arg("-C").arg(root).args(args),
+            "git could not be run",
+        )
+        .ok()?;
+        let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        (output.status.success() && !text.is_empty()).then_some(text)
+    };
+    let version = git(&["describe", "--tags", "--abbrev=0"]);
+    let ahead = version
+        .as_deref()
+        .and_then(|tag| git(&["rev-list", "--count", &format!("{tag}..HEAD")]))
+        .and_then(|count| count.parse::<u32>().ok())
+        .unwrap_or(0);
+    json!({
+        "id": stamp(files),
+        "version": version,
+        "ahead": ahead,
+        "commit": git(&["rev-parse", "HEAD"]),
+        "date": git(&["log", "-1", "--format=%cs"]),
+    })
+}
+
 /// The service worker with this build's stamp and the files the offline
 /// page needs: the stylesheet, the scripts every page loads, the fonts and
 /// the icon. The stamp is the digest of every asset's address, so a build
@@ -248,12 +290,7 @@ fn service_worker(
     ] {
         offline.push(url(name)?);
     }
-    let every: String = files
-        .values()
-        .filter_map(|f| f.get("url").and_then(Value::as_str))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let build = &random::to_hex(&Sha256::digest(every.as_bytes()))[..16];
+    let build = stamp(files);
     let assets =
         serde_json::to_string(&offline).or_fail("the offline list could not be written")?;
     let codes = serde_json::to_string(languages).or_fail("the languages could not be written")?;

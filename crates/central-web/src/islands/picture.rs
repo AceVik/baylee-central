@@ -852,6 +852,33 @@ impl Card {
     }
 }
 
+/// The signed-in account's own face for the overview: its picture once
+/// Central said which, else the initials of `name`, in one mark of a fixed
+/// size. Asking also tells the header which picture is the account's
+/// (`session.rs`), so it shows from the first page after a sign-in.
+pub fn own_face(name: &str) -> impl IntoView {
+    let own = RwSignal::new(None::<Option<(PictureKey, bool)>>);
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            if let Ok(mine) = mine().await {
+                browser::remember(mine.picture.as_ref());
+                own.set(Some(
+                    mine.picture.map(|p| (p.key, p.sequence_bytes.is_some())),
+                ));
+            }
+        });
+    });
+    let initials: String = name.chars().take(1).flat_map(char::to_uppercase).collect();
+    view! {
+        <span class="me-face" aria-hidden="true">
+            {move || match own.get().flatten() {
+                Some((key, moving)) => face_view(&key, moving, String::new(), false).into_any(),
+                None => view! { <span class="me-initials">{initials.clone()}</span> }.into_any(),
+            }}
+        </span>
+    }
+}
+
 /// The profile page's card: the picture, choosing one, placing its square,
 /// saving it, removing it.
 pub fn card(lang: Lang, name: String) -> impl IntoView {
@@ -1200,118 +1227,21 @@ mod browser {
         }
     }
 
-    /// Whether this tab already remembers a profile picture key in `sessionStorage`.
+    /// Whether the header already holds this sign-in's own picture
+    /// (`session.rs`), so its place can be kept while the page asks.
     pub fn has_remembered_key() -> bool {
-        let Some(text) = web_sys::window()
-            .and_then(|w| w.session_storage().ok().flatten())
-            .and_then(|s| s.get_item("baylee-central-own-picture").ok().flatten())
-        else {
-            return false;
-        };
-        serde_json::from_str::<serde_json::Value>(&text)
-            .ok()
-            .and_then(|v| v.get("key")?.as_str().map(str::len))
-            .is_some_and(|len| len == 32)
+        super::super::session::noted_picture()
     }
 
-    fn sync_nav_face(
-        doc: &web_sys::Document,
-        face: &web_sys::Element,
-        picture: Option<&central_api::picture::Picture>,
-    ) {
-        while let Some(child) = face.first_child() {
-            let _ = face.remove_child(&child);
-        }
-        if let Some(p) = picture {
-            let _ = face.remove_attribute("data-none");
-            let key = central_api::picture::key_hex(&p.key);
-            let base = format!("/api/v1/pictures/{key}");
-            let Ok(pic) = doc.create_element("picture") else {
-                return;
-            };
-            if p.sequence_bytes.is_some()
-                && let Ok(moving) = doc.create_element("source")
-            {
-                let _ = moving.set_attribute("type", "image/avif");
-                let _ = moving.set_attribute("media", "(prefers-reduced-motion: no-preference)");
-                let _ = moving.set_attribute("srcset", &format!("{base}.sequence.avif"));
-                let _ = pic.append_child(&moving);
-            }
-            if let Ok(still) = doc.create_element("source") {
-                let _ = still.set_attribute("type", "image/avif");
-                let _ = still.set_attribute("srcset", &format!("{base}.avif"));
-                let _ = pic.append_child(&still);
-            }
-            if let Ok(img) = doc.create_element("img") {
-                let _ = img.set_attribute("src", &format!("{base}.png"));
-                let _ = img.set_attribute("alt", "");
-                let _ = img.set_attribute("width", "24");
-                let _ = img.set_attribute("height", "24");
-                let _ = img.set_attribute("decoding", "async");
-                let _ = pic.append_child(&img);
-            }
-            let _ = face.append_child(&pic);
-        } else {
-            let _ = face.set_attribute("data-none", "");
-        }
-    }
-
-    /// Tells this tab's header (`boot.js`) the account's own picture: its
-    /// key and whether it moves, or that there is none, and updates the
-    /// current page's header avatar in place.
+    /// Notes the account's own picture for the header: its key and whether
+    /// it moves, or that there is none. `boot.js` draws the account link
+    /// from the note, on this page at once.
     pub fn remember(picture: Option<&central_api::picture::Picture>) {
-        let signed_in = super::super::session::marker().is_some();
-        if let Some(storage) = web_sys::window().and_then(|w| w.session_storage().ok().flatten()) {
-            if signed_in {
-                let held = picture.map_or_else(
-                    || serde_json::json!({ "key": null }),
-                    |p| {
-                        serde_json::json!({
-                            "key": central_api::picture::key_hex(&p.key),
-                            "moving": p.sequence_bytes.is_some(),
-                        })
-                    },
-                );
-                let _ = storage.set_item("baylee-central-own-picture", &held.to_string());
-            } else {
-                let _ = storage.remove_item("baylee-central-own-picture");
-            }
-        }
-        let doc = document();
-        // Through `Reflect`, as the clipboard and the early fields are read:
-        // `web-sys`'s `NodeList` is not among the reviewed features
-        // (`docs/dependency-proposal/approved-packages.json`).
-        let links = js_sys::Reflect::get(&doc, &JsValue::from_str("querySelectorAll"))
-            .ok()
-            .and_then(|find| find.dyn_into::<js_sys::Function>().ok())
-            .and_then(|find| {
-                find.call1(&doc, &JsValue::from_str("a[data-account-href]"))
-                    .ok()
-            });
-        if let Some(links) = links {
-            for node in js_sys::Array::from(&links).iter() {
-                let Ok(link) = node.dyn_into::<web_sys::Element>() else {
-                    continue;
-                };
-                let existing = link.query_selector(".nav-face").ok().flatten();
-                if !signed_in {
-                    if let Some(face) = existing {
-                        let _ = link.remove_child(&face);
-                    }
-                    continue;
-                }
-                let face = existing.or_else(|| {
-                    let span = doc.create_element("span").ok()?;
-                    let _ = span.set_attribute("class", "nav-face");
-                    let _ = span.set_attribute("aria-hidden", "true");
-                    let _ = link.insert_before(&span, link.first_child().as_ref());
-                    Some(span)
-                });
-                if let Some(face) = face {
-                    sync_nav_face(&doc, &face, picture);
-                }
-            }
-        }
+        let key = picture.map(|p| central_api::picture::key_hex(&p.key));
+        super::super::session::note_picture(
+            key.as_deref(),
+            picture.is_some_and(|p| p.sequence_bytes.is_some()),
+        );
     }
 
     fn paint(canvas: &HtmlCanvasElement, crop: Crop, side: f64) -> Option<()> {

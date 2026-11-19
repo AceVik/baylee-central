@@ -392,7 +392,9 @@ the public gateway directory of the `/gateways` page ([gateway
 registry](gateway-registry.md)), and since 11.11.2026 `PublicFigures`, the
 numbers read beside it ([gateway
 registry](gateway-registry.md#activity-and-the-public-figures); both
-listeners, no session), since 28.10.2026 `ChangePasswordStart`
+listeners, no session), since 18.11.2026 `PublicFunding`, the donation
+figures ([operations](operations.md#donations); both listeners, no
+session), since 28.10.2026 `ChangePasswordStart`
 and `ChangePasswordFinish` ([native login](native-login.md) §"Password
 change"; served on both listeners, the page's form since 12.11.2026), and
 `Admin`, an administrator's requests ([administration](administration.md);
@@ -475,7 +477,7 @@ room, so a crowd of addresses cannot lock new ones out.
 | `RegisterChallenge` and `RegisterChallengeFor` | 20 an hour, together |
 | `Discover` | 30 a minute |
 | `LoginStart` | 30 a minute, apart from `Discover` |
-| `GatewayDirectory` and `PublicFigures` | 60 a minute for the two together, apart from the others |
+| `GatewayDirectory`, `PublicFigures` and `PublicFunding` | 60 a minute for the three together, apart from the others |
 | `ResetStart` | 10 an hour |
 | Every request that needs no session | 600 a minute, of the 32 a second all clients share; when those are spent, an address that was served fewer than 30 in its minute draws on 8 a second kept beside them (12.11.2026, [native login](native-login.md#guessing-a-password-online)) |
 
@@ -753,8 +755,23 @@ The CSP gains `'wasm-unsafe-eval'` in `script-src`.
   expires_at }`, and `SessionStatus` answered there as `browser_status {
   identity, username, expires_at }`. The page takes exactly these shapes.
   Since 23.10.2026 the name it shows is the handle of the account's
-  `AccountSummary` (§"Display name and tag"), always Central's, held in
-  memory; without a display name the header says "Your account".
+  `AccountSummary` (§"Display name and tag"), always Central's; without a
+  display name the header says "Your account".
+- **The header's note of who is signed in** (18.11.2026). The account link
+  shows the account's picture, its display name and its tag, the tag set
+  apart in gold, on every page and in every tab. No page asks Central for
+  that: the pages that learn them (the sign-in, every account page's
+  `AccountSummary`, the profile page's picture) write one note to
+  localStorage, `baylee-central-own`: `{ of, name, tag, key, moving }`,
+  where `of` is the session record as it stood (`baylee-central-session`,
+  below). `boot.js` draws the link from the note where `of` is the
+  current record, with DOM calls and text only, and draws it again when a
+  page says the note changed (`baylee:own`). A note of another sign-in is
+  never shown; signing out, a new sign-in and any page that finds no live
+  session remove it. What it holds is what other people see of the account
+  (the handle and the picture's public key), on the person's own device,
+  for as long as the sign-in; the privacy notice names it. Until a page
+  noted a name the link says "Your account".
 - The page keeps the session's end and a random non-secret change marker in localStorage
   (`baylee-central-session`), so after a reload it knows to ask whose
   session it is (`AccountSummary` since 23.10.2026, `SessionStatus` before;

@@ -1,6 +1,6 @@
 // The checks every page of the site passes, shared by the suites.
 import { AxeBuilder } from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import { test, type Page, type TestInfo } from "@playwright/test";
 
 /**
  * axe-core with every WCAG 2.2 A/AA rule and its best practices. Its
@@ -102,4 +102,14 @@ export function watch(page: Page, origin: string, expected404 = false): string[]
     if (!request.url().startsWith(origin) && !request.url().startsWith("data:")) problems.push(`elsewhere: ${request.url()}`);
   });
   return problems;
+}
+
+/**
+ * Skips the test in every project but the desktop one, for a test that sets
+ * its own window sizes (usually in a loop): the project's size is irrelevant
+ * to it, so running it once is enough. `phoneToo` keeps the phone project
+ * for the cases that name it. The one permitted use of `test.skip`.
+ */
+export function onlyDesktop(info: TestInfo, reason: string, phoneToo = false): void {
+  test.skip(info.project.name !== "desktop" && !phoneToo, reason);
 }

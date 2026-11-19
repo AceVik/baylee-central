@@ -3,8 +3,9 @@
 // visitor chose (localStorage "baylee-site-theme", as before), shows the
 // colour switch, which turns the scheme shown into the other one, and lets
 // a new scheme spread from it, names the account link while a session is remembered
-// ("baylee-central-session", which holds only when it ends) and puts the
-// account's own picture beside it, opens
+// ("baylee-central-session", which holds only when it ends): with the
+// account's own picture, display name and tag where a page noted them
+// ("baylee-central-own"), opens
 // dialogs in browsers without invoker commands, closes the dropdowns as a
 // menu closes, copies a gateway's address, pauses the hero's light off
 // screen, and marks what is on screen as the page opens. Nothing here is
@@ -100,24 +101,29 @@
       } else {
         indexedDB.deleteDatabase("baylee-chat");
       }
-      // and the header's note of the account's own picture
+      // and the header's note of who was signed in (the second key is
+      // the note's earlier, per-tab home)
+      localStorage.removeItem("baylee-central-own");
       sessionStorage.removeItem("baylee-central-own-picture");
     } catch {
       // no storage here, nothing kept
     }
   }
 
-  // The account's own picture beside the account link
-  // (docs/profile-pictures.md). Asked of nobody: the profile page writes
-  // its key, and whether it moves, to "baylee-central-own-picture" in this
-  // tab's sessionStorage whenever it reads or changes it. Only Central's own
-  // files under their random key; a moving one plays only where the system
-  // allows motion. Until the key is known, or without a picture, a neutral
-  // mark of the same fixed size, so nothing shifts.
-  const OWN = "baylee-central-own-picture";
-  const ownPicture = () => {
+  // Who is signed in, beside the account link (docs/web-accounts.md,
+  // docs/profile-pictures.md). Asked of nobody: the pages that learn the
+  // display name, the tag and the own picture's key note them in
+  // localStorage ("baylee-central-own") with the session record they
+  // belong to, and tell this page ("baylee:own"). A note of another
+  // sign-in is not shown. Only Central's own files under their random key;
+  // a moving picture plays only where the system allows motion. Until the
+  // key is known, or without a picture, a neutral mark of the same fixed
+  // size, so nothing shifts.
+  const own = () => {
     try {
-      return JSON.parse(sessionStorage.getItem(OWN) ?? "null");
+      const held = JSON.parse(read("baylee-central-own") ?? "null");
+      const session = read("baylee-central-session");
+      return held && typeof held === "object" && session !== null && held.of === session ? held : null;
     } catch {
       return null;
     }
@@ -152,6 +158,40 @@
     }
     link.prepend(face);
   };
+  // The account link of a signed-in visitor: where it leads, whose it is
+  // (the handle, its tag set apart; "Your account" until a page noted
+  // one) and the picture. Drawn again whenever the note changes.
+  const account = () => {
+    const live = signedIn();
+    const held = live ? own() : null;
+    for (const link of document.querySelectorAll("a[data-account-href]")) {
+      link.querySelector(".nav-face")?.remove();
+      if (!live) continue;
+      link.href = link.dataset.accountHref;
+      const text = link.querySelector(":scope > span");
+      if (text) {
+        const named = typeof held?.name === "string" && held.name !== "" && /^[0-9a-f]{4,8}$/.test(held.tag ?? "");
+        if (named) {
+          const whose = document.createElement("span");
+          whose.className = "visually-hidden";
+          whose.textContent = `${link.dataset.account}: `;
+          const name = document.createElement("bdi");
+          name.className = "nav-name";
+          name.textContent = held.name;
+          const tag = document.createElement("span");
+          tag.className = "nav-tag";
+          tag.textContent = `#${held.tag}`;
+          text.replaceChildren(whose, name, tag);
+          text.translate = false;
+        } else {
+          text.textContent = link.dataset.account;
+          text.translate = true;
+        }
+      }
+      ownFace(link, held);
+    }
+  };
+  window.addEventListener("baylee:own", account);
 
   const ready = () => {
     for (const button of document.querySelectorAll("[data-theme-switch]")) {
@@ -159,16 +199,8 @@
       label(button);
       button.addEventListener("click", turn);
     }
+    account();
     if (signedIn()) {
-      for (const link of document.querySelectorAll("a[data-account-href]")) {
-        link.href = link.dataset.accountHref;
-        const text = link.querySelector("span");
-        if (text) text.textContent = link.dataset.account;
-      }
-      const held = ownPicture();
-      for (const link of document.querySelectorAll("a[data-account-href]")) {
-        if (!link.querySelector(".nav-face")) ownFace(link, held);
-      }
       for (const line of document.querySelectorAll("[data-signed-out]")) line.hidden = true;
     }
     // The hero's slow light moves only while the hero is on screen.
@@ -215,17 +247,6 @@
         });
       }
     }
-    // Invoker commands (<button commandfor command>) where the browser has none.
-    if (!("command" in HTMLButtonElement.prototype)) {
-      document.addEventListener("click", (event) => {
-        const button = event.target instanceof Element ? event.target.closest("button[commandfor]") : null;
-        const dialog = button ? document.getElementById(button.getAttribute("commandfor") ?? "") : null;
-        if (!(dialog instanceof HTMLDialogElement)) return;
-        const command = button.getAttribute("command");
-        if (command === "show-modal" && !dialog.open) dialog.showModal();
-        else if (command === "close") dialog.close();
-      });
-    }
     // What stands on screen as the page opens is there at once: rising and
     // brightening on the way into view (home.css) is for what comes after.
     // A card that started half in view would otherwise wait half faded.
@@ -236,6 +257,21 @@
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
   else ready();
+  // a page put in place without a new document (`nav.js`) is made ready as
+  // a loaded one is
+  document.addEventListener("baylee:page", ready);
+
+  // Invoker commands (<button commandfor command>) where the browser has none.
+  if (!("command" in HTMLButtonElement.prototype)) {
+    document.addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest("button[commandfor]") : null;
+      const dialog = button ? document.getElementById(button.getAttribute("commandfor") ?? "") : null;
+      if (!(dialog instanceof HTMLDialogElement)) return;
+      const command = button.getAttribute("command");
+      if (command === "show-modal" && !dialog.open) dialog.showModal();
+      else if (command === "close") dialog.close();
+    });
+  }
 
   // The dropdowns (the language menu, the download's other systems) are
   // <details data-menu>: they open without script; with it, one at a time,
@@ -294,13 +330,81 @@
     if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) close(menu);
   });
 
-  // Signing in and registering open over the page that asked for them:
-  // every link to either shows its dialog where the page has one. A press
-  // with a modifier key, a browser without <dialog>, or a page without
-  // them (the two pages themselves) follows the link as ever. The dialog
-  // closes by its button, by Escape, and by a press on the veil around it
-  // that also began there (a text selection dragged out of a field is not
-  // one).
+  // Signing in, registering and setting a new password open over the page
+  // that asked for them: every link to one of the three shows its dialog
+  // where the page has one. A press with a modifier key, a browser without
+  // <dialog>, or a page without them (the signed-in area) follows the link
+  // as ever, and the address it leads to is the start page with that dialog
+  // open (`data-auth` on the document). The dialog closes by its button, by
+  // Escape, and by a press on the veil around it that also began there (a
+  // text selection dragged out of a field is not one).
+  //
+  // An open dialog has its address: opening one puts the form's address in
+  // the bar (one step in the history, however often the forms change
+  // places), closing it goes that step back, and Back closes it. A dialog
+  // that stood open when the page came (the address was entered, or a mail
+  // led here) has nothing to go back to and leaves for the start page.
+  const AUTH = /^\/([A-Za-z-]+)\/(signin|register|reset)\/?$/;
+  const authDialog = (which) => {
+    const dialog = which ? document.getElementById(`auth-${which}`) : null;
+    return dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function" ? dialog : null;
+  };
+  // Closing one dialog to show another, or because the address changed, is
+  // not the visitor leaving the forms. The `close` event comes later, in a
+  // task of its own, so the dialog itself carries the mark until then.
+  const shutAll = () => {
+    for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) {
+      other.dataset.changing = "";
+      other.close();
+    }
+  };
+  // the title of the page a dialog stands over
+  let beneath = document.title;
+  const show = (dialog) => {
+    shutAll();
+    const nav = document.getElementById("nav");
+    if (nav?.matches(":popover-open")) nav.hidePopover();
+    const title = dialog.querySelector("h2")?.textContent;
+    if (title) document.title = `${title} – Baylee`;
+    dialog.showModal();
+  };
+  document.addEventListener(
+    "close",
+    (event) => {
+      const closed = event.target;
+      if (!(closed instanceof HTMLDialogElement) || !closed.matches(".auth-dialog")) return;
+      if ("changing" in closed.dataset) {
+        delete closed.dataset.changing;
+        return;
+      }
+      const at = AUTH.exec(location.pathname);
+      if (!at) return;
+      document.title = beneath;
+      if (history.state?.auth === true) history.back();
+      else location.replace(`/${at[1]}/`);
+    },
+    true,
+  );
+  // The dialog the address names is the one that stands open: as the page
+  // comes, as the history moves, and when another page is put in place
+  // under the same address (`nav.js`, Back to a page a form stood over).
+  const match = () => {
+    const dialog = authDialog(AUTH.exec(location.pathname)?.[2]);
+    if (dialog?.open) return;
+    if (dialog) {
+      show(dialog);
+    } else if (document.querySelector("dialog.auth-dialog[open]")) {
+      shutAll();
+      document.title = beneath;
+    }
+  };
+  window.addEventListener("popstate", match);
+  document.addEventListener("baylee:page", () => {
+    beneath = document.title;
+    match();
+  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", match, { once: true });
+  else match();
   let pressed = null;
   document.addEventListener("pointerdown", (event) => {
     pressed = event.target;
@@ -320,14 +424,13 @@
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = target.closest("a[href]");
     if (!(link instanceof HTMLAnchorElement) || link.origin !== location.origin || link.target === "_blank") return;
-    const which = /^\/[A-Za-z-]+\/(signin|register)\/?$/.exec(link.pathname)?.[1];
-    const dialog = which ? document.getElementById(`auth-${which}`) : null;
-    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== "function") return;
+    const dialog = authDialog(AUTH.exec(link.pathname)?.[2]);
+    if (!dialog) return;
     event.preventDefault();
-    for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) other.close();
-    const nav = document.getElementById("nav");
-    if (nav?.matches(":popover-open")) nav.hidePopover();
-    dialog.showModal();
+    const address = link.pathname + link.hash;
+    if (AUTH.test(location.pathname)) history.replaceState(history.state, "", address);
+    else history.pushState({ auth: true, page: history.state?.page ?? location.pathname + location.search }, "", address);
+    show(dialog);
   });
 
   // An island's form works only once its island runs. Until then the

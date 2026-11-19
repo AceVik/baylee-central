@@ -89,6 +89,17 @@ fn upload(request: &Request) -> bool {
     request.method() == Method::PUT && request.uri().path().starts_with("/v1/reports/")
 }
 
+/// The most of a request's body the boundary reads: Ko-fi's deliveries
+/// (`native.rs`) have a small bound of their own, every other request the
+/// listener's.
+fn limit(state: &Boundary, request: &Request) -> usize {
+    if request.uri().path() == super::native::KOFI_PATH {
+        central_identity::KOFI_READ.min(state.request_bytes)
+    } else {
+        state.request_bytes
+    }
+}
+
 pub(crate) fn router(authority: HeaderValue, request_bytes: usize, connections: usize) -> Router {
     with_routes(authority, request_bytes, connections, Router::new())
 }
@@ -143,7 +154,8 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
     ));
     request.extensions_mut().insert(from);
     if !upload(&request) {
-        return timed(state.request_time, admitted(&state, request, next)).await;
+        let limit = limit(&state, &request);
+        return timed(state.request_time, admitted(&state, request, next, limit)).await;
     }
     // A part's upload declares its length, within the largest part; its
     // handler checks the credential and the announcement before it reads
@@ -217,7 +229,7 @@ fn origin(peer: Option<&Peer>, headers: &HeaderMap) -> Option<Client> {
     }
 }
 
-/// Read the whole body, at most the boundary's bytes, before `next` runs.
+/// Read the whole body, at most `limit` bytes, before `next` runs.
 ///
 /// A body of at most [`LIGHT_BYTES`] that is there within the grace needs
 /// nothing more. One that is not, or a larger one, needs one of its
@@ -227,11 +239,11 @@ fn origin(peer: Option<&Peer>, headers: &HeaderMap) -> Option<Client> {
 /// each for the request's time at most. A late body gives its place back
 /// when it has arrived, a large one when its request ends, however it
 /// ends: the places bound the large bodies in memory too.
-async fn admitted(state: &Boundary, request: Request, next: Next) -> Response {
+async fn admitted(state: &Boundary, request: Request, next: Next, limit: usize) -> Response {
     let (parts, body) = request.into_parts();
     // Reject declared oversize before waiting for an attacker to send a body.
     // Streaming/chunked bodies are still bounded independently below.
-    if oversize(&parts.headers, state.request_bytes) {
+    if oversize(&parts.headers, limit) {
         return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
     }
     let client = client(&parts);
@@ -239,7 +251,7 @@ async fn admitted(state: &Boundary, request: Request, next: Next) -> Response {
         .size_hint()
         .upper()
         .is_none_or(|bytes| bytes > LIGHT_BYTES);
-    let reading = collect(body, state.request_bytes);
+    let reading = collect(body, limit);
     tokio::pin!(reading);
     let in_time = if large {
         None

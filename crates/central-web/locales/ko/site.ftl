@@ -122,15 +122,13 @@ dl-linux-unsure = 브라우저가 프로세서를 알려 주지 않아서 x86-64
 dl-missing = 이 릴리스에는 사용 중인 시스템용 파일이 없어요. 이전 릴리스는 <releases>릴리스 페이지</releases>에 있어요.
 dl-none = GitHub가 지금은 응답하지 않았어요. 모든 릴리스는 <releases>릴리스 페이지</releases>에 있어요.
 dl-yours = 내 시스템
-dl-more-files = 파일 더 보기 ({ $count })
 dl-installer = 설치 프로그램
 dl-deb = Debian 패키지
 dl-archive = 압축 파일
 dl-fallback = 구형 프로세서용 압축 파일
-dl-fallback-help = AVX2가 없는 x86-64 프로세서(대략 2013년 이전)용이에요. Baylee의 기본 빌드에는 AVX2가 필요하며, 없으면 시작되지 않아요.
 plat-windows-x64 = Windows
 plat-windows-x64-sub = 대부분의 PC: 64‑bit Intel 또는 AMD
-plat-windows-arm64 = Windows on ARM
+plat-windows-arm64 = ARM용 Windows
 plat-windows-arm64-sub = Snapdragon 노트북 등
 plat-mac-arm64 = macOS
 plat-mac-arm64-sub = Apple 칩: M1 이후
@@ -255,7 +253,7 @@ privacy-hosting = 이 사이트는 독일 netcup GmbH에서 임대한 서버에�
 privacy-views-title = 페이지 조회수 세기
 privacy-views = 이 사이트는 페이지가 열린 횟수를 세요. 모든 페이지와 모든 방문자를 합친 숫자 하나뿐이고, 시작 페이지에 표시돼요. 브라우저에서 페이지가 열리면 이 숫자에 1이 더해져요. 이를 위해 여러분에 관한 정보는 저장하지 않아요. IP 주소도, 쿠키도, 식별자도, 어느 페이지였는지조차 저장하지 않아요.
 privacy-device-title = 브라우저에 저장되는 것
-privacy-device = 이 사이트는 로그인하기 전에는 쿠키를 설정하지 않아요. 브라우저가 기기에 저장하는 것은 다음과 같고, JavaScript를 쓸 때만 해당돼요. 색상을 선택했다면 그 선택(<code>baylee-site-theme</code>), 로그인한 동안에는 세션이 끝나는 시각과 로그인 변경을 감지하는 임의 표식(<code>baylee-central-session</code>), 채팅 키, 연락처의 신뢰한 키(채팅 항목 참고), 알림을 켰다면 이 기기의 임의 번호(<code>baylee-push-installation-v1</code>, <code>baylee-push</code>), 그리고 로그인했거나 사이트를 앱으로 설치했거나 알림을 켠 경우에 한해 사이트의 공개 파일(페이지 틀, 글꼴, 스크립트)의 사본이에요. 이 사본이 있으면 연결 없이도 시작되고 알림을 받을 수 있어요. 세 가지가 모두 더는 해당하지 않으면 다음에 사이트를 열 때 사본이 제거돼요. 아래 항목에서 달리 말하지 않는 한, 이 중 어떤 것도 우리에게 전송되지 않아요. 채팅과 세션 항목은 로그아웃하면 삭제되며, 나머지는 브라우저에서 사이트 데이터를 지우면 제거할 수 있어요. 법적 근거: TDDDG § 25 제2항 제2호(사용하는 기능에 꼭 필요한 경우). 알림의 임의 번호에 대해서는 동의(TDDDG § 25 제1항).
+privacy-device = 이 사이트는 로그인하기 전에는 쿠키를 설정하지 않아요. 브라우저가 기기에 저장하는 것은 다음과 같고, JavaScript를 쓸 때만 해당돼요. 색상을 선택했다면 그 선택(<code>baylee-site-theme</code>), 로그인한 동안에는 세션이 끝나는 시각과 로그인 변경을 감지하는 임의 표식(<code>baylee-central-session</code>), 머리글에 누가 로그인했는지 보여 주기 위한 표시 이름, 태그, 프로필 사진을 가져오는 키(<code>baylee-central-own</code>. 로그아웃할 때, 또는 세션이 끝난 뒤 사이트를 다음에 열 때 삭제돼요), 채팅 키, 연락처의 신뢰한 키(채팅 항목 참고), 알림을 켰다면 이 기기의 임의 번호(<code>baylee-push-installation-v1</code>, <code>baylee-push</code>), 그리고 로그인했거나 사이트를 앱으로 설치했거나 알림을 켠 경우에 한해 사이트의 공개 파일(페이지 틀, 글꼴, 스크립트)의 사본이에요. 이 사본이 있으면 연결 없이도 시작되고 알림을 받을 수 있어요. 세 가지가 모두 더는 해당하지 않으면 다음에 사이트를 열 때 사본이 제거돼요. 아래 항목에서 달리 말하지 않는 한, 이 중 어떤 것도 우리에게 전송되지 않아요. 채팅과 세션 항목은 로그아웃하면 삭제되며, 나머지는 브라우저에서 사이트 데이터를 지우면 제거할 수 있어요. 법적 근거: TDDDG § 25 제2항 제2호(사용하는 기능에 꼭 필요한 경우). 알림의 임의 번호에 대해서는 동의(TDDDG § 25 제1항).
 privacy-device-manager = 복구 코드를 브라우저의 비밀번호 관리자에 보관하거나, 자신에게 메일로 보내거나, 파일로 저장하거나, 코드가 나오는 단계에서 인쇄하면, 코드는 브라우저, 메일 프로그램, 파일, 종이에 남을 뿐 이 사이트에는 남지 않아요. 코드는 브라우저 안에서 만들어지고 우리에게 전송되지 않아요. 사이트 데이터를 지워도 그곳에서는 지워지지 않아요.
 privacy-github-title = GitHub
 privacy-github = 다운로드 페이지와 시작 페이지는 최신 릴리스, 테스트 상태, 카드 수치를 보여 줘요. 이 정보는 브라우저가 아니라 우리 서버가 GitHub에 요청하므로, GitHub는 이를 통해 여러분에 대해 아무것도 알 수 없어요. 다운로드나 GitHub 링크를 누를 때만 브라우저가 GitHub(GitHub, Inc., 미국)에 연결해 IP 주소와 모든 요청에 담기는 정보를 보내며, 그 뒤에는 GitHub의 개인정보 처리방침이 적용돼요.
@@ -485,7 +483,6 @@ register-error-taken = 이미 사용 중인 로그인 이름이에요. 다른 �
 ## The recovery code
 
 code-title = 복구 코드
-code-handle = 내 핸들: { $handle }
 code-lead = 비밀번호를 잊어버렸을 때 이 코드가 있어야만 암호화된 데이터가 남아 있어요. 우리는 이 코드를 알지 못하며 복원할 수도 없어요. 이 기기와 떨어진 안전한 곳에 보관해 주세요.
 code-shown-once = 지금만 표시돼요
 code-download = 텍스트 파일로 저장
@@ -882,38 +879,22 @@ strip-gateways = Gateway
 strip-online = 온라인
 strip-offline = 오프라인
 strip-directory = 목록
-strip-cards = 플레이 가능한 카드
-strip-cards-unit = 장
 strip-accounts = Baylee Central의 계정
 strip-live = 지금 Gateways가 보고한 수치
 strip-views = { $date }부터의 페이지 조회수
-live-views = { $n ->
-   *[other] 조회 { $n }회
-}
-live-accounts = { $n ->
-   *[other] 계정 { $n }개
-}
-live-players = { $n ->
-   *[other] 플레이어 { $n }명
-}
-live-playing = { $n ->
-   *[other] 게임 중 { $n }명
-}
-live-tables = { $n ->
-   *[other] 열린 테이블 { $n }개
-}
-live-games = { $n ->
-   *[other] 게임 { $n }개
-}
+strip-l-players = 플레이어
+strip-l-games = 게임
+strip-l-tables = 열린 테이블
+strip-l-accounts = 계정
+strip-l-views = 조회
+stat-cards = 플레이 가능한 카드
 hero-badges = 한눈에 보기
 hero-badge-beta = 오픈 베타
 hero-badge-free = 무료
 hero-badge-open = 오픈 소스
 hero-badge-fan = 비공식 팬 콘텐츠
 gws-open-client = Baylee에서 열기
-gws-open-client-help = “Baylee에서 열기”는 설치된 클라이언트(0.1.1-beta.9b 이상)를 실행해요. 클라이언트가 주소를 보여 주고, Gateway를 추가하기 전에 물어봐요.
 dl-menu-title = 모든 시스템
-dl-old-cpu = 구형 프로세서 (AVX2 없음)
 ci-passing = 통과
 ci-failing = 실패
 dl-button = Baylee 다운로드
@@ -974,10 +955,6 @@ source-repoTitle = 저장소 현황
 source-stars = 스타
 source-issues = 열린 이슈와 풀 리퀘스트
 source-note = 이 사이트의 서버가 10분마다 GitHub의 공개 API에서 읽어 와요. 브라우저는 GitHub에 아무것도 요청하지 않아요.
-gw-count =
-    { $n ->
-       *[other] 등록된 Gateway { $n }개, 그중 온라인 { $online }개.
-    }
 gw-none = 아직 등록된 Gateway가 없어요.
 contact-intro = 질문, 아이디어, 보고 싶은 게임, 또는 공개로 올리고 싶지 않은 이야기라면, 이 양식은 Baylee를 만든 사람에게 바로 전달돼요. 답장을 원하면 이메일 주소를 남겨 주세요. 주소가 없으면 읽을 수만 있어요.
 contact-f8 = 잘못 처리된 카드는 게임 전체를 보고서에 담을 수 있으므로 게임에서 <kbd>F8</kbd>로 신고하는 것이 가장 좋아요.
@@ -1000,17 +977,14 @@ ai-hostingLink = Gateway 호스팅과 LLM 설정
 
 # The gateways and the contact page, as the old site wrote them (owner, 11.11.2026)
 gw-lead = Gateway는 온라인 테이블이 있는 서버예요. 계정, 덱, 방, 그리고 게임마다 엔진 프로세스 하나가 거기 있어요. 여기에 나오는 것은 Baylee Central에 등록되고 관리자가 승인한 Gateway예요. 각 Gateway는 운영자가 자기 그룹을 위해 운영하며, 거기서는 운영자의 규칙이 적용돼요. 목록에 있다고 해서 그 Gateway가 하는 일을 보증하는 것은 아니에요.
-gw-howTo = Gateway에서 플레이하려면 주소를 복사해 클라이언트의 첫 화면에 붙여 넣으세요. 온라인은 Central이 최근 1분 30초 안에 그 Gateway에서 소식을 받았다는 뜻이며, 응답한다는 보장은 아니에요. 이름과 버전은 각 운영자가 알려 준 그대로예요.
 gw-find = Gateway 찾기
 gw-findHint = 이름 또는 주소
 gw-shown = { $all }개 중 { $n }개 표시
 gw-noMatch = 지금까지 불러온 Gateway 중 일치하는 것이 없어요.
 gw-showAll = 모두 보기
 gw-stats = 숫자로 보는 디렉터리
-gw-stat-listed = 등록된 Gateway
 gw-stat-online = 지금 온라인
 gw-stat-players = 온라인 플레이어
-gw-stat-playing = 그중 게임 중
 gw-stat-tables = 열린 테이블
 gw-stat-games = 진행 중인 게임
 gw-show = 표시
@@ -1349,7 +1323,6 @@ chat-write-first = 첫 메시지를 써 보세요
 people-copy-handle = 내 핸들 복사
 people-copy-failed = 여기서는 복사가 되지 않았어요. 위의 핸들을 선택해서 직접 복사해 주세요.
 
-
 # ==== the administration's other pages (islands/admin/) ========================
 # Translated by a model (Claude Sonnet) on 12.11.2026; no native speaker has read it yet.
 admin-accounts = 계정
@@ -1458,8 +1431,6 @@ admin-legacy-restored = 복원됨
 admin-legacy-banned = 차단됨
 admin-legacy-must-change = 새 비밀번호 필요
 admin-legacy-locked = { $until }까지 잠김
-
-
 
 ## The feedback moderation (/account/admin/feedback)
 
@@ -1759,93 +1730,122 @@ fb-json-base64 = base64 { $n }자
 fb-json-more = 다음 { $n }자 보기 (남은 글자: { $left })
 fb-json-items = 항목: { $n }
 fb-json-keys = 키: { $n }
-## Global daily and weekly challenges
-ch-title = 도전 과제
-ch-lead = 어느 게이트에서 플레이하든 모두에게 같은 과제입니다. 나만의 해법을 찾고 기록을 개선하며 영구 배지를 모아 보세요.
-ch-eyebrow = 다시 찾고 싶은 도전
-ch-daily = 일일 과제
-ch-weekly = 주간 과제
-ch-loading = 불러오는 중…
-ch-play-help = 링크를 누르면 Baylee에서 과제가 열립니다. 클라이언트의 도전 과제 메뉴에서도 찾을 수 있습니다.
-ch-unavailable = 과제를 불러오지 못했습니다. 다시 시도해 주세요.
-ch-empty = 아직 검증된 과제가 없습니다.
-ch-archive = 보관함
-ch-older = 이전 과제
-ch-withdrawn = 철회됨 — 이 과제는 시작하거나 순위에 등록할 수 없습니다.
-ch-current = 진행 중인 과제
-ch-details = 과제와 순위
-ch-play = Baylee에서 플레이
-ch-ends = 순위 집계 마감
-ch-estimated = 예상 시간
-ch-target = 목표 턴 수
-ch-deck = 제공 덱
-ch-progress = 내 진행 상황
-ch-attempts = 시작한 시도
-ch-failures = 실패한 시도
-ch-best-turns = 최소 턴 수
-ch-completed = 완료 — 진행 상황이 저장되었습니다.
-ch-assisted = 힌트 사용됨: 새 시도는 도움을 받은 것으로 처리되어 경쟁 순위에 등록되지 않습니다.
-ch-consent = 이 과제의 순위에 내 공개 이름과 태그를 표시합니다.
-ch-hint-one = 힌트 1
-ch-hint-two = 힌트 2
-ch-hint-confirm = 힌트 보기
-ch-hint-warning = 힌트를 보면 이후 시도를 포함해 이 계정의 해당 과제가 도움을 받은 것으로 표시됩니다. 완료 배지는 계속 획득할 수 있습니다. 이전에 도움 없이 세운 기록은 유지됩니다.
-ch-first-win = 첫 승리
-ch-sprint = 스프린트
-ch-rankings = 전체 순위
-ch-ranking-rules = 첫 승리는 실패 횟수가 적은 순서, 그다음 턴 수가 적은 순서입니다. 최소 턴 수는 도움 없이 이긴 최고 기록입니다. 스프린트는 일시 정지나 연결 끊김 없이 서버가 측정한 시간입니다. 같은 기록은 공동 순위입니다. 진행 기간 안에 끝낸 승리만 인정됩니다.
-ch-no-scores = 아직 조건에 맞는 공개 기록이 없습니다.
-ch-more = 다음 페이지
-ch-rank = 순위
-ch-player = 플레이어
-ch-turn = 턴
-ch-time = 시간
-ch-badges = 내 배지 모음
-ch-badges-lead = 각 과제는 한 번만 집계됩니다. 배지 등급은 영구적이며 쉬는 날이 있어도 진행 상황은 사라지지 않습니다. 보관함의 승리도 일일, 주간, 전술가 배지에 반영됩니다.
-ch-active = 진행 중인 시도 계속하기
-ch-badge-daily = 일일 탐험가
-ch-badge-weekly = 주간 탐험가
-ch-badge-tactician = 전술가
-ch-badge-first-try = 첫 시도 성공
-ch-badge-regular = 꾸준한 참가자
-ch-badge-locked = 아직 미획득
-ch-bronze = 브론즈
-ch-silver = 실버
-ch-gold = 골드
-ch-platinum = 플래티넘
-ch-obsidian = 옵시디언
+## The privacy notice: what Central keeps of Daily and Weekly tasks
 privacy-challenges-title = Daily 및 Weekly 도전
 privacy-challenges = Central은 시도, 결과, 사용한 힌트, 순위 공개 설정, 영구 배지 진행 상황을 계정에 저장합니다. 공식 호스트가 결과와 측정 시간을 보냅니다. 이름, 태그, 기록은 해당 도전의 순위 공개를 켠 경우에만 공개되며, 끄면 순위에서 사라집니다. 기록은 계정 삭제까지 보관됩니다. 백업 보관 기간은 계정 항목을 참조하세요. 도전 메타데이터는 계정 데이터 내보내기에 포함됩니다.
 
-# Tower expeditions
+# The privacy notice: what Central keeps of Tower expeditions
 tower-title = 초록빛 탑
-tower-lead = 다섯 번의 결투. 세 번의 생명. 선택에 따라 성장하는 덱.
-tower-rules = 제공된 덱으로 모든 결투를 직접 플레이하세요. 처음 네 번의 승리 후에는 각각 강화 하나를 선택합니다. 패배하면 생명 하나를 잃고 세 번 패배하면 원정이 끝납니다. 재접속해도 대전은 유지되며 기술적 무효 경기는 생명을 소모하지 않습니다. 모두 같은 주간 탑에 도전합니다. 주가 끝나도 연습으로 영구 배지를 획득할 수 있습니다.
-tower-floors = 층
-tower-lives = 생명
-tower-rewards = 등정의 유물
-tower-reward-rules = 개척자는 각 주의 서로 다른 층, 왕관의 수호자는 주간 정상 정복, 불굴은 무패 주간 정상 정복을 셉니다. 같은 주에 같은 업적을 반복해도 진행도가 늘지 않습니다. 유물은 사라지지 않으며 연속 플레이도 필요 없습니다.
-tower-conquered = 왕관은 당신의 것입니다
-tower-choosing = 게임에서 다음 강화를 선택하세요
-tower-ended = 원정 종료
-tower-pathfinder = 개척자
-tower-summit = 왕관의 수호자
-tower-unbroken = 불굴
-tower-tiers = 다섯 등급 모두 보기
-tower-ascent = 등정
-tower-sprint = 완벽한 스프린트
-tower-scoring = 등정은 완료한 층, 적은 패배, 승리한 결투의 적은 턴 순으로 순위를 정합니다. 스프린트는 패배 없이 승리한 결투를 중단하지 않고 정상에 오른 실제 사고 시간입니다. 유효한 최고 기록만 표시하며 같은 기록은 같은 순위입니다.
 tower-privacy = Central은 원정, 선택한 강화, 남은 목숨, 결과, 순위 공개 설정과 유물의 영구 진행 상황을 계정에 저장합니다. 시즌 순위를 활성화한 경우에만 공개 이름, 태그와 유효한 최고 기록이 표시됩니다. 비활성화하면 해당 항목이 순위에서 삭제됩니다. 계정 내보내기에는 원정과 도전 기록이 포함됩니다. 계정을 삭제하면 이 진행 상황도 삭제되며, 계정 항목에 설명된 백업 보관 기간이 적용됩니다.
-tower-guide = 원정 규칙
 
-echoes-title = 탑의 메아리
-echoes-permanent = 영구 컬렉션
-echoes-lead = 모든 승리는 흔적을 남깁니다. 여러 원정에 걸쳐 고유한 메달을 모으고 점점 더 화려해지는 다섯 등급을 달성하세요.
-echoes-confirmed = 확인된 결과만 반영됩니다. 외형 보상은 만료되지 않으며 결투에서 이점을 주지 않습니다.
-echoes-pending = 확인된 컬렉션을 불러오는 중입니다. 연결이 끊겨도 달성한 진행 상황은 사라지지 않습니다.
-echoes-victories = 결투의 달인
-echoes-victories-goal = 탑의 메아리에서 결투에 승리하세요.
-echoes-ascents = 왕관 정복자
-echoes-ascents-goal = 8승으로 원정을 완료하세요.
-echoes-unbroken = 무결점
-echoes-unbroken-goal = 패배나 무승부 없이 8승을 달성하세요.
+## the steps after signing in (code and terms, redesign)
+code-created = 계정을 만들었어요
+code-handle-label = 내 핸들
+code-keep-title = 지금 아래 방법 중 하나 이상으로 보관하세요
+code-mail-opened = 메일 프로그램이 초안과 함께 열릴 거예요. 아무 일도 일어나지 않는다면 이 브라우저에 설정된 메일 프로그램이 없는 거예요. 다른 방법으로 코드를 보관하세요.
+terms-step-version = 버전 { $version }
+terms-read-hint = 끝까지 읽으면 동의할 수 있어요.
+terms-read-done = 끝까지 읽었어요.
+
+## the contact form (redesign)
+contact-again = 다른 메시지 쓰기
+
+## the footer's last line (which build this is)
+foot-build = 이 사이트의 빌드:
+
+## download (variants and page)
+dl-v2-name = 구형 프로세서(x86-64-v2)
+dl-v2-help = 2013~2015년경 이전의 프로세서용이에요. 기본 빌드가 시작되지 않을 때도 쓰세요.
+dl-os-windows = Windows 10 또는 11
+dl-os-mac = macOS 11 이상
+dl-os-linux = glibc 2.35 이상과 Vulkan 드라이버
+dl-howto-title = 설치하기
+dl-howto-windows-1 = 설치 프로그램을 내려받아 실행하세요.
+dl-howto-windows-2 = Windows가 경고하면 <i>추가 정보</i>를 누른 다음 <i>실행</i>을 선택하세요. 빌드에 코드 서명이 없기 때문이에요.
+dl-howto-windows-3 = 시작 메뉴에서 Baylee를 실행하세요.
+dl-howto-mac-1 = <code>.dmg</code>를 열고 Baylee를 <i>응용 프로그램</i>으로 끌어다 놓으세요.
+dl-howto-mac-2 = 처음 실행할 때 <i>시스템 설정 → 개인정보 보호 및 보안</i>을 열고 <i>그래도 열기</i>를 선택하세요.
+dl-howto-mac-3 = Mac에 어떤 칩이 들어 있는지 모르겠다면 <i>Apple 메뉴 → 이 Mac에 관하여</i>에서 확인할 수 있어요.
+dl-howto-linux-1 = <code>chmod +x</code>로 AppImage를 실행할 수 있게 만들고 실행하세요.
+dl-howto-linux-2 = 또는 패키지를 설치하세요: <code>sudo apt install ./baylee_*.deb</code>.
+dl-howto-linux-3 = 압축 파일은 설치가 필요 없어요. 압축을 풀고 <code>baylee</code>를 실행하세요.
+dl-soon-title = 나중에 나와요
+dl-soon-text = Baylee는 지금은 컴퓨터에서 실행돼요. 아래는 계획 중이며 아직 내려받을 수 있는 것은 없어요.
+dl-soon-web = 브라우저에서
+
+## the account overview and its navigation (redesign)
+account-group-account = 계정
+account-play-title = 플레이
+account-play-lead = 게임을 받고, 이 계정으로 거기서 로그인하세요.
+account-numbers-lead = 지금 Gateway와 Baylee Central이 알려 주는 공개 수치예요.
+account-chat-lead = 메시지와 연락처예요. 종단 간 암호화되어 있어요.
+account-push-lead = 새 메시지를 이 기기에서 알려 줘요.
+
+## donations (the page, the bar's entry, the start page's band)
+nav-donate = 후원
+donate-title = Baylee 개발을 이어 가려면
+donate-eyebrow = 응원하기
+donate-description = Baylee는 무료이고 앞으로도 무료예요. 마음에 든다면 매달 드는 비용을 함께 짊어질 수 있어요. GitHub Sponsors, Liberapay, Ko-fi에서요.
+donate-lead = Baylee는 무료이고 앞으로도 무료예요. 유료 장벽도, 유료 기능도, 광고도 없어요. 여가 시간에 만들지만 그래도 매달 돈이 들어요. 마음에 든다면 그 부담을 함께 짊어질 수 있어요.
+donate-goal-title = 목표
+donate-goal-amount = 한 달에 약 { $amount }
+donate-goal-lead = 개발과 운영에 매달 드는 비용이 대략 이 정도예요.
+donate-progress = 한 달 { $goal } 중 { $have }
+donate-progress-label = 월 목표 중 채워진 정도
+donate-progress-percent = { $percent } % 채워짐
+donate-progress-supporters = 후원자: { $n }명.
+donate-progress-missing = 아직 집계되지 않음: { $platforms }.
+donate-progress-first = 아직 정기 후원이 없어요. 당신이 첫 번째가 될 거예요.
+donate-progress-none = 플랫폼들이 아직 금액을 알려 주지 않았어요.
+donate-once-title = 일회성 후원
+donate-once-since = { $date }부터
+donate-once-count = 후원: { $n }건
+donate-once-note = 한 번만 낸 후원이라 월 목표에는 들어가지 않아요. 다른 통화는 받은 날의 환율로 유로로 환산했어요.
+donate-costs-title = 어디에 쓰이나요
+donate-costs-lead = 매달 금액을 어림해서 적었어요.
+donate-cost-ai = AI 어시스턴트
+donate-cost-ai-note = Claude와 Gemini예요. 이것 없이는 프로젝트를 더 개발할 수 없어요.
+donate-cost-servers = 서버
+donate-cost-servers-note = 공개 Gateway, Baylee Central, 그리고 이 웹사이트예요.
+donate-cost-art = 그림, 영상, 음악
+donate-cost-art-note = 배경과 음악을 만드는 데 쓰는 도구예요.
+donate-cost-tools = 개발 도구
+donate-cost-tools-note = GitHub, 편집기, Apple 기기용 개발자 프로그램, 도메인, 이메일이에요.
+donate-cost-fees = 수수료
+donate-cost-fees-note = 플랫폼과 결제 서비스가 가져가는 몫이며, 약 10분의 1이에요.
+donate-cost-about = 약 { $amount }
+donate-ways-title = 후원하는 세 가지 방법
+donate-ways-lead = 셋 모두 이 비용을 내고 있는 Baylee 개발자 AceVik에게 닿아요. 마음에 드는 방법을 고르세요.
+donate-github-lead = 매달 또는 한 번, GitHub 계정으로.
+donate-liberapay-lead = 정기 후원을 카드나 PayPal로. Liberapay는 비영리 단체가 운영해요.
+donate-kofi-lead = 일회성 팁을 계정 없이 카드나 PayPal로.
+donate-open = { $platform } 열기
+donate-qr-alt = { $address }의 QR 코드
+donate-nothing-title = 후원으로 얻는 것
+donate-nothing = 아무것도 없어요. 일부러 그래요. 기능도, 게임 속 이점도, 더 이른 또는 독점적인 이용도, 배지도, 목록에 오르는 이름도 없어요. 모두가 같은 Baylee를 받아요. 후원은 감사의 표시이자 개인에게 주는 선물이며, 세금 공제 대상이 아니에요.
+donate-other-title = 다른 방법으로 돕기
+donate-other = 플레이하고, 고장 난 곳을 알려 주고, 친구에게 알려 주세요. 그것도 똑같이 도움이 돼요.
+donate-privacy = 결제는 고른 플랫폼에서 그 플랫폼의 결제 서비스로 이루어져요. 이 사이트는 결제를 받지 않고, 누가 후원했는지도 알지 못해요.
+donate-band-title = Baylee는 무료예요. 계속 이어 갈 수 있게 도와주세요.
+donate-band-lead = 서버와 도구에 한 달에 약 { $amount }이 들어요. 후원으로 얻는 것은 없지만 큰 도움이 돼요.
+donate-band-button = 후원하는 방법
+privacy-donate-title = 후원
+privacy-donate = The donation page links to GitHub Sponsors (GitHub, Inc., USA), Liberapay (Liberapay, France) and Ko-fi (Ko-fi Labs Limited, United Kingdom). Only when you follow one of these links does your browser connect to that platform; payment happens there and with its payment service (Stripe or PayPal), and the platform's own privacy notice applies. We take no payment on this site. The page shows how much of the monthly goal is covered and what was given once. Baylee Central collects these figures, not your browser: it asks Liberapay for its public total and GitHub Sponsors for the account's own totals and one-time sponsorships, without the sponsors' names, takes the euro exchange rates from the European Central Bank, and is notified by Ko-fi of each payment. Of a payment Central keeps only the amount, the currency, the time, whether it was given once or regularly, and a fingerprint of the platform's transaction number so that a notice that comes twice counts once; everything else in a notice, such as a name, an e-mail address or a message, is discarded without being stored or logged. After 40 days the amounts are added to a total and the single records are deleted. The figures name nobody, and we publish no donor's name.
+
+## gateways directory (redesign)
+gw-play-hint = “Baylee에서 열기”를 누르면 Gateway가 설치된 클라이언트로 넘어가요. 클라이언트가 주소를 보여 주고, 추가하기 전에 물어봐요. 로그인은 여기가 아니라 거기서 해요. 아직 클라이언트가 없나요? <download>Baylee 다운로드</download>.
+gw-fineprint = 온라인은 Central이 최근 1분 30초 안에 Gateway의 소식을 받았다는 뜻이에요. 응답을 보장하지는 않아요. 이름, 버전, 수치는 각 운영자가 알려 준 그대로예요.
+gw-fig-players = 플레이어
+gw-fig-playing = 게임 중
+gw-fig-tables = 열린 테이블
+gw-fig-games = 게임
+gw-load = 플레이어의 { $n }%가 게임 중이에요
+gw-load-empty = 지금은 아무도 없어요.
+gw-silent = 수치를 알려 주지 않아요.
+gw-away = Central이 최근에 소식을 받지 못했어요.
+gw-current = 최신
+gw-current-title = 최신 릴리스의 버전으로 실행 중이에요.
+gw-secure = 암호화된 연결(HTTPS)
+gw-show-current = 최신 버전
+gw-col-gateway = Gateway
+gw-col-state = 상태

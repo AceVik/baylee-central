@@ -1,6 +1,7 @@
 # Database adapter and migration development
 
-The server-side libraries use SeaORM 2.0.4 and sea-orm-migration 2.0.4.
+The server-side libraries use SeaORM 2.0.4. Migrations ran on sea-orm-migration
+2.0.4 until 18.11.2026; since then `central-migration` runs them itself (below).
 PostgreSQL 18 is the minimum; the pinned local fixture reports 18.6.
 Client, policy and crypto crates remain independent of database implementation.
 
@@ -22,8 +23,11 @@ Client, policy and crypto crates remain independent of database implementation.
   and runs the versioned registry under an outer transaction and timeouts.
   Unknown migration history is rejected. Failed DDL rolls back history too.
   History is fixed to the trusted public schema with a transaction-local search
-  path and catalog-qualified gate functions. The raw SeaORM migrator is private;
-  consumers cannot call its destructive or unguarded convenience methods.
+  path and catalog-qualified gate functions. The runner is first-party since
+  18.11.2026: one ordered list of SQL files, the history table exactly as
+  sea-orm-migration created it, and a recorded history that must be the list's
+  beginning (an unknown name, a gap or another order is refused before any
+  DDL). No destructive or unguarded operation exists.
   Missing/inaccessible public is an error, even if a temporary history table exists.
 - The first migration creates central_identity.pending_accounts. PostgreSQL
   generates the primary UUID with uuidv7(); UUIDv7/variant and expiry constraints

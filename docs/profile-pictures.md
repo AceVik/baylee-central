@@ -251,8 +251,10 @@ hidden from screen readers since the name stands beside it, with the
 initials (a group's sign, or in the header a neutral mark) where there is
 no picture:
 - the header's account link: the account's own, which the profile page
-  notes in the tab's `sessionStorage` (`baylee-central-own-picture`: the
-  key and whether it moves; removed at sign-out), so no page asks for it;
+  notes beside the display name and the tag in `localStorage`
+  (`baylee-central-own`: the key and whether it moves, bound to the
+  session record and removed with it; `docs/web-accounts.md` §"The
+  header's note of who is signed in"), so no page asks for it;
 - the profile page's card;
 - the messenger: one's own, the conversation list, the conversation's
   head, a group message's author, contacts, requests, group members, a

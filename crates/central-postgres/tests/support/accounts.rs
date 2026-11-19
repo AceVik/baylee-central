@@ -15,6 +15,7 @@ mod admin;
 mod challenges;
 mod chat;
 mod deletion;
+mod donations;
 mod email;
 mod gateways;
 mod kinds;
@@ -175,6 +176,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     pictures::run(&store, operator, &keys).await;
     challenges::run(&store, operator, &keys).await;
     tower_awards::run(&store, operator, &keys).await;
+    donations::run(&store, operator).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
     store.close().await.unwrap();

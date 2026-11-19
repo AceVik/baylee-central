@@ -1,15 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
 
-import { axe, targets, watch } from "./check.ts";
+import { axe, onlyDesktop, targets, watch } from "./check.ts";
 
 const PAGES = [
   "",
   "download",
   "gateways",
-  "challenges",
   "faq",
   "security",
+  "donate",
   "contact",
   "impressum",
   "privacy",
@@ -29,17 +28,6 @@ const PAGES = [
 const LANGS = ["en", "de"];
 const WIDTHS = [320, 375, 768, 1024, 1440, 2560];
 
-test.beforeEach(async ({ page }) => {
-  await page.route("**/api/v1", (route) => {
-    const body = route.request().postDataJSON() as { operation: string; request?: { action: string } };
-    if (body.operation !== "challenges") return route.fallback();
-    const feed = JSON.parse(readFileSync(new URL("../../../central-web-server/tests/data/challenges.json", import.meta.url), "utf8")) as { now: number; before: number | null; challenges: unknown[]; tower: unknown };
-    if (body.request?.action === "tower") return route.fulfill({ json: { result: "challenges", response: { answer: "tower", response: { answer: "read", now: feed.now, season: feed.tower, standings: [], run: null, active: null, badges: [] } } } });
-    if (body.request?.action !== "catalogue") return route.fallback();
-    return route.fulfill({ json: { result: "challenges", response: { answer: "catalogue", now: feed.now, before: feed.before, challenges: feed.challenges } } });
-  });
-});
-
 for (const lang of LANGS) {
   for (const slug of PAGES) {
     for (const scheme of ["light", "dark"] as const) {
@@ -57,7 +45,8 @@ for (const lang of LANGS) {
   }
 }
 
-test("no page needs sideways scrolling from 320 to 2560 px, portrait or landscape", async ({ page }) => {
+test("no page needs sideways scrolling from 320 to 2560 px, portrait or landscape", async ({ page }, info) => {
+  onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   // every size loads every page, and a page now fades into the next
   test.slow();
   for (const width of WIDTHS) {
@@ -72,7 +61,8 @@ test("no page needs sideways scrolling from 320 to 2560 px, portrait or landscap
   }
 });
 
-test("nor while signed in, where the bar names the account (German)", async ({ page }) => {
+test("nor while signed in, where the bar names the account (German)", async ({ page }, info) => {
+  onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   // every width loads four pages, two of them with their islands
   test.slow();
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
@@ -362,42 +352,49 @@ test("the gateway directory finds by name or address, narrows, sorts and lays ou
   const count = page.locator("[data-dir-count]");
   const every = page.getByRole("button", { name: /^All/ });
   const online = page.getByRole("button", { name: /^Online/ });
-  await expect(cards).toHaveCount(2);
-  // the directory in numbers, from the server
-  await expect(page.locator(".dir-stat")).toHaveCount(6);
-  await expect(page.locator(".dir-stat").first()).toContainText("2");
+  await expect(cards).toHaveCount(7);
+  // the directory in numbers, from the server: five of seven online, and
+  // what the online ones report added up
+  await expect(page.locator(".dir-stat")).toHaveCount(4);
+  await expect(page.locator(".dir-stat dt")).toHaveText(["Online now", "Players online", "Games running", "Open tables"]);
+  await expect(page.locator(".dir-stat dd .num")).toHaveText(["5", "44", "12", "4"]);
+  await expect(page.locator(".dir-stat-of")).toHaveText("/ 7");
   // each chip says how many it would show
-  await expect(every).toHaveText(/2$/);
-  await expect(online).toHaveText(/1$/);
+  await expect(every).toHaveText(/7$/);
+  await expect(online).toHaveText(/5$/);
+  await expect(count).toHaveText("7 of 7 shown");
   await field.fill("kitchen");
   await expect(cards).toHaveCount(1);
-  await expect(count).toHaveText("1 of 2 shown");
+  await expect(count).toHaveText("1 of 7 shown");
   await expect(page).toHaveURL(/\/en\/gateways\?q=kitchen$/);
   await field.press("Escape");
-  await expect(cards).toHaveCount(2);
+  await expect(cards).toHaveCount(7);
   await online.click();
   await expect(online).toHaveAttribute("aria-pressed", "true");
   await expect(every).toHaveAttribute("aria-pressed", "false");
-  await expect(cards).toHaveCount(1);
+  await expect(cards).toHaveCount(5);
   await expect(page).toHaveURL(/\?show=online$/);
+  // Kitchen is the one that is offline
   await field.fill("kitchen");
   await expect(page.locator("[data-no-match]")).toBeVisible();
   await page.getByRole("button", { name: "Show all" }).click();
-  await expect(cards).toHaveCount(2);
+  await expect(cards).toHaveCount(7);
   await expect(field).toBeFocused();
-  await expect(count).toHaveText("2 gateways listed, 1 online.");
+  await expect(count).toHaveText("7 of 7 shown");
   await expect(every).toHaveAttribute("aria-pressed", "true");
   await expect(page).toHaveURL(/\/en\/gateways$/);
   // a pressed chip pressed again shows all
   await online.click();
   await online.click();
-  await expect(cards).toHaveCount(2);
-  // by name Kitchen comes first; recommended is the server's order again
-  const sort = page.getByLabel("Sort by");
+  await expect(cards).toHaveCount(7);
+  // by name Atelier comes first; recommended is the server's order again
+  const sort = page.getByRole("combobox", { name: "Sort by" });
   await sort.selectOption("name");
-  await expect(cards.first()).toContainText("Kitchen");
+  await expect(cards.first()).toContainText("Atelier");
   await expect(page).toHaveURL(/\?sort=name$/);
   await sort.selectOption("players");
+  await expect(cards.first()).toContainText("Tavern of the Seven Lands");
+  await sort.selectOption("tables");
   await expect(cards.first()).toContainText("Sanctuary");
   await sort.selectOption("");
   await expect(cards.first()).toContainText("Sanctuary");
@@ -421,18 +418,19 @@ test("the gateway directory finds by name or address, narrows, sorts and lays ou
   // the address asks for a view, and gets it
   await page.goto("/en/gateways?q=sanc&show=online&sort=name");
   await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Sanctuary");
   await expect(field).toHaveValue("sanc");
   await expect(online).toHaveAttribute("aria-pressed", "true");
   await expect(sort).toHaveValue("name");
   // there are no official gateways, and no chip for them: an old address
   // that asked for them shows every gateway
   await page.goto("/en/gateways?show=official");
-  await expect(cards).toHaveCount(2);
+  await expect(cards).toHaveCount(7);
   await expect(every).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-show]")).toHaveText([/^All/, /^Online/, /^With open tables/]);
+  await expect(page.locator("[data-show]")).toHaveText([/^All/, /^Online/, /^With open tables/, /^Current version/]);
   // what it asks for and the page does not offer is left out
   await page.goto("/en/gateways?show=nothing&sort=%3Cscript%3E&view=sideways");
-  await expect(cards).toHaveCount(2);
+  await expect(cards).toHaveCount(7);
   await expect(every).toHaveAttribute("aria-pressed", "true");
   await expect(sort).toHaveValue("");
   await expect(page).toHaveURL(/\/en\/gateways$/);
@@ -485,21 +483,24 @@ test("the sign-in and the registration keep what was typed before the islands ra
     await held;
     await route.continue();
   });
+  // both forms stand in dialogs, which their addresses open
   await page.goto("/en/signin");
-  await page.getByLabel("Sign-in name").fill("early_erika");
+  const signin = page.locator("#auth-signin");
+  await signin.getByLabel("Sign-in name").fill("early_erika");
   release();
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  await expect(page.getByLabel("Sign-in name")).toHaveValue("early_erika");
+  await expect(signin.getByLabel("Sign-in name")).toHaveValue("early_erika");
   ({ promise: held, resolve: release } = Promise.withResolvers<void>());
   await page.goto("/en/register");
-  await page.getByLabel("Sign-in name").fill("early_erika");
-  await page.getByLabel("Display name").fill("Erika");
-  await page.getByLabel("I am 16 or older.").check();
+  const register = page.locator("#auth-register");
+  await register.getByLabel("Sign-in name").fill("early_erika");
+  await register.getByLabel("Display name").fill("Erika");
+  await register.getByLabel("I am 16 or older.").check();
   release();
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-  await expect(page.getByLabel("Sign-in name")).toHaveValue("early_erika");
-  await expect(page.getByLabel("I am 16 or older.")).toBeChecked();
+  await expect(register.getByLabel("Sign-in name")).toHaveValue("early_erika");
+  await expect(register.getByLabel("I am 16 or older.")).toBeChecked();
   // the island knows them too: only the missing password is named
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.locator(".error[role=alert]")).not.toContainText(/name/i);
+  await register.getByRole("button", { name: "Create account" }).click();
+  await expect(register.locator(".error[role=alert]")).not.toContainText(/name/i);
 });

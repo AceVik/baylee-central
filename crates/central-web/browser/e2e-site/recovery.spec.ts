@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
 
-import { narrow, schemes, targets } from "./check.ts";
+import { narrow, onlyDesktop, schemes, targets } from "./check.ts";
 
 // The registration's recovery-code step (crates/central-web/src/islands/auth.rs
 // `code_view`, keep.rs, and email.rs for the address) in a real browser,
@@ -211,8 +211,8 @@ test.beforeEach(() => {
   test.slow();
 });
 
-/** Fills the registration in `scope` as a person would, after the three seconds a person takes, and sends it. */
-async function register(page: Page, scope: Locator | Page = page) {
+/** Fills the registration (a dialog; its address opens it) in `scope` as a person would, after the three seconds a person takes, and sends it. */
+async function register(page: Page, scope: Locator = page.locator("#auth-register")) {
   await scope.getByLabel("Sign-in name").fill("erika");
   await scope.getByLabel("Display name").fill("Erika");
   await scope.getByLabel("Password", { exact: true }).fill(PASSWORD);
@@ -250,7 +250,9 @@ test("the code step offers every way to keep the code, each made only when it is
   await register(page);
   const section = step(page);
   await expect(section.locator(".secret code")).toHaveText(CODE);
-  await expect(section).toContainText("Your handle: Erika#1a2b");
+  await expect(section.locator(".step-badge")).toHaveText("Account created");
+  await expect(section.locator(".who-label")).toHaveText("Your handle");
+  await expect(section.locator(".who-handle")).toHaveText("Erika#1a2b");
   await expect(section).toContainText("Keep it somewhere safe where you will find it even without this device.");
   await expect(field(page)).toBeVisible();
 
@@ -266,7 +268,9 @@ test("the code step offers every way to keep the code, each made only when it is
   const ways = ["Copy", "Save as a text file", "Print", "Save in password manager", "Mail it to myself"];
   for (const name of ways) await expect(button(page, name)).toBeVisible();
   await expect(section.locator("#code-mail-warning")).toHaveText(WARNING);
-  await expect(button(page, "Mail it to myself")).toHaveAccessibleDescription(WARNING);
+  // the warning unfolds with the first press or an address typed; the button names it
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-controls", "code-mail-warning");
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-expanded", "false");
   await expect(field(page)).toHaveAttribute("type", "email");
   await expect(field(page)).toHaveAttribute("autocomplete", "email");
   await expect(field(page)).not.toHaveAttribute("name", /.*/);
@@ -286,6 +290,7 @@ test("the code step offers every way to keep the code, each made only when it is
   // The mail: built on the click, to the address typed, with the subject
   // and the body made here, and never put into the page.
   await field(page).fill(ADDRESS);
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-expanded", "true");
   const asked: string[] = [];
   const protocol = await page.context().newCDPSession(page);
   await protocol.send("Page.enable");
@@ -412,6 +417,8 @@ test("where Central's terms are in force the address is named once they are acce
   await button(page, "Continue").click();
   await expect(page.getByRole("heading", { name: "New terms of use" })).toBeVisible();
   expect(emails(seen)).toEqual(["status"]);
+  // the short text fits its box, so it is read as it stands: accepting works
+  await expect(page.locator("#terms-read-hint")).toHaveText("Read to the end.");
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(page.locator("#email-code")).toBeFocused();
   const order = seen.map((body) => body.operation === "email" ? `email ${body.request?.action}` : body.operation);
@@ -483,7 +490,8 @@ test("in the registration's dialog the print is the sheet alone too", async ({ p
   await expect(dialog).toBeVisible();
   await expect(dialog.locator("leptos-island")).toHaveAttribute("data-hydrated", "", { timeout: 15_000 });
   await register(page, dialog);
-  await expect(page).toHaveURL(/\/en\/faq$/);
+  // the dialog has its address, over the page that asked
+  await expect(page).toHaveURL(/\/en\/register$/);
   await sound(page);
   await dialog.getByRole("button", { name: "Print", exact: true }).click();
   await expect.poll(() => page.evaluate(() => Reflect.get(window, "printed"))).toBe(1);
@@ -516,10 +524,12 @@ async function overflow(card: Locator): Promise<{ beyond: string[]; scroll: numb
 // card: at 320 px nothing of the two steps may reach past the card's edge,
 // on the page or in the dialog.
 for (const where of ["page", "dialog"] as const) {
-  test(`at 320 px in German both steps stay inside their card: ${where}`, async ({ page }) => {
+  test(`at 320 px in German both steps stay inside their card: ${where}`, async ({ page }, info) => {
+    onlyDesktop(info, "sets its own window size, so the project's size is irrelevant");
     await page.setViewportSize({ width: 320, height: 760 });
     await open(page, world(), { path: where === "page" ? "/de/register" : "/de/faq" });
-    let card = page.locator(".auth-form");
+    // the address opens the dialog; the other way in is through the sign-in's
+    let card = page.locator("#auth-register");
     if (where === "dialog") {
       const menu = page.locator(".menu-btn");
       if (await menu.isVisible()) await menu.click();

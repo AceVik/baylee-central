@@ -13,6 +13,7 @@ use sea_orm::{
 mod admin;
 mod challenges;
 mod deletion;
+mod donations;
 mod email;
 mod export;
 mod gateways;
@@ -40,6 +41,10 @@ mod tokens;
 mod tower_access;
 mod tower_awards;
 pub use admin::{AUDIT_YEARS, Action, Appointed, AuditPage, Swept, appoint_admin, sweep};
+pub use donations::{
+    CONVERT_DAYS, DONATION_DAYS, Donation, DonationKind, DonationSums, GITHUB_WINDOW_DAYS,
+    KOFI_WINDOW_DAYS, MOST_AMOUNT, MOST_EURO_CENTS, Platform, Recorded,
+};
 pub use email::{EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, Told};
 pub use legacy::LegacyMove;
 pub use migration::Status;

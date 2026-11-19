@@ -27,7 +27,12 @@ pub use challenge::{Agent, Seen};
 mod deletion;
 mod dispatch;
 mod email;
+mod funding;
 pub use email::Delivery;
+pub use funding::{
+    KOFI_LIMIT, KOFI_READ, Kofi as KofiIntake, KofiAnswer, KofiCounts, Sources as FundingSources,
+    kofi_digest,
+};
 mod gateways;
 mod guesses;
 pub use guesses::Place;
@@ -114,8 +119,8 @@ pub struct BrowserReply {
 
 /// The operations the browser listener serves (`docs/web-accounts.md`); every
 /// other one is refused before anything else happens. Terms are accepted there
-/// for Central only; the public gateway directory and the public figures are
-/// read there without a session. A gateway's pulse, like its heartbeat, is
+/// for Central only; the public gateway directory, the public figures and the
+/// donation figures are read there without a session. A gateway's pulse, like its heartbeat, is
 /// the native route's. The match names every operation, so a new one does
 /// not compile until it is decided here.
 #[must_use]
@@ -141,6 +146,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::TermsStatus
         | Request::GatewayDirectory { .. }
         | Request::PublicFigures { .. }
+        | Request::PublicFunding {}
         | Request::AccountSummary
         | Request::SetRecovery { .. }
         | Request::SetDisplayName { .. }
@@ -332,6 +338,8 @@ pub struct IdentityService {
     mails: email::Mails,
     /// The picture worker and the upload slots (`pictures.rs`).
     pictures: pictures::Pictures,
+    /// The donation figures and Ko-fi's deliveries (`funding.rs`).
+    funding: funding::Funding,
 }
 
 impl IdentityService {
@@ -383,6 +391,7 @@ impl IdentityService {
             push_key: None,
             mails: email::Mails::default(),
             pictures: pictures::Pictures::default(),
+            funding: funding::Funding::default(),
         })
     }
 
