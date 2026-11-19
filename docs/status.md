@@ -465,7 +465,8 @@ decisions in the [proposal](dependency-proposal/profile-picture.md) §0 to
   the file itself where it cannot draw it, or where it moves; Central
   decodes every original in a fresh sandboxed worker and stores a 256 px
   AVIF and PNG, and for an animated GIF, WebP or APNG an AVIF image
-  sequence made by ffmpeg with `libaom-av1` from the worker's own frames;
+  sequence made by ffmpeg with `libaom-av1` (or, for an opaque one where
+  ffmpeg lacks it, `libsvtav1`) from the worker's own frames;
 - migration 000027, the routes on the browser listener, the wire's new
   variants, `central-client`'s functions, the website's card, avatars and
   moderation.

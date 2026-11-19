@@ -26,7 +26,7 @@ pub use animation::{
     frames,
 };
 pub use central_picture::{Format, Motion, Output, Refusal};
-pub use ffmpeg::{FFMPEG_TIME, Ffmpeg};
+pub use ffmpeg::{Encoder, FFMPEG_TIME, Ffmpeg, Found};
 
 /// Longest side of any picture or frame, in pixels.
 pub const MAX_SIDE: u32 = 8_192;

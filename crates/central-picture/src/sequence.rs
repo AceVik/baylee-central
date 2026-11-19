@@ -1,7 +1,8 @@
 //! AVIF image sequences (`avis`) as the worker must write them
 //! (`docs/profile-pictures.md`, "Animations"): ffmpeg's `avif` muxer with
-//! `libaom-av1`, one colour track and, for a picture with transparency, one
-//! alpha track. The worker checks every sequence it made against the
+//! `libaom-av1` (or, for an opaque picture, `libsvtav1`), one colour track
+//! and, for a picture with transparency, one alpha track. The worker
+//! checks every sequence it made against the
 //! frames it sent; the service checks the framing and the sample tables
 //! again before it keeps one.
 use super::{MAX_FRAMES, MAX_SEQUENCE};

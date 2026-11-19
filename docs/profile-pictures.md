@@ -21,10 +21,12 @@ picture that moves also as an AVIF image sequence.
 - **Pictures that move go as they are.** A canvas holds one frame, so
   the page sends an animated GIF, WebP or APNG itself, says so, and does
   not offer to place the square. The worker composites its frames within
-  bounds and hands them, as raw pixels, to ffmpeg with `libaom-av1`,
+  bounds and hands them, as raw pixels, to ffmpeg with `libaom-av1`, or
+  where ffmpeg has only `libsvtav1` with that for an opaque animation,
   which writes an AVIF image sequence ([Animations](#animations)). The
-  first frame is the still. Where ffmpeg is missing or fails, Central
-  keeps the still alone, the page says so and the service logs it.
+  first frame is the still. Where ffmpeg or a fitting encoder is missing
+  or fails, Central keeps the still alone, the page says so and the
+  service logs it.
 - **Every decoder runs only in the worker.** That is a fresh process per
   picture (`central-picture-worker`), with no secret, no network, no file
   but a private `/tmp` (where ffmpeg writes an animation's sequence), and
@@ -93,15 +95,27 @@ in `crates/central-picture-codec/src/animation.rs`:
 - **Encoding** (owner, 12.11.2026, [proposal §0.8](dependency-proposal/profile-picture.md)),
   in `src/ffmpeg.rs`:
   - ffmpeg is a child of the worker: an absolute path from the worker's
-    command line (`--ffmpeg`, default `/usr/bin/ffmpeg`), no shell, no
+    command line (`--ffmpeg`; without it the first of `/usr/bin/ffmpeg`,
+    `/opt/homebrew/bin/ffmpeg` and `/usr/local/bin/ffmpeg` that is a file,
+    so a development Central on a Mac finds Homebrew's), no shell, no
     environment, fixed arguments, only the pipe as input and one file as
     output, in a fresh directory only the worker may enter (the `avif`
     muxer cannot write to a pipe), removed after;
   - it gets the composited 256 px frames as raw RGBA and never sees the
     uploaded file;
-  - `libaom-av1` on one thread, speed 6, constant rate factor 32, then 40
-    and 48 until the sequence fits 512 KiB; 12 s for the probe and every
-    attempt together, then it is ended;
+  - the encoder (19.11.2026, so that animation does not depend on one):
+    the probe asks ffmpeg `-h encoder=…` for `libaom-av1`, then
+    `libsvtav1`, and takes the first that lists `yuv420p`. ffmpeg's `avif`
+    muxer takes an alpha track only as one plane (`gray`), which
+    `libsvtav1` cannot write (it lists `yuv420p` and `yuv420p10le` only),
+    so a transparent animation needs `libaom-av1`: without it, it keeps its
+    still (`no_encoder`). `librav1e`, the third AV1 encoder Ubuntu's
+    ffmpeg links, lists no `gray` either and is not used;
+  - `libaom-av1` on one thread at speed 6, or `libsvtav1` at preset 8 with
+    one level of parallelism (`-svtav1-params lp=1`; `-threads 1` alone
+    leaves it at its own choice); constant rate factor 32, then 40 and 48
+    until the sequence fits 512 KiB; 12 s for the probe and every attempt
+    together, then it is ended;
   - every frame keeps its duration, the last one included: frames are
     timed in milliseconds and the input's frame rate is the last frame's;
   - an opaque picture has one track, a transparent one an alpha track as
@@ -111,6 +125,35 @@ in `crates/central-picture-codec/src/animation.rs`:
   with the reason in the answer (`no_encoder`, `failed`, `too_large`);
   the service logs a fixed line for each, with a count, and never fails
   the upload for it. The service checks the sequence's framing again.
+  `libsvtav1`'s sequences pass both checks unchanged: the same boxes, a
+  colour track, every duration. Chromium's `ImageDecoder` (19.11.2026)
+  played them as it plays `libaom-av1`'s: the fixture's 3 frames at 100,
+  300 and 1500 ms and 100 frames of noise, each looping for ever. Their
+  last sample may be a 3-byte frame that shows an earlier hidden one
+  (`show_existing_frame`), as AV1 allows; a decoder must take it.
+- **Measured** (19.11.2026, Ubuntu 26.04's ffmpeg 8.0.1 in a container on
+  Apple Silicon, one CPU, 512 MiB; 100 frames of 256 px noise, the worst
+  case for an encoder; peak memory of the whole container):
+
+  | Encoder | One attempt at CRF 32 | At CRF 48 | Threads of ffmpeg | Memory |
+  | --- | --- | --- | --- | --- |
+  | `libaom-av1` 3.13.1, speed 6 | 14.9 s, 2.0 MB | 5.8 s, 99 KB | 6 | 94 MiB |
+  | `libsvtav1` 2.3.0, preset 8, `lp=1` | 2.6 s, 2.3 MB | 2.4 s, 228 KB | 22 | 123 MiB |
+
+  Such noise ends `libaom-av1` at the 12 s, and the still stands
+  (`failed`); `libsvtav1` makes all three attempts in about 7.5 s. A
+  photo-like animation is far smaller (50 frames of a photo, 50 KB at CRF
+  32, proposal §10). `libsvtav1` at preset 6 took 4.0 s, at 10 1.6 s.
+- **`libsvtav1` in the production unit.** It sets its threads'
+  scheduling, which the unit's `SystemCallFilter=~@resources` answers by
+  killing ffmpeg (`SIGSYS`; tried in the container with a seccomp profile
+  of that group's scheduling calls, as root and as an unprivileged user;
+  `libaom-av1` ran through). So in that unit only `libaom-av1` encodes; a
+  `libsvtav1` there ends as `failed`, the still standing. Refusing those
+  calls with `EPERM` instead (`SystemCallErrorNumber=EPERM`) let it run in
+  the same container; the unit is unchanged, as production has
+  `libaom-av1`. The fallback is for hosts without it, such as a Mac with
+  Homebrew's ffmpeg (which has only `libsvtav1`) running the local stack.
 - **An AVIF image sequence** uploaded (major brand `avis`) is refused as
   `unsupported`: `avif-parse` 2.1.0 refuses it and no accepted package
   decodes AV1 sequences safely. The page draws its first frame and sends
@@ -260,6 +303,15 @@ no picture:
   head, a group message's author, contacts, requests, group members, a
   group invitation (its sign), and the safety number's view.
 
+Every one of these draws its picture through one function each (`face`
+in `islands/picture.rs`, `ownFace` in `js/boot.js`), so a picture that
+moves plays its sequence in all of them alike; the messenger's marks are
+all `avatar` in `islands/chat/talk.rs`, given the person's tag. Where a
+mark stays with its initials by design: a group's invited people and a
+person found by handle, whose tags the messenger does not read, since
+tags outside the contacts and groups would spend the lookup budget (and a
+batch over it is refused whole).
+
 The messenger reads the keys of all the tags it shows in one request (at
 most 300), again only when the contacts or groups change.
 Clients learn whether a picture moves from `TaggedPicture.moving` and
@@ -372,19 +424,34 @@ Reports about one's own picture are not exported with their reporters.
     container through `tests/ffmpeg/ffmpeg`, built from the `Dockerfile`
     beside it). Without one they say SKIPPED, except where
     `PICTURE_REQUIRE_FFMPEG=1`, which CI sets: there they fail;
+  - the encoder's choice: the probe's reading of `-h encoder=…` (an
+    encoder named, `yuv420p`, `gray` for alpha); a stand-in with only
+    `libsvtav1` gets the opaque animation encoded with it and keeps the
+    transparent one's still (`no_encoder`); and the same ffmpeg as above
+    behind a stand-in that hides its `libaom-av1`: `libsvtav1` encodes an
+    opaque GIF of a long last frame and one of 100 frames with every
+    duration, the stills' colour description and one track, keeps a
+    transparent APNG's still, and its sequence passes the service's checks
+    through the worker binary. That test says SKIPPED where the ffmpeg has
+    no `libsvtav1` (Homebrew's has it:
+    `PICTURE_FFMPEG=/opt/homebrew/bin/ffmpeg`);
   - an uploaded AVIF image sequence refused as `unsupported`;
   - seeded mutations of every format;
   - the worker binary behind the real client.
 - **`crates/central-http`:** every header refusal before the body and the
   service; admission before the body; length mismatches; a stalled body;
   every named refusal; reads of all three files to anyone with the headers
-  byte for byte; the same 404 for every refusal, other sequence names and
-  an unknown key's sequence; 405; the read budget.
+  byte for byte, the game client's plain `GET` among them; the same 404
+  for every refusal, other sequence names and an unknown key's sequence;
+  405; the read budget.
+- **`crates/central-identity`:** the native listener reads keys and files
+  no report.
 - **PostgreSQL fixture:**
   - set, replace and remove under new keys, a picture that moves among
     them (its sequence served, its size the owner's, gone with it);
   - the budget;
-  - who learns a key, with the lookup budget and blocks;
+  - who learns a key, with the lookup budget and blocks, by a browser
+    session and by a native one;
   - reports and their bounds;
   - decisions with a fresh sign-in and the exact audit;
   - blocks;
