@@ -286,3 +286,37 @@ fn presence_reports_at_most_an_account_s_contacts() {
     assert_eq!(shown.len(), MAX_CONTACTS);
     assert!(shown.windows(2).all(|pair| pair[0] < pair[1]));
 }
+
+#[test]
+fn a_reading_given_up_closes_the_sockets_and_the_next_one_reads_anew() {
+    let live = Arc::new(Live::default());
+    let a = socket(&live, A, 1, &[B]);
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let _ = a.take();
+    assert_eq!(live.presence(&A), vec![2]);
+    // A request's future is dropped while it reads A's friends again (its
+    // time ran out, its client went away): the reading ends as unread.
+    let reading = Pending::new(&live, live.reread(A).unwrap());
+    drop(reading);
+    assert_eq!(a.take() & news::STALE, news::STALE, "A's sockets close");
+    assert_eq!(b.take() & news::STALE, 0);
+    assert_eq!(
+        live.presence(&A),
+        Vec::<u32>::new(),
+        "nothing is shown of a list that may be wrong"
+    );
+    // a socket of A's that opens while the old one is still closing reads
+    // the list anew instead of taking it as read
+    let (again, reading) = live.admit(A, Some(1), digest(1)).unwrap();
+    let reading = Pending::new(&live, reading.expect("a new reading"));
+    reading.read(vec![B]);
+    assert_eq!(live.presence(&A), vec![2]);
+    let _ = again.take();
+    drop((a, again));
+    // a reading that was read is not undone by its guard
+    let c = socket(&live, C, 3, &[]);
+    let reading = Pending::new(&live, live.reread(C).unwrap());
+    reading.read(vec![]);
+    assert_eq!(c.take() & news::STALE, 0);
+}
