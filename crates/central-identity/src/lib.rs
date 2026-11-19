@@ -38,6 +38,8 @@ mod guesses;
 pub use guesses::Place;
 mod legacy;
 mod limits;
+mod live;
+pub use live::{ACCOUNT_SOCKETS, Listener, SESSION_DIALS, news};
 mod objects;
 mod owner;
 mod pairing;
@@ -340,6 +342,8 @@ pub struct IdentityService {
     pictures: pictures::Pictures,
     /// The donation figures and Ko-fi's deliveries (`funding.rs`).
     funding: funding::Funding,
+    /// The push sockets open now and what each is to tell (`live.rs`).
+    live: Arc<live::Live>,
 }
 
 impl IdentityService {
@@ -392,6 +396,7 @@ impl IdentityService {
             mails: email::Mails::default(),
             pictures: pictures::Pictures::default(),
             funding: funding::Funding::default(),
+            live: Arc::default(),
         })
     }
 
@@ -628,6 +633,10 @@ impl IdentityService {
         // Only now is the place the account's own: an attempt begun before
         // a password change proves the old one, and the store refused it.
         self.accepted(&guess);
+        // A native sign-in replaced the account's native session.
+        if surface == Surface::Native {
+            self.sessions_changed(&credential.identity.account);
+        }
         signed_in(self, surface, credential.identity, issued, token)
     }
 
@@ -760,6 +769,8 @@ impl IdentityService {
         if let Ok(mut limits) = self.limits.lock() {
             limits.guesses.changed(account, at, Instant::now());
         }
+        // Every session of the account ended with the old password.
+        self.sessions_changed(&account);
     }
 
     /// Process a command from the website's browser listener. Only

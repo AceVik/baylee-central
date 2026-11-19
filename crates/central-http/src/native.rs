@@ -51,6 +51,10 @@ pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
         // Above this line every route speaks the protocol; the key set below is public.
         .layer(middleware::from_fn(protocol))
         .route("/.well-known/jwks.json", get(jwks))
+        // The push socket (`ws.rs`): the client's dial sends its bearer and the
+        // handshake, no protocol header, and the socket's events are its own
+        // fixed vocabulary.
+        .route("/v1/ws", get(socket))
         // Ko-fi's webhook (`docs/operations.md` §"Donations"): Ko-fi speaks no
         // protocol of ours, so it stands below the protocol's layer too.
         .route(KOFI_PATH, post(kofi))
@@ -121,6 +125,12 @@ async fn jwks(State(native): State<Native>) -> Response {
     }
 }
 
+/// `GET /v1/ws`: a push socket for a signed-in native client (`ws.rs`).
+async fn socket(State(native): State<Native>, request: Request) -> Response {
+    let from = native.origin(request.extensions());
+    super::ws::dial(&native.identity, from, request).await
+}
+
 /// Where Ko-fi delivers: the one route that takes a platform's word for a
 /// payment. No secret is in it; the token is in the body.
 pub(crate) const KOFI_PATH: &str = "/v1/kofi";
@@ -162,7 +172,7 @@ async fn kofi(
 }
 
 /// Fixed public vocabulary; no parser/database/crypto diagnostics reach the peer.
-fn failure(error: Error) -> Response {
+pub(crate) fn failure(error: Error) -> Response {
     let status = match error {
         Error::UpdateRequired => return update_required(),
         Error::Rejected => StatusCode::UNAUTHORIZED,

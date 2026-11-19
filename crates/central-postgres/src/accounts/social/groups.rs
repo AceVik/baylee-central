@@ -1,7 +1,7 @@
 //! Membership transitions and ciphertext delivery share a group lock. Then all
 //! affected account locks are taken in UUID order, before checking live sessions.
 use super::{
-    Error, Session, by_tag, caller, limits, lock_accounts, person, statement, unavailable,
+    Concerns, Error, Session, by_tag, caller, limits, lock_accounts, person, statement, unavailable,
 };
 use central_api::groups::{Change, GroupRequest, GroupResponse};
 use sea_orm::{ConnectionTrait, prelude::Uuid};
@@ -94,12 +94,18 @@ pub(super) async fn dispatch(
     session: Session<'_>,
     me: Uuid,
     request: GroupRequest,
-) -> Result<GroupResponse, Error> {
+) -> Result<(GroupResponse, Concerns), Error> {
     match request {
-        GroupRequest::List => Ok(GroupResponse::Groups {
-            snapshot: snapshot::read(db, me).await?,
-        }),
-        GroupRequest::Create { name } => create(db, session, me, &name).await,
+        GroupRequest::List => Ok((
+            GroupResponse::Groups {
+                snapshot: snapshot::read(db, me).await?,
+            },
+            Concerns::default(),
+        )),
+        GroupRequest::Create { name } => Ok((
+            create(db, session, me, &name).await?,
+            Concerns::social_of([me]),
+        )),
         GroupRequest::Change { id: text, change } => {
             let group = lock(db, id(&text)?, me).await?;
             let target = match &change {
@@ -120,8 +126,8 @@ pub(super) async fn dispatch(
             accounts.extend(target);
             lock_accounts(db, accounts).await?;
             caller(db, session, true).await?;
-            change::apply(db, &group, me, target, change).await?;
-            Ok(GroupResponse::Done)
+            let concerned = change::apply(db, &group, me, target, change).await?;
+            Ok((GroupResponse::Done, Concerns::social_of(concerned)))
         }
     }
 }

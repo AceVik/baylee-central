@@ -6,6 +6,12 @@ use central_api::chat::{Header, MAX_CIPHERTEXT, MAX_DELIVERIES, Sealed};
 use central_crypto::chat::{Envelope, b64};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// A message stored, and the accounts it was delivered to: the sender, and
+/// every other account at least one of whose devices took it. An account
+/// whose devices took none (it blocked the sender, or its inbox had no room)
+/// is not among them, so its push socket hears nothing of the send.
+pub(in crate::accounts::social) type Sent = (ChatResponse, BTreeSet<Uuid>);
+
 /// What a device's inbox holds (`central_api::chat::MAX_DELIVERIES`).
 const INBOX: i64 = 5_000;
 const _: () = assert!(MAX_DELIVERIES == 5_000);
@@ -110,7 +116,7 @@ pub(super) async fn send(
     me: Uuid,
     conv: &str,
     sealed: &Sealed,
-) -> Result<ChatResponse, Error> {
+) -> Result<Sent, Error> {
     let parsed = Parsed::read(conv, sealed)?;
     let own = account_tag(db, me).await?;
     if parsed.header.from != own {
@@ -140,13 +146,16 @@ pub(super) async fn send(
         return Err(Error::Rejected);
     }
     if let Some(at) = repeated(db, me, parsed.correlation, &payload).await? {
-        return Ok(ChatResponse::Sent {
+        // Delivered before: nobody receives anything new.
+        let sent = ChatResponse::Sent {
             id: parsed.header.id,
             at,
-        });
+        };
+        return Ok((sent, BTreeSet::new()));
     }
-    let recipients = recipients(db, me, &accounts, sealed).await?;
-    store(db, me, parsed, conv, payload, recipients).await
+    let (recipients, reached) = recipients(db, me, &accounts, sealed).await?;
+    let sent = store(db, me, parsed, conv, payload, recipients).await?;
+    Ok((sent, reached))
 }
 
 async fn authorize(db: &impl ConnectionTrait, me: Uuid, other: Uuid) -> Result<(), Error> {
@@ -186,7 +195,7 @@ async fn recipients(
     me: Uuid,
     accounts: &[Uuid],
     sealed: &Sealed,
-) -> Result<BTreeMap<String, [u8; 48]>, Error> {
+) -> Result<(BTreeMap<String, [u8; 48]>, BTreeSet<Uuid>), Error> {
     let rows = db.query_all_raw(statement("SELECT d.fingerprint, d.account_id,
         EXISTS (SELECT 1 FROM central_identity.social_blocks b WHERE b.owner = d.account_id AND b.blocked = $2) AS blocked
         FROM central_identity.chat_devices d JOIN central_identity.accounts a ON a.id = d.account_id
@@ -220,6 +229,7 @@ async fn recipients(
     let room = room(db, me, &devices).await?;
     let mut others = false;
     let mut heard = false;
+    let mut reached = BTreeSet::from([me]);
     for (id, owner, blocked) in devices {
         let fits = room.get(&id).is_none_or(|held| held.fits(owner == me));
         if owner == me {
@@ -239,6 +249,8 @@ async fn recipients(
         heard |= fits;
         if blocked || !fits {
             wraps.remove(&id);
+        } else {
+            reached.insert(owner);
         }
     }
     // Nobody else has room for it (a direct message's only reader among
@@ -246,7 +258,7 @@ async fn recipients(
     if others && !heard {
         return Err(Error::Busy);
     }
-    Ok(wraps)
+    Ok((wraps, reached))
 }
 
 /// What a device's inbox holds, and how much of it is one sender's.

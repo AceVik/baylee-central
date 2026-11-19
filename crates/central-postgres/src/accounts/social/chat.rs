@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod inbox;
 mod send;
+use super::Concerns;
 pub use send::CHAT_SENDER_SHARE;
 
 fn rejected(_: impl Sized) -> Error {
@@ -57,16 +58,34 @@ pub(super) async fn dispatch(
     session: Session<'_>,
     me: Uuid,
     request: ChatRequest,
-) -> Result<ChatResponse, Error> {
+) -> Result<(ChatResponse, Concerns), Error> {
     match request {
         ChatRequest::Register { device } => {
             lock_accounts(db, vec![me]).await?;
             caller(db, session, true).await?;
-            register(db, me, &device).await
+            let (registered, new) = register(db, me, &device).await?;
+            // A new device is its account's own news: others read keys when
+            // they send, not on a push.
+            let concerns = if new {
+                Concerns::social_of([me])
+            } else {
+                Concerns::default()
+            };
+            Ok((registered, concerns))
         }
-        ChatRequest::Keys { tags } => keys(db, me, &tags).await,
-        ChatRequest::Send { conv, sealed } => send::send(db, session, me, &conv, &sealed).await,
-        ChatRequest::Inbox { device, after } => inbox::read(db, me, &device, after).await,
+        ChatRequest::Keys { tags } => Ok((keys(db, me, &tags).await?, Concerns::default())),
+        ChatRequest::Send { conv, sealed } => {
+            let (sent, reached) = send::send(db, session, me, &conv, &sealed).await?;
+            let concerns = Concerns {
+                chat: reached.into_iter().map(Uuid::into_bytes).collect(),
+                ..Concerns::default()
+            };
+            Ok((sent, concerns))
+        }
+        ChatRequest::Inbox { device, after } => Ok((
+            inbox::read(db, me, &device, after).await?,
+            Concerns::default(),
+        )),
     }
 }
 
@@ -74,7 +93,7 @@ async fn register(
     db: &impl ConnectionTrait,
     me: Uuid,
     registration: &DeviceRegistration,
-) -> Result<ChatResponse, Error> {
+) -> Result<(ChatResponse, bool), Error> {
     let ik = decode(&registration.ik)?;
     let dk = decode(&registration.dk)?;
     let dsig = decode(&registration.dsig)?;
@@ -109,7 +128,7 @@ async fn register(
         if owner != me || old.try_get::<i64>("", "vault_epoch").map_err(unavailable)? != epoch || old.try_get::<Vec<u8>>("", "ik").map_err(unavailable)? != ik
             || old.try_get::<Vec<u8>>("", "dk").map_err(unavailable)? != dk
             || old.try_get::<Vec<u8>>("", "dsig").map_err(unavailable)? != dsig { return Err(Error::Conflict); }
-        return Ok(ChatResponse::Registered { id: key.id });
+        return Ok((ChatResponse::Registered { id: key.id }, false));
     }
     let count: i64 = db
         .query_one_raw(statement(
@@ -127,7 +146,7 @@ async fn register(
     db.query_one_raw(statement("INSERT INTO central_identity.chat_devices (fingerprint, account_id, ik, dk, dsig, label, vault_epoch) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
         vec![key.id.clone().into(), me.into(), ik.to_vec().into(), dk.to_vec().into(), dsig.to_vec().into(), registration.label.clone().into(), epoch.into()],
     )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
-    Ok(ChatResponse::Registered { id: key.id })
+    Ok((ChatResponse::Registered { id: key.id }, true))
 }
 
 async fn keys(db: &impl ConnectionTrait, me: Uuid, tags: &[u32]) -> Result<ChatResponse, Error> {

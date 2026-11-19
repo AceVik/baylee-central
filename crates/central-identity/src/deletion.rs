@@ -155,6 +155,8 @@ impl IdentityService {
             .await?;
         // Nothing is remembered of where the account signed in.
         self.changed(credential.identity.account, None);
+        // Its friends' sockets forget it and are told their contacts changed.
+        self.live.deleted(&credential.identity.account);
         Ok(Response::Done)
     }
 }

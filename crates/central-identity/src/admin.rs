@@ -112,11 +112,24 @@ impl IdentityService {
             // Profile pictures (`docs/profile-pictures.md`, `pictures.rs`).
             AdminRequest::Picture { request } => return self.picture_admin(request, cookie).await,
             AdminRequest::SetTag { account, tag } => {
-                self.store.set_tag(cookie, account, tag).await?;
-                return Ok(Response::Done);
+                return self.set_tag(cookie, account, tag).await;
             }
         };
         Ok(Response::Admin { answer })
+    }
+
+    /// An account's tag (`docs/administration.md`): the store checks the
+    /// administrator and writes the audit; whoever counts the account among
+    /// their friends is told, and sees the new tag in their presence.
+    async fn set_tag(
+        &self,
+        cookie: &Token,
+        account: [u8; 16],
+        tag: u32,
+    ) -> Result<Response, Error> {
+        self.store.set_tag(cookie, account, tag).await?;
+        self.live.retagged(&account, tag);
+        Ok(Response::Done)
     }
 
     /// The registration switch (`docs/registration-abuse.md`): the store

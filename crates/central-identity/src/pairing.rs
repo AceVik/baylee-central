@@ -107,6 +107,8 @@ impl IdentityService {
                     .await?;
                 // Vouched for here, where its capability is at hand (`limits.rs`).
                 self.issued(&token);
+                // It replaced the account's native session.
+                self.sessions_changed(&redeemed.identity.account);
                 Ok(Response::PairSession {
                     token: self.central_token(&token, redeemed.identity.account)?,
                     identity: redeemed.identity,
