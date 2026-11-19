@@ -29,6 +29,8 @@ use tower::ServiceExt;
 
 /// How long one connection may last: a request and its answer.
 const CONNECTION: Duration = Duration::from_secs(10);
+/// How long a connection's request head may take to arrive.
+const HEAD_TIME: Duration = Duration::from_secs(3);
 
 /// A bound local-only server. Drop before running to release the listener.
 /// Runtime connections are owned by a join set and aborted when the run future drops.
@@ -285,6 +287,7 @@ async fn connect(
     app: axum::Router,
     upgrades: Option<Upgrades>,
 ) {
+    let peeked = std::time::Instant::now();
     let asked = match &upgrades {
         Some(_) => ws::asks(&stream).await,
         None => false,
@@ -294,7 +297,14 @@ async fn connect(
         .max_headers(32)
         .max_buf_size(16_384)
         .timer(TokioTimer::new())
-        .header_read_timeout(Duration::from_secs(3));
+        // The time the first line took to show counts against the head's
+        // three seconds, so that a silent connection is held no longer than
+        // before there were sockets.
+        .header_read_timeout(
+            HEAD_TIME
+                .saturating_sub(peeked.elapsed())
+                .max(Duration::from_millis(1)),
+        );
     // Each request learns its connection's peer: a forwarded address counts
     // only from the loopback proxy, for the browser listener's budgets and
     // both listeners' places. The push socket's request learns what lets it
@@ -574,6 +584,40 @@ mod tests {
         assert!(
             std::net::TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn a_silent_connection_is_held_no_longer_where_sockets_are_served() {
+        let bound = server().await;
+        let address = bound.local_addr();
+        let (stop, stopped) = oneshot::channel();
+        let running =
+            tokio::spawn(
+                bound.serve(upgrading(), CONNECTION, Some(Sockets::new()), async {
+                    let _ = stopped.await;
+                }),
+            );
+        let held = tokio::task::spawn_blocking(move || {
+            let mut silent =
+                std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
+            silent
+                .set_read_timeout(Some(Duration::from_secs(8)))
+                .unwrap();
+            let started = std::time::Instant::now();
+            let mut rest = Vec::new();
+            let _ = silent.read_to_end(&mut rest);
+            started.elapsed()
+        })
+        .await
+        .unwrap();
+        // the head's three seconds, the first line's wait included
+        assert!(held < HEAD_TIME + Duration::from_millis(700), "{held:?}");
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(4), running)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
     }
 
     #[tokio::test]
