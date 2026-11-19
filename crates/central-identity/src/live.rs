@@ -258,8 +258,8 @@ impl State {
     /// and a change of the table it shares, is the only news of an account
     /// its friends get, and nothing of one that chose to be offline ever
     /// reaches them.
-    fn shown_changed(&mut self, account: &[u8; 16], before: Option<Showing>) {
-        if self.showing(account) != before {
+    fn shown_changed(&mut self, account: &[u8; 16], before: Option<&Showing>) {
+        if self.showing(account).as_ref() != before {
             self.raise_followers(account, news::PRESENCE);
         }
     }
@@ -452,7 +452,7 @@ impl Live {
         };
         entry.choice = choice;
         state.raise(account, news::PRESENCE);
-        state.shown_changed(account, before);
+        state.shown_changed(account, before.as_ref());
     }
 
     /// Store `account`'s choice with `write` and take it, in the account's
@@ -575,7 +575,7 @@ impl Live {
                 socket.report = Some(report.clone());
             }
         }
-        state.shown_changed(&account, before);
+        state.shown_changed(&account, before.as_ref());
     }
 
     /// Admit a socket of `account` with the session `digest`, unless the
@@ -608,7 +608,7 @@ impl Live {
         {
             entry.choice = choice;
             state.raise(&account, news::PRESENCE);
-            state.shown_changed(&account, before);
+            state.shown_changed(&account, before.as_ref());
         }
         let id = state.next;
         let entry = state.accounts.entry(account).or_insert_with(|| Account {
@@ -851,7 +851,7 @@ impl Live {
             return;
         };
         entry.live += 1;
-        state.shown_changed(&account, before);
+        state.shown_changed(&account, before.as_ref());
     }
 
     fn remove(&self, id: u64) {
@@ -880,7 +880,7 @@ impl Live {
         if entry.sockets.is_empty() {
             state.accounts.remove(&account);
         }
-        state.shown_changed(&account, before);
+        state.shown_changed(&account, before.as_ref());
     }
 
     #[cfg(test)]
