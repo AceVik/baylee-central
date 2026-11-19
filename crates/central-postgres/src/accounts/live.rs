@@ -1,6 +1,7 @@
 //! What the native push socket (`GET /v1/ws`, `docs/push-socket.md`) asks of the
-//! store: which of the sessions it serves still stand, and who an account's
-//! friends are. Nothing here writes; presence itself is never stored.
+//! store: which of the sessions it serves still stand, who an account's
+//! friends are, and how the account chose to be shown. Only that choice is
+//! written; whether an account is online, or what it does, is never stored.
 use super::{AccountStore, Error, Session, statement, uuid};
 use central_api::{presence::Choice, social::MAX_CONTACTS};
 use sea_orm::{ConnectionTrait, QueryResult, prelude::Uuid};
@@ -94,34 +95,39 @@ impl AccountStore {
     /// either listener. Returns the account, whose sockets and friends are
     /// told. Needs a session that stands, as every account's own write does.
     ///
+    /// The session is read at once and the write owns everything it needs,
+    /// so the caller can run it in a task of its own that a dropped request
+    /// does not cut short (`central-identity`'s registry does).
+    ///
     /// # Errors
     /// `Rejected` for a session that does not stand; storage failure.
-    pub async fn set_presence<'a>(
+    pub fn set_presence<'a>(
         &self,
         session: impl Into<Session<'a>>,
         choice: Choice,
-    ) -> Result<[u8; 16], Error> {
+    ) -> impl Future<Output = Result<[u8; 16], Error>> + Send + 'static {
         let session = session.into();
-        let row = self
-            .db
-            .query_one_raw(statement(
-                "UPDATE central_identity.accounts a SET presence = $3
-                 FROM central_identity.sessions s
-                 WHERE s.digest = $1 AND s.kind = $2 AND s.account_id = a.id
-                 AND s.credential_revision = a.credential_revision AND a.credential IS NOT NULL
-                 AND s.expires_at > pg_catalog.clock_timestamp()
-                 RETURNING a.id",
-                vec![
-                    session.digest().to_vec().into(),
-                    session.kind().into(),
-                    choice.name().into(),
-                ],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?
-            .ok_or(Error::Rejected)?;
-        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
-        Ok(account.into_bytes())
+        let digest = session.digest();
+        let kind = session.kind();
+        let store = self.clone();
+        async move {
+            let row = store
+                .db
+                .query_one_raw(statement(
+                    "UPDATE central_identity.accounts a SET presence = $3
+                     FROM central_identity.sessions s
+                     WHERE s.digest = $1 AND s.kind = $2 AND s.account_id = a.id
+                     AND s.credential_revision = a.credential_revision AND a.credential IS NOT NULL
+                     AND s.expires_at > pg_catalog.clock_timestamp()
+                     RETURNING a.id",
+                    vec![digest.to_vec().into(), kind.into(), choice.name().into()],
+                ))
+                .await
+                .map_err(|_| Error::Unavailable)?
+                .ok_or(Error::Rejected)?;
+            let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+            Ok(account.into_bytes())
+        }
     }
 }
 

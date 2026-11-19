@@ -238,6 +238,11 @@ pub struct Presence {
 #[derive(Default)]
 pub(super) struct Live {
     state: Mutex<State>,
+    /// Held from a choice's write, or a dial's second reading of it, until
+    /// the registry has what it found ([`Live::settle`], [`Live::recheck`]):
+    /// so the registry takes choices in the order the store did, and never
+    /// ends at one the store no longer holds.
+    choosing: tokio::sync::Mutex<()>,
 }
 
 /// A reading begun, which ends as read or, however else it ends (an error,
@@ -330,6 +335,44 @@ impl Live {
         entry.choice = choice;
         state.raise(account, news::PRESENCE);
         state.shown_changed(account, before);
+    }
+
+    /// Store a choice with `write` and then take it: one step that a dropped
+    /// request does not cut short (it runs in a task of its own), and that no
+    /// other choice of the store's overtakes. Without it a request dropped
+    /// while the store wrote would leave the registry at the old choice, and
+    /// two choices at once (the website and the client) could be taken in
+    /// the order other than the store's: an account could be shown after it
+    /// chose `offline`.
+    pub(super) async fn settle<W>(self: &Arc<Self>, choice: Choice, write: W) -> Result<(), Error>
+    where
+        W: Future<Output = Result<[u8; 16], Error>> + Send + 'static,
+    {
+        let live = Arc::clone(self);
+        let step = async move {
+            let _turn = live.choosing.lock().await;
+            let account = write.await?;
+            live.chose(&account, choice);
+            Ok(())
+        };
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => runtime.spawn(step).await.unwrap_or(Err(Error::Unavailable)),
+            Err(_) => step.await,
+        }
+    }
+
+    /// Take the choice `read` finds for `account`, a dial's second reading of
+    /// it, in turn with every [`Self::settle`]: a write the reading did not
+    /// see is taken after it, never before. A dial dropped meanwhile takes
+    /// nothing, and its socket is gone with it.
+    pub(super) async fn recheck<R>(&self, account: &[u8; 16], read: R) -> Result<(), Error>
+    where
+        R: Future<Output = Result<Choice, Error>>,
+    {
+        let _turn = self.choosing.lock().await;
+        let choice = read.await?;
+        self.chose(account, choice);
+        Ok(())
     }
 
     /// What the client of the session `digest` says it is doing. Only a
@@ -770,11 +813,14 @@ impl super::IdentityService {
         // reaches it. The socket has not said `ready`, so a choice corrected
         // here was never shown.
         if self.live.changes() != changes {
-            let again = self
-                .store
-                .session_status(central_postgres::Session::Native(token))
+            self.live
+                .recheck(&account, async {
+                    self.store
+                        .session_status(central_postgres::Session::Native(token))
+                        .await
+                        .map(|again| again.presence)
+                })
                 .await?;
-            self.live.chose(&account, again.presence);
         }
         Ok(listener)
     }
@@ -808,8 +854,9 @@ impl super::IdentityService {
         let session = surface.session(bearer)?;
         self.live
             .choose(bearer.ok_or(Error::Rejected)?.digest(), Instant::now())?;
-        let account = self.store.set_presence(session, choice).await?;
-        self.live.chose(&account, choice);
+        self.live
+            .settle(choice, self.store.set_presence(session, choice))
+            .await?;
         Ok(central_api::wire::Response::Presence { choice })
     }
 

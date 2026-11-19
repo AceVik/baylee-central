@@ -2,6 +2,7 @@
 //! sessions stand, who an account's friends are, and whom each social change
 //! concerns, so that a socket hears exactly its own account's news.
 use super::{AccountStore, Error, ServerKeys, Token, enroll, login};
+use central_api::presence::Choice;
 use central_api::{
     chat::{ChatRequest, DeviceRegistration, Header, Sealed, Wrap},
     groups::{Change, GroupRequest, GroupResponse},
@@ -9,7 +10,6 @@ use central_api::{
     wire::Identity,
 };
 use central_crypto::chat::{DeviceSecrets, Entropy, Recipient, b64::url};
-use central_api::presence::Choice;
 use central_postgres::{Concerns, LIVE_CHECK, Session};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 use std::collections::BTreeSet;
@@ -166,9 +166,15 @@ async fn choices(
     [ai, bi]: [Identity; 2],
     [a, b]: [&Token; 2],
 ) {
-    assert_eq!(chosen(store, a).await, Choice::Online, "online until chosen");
     assert_eq!(
-        store.set_presence(Session::Native(a), Choice::Offline).await,
+        chosen(store, a).await,
+        Choice::Online,
+        "online until chosen"
+    );
+    assert_eq!(
+        store
+            .set_presence(Session::Native(a), Choice::Offline)
+            .await,
         Ok(ai.account)
     );
     assert_eq!(chosen(store, a).await, Choice::Offline);
@@ -183,7 +189,9 @@ async fn choices(
         .await
         .unwrap();
     assert_eq!(
-        store.set_presence(Session::Browser(&browser), Choice::Afk).await,
+        store
+            .set_presence(Session::Browser(&browser), Choice::Afk)
+            .await,
         Ok(bi.account)
     );
     assert_eq!(chosen(store, b).await, Choice::Afk);
@@ -198,7 +206,9 @@ async fn choices(
     // nobody's session, and a session that ended
     let nobody = Token::generate().unwrap();
     assert_eq!(
-        store.set_presence(Session::Native(&nobody), Choice::Online).await,
+        store
+            .set_presence(Session::Native(&nobody), Choice::Online)
+            .await,
         Err(Error::Rejected)
     );
     store.logout(Session::Browser(&browser)).await.unwrap();
