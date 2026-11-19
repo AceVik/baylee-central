@@ -1127,8 +1127,9 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
 }
 
 /// The privacy notice says who sees that an account is online (its friends,
-/// while the Baylee app is connected, `docs/push-socket.md`) and that Central
-/// keeps it in memory only; and, in every language, on what basis the push
+/// while the Baylee app is connected, `docs/push-socket.md`), what else they
+/// see of its status, that it can appear offline, and that Central keeps
+/// only that choice; and, in every language, on what basis the push
 /// providers carry notifications to the USA.
 #[tokio::test]
 async fn the_privacy_notice_says_who_sees_an_account_online() {
@@ -1139,12 +1140,24 @@ async fn the_privacy_notice_says_who_sees_an_account_online() {
     }
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("your friends (contacts you both accepted) see that you are online"));
-    assert!(english.contains("Central keeps this online status only in memory"));
+    assert!(english.contains("whether you are away, playing"));
+    assert!(english.contains("with “offline” they never see you online"));
+    assert!(english.contains("Central keeps only in memory while the connection is open"));
+    assert!(
+        english.contains("Your choice (online, away, offline) Central stores with your account")
+    );
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
     assert!(german.contains(
         "sehen deine Freunde (Kontakte, die ihr beide angenommen habt), dass du online bist"
     ));
-    assert!(german.contains("Diesen Online-Status hält Central nur im Arbeitsspeicher"));
+    assert!(german.contains("ob du abwesend bist, spielst"));
+    assert!(german.contains("bei „offline“ sehen sie dich nie online"));
+    assert!(german.contains("hält Central nur im Arbeitsspeicher, solange die Verbindung besteht"));
+    assert!(
+        german.contains(
+            "Deine Wahl (online, abwesend, offline) speichert Central mit deinem Account"
+        )
+    );
     assert!(german.contains("Stand: 19. November 2026"));
 }
 

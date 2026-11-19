@@ -8459,3 +8459,74 @@ at `6f5c2bb2` found, and the implementing agent confirmed in the code:
 Each fix's test is red without it (the store's pairs, the readings' numbers, the retag, the counted
 news, the full table), except the dropped-request scenario over TCP, which the old code failed only
 when the drop met the reading; the store's pair test covers it without timing.
+
+## A status for presence: online, away, offline, playing, at a table, 19 November 2026
+
+The owner decided on 19.11.2026 that a person chooses whether its friends see it online, away or
+offline, and that the client says whether it is playing or at a table; the PM added that only fixed
+values exist, that a report without a socket has no effect and says so to nobody, at most one
+presence change a second, that `offline` is never visible by a side path, a reader's fallback for a
+frame it does not understand, the operations in `central-client`, and one column with a way back.
+The design is [push socket](push-socket.md) §"Status".
+
+Design pass. Assets: the choice (stored, the one new datum Central keeps), what a client says it is
+doing (new, in memory), and everything presence already disclosed. Callers: the account itself on
+either listener, its friends' sockets, a second device of it, a session without a socket, a
+stranger, a browser page, a client of before the status. Invariants: an account that chose `offline`
+is never in a friend's frame and its friends are never woken by anything it does; friends are told
+only when how an account is shown changes; a report names no game, table, room or gateway, is heard
+only from a session that holds a socket, and is answered alike either way; the registry never ends
+at a choice the store no longer holds; frames stay below the client's 4,096 bytes and a reader of
+before the status still reads them; every new operation is budgeted per session.
+
+Implementation pass. `central_api::presence` holds the values and the frame's letters (`o a g G t
+T`), with a reader that shows a friend as online for a letter it does not know and every friend so
+when `states` is missing or not as long as `online`. `SetPresence` runs on either listener under
+Central's terms, `ReportPresence` on the native one only; both are budgeted per session in the
+registry (10 and 30 a minute, tables of 4,096), a report only for a session with a socket. The
+choice is one column (migration 000033, `text NOT NULL DEFAULT 'online'` with a check); the dial
+reads it with the session's status, and the registry keeps it per account with the activity and
+idleness, comparing how the account is shown before and after every change and waking its followers
+only on a difference. The store's write is an owned future, so the registry runs the write and its
+own update in a task (`Live::settle`); every choice and every dial's second reading of one take a
+turn (`Live::recheck`), so the registry takes choices in the store's order. The socket says
+presence at most once a second, the latest; the frame's worst case is 3,659 bytes (a const
+assertion). Today's Baylee client decodes the push frame into a struct without
+`deny_unknown_fields` (Baylee 374e42695, `crates/baylee-client/src/lobby/central.rs:108`), so it
+ignores `states` and `me` and reads `online` as before.
+
+Adversarial pass, what it found and what changed. The end-to-end scenario failed at first, and the
+code was right: choosing `offline` tells the account's own sockets its choice, which the test did
+not read. The review of the finished code (the implementing agent and a reviewer model that read the
+whole session) found two ways the registry could end at `online` while the store held `offline`:
+the request awaited the store and only then told the registry, so a request dropped in between (its
+time up, its client gone) left the registry at the old choice; and two choices at once (the website
+and the client), or a choice and a dial's second reading, could be taken in an order other than the
+store's. The write and the update now run in a task of their own, in turn, and three registry tests
+hold it, each red without its part of the fix (taken back one at a time): a choice whose request
+went away is still taken; two choices whose answers come in the other order end where the store
+does; a dial's slow second reading never takes a choice the store no longer holds. The end-to-end
+test watched a quiet socket for 400 ms, less than the second a socket holds presence back, so a
+frame that leaked could have merged into the next one the test expected; it now watches 1,250 ms.
+Considered and not a finding: a report cannot tell anybody whether another account holds a socket
+(it is keyed by the caller's own session and always answered `Done`); a session out of choices is
+told `Busy`, which says nothing of anyone else; the website's choice is an ordinary browser
+operation under the cookie and the listener's boundary. Tested: the letters and the reader's
+fallbacks; in the registry, `offline` never shown from a fresh registry with the stored choice, on a
+second device, while it reports and idles and as a device goes, away and activity and only their
+changes reaching friends, a report without a socket, the budgets, the last report winning, the
+three ordering tests above, and a socket's gap between presence frames; the stored choice on
+PostgreSQL 18 from both listeners' sessions, refused for nobody's and an ended session, and in the
+export; over real TCP and PostgreSQL, an account that chose `offline` before connecting, two of its
+devices and a report unseen by a friend, a report from a session without a socket, and each change
+of choice and activity as the friend's socket and the account's own see it.
+
+What was not done: no real restart of the service (a fresh registry with the stored choice, the
+store's test and the end-to-end scenario that chooses before connecting stand for it); no real
+Baylee client reports or chooses yet; an answer the store loses after it wrote a choice still leaves
+the registry at the one before until the account's sockets close (its own sockets say which, as
+`me`); a page of the website opened before a deploy fails to read the export, whose decoder refuses
+the new field, until it is reloaded; the migration has not run on production, which has its own
+gate. The privacy policy's § 5a paragraph and § 7 point changed after the owner read them, so his
+review does not cover the status sentences. These passes are by the implementing agent and are not
+an independent audit.

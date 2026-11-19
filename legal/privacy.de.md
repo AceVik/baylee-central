@@ -159,8 +159,9 @@ Zustellung verhindern.
   nicht aber dein Passwort oder deine verschlüsselten Daten.
 - **Andere Spieler:** Deine Kontakte und die Mitglieder deiner Gruppen sehen
   deinen Anzeigenamen mit Tag und die Nachrichten, die du ihnen schickst;
-  deine Freunde außerdem, solange die Baylee-App mit Central verbunden ist,
-  dass du online bist (Abschnitt 5a). Dein Profilbild kann jeder sehen, auch
+  deine Freunde außerdem, solange die Baylee-App mit Central verbunden ist
+  und du nicht „offline“ gewählt hast, dass du online bist und ob du
+  abwesend bist, spielst oder an einem Tisch sitzt (Abschnitt 5a). Dein Profilbild kann jeder sehen, auch
   ohne Anmeldung, ebenso deinen Eintrag in einer Rangliste, die du freigibst.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
