@@ -8577,3 +8577,24 @@ accepted the terms is answered `TermsRequired` nine times and then `Busy`; the e
 also reports playing and idle while `offline` and reads the choice back natively and on the
 website. The website's download is checked by its browser specs, which the implementing agent
 updated but did not run (they need packages it did not download); CI's `site` job runs them.
+
+Addendum, the same day: the same reviewer checked the fixes at `d11f5ee5`; they hold, and it named
+what remained:
+
+- A socket admitted while the store held `online` could say `ready` while a write of `offline`
+  was under way, after it committed and before the registry took it, and be shown for up to the
+  second a frame is held back. `offline` is now taken before its write: hidden is the side to err
+  on, and a failed write leaves it hidden as before.
+- A write that never answered held its account's turn for good. It has five seconds now, then
+  counts as failed; and the count of settled choices rises from a guard however the step ends, a
+  panic included, before the turn is let go.
+- Left as it is, with the reasons in the design (`push-socket.md` §"Status"): every settled choice
+  counts, a choice that changed nothing included (one more statement for each dial in flight); and
+  a choice's budget is spent on the bearer's digest before the session is checked, so made-up
+  website cookies can push real sessions out of the table of 4,096, within the request limits per
+  address.
+
+Each fix's test is red without it: `offline` taken before its write, a write without an answer
+letting the turn go, a step that panics still counted as settled. Tests the review missed were
+added: two dials around a choice both admit with what the store holds, and a dial whose second
+reading fails is not admitted and leaves no entry.

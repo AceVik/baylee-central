@@ -264,6 +264,19 @@ pub(super) struct Live {
     turns: Mutex<BTreeMap<[u8; 16], Arc<tokio::sync::Mutex<()>>>>,
 }
 
+/// How long a choice's write may take before it counts as failed, and the
+/// account's turn is let go ([`Live::settle`]): a request's own time.
+pub(super) const CHOICE_TIME: Duration = Duration::from_secs(5);
+
+/// Counts a choice as settled when dropped, however its step ends.
+struct Settled(Arc<Live>);
+
+impl Drop for Settled {
+    fn drop(&mut self) {
+        self.0.state().settled += 1;
+    }
+}
+
 /// Accounts whose turns are kept at once; past it, the turns nobody holds or
 /// awaits are let go (a dial dropped while it waited leaves one behind).
 const TURNS: usize = 4_096;
@@ -404,18 +417,22 @@ impl Live {
         state.shown_changed(account, before);
     }
 
-    /// Store `account`'s choice with `write` and then take it, in the
-    /// account's turn: one step that a dropped request does not cut short (it
-    /// runs in a task of its own), and that no other choice of the account
-    /// overtakes. A write that fails may still have been stored; a failed
-    /// `offline` is taken all the same, since hidden is the side to err on,
-    /// and any other is left to the next dial's reading. Either way the
-    /// choice counts as settled, so a dial that read meanwhile reads again.
+    /// Store `account`'s choice with `write` and take it, in the account's
+    /// turn: one step that a dropped request does not cut short (it runs in a
+    /// task of its own), and that no other choice of the account overtakes.
+    /// `offline` is taken before the write, since hidden is the side to err
+    /// on: no socket of the account says `ready` under the choice before
+    /// while the write is under way, and a write that fails leaves it hidden.
+    /// Any other choice is taken once stored; one that fails, or takes longer
+    /// than `time`, is left to the next dial's reading. However the step ends,
+    /// a panic included, the choice counts as settled before the turn is let
+    /// go, so a dial that read meanwhile reads again.
     pub(super) async fn settle<W>(
         self: &Arc<Self>,
         account: [u8; 16],
         choice: Choice,
         write: W,
+        time: Duration,
     ) -> Result<(), Error>
     where
         W: Future<Output = Result<[u8; 16], Error>> + Send + 'static,
@@ -423,11 +440,17 @@ impl Live {
         let live = Arc::clone(self);
         let step = async move {
             let _turn = live.turn(account).await;
-            let written = write.await;
-            if written.is_ok() || choice == Choice::Offline {
+            // Dropped before the turn: counted first, then let go.
+            let _settled = Settled(Arc::clone(&live));
+            if choice == Choice::Offline {
                 live.chose(&account, choice);
             }
-            live.state().settled += 1;
+            let written = tokio::time::timeout(time, write)
+                .await
+                .unwrap_or(Err(Error::Unavailable));
+            if written.is_ok() && choice != Choice::Offline {
+                live.chose(&account, choice);
+            }
             written.map(|_| ())
         };
         match tokio::runtime::Handle::try_current() {
@@ -1022,6 +1045,7 @@ impl super::IdentityService {
                 account,
                 choice,
                 self.store.set_presence(surface.session(bearer)?, choice),
+                CHOICE_TIME,
             )
             .await?;
         Ok(central_api::wire::Response::Presence { choice })

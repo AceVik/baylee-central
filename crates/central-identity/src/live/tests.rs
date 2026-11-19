@@ -682,6 +682,10 @@ fn write(
     }
 }
 
+/// A choice's time in these tests, where the store answers at once or when
+/// told to.
+const TIME: Duration = Duration::from_secs(5);
+
 fn runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_time()
@@ -705,7 +709,12 @@ fn a_choice_whose_request_went_away_is_still_taken() {
     runtime().block_on(async {
         // the request is dropped while the store answers (its time is up,
         // its client gone); the store has the choice by then
-        let request = live.settle(A, Choice::Offline, write(&store, Choice::Offline, &answer));
+        let request = live.settle(
+            A,
+            Choice::Offline,
+            write(&store, Choice::Offline, &answer),
+            TIME,
+        );
         assert!(
             tokio::time::timeout(Duration::from_millis(20), request)
                 .await
@@ -733,12 +742,12 @@ fn choices_at_once_are_taken_in_the_order_the_store_wrote_them() {
         // website chooses online; the website's answer comes first
         let client = tokio::spawn({
             let (live, write) = (Arc::clone(&live), write(&store, Choice::Offline, &first));
-            async move { live.settle(A, Choice::Offline, write).await }
+            async move { live.settle(A, Choice::Offline, write, TIME).await }
         });
         others().await;
         let website = tokio::spawn({
             let (live, write) = (Arc::clone(&live), write(&store, Choice::Online, &second));
-            async move { live.settle(A, Choice::Online, write).await }
+            async move { live.settle(A, Choice::Online, write, TIME).await }
         });
         others().await;
         second.notify_one();
@@ -770,7 +779,7 @@ fn a_dial_waits_for_a_choice_under_way_and_admits_with_what_the_store_holds() {
         // the account chooses offline; the store has it, its answer is slow
         let chosen = tokio::spawn({
             let (live, write) = (Arc::clone(&live), write(&store, Choice::Offline, &answer));
-            async move { live.settle(A, Choice::Offline, write).await }
+            async move { live.settle(A, Choice::Offline, write, TIME).await }
         });
         others().await;
         assert_eq!(stored(&store), Choice::Offline);
@@ -845,12 +854,12 @@ fn an_offline_choice_whose_write_failed_is_taken_all_the_same() {
     let runtime = runtime();
     // the store may have it or not: hidden is the side to err on
     let failed =
-        runtime.block_on(live.settle(A, Choice::Offline, async { Err(Error::Unavailable) }));
+        runtime.block_on(live.settle(A, Choice::Offline, async { Err(Error::Unavailable) }, TIME));
     assert_eq!(failed, Err(Error::Unavailable));
     assert_eq!(live.presence(&B).online, Vec::<u32>::new());
     // any other failed choice is left to the next reading
     let failed =
-        runtime.block_on(live.settle(A, Choice::Online, async { Err(Error::Unavailable) }));
+        runtime.block_on(live.settle(A, Choice::Online, async { Err(Error::Unavailable) }, TIME));
     assert_eq!(failed, Err(Error::Unavailable));
     assert_eq!(live.presence(&A).me, Choice::Offline);
     // both count as settled, so a dial that read meanwhile reads again
@@ -867,7 +876,7 @@ fn one_account_s_turn_never_waits_for_another_s_and_a_reading_counts_nothing() {
         // B's choice is under way and its answer slow
         let chosen = tokio::spawn({
             let (live, write) = (Arc::clone(&live), write(&store, Choice::Afk, &answer));
-            async move { live.settle(B, Choice::Afk, write).await }
+            async move { live.settle(B, Choice::Afk, write, TIME).await }
         });
         others().await;
         // A's dial is admitted at once
@@ -898,4 +907,151 @@ fn one_account_s_turn_never_waits_for_another_s_and_a_reading_counts_nothing() {
     });
     // and no turn is kept once nobody holds or awaits it
     assert!(live.turns().is_empty());
+}
+
+#[test]
+fn offline_is_taken_before_its_write() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    // a socket admitted while the store held online, not yet `ready`
+    let a = choosing(&live, A, Choice::Online, &[B]);
+    let store: Stored = Arc::new(Mutex::new(Choice::Online));
+    let answer = Arc::new(Notify::new());
+    runtime().block_on(async {
+        let chosen = tokio::spawn({
+            let (live, write) = (Arc::clone(&live), write(&store, Choice::Offline, &answer));
+            async move { live.settle(A, Choice::Offline, write, TIME).await }
+        });
+        others().await;
+        // the write is under way when the socket says `ready`
+        a.ready();
+        assert_eq!(live.presence(&B).online, Vec::<u32>::new(), "never shown");
+        answer.notify_one();
+        chosen.await.unwrap().unwrap();
+    });
+    assert_eq!(b.take(), 0, "B was never told anything");
+    assert_eq!(live.presence(&A).me, Choice::Offline);
+}
+
+#[test]
+fn a_write_that_never_answers_lets_the_turn_go() {
+    let live = Arc::new(Live::default());
+    let _a = choosing(&live, A, Choice::Online, &[]);
+    runtime().block_on(async {
+        let never = std::future::pending::<Result<[u8; 16], Error>>();
+        let chosen = tokio::time::timeout(
+            Duration::from_secs(2),
+            live.settle(A, Choice::Afk, never, Duration::from_millis(50)),
+        )
+        .await
+        .expect("the write's time ends it");
+        assert_eq!(chosen, Err(Error::Unavailable));
+        assert_eq!(live.settled(), 1);
+        // the account's turn is free again: a dial is admitted at once
+        let since = live.settled();
+        let (dialled, _) = tokio::time::timeout(
+            Duration::from_millis(200),
+            live.admit_in_turn(A, Some(1), Choice::Afk, since, digest(9), async {
+                Ok(Choice::Afk)
+            }),
+        )
+        .await
+        .expect("not held up")
+        .unwrap();
+        drop(dialled);
+    });
+    assert_eq!(live.presence(&A).me, Choice::Afk, "the dial's reading");
+}
+
+#[test]
+fn a_choice_whose_step_panics_still_counts_as_settled() {
+    let live = Arc::new(Live::default());
+    let _a = choosing(&live, A, Choice::Online, &[]);
+    let store: Stored = Arc::new(Mutex::new(Choice::Online));
+    runtime().block_on(async {
+        let stored_by = Arc::clone(&store);
+        let panics = async move {
+            // stored, and then the step dies before the registry takes it
+            *stored_by.lock().unwrap() = Choice::Afk;
+            panic!("a panic after the store's commit");
+        };
+        let chosen = live.settle(A, Choice::Afk, panics, TIME).await;
+        assert_eq!(chosen, Err(Error::Unavailable));
+    });
+    // so a dial that read before it reads again, and finds the store's
+    assert_eq!(live.settled(), 1);
+    let (dialled, _) = runtime()
+        .block_on(
+            live.admit_in_turn(A, Some(1), Choice::Online, 0, digest(9), {
+                let store = Arc::clone(&store);
+                async move { Ok(stored(&store)) }
+            }),
+        )
+        .unwrap();
+    assert_eq!(live.presence(&A).me, Choice::Afk);
+    assert!(live.turns().is_empty());
+    drop(dialled);
+}
+
+#[test]
+fn two_dials_around_a_choice_both_admit_with_what_the_store_holds() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let store: Stored = Arc::new(Mutex::new(Choice::Online));
+    let runtime = runtime();
+    // the first dial reads online before the choice
+    let first_since = live.settled();
+    let first_read = stored(&store);
+    // the account chooses offline, all of it, while no socket is admitted
+    let answer = Arc::new(Notify::new());
+    answer.notify_one();
+    runtime
+        .block_on(live.settle(
+            A,
+            Choice::Offline,
+            write(&store, Choice::Offline, &answer),
+            TIME,
+        ))
+        .unwrap();
+    // the second dial reads offline after it
+    let second_since = live.settled();
+    let second_read = stored(&store);
+    // a first dial whose second reading fails is not admitted
+    let failed = runtime.block_on(live.admit_in_turn(
+        A,
+        Some(1),
+        first_read,
+        first_since,
+        digest(1),
+        async { Err(Error::Unavailable) },
+    ));
+    assert!(matches!(failed, Err(Error::Unavailable)));
+    assert!(!live.state().accounts.contains_key(&A));
+    // the first dial again, reading anew, and the second: both offline
+    let again = Arc::clone(&store);
+    let (first, reading) = runtime
+        .block_on(
+            live.admit_in_turn(A, Some(1), first_read, first_since, digest(1), async move {
+                Ok(stored(&again))
+            }),
+        )
+        .unwrap();
+    if let Some(reading) = reading {
+        live.friends_read(reading, vec![B]);
+    }
+    let (second, _) = runtime
+        .block_on(
+            live.admit_in_turn(A, Some(1), second_read, second_since, digest(1), async {
+                Ok(Choice::Online)
+            }),
+        )
+        .unwrap();
+    first.ready();
+    second.ready();
+    assert_eq!(live.presence(&A).me, Choice::Offline);
+    assert_eq!(live.presence(&B).online, Vec::<u32>::new());
+    assert_eq!(b.take(), 0);
+    drop((first, second));
 }
