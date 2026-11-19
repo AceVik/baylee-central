@@ -146,8 +146,9 @@ only after you choose to enable notifications; OS/browser settings can block del
   not your password or your encrypted data.
 - **Other players:** your contacts and the members of your groups see your
   display name and tag and the messages you send them; your friends also see
-  that you are online while the Baylee app is connected to Central
-  (section 5a). Anyone can see your profile picture, signed in or not, and
+  that you are online, and whether you are away, playing or sitting at a
+  table, while the Baylee app is connected to Central and you did not choose
+  "offline" (section 5a). Anyone can see your profile picture, signed in or not, and
   your entry on a leaderboard you enable.
 - **Authorities** receive data only where we are legally obliged.
 

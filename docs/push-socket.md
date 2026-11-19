@@ -150,7 +150,7 @@ to hide it.
 | --- | --- | --- |
 | dial | the session's status, the terms' acceptance, the account's friends if no socket of it is open, and the session and its choice again if news of an ended session or a changed choice came meanwhile: 2–4 statements | bounded registry entries |
 | chat send, group change, new device | none beyond the operation's own | bits for the named accounts' sockets (at most 51 accounts × 4 sockets for a group) |
-| a choice (`SetPresence`) | one statement | bits for the account's sockets, and its followers' if how it is shown changed |
+| a choice (`SetPresence`) | one statement, in turn with every other choice and a dial's second reading of one | bits for the account's sockets, and its followers' if how it is shown changed |
 | a report (`ReportPresence`) | none | bits for its followers, only if how it is shown changed |
 | contact change | for a friendship that began or ended only, one read of each of the two accounts' friends that holds a socket (≤ 2 statements of ≤ 300 rows), in a task the request does not wait for; a request or a block of a stranger reads nothing | presence bits for the two and whom their lists gained or lost |
 | sign-out | none | bits for that session's sockets |
@@ -266,6 +266,16 @@ and the client says what it is doing (`central_api::presence`).
   the 4,096 the client reads (a const assertion holds it). A socket says
   presence at most once a second; news within that second waits, and the
   frame that follows says the latest.
+- **In the store's order**: a choice is written and then taken by the
+  registry in one step of its own, which a dropped request does not cut short
+  (it runs in a task), and every choice and every dial's second reading of
+  one takes its turn (`Live::settle`, `Live::recheck`): so the registry takes
+  choices in the order the store wrote them, and never ends at one the store
+  no longer holds. The turn is one for the service, since a choice is rare
+  (ten a minute a session) and one statement. What remains: an answer lost
+  after the store wrote (the store gone between its commit and its answer)
+  leaves the registry at the choice before, which the account's own sockets
+  say as `me` until its sockets close; its friends see what `me` says.
 - **Budgets**: 10 choices a minute a session (each is a statement) and 30
   reports (none is); the registry's tables hold at most 4,096 sessions, a
   newcomer taking the oldest's place, and a report is counted only for a
