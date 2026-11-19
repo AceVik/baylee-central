@@ -735,7 +735,8 @@ fn tables(http: &Http, [a, b, c]: [&mut Player; 3]) {
             Ok(Response::Presence { choice: stored }) if stored == choice
         ));
     };
-    let table_text = |player: &Player, table: Option<&Table>| table_frame(player.tag, table);
+    let table_text =
+        |player: &Player, table: Option<&Table>| table_frame(player.tag, table).unwrap();
     let shared = Table {
         origin: "https://gateway.example".into(),
         game: "01937d4e-7b1c-7000-8000-000000000001".into(),

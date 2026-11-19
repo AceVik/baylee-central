@@ -153,7 +153,7 @@ to hide it.
 | chat send, group change, new device | none beyond the operation's own | bits for the named accounts' sockets (at most 51 accounts × 4 sockets for a group) |
 | a choice (`SetPresence`) | the session's status and the write: two statements, in the account's turn | bits for the account's sockets, and its followers' if how it is shown changed |
 | a reading of it (`Presence`) | the session's status: one statement | — |
-| a report (`ReportPresence`) | none | bits for its followers, only if how it is shown or the table it shares changed; a table's check (`Table::valid`, one origin parsed) after the budget |
+| a report (`ReportPresence`) | none | bits for its followers, only if how it is shown or the table it shares changed; a table's check (`Table::valid`, the origin parsed once, last) after the budget |
 | contact change | for a friendship that began or ended only, one read of each of the two accounts' friends that holds a socket (≤ 2 statements of ≤ 300 rows), in a task the request does not wait for; a request or a block of a stranger reads nothing | presence bits for the two and whom their lists gained or lost |
 | sign-out | none | bits for that session's sockets |
 | sign-in, password, reset, deletion, pairing, client session ended | none at the event; each of the account's sockets checks its session: ≤ 4 statements | bits |
@@ -181,7 +181,7 @@ minute between checks, ten seconds for one).
 | frames from a client | 16 in 10 s | a pong a ping, and pings of its own |
 | a frame from a client | 131 bytes | a control frame's longest; a data frame is refused at its header |
 | a frame to a client | 4,096 bytes | the client's limit; the longest presence (300 friends, eight-digit tags, a state each, the longest choice) fits, and so does the longest `table` frame (796 bytes, one friend's) |
-| presence frames | one a second a socket | news within the second waits; the next frame says the latest. The `table` frames said with a presence count as it: they come together, at most once a second |
+| presence frames | one a second a socket | news within the second waits; the next frame says the latest. The `table` frames said with a presence count as it: they come together, in one write, at most once a second (≤ 300 table frames and a presence, about 240 KB at the very most) |
 | choices, reports | 10 and 30 a minute a session | a choice is a statement, a report none |
 | a write | 10 s | a client that does not read loses its socket |
 | idle | 75 s | two pings unanswered |
@@ -354,14 +354,18 @@ passes it to the friends that are shown the account, and nobody else.
   activity; any other is dropped and the rest of the report heard, answered
   `Done` either way. A table that does not even decode (a number past a byte,
   a string where a number belongs, `null`, a missing field) is read as none
-  (`Table::lenient`) rather than costing the report. The check runs after the
-  report's budget is spent, under the registry's lock: one origin parsed.
+  (`Table::lenient`) rather than costing the report. What no JSON reader
+  takes still refuses the whole request, as it always did: a value nested
+  past the parser's depth, or `table` given twice; that harms only the
+  client that sent it. The check runs after the report's budget is spent,
+  under the registry's lock, the cheap bounds first and the origin last,
+  parsed once (by its scheme: `http` as development, anything else as live).
 
 | field | bound |
 | --- | --- |
 | `origin` | an `https` origin in its canonical spelling, or `http` with a numeric loopback address and its port (`gateway::validate_origin`, as the directory checks a gateway's); at most 200 bytes |
 | `game` | 1 to 40 bytes of `A-Z a-z 0-9 - _` |
-| `name` | at most 64 characters, possibly none, each a `gateway::shown_char`: no control character, line or paragraph separator, direction control or invisible character |
+| `name` | at most 64 characters, possibly none, each a `gateway::shown_char`: no control character, line or paragraph separator, direction control, nor the invisible characters it names (zero-width space, word joiner and the invisible operators, the byte order mark); it lets other invisible ones pass (a soft hyphen, the Hangul fillers), which the directory's names share |
 | `seats` | 2 to 8 |
 | `taken` | at most `seats` |
 
@@ -383,9 +387,13 @@ passes it to the friends that are shown the account, and nobody else.
   first says a `table` frame for each friend whose table is not the one it
   said last, and a clearing one for each that shares none any more, then the
   `presence` frame if the friends, their letters or the choice changed, all
-  of it at most once a second; so a client holds a friend's table before the
-  frame that shows the friend at a table. A socket opens with a `table`
-  frame for each friend shown at a shared table.
+  of it at most once a second and as one write with one write's time; so a
+  client holds a friend's table before the frame that shows the friend at a
+  table. A socket opens with a `table` frame for each friend shown at a
+  shared table. One pass is at most 300 table frames and a presence, about
+  240 KB at the very most (every friend at a table with every field at its
+  longest, all changing within the second), and a client that cannot take it
+  within the write's ten seconds loses its socket as for any write.
 - **For the client**: keep a friend's table until a `table` frame clears it,
   a `presence` frame no longer lists the friend, or the socket ends, and use
   it only while the friend is shown playing or at a table. Read the table

@@ -1315,6 +1315,16 @@ mod tests {
             )
             .is_err()
         );
+        // what no JSON reader takes refuses the request, as it always did:
+        // a field given twice, a value nested past the parser's depth
+        let twice = br#"{"operation":"report_presence","activity":null,"idle":false,"table":null,"table":null}"#;
+        assert!(crate::decode::<Request>(twice).is_err());
+        let deep = format!(
+            r#"{{"operation":"report_presence","activity":null,"idle":false,"table":{}{}}}"#,
+            "[".repeat(200),
+            "]".repeat(200)
+        );
+        assert!(crate::decode::<Request>(deep.as_bytes()).is_err());
     }
 
     #[test]

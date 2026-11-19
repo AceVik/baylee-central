@@ -801,7 +801,7 @@ fn a_shared_table_reaches_the_friends_shown_and_each_change_of_it_is_news() {
     );
     assert_eq!(b.take(), news::PRESENCE);
     assert_eq!(live.presence(&B).states, vec![AT_TABLE]);
-    assert!(tables(&live, &B).is_empty());
+    assert_eq!(tables(&live, &B), Vec::new());
     // its own sockets never hear of its own table
     live.report(
         digest(1),
@@ -811,7 +811,7 @@ fn a_shared_table_reaches_the_friends_shown_and_each_change_of_it_is_news() {
         Instant::now(),
     );
     assert_eq!(a.take(), 0);
-    assert!(tables(&live, &A).is_empty());
+    assert_eq!(tables(&live, &A), Vec::new());
     // and the table goes with the device that said it
     let _ = b.take();
     drop(a);
@@ -872,12 +872,12 @@ fn a_table_out_of_bounds_or_without_an_activity_is_dropped_and_the_rest_heard() 
             }],
             "{bad:?}"
         );
-        assert!(tables(&live, &B).is_empty(), "{bad:?}");
+        assert_eq!(tables(&live, &B), Vec::new(), "{bad:?}");
     }
     // a table with no activity is no table
     live.report(digest(1), None, false, Some(table(1)), Instant::now());
     assert_eq!(live.presence(&B).states, vec![ONLINE]);
-    assert!(tables(&live, &B).is_empty());
+    assert_eq!(tables(&live, &B), Vec::new());
     assert!(
         live.state()
             .sockets
@@ -915,7 +915,7 @@ fn an_account_that_chose_offline_shares_no_table_and_its_changes_tell_nobody() {
     // and hidden, nothing of it
     live.chose(&A, Choice::Offline);
     assert_eq!(b.take(), news::PRESENCE);
-    assert!(tables(&live, &B).is_empty());
+    assert_eq!(tables(&live, &B), Vec::new());
     drop(a);
 }
 

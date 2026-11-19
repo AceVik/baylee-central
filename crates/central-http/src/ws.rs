@@ -734,42 +734,40 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
     /// (and one without a table for each that shares none any more), so that
     /// a client has the table when the frame that shows the friend at it
     /// comes; then the `presence` frame if the friends, their states or the
-    /// choice changed. Whatever was held back is said with it: the gap begins
+    /// choice changed. All of it is one write, with one write's time: so a
+    /// pass costs the socket one wait however many friends' tables changed,
+    /// and holds at most 300 table frames (796 bytes each at the longest) and
+    /// one presence. Whatever was held back is said with it: the gap begins
     /// anew, and a deadline from before would otherwise send the next change
     /// at once.
     async fn presence(&mut self) -> Result<(), ()> {
         self.due = None;
         let mut now = self.account.presence();
         let tables = std::mem::take(&mut now.tables);
-        let mut said = false;
+        let mut out = Vec::new();
         for (tag, table) in &tables {
             if self.tables.get(tag) != Some(table) {
-                let text = table_frame(*tag, Some(&**table));
-                self.write(&frame::text(&text).ok_or(())?).await?;
-                said = true;
+                let text = table_frame(*tag, Some(&**table)).ok_or(())?;
+                out.extend(frame::text(&text).ok_or(())?);
             }
         }
-        let gone: Vec<u32> = self
-            .tables
-            .keys()
-            .filter(|tag| !tables.contains_key(*tag))
-            .copied()
-            .collect();
-        for tag in gone {
-            self.write(&frame::text(&table_frame(tag, None)).ok_or(())?)
-                .await?;
-            said = true;
+        for tag in self.tables.keys().filter(|tag| !tables.contains_key(*tag)) {
+            let text = table_frame(*tag, None).ok_or(())?;
+            out.extend(frame::text(&text).ok_or(())?);
         }
+        let changed = self.sent.as_ref() != Some(&now);
+        if changed {
+            out.extend(frame::text(&presence(&now)).ok_or(())?);
+        }
+        if out.is_empty() {
+            return Ok(());
+        }
+        self.write(&out).await?;
         self.tables = tables;
-        if self.sent.as_ref() != Some(&now) {
-            let text = presence(&now);
-            self.write(&frame::text(&text).ok_or(())?).await?;
+        if changed {
             self.sent = Some(now);
-            said = true;
         }
-        if said {
-            self.said_at = Some(Instant::now());
-        }
+        self.said_at = Some(Instant::now());
         Ok(())
     }
 
