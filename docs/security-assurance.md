@@ -8635,3 +8635,38 @@ changed, and a clearing one for a friend that no longer shares one, before the `
 with the same one-second gap; `table_frame` serializes with `serde_json`. `ready` says
 `"tables":true`; the client sends a table only after it. The longest frame for a table within its
 bounds is 796 bytes, a const assertion against `frame::TEXT`.
+
+Adversarial pass. The negative tests come first in each layer: every bound's edges (origins of every
+wrong kind: `http` to a name or a remote address, a loopback without its port, a path, a query,
+credentials, a trailing dot, a capital, the default port spelled out, another scheme, too long; ids
+outside the alphabet or too long; names with a control, a line or paragraph separator, a direction
+control, a zero-width space, the byte order mark, one character too many; one seat, nine, more taken
+than seats), the lenient reader against `null`, wrong types, a seat count past a byte, a deep value
+and a later field, and a frozen copy of the previous `ReportPresence` that refuses a table and reads
+a report without one, byte for byte. In the registry: a table out of bounds or without an activity
+is neither kept nor shown while the activity is; while `offline`, three changes of the table wake
+nobody and the table comes back with the choice; a block takes the table from the blocked friend and
+not from another, and a later change reaches only the other; the account's own sockets never hear
+its table; the table goes with the device. In the socket: the table before the presence, a change of
+the table alone with no presence after it, the gap holding a second change back, a clearing frame,
+and a socket opening with every friend's table. Over real TCP and PostgreSQL 18 (the `tables`
+scenario of the push suite, CI's `postgres` job): the friend hears the table and then the letter, a
+seat taken alone, an out-of-bounds table dropped with the game heard, nothing while `offline` and the
+table back after, nothing for a stranger or the account's own socket, and a block clearing it with
+nothing after.
+
+An independent review of the finished code (a second agent of the same model, reading the diff
+against the invariants above, with no part in writing it) found no defect of medium severity or
+worse and four small ones, all fixed at `d977f4f1`: `Table::valid` parsed the origin up to twice,
+first, under the registry's lock (now the cheap bounds first and the origin once, by its scheme); a
+presence pass wrote each table frame on its own, so a slow client could hold a pass for one write
+time per changed table (now one write for the pass, bounded at 300 table frames and a presence, about
+240 KB); `table_frame` would have sent an empty frame had it failed to serialize (now `None`); and
+the docs claimed nothing malformed costs a report, while a `table` given twice or nested past the
+parser's depth refuses the request as such JSON always did (now said and tested). Left as they are,
+named in the design: `shown_char`, shared with the directory's names, lets some invisible characters
+pass (a soft hyphen, the Hangul fillers), so a name may draw blank; a blocked account's sockets keep
+the blocker's letter and table until their own reading ends, as they already kept its letter; and
+the URL standard admits hosts no DNS name has (a quote in a host), which the frame serializes safely
+and which a client never dials. The table remains the client's claim: Central cannot check that it
+exists or that the client sits at it.
