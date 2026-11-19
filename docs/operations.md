@@ -1660,6 +1660,11 @@ on the server on 12.11.2026, where neither package was installed):
 **After every deploy, and after every ffmpeg update:**
 - `/opt/baylee-central/bin/central-picture-worker --ffmpeg /usr/bin/ffmpeg
   --probe` prints `animations: ffmpeg with libaom-av1 found` and exits 0.
+  It names the encoder it found: a line that names `libsvtav1` (ffmpeg's
+  other AV1 encoder, which the worker falls back to) means `libaom-av1` is
+  gone, and in this unit `libsvtav1` is killed by the system-call filter
+  ([profile pictures](profile-pictures.md#animations)), so animations
+  would be kept as stills: restore `libaom-av1` rather than the unit.
 - With a test account, upload an animated GIF on the profile page. It
   must play there, and `curl -sI
   https://baylee.app/api/v1/pictures/<its key>.sequence.avif` must answer
@@ -1668,7 +1673,8 @@ on the server on 12.11.2026, where neither package was installed):
   `MemoryDenyWriteExecute`, 32 tasks, 512 MiB, 25 s), which could not be
   tested before deploy.
 - The service's journal must hold no line `central: an animation was
-  kept as its still (…)`. `no_encoder` means ffmpeg or `libaom-av1` is
+  kept as its still (…)`. `no_encoder` means ffmpeg or an AV1 encoder
+  for the animation (`libaom-av1`; for an opaque one also `libsvtav1`) is
   missing or did not answer in time; `failed` that ffmpeg failed or was
   ended: look at `journalctl -u 'central-picture@*'` for a kill by the
   system-call filter (`SIGSYS`) or by the memory limit. Pictures still

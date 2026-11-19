@@ -53,6 +53,9 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
+# Without @resources, ffmpeg's libsvtav1 (the worker's fallback where
+# libaom-av1 is missing) is killed: it sets its threads' scheduling. Here
+# libaom-av1 encodes; docs/profile-pictures.md §"Animations".
 SystemCallFilter=~@privileged @resources
 InaccessiblePaths=-/etc/baylee-central
 UMask=0077

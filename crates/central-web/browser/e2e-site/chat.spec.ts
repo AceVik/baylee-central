@@ -340,6 +340,39 @@ test("pictures stand beside every name: one size, initials without one, the stil
   expect(problems).toEqual([]);
 });
 
+/** The address the first of `marks` draws its picture from. */
+const drawn = (marks: Locator) => marks.first().locator("img").evaluate((img: HTMLImageElement) => img.currentSrc);
+
+test("a moving picture plays wherever the messenger shows its person, and stands still where motion is reduced", async ({ page }, info) => {
+  onlyDesktop(info, "the same marks at every width");
+  const { problems } = await open(page, ["2c3d"], rich());
+  const moving = `.avatar:has(source[type='image/avif'][media='(prefers-reduced-motion: no-preference)'][srcset='${BEA_FILE}.sequence.avif'])`;
+  // the contacts: a friend's line
+  await page.goto("/en/account/contacts");
+  const friends = page.locator(".people[data-relation='friend']");
+  await expect(friends.getByText("Bea#2c3d")).toBeVisible({ timeout: 15_000 });
+  await expect(friends.locator(moving)).toHaveCount(1);
+  await expect.poll(() => drawn(friends.locator(moving))).toMatch(/\.sequence\.avif$/);
+  // a group: her face beside her lines, and among the members
+  await page.goto(`/en/account/chat?c=${GROUP_CONV}`);
+  await expect(page.locator(".conv-msgs").getByText("Perfect.")).toBeVisible({ timeout: 15_000 });
+  expect(await page.locator(`.msg-face ${moving}`).count()).toBeGreaterThanOrEqual(1);
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.locator(`#conv-details ${moving}`).first()).toBeVisible();
+  // the safety number's view, where her keys changed
+  await page.goto(`/en/account/chat?c=${CONV}`);
+  await page.getByRole("button", { name: "Compare the safety number" }).click();
+  const safety = page.locator(`.safety-item[data-warn] ${moving}`);
+  await expect(safety).toBeVisible();
+  await expect.poll(() => drawn(safety)).toMatch(/\.sequence\.avif$/);
+  // asked for less motion, the same marks take the still
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/en/account/contacts");
+  await expect(friends.locator(moving)).toHaveCount(1, { timeout: 15_000 });
+  await expect.poll(() => drawn(friends.locator(moving))).toMatch(/[0-9a-f]{32}\.avif$/);
+  expect(problems).toEqual([]);
+});
+
 test("the messenger fits from 320 px without sideways scrolling", async ({ page }, info) => {
   onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   await open(page);
