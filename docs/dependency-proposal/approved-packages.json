@@ -3290,6 +3290,16 @@
         "new features on approved packages: bitflags@2.13.2 std; signature@3.0.0 alloc, rand_core; whoami@2.1.3 std"
       ],
       "implied": "whoami 2.1.3 gains std through sqlx-postgres 0.9.1: its own libc calls on Linux, objc2-core-foundation and objc2-system-configuration (FFI) on Apple targets only, libredox on Redox only; libsqlite3-sys 0.40.0 stays in no build. Disclosed in upgrade-2026-11-18.md; first-party unsafe stays forbidden. Not a third-party source audit."
+    },
+    {
+      "approved_on": "2026-11-19",
+      "reason": "owner 19.11.2026: \"sha1 darf rein.\", relayed by the PM after the disclosure in pull request 74",
+      "for": "central-http's push socket, GET /v1/ws (docs/push-socket.md): the handshake's Sec-WebSocket-Accept (RFC 6455), SHA-1 there being the protocol's checksum of the client's key, not a security property",
+      "entries": [
+        "sha1@0.11.0 as a direct dependency of central-http, default features off, no features",
+        "base64@0.22.1 as a direct dependency of central-http, default features off, with alloc"
+      ],
+      "implied": "sha1 0.11.0 enters the compiled graph; until then it was in the lock through sqlx-mysql only. Its own unsafe: x86 SHA-NI and AArch64 SHA2 intrinsics chosen at run time, inline assembly for LoongArch only, which no build here targets. cpufeatures 0.3.1 and digest 0.11.3 under it, and base64 0.22.1, were compiled already (through sha2 0.11.1, ece and sqlx-core). First-party unsafe stays forbidden. Not a third-party source audit."
     }
   ]
 }
