@@ -1,7 +1,9 @@
 # Legal texts of Baylee Central
 
-**Status: the terms and the privacy policy are at version 2026-11-19, a
-proposal that awaits the owner's review** (see the last paragraph below; before
+**Status: the terms and the privacy policy are at version 2026-11-19.** The
+privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
+reviewed by the owner on 19.11.2026; the version's other changes await his
+review (see the last paragraph below; before
 it, the terms at 2026-11-11 and the privacy policy at 2026-11-18. On 11.11.2026
 the owner asked for the texts to be corrected: an administrator's
 reset code, deleting the account in its settings on the website, the Fan
@@ -41,8 +43,10 @@ push socket with presence ([push socket](../docs/push-socket.md)). That
 makes the privacy policy's version 2026-11-19: § 5a says what the socket
 carries and that accepted friends see when an account is online, held in
 memory only, § 7 how long (while the client is connected). Written by the
-implementing agent as a proposal in the same pull request, it awaits the
-owner's review before it is merged.
+implementing agent in the same pull request; the owner read § 5a's
+paragraph and § 7's point in German, with "erkennbar an deinem Tag (dem
+Kürzel hinter deinem Anzeigenamen)", and answered "Ja, passt" (19.11.2026,
+relayed by the PM). The English follows the German.
 
 The same day the owner asked for all of Central's legal texts to be brought
 in line, and chose the contract (Art. 6(1)(b) GDPR) as presence's legal
