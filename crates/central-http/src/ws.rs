@@ -2,9 +2,9 @@
 //! WebSocket per signed-in Baylee client, on which Central says that
 //! something concerning the client's own account changed. It carries no
 //! content: `ready`, `chat`, `social`, `presence` (the tags of the account's
-//! online friends) and `revoked`, each a small JSON text frame. The client
-//! reads what changed over `/v1/native`, as it always did; the socket only
-//! saves it the polling.
+//! online friends), `table` (the table a friend shares) and `revoked`, each a
+//! small JSON text frame. The client reads what changed over `/v1/native`, as
+//! it always did; the socket only saves it the polling.
 //!
 //! A socket is admitted on a connection whose first line asked for exactly
 //! this route (`server.rs`), so every other connection keeps its one request
@@ -24,7 +24,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use base64::Engine as _;
-use central_api::Error;
+use central_api::{
+    Error,
+    presence::{LONGEST_TABLE_FRAME, Table, table_frame},
+};
 use central_identity::{IdentityService, Listener, Place, Presence, news};
 use frame::{Code, Ended, Frame, Reader};
 use hyper_util::rt::TokioIo;
@@ -96,8 +99,11 @@ const CHECK_TIME: Duration = Duration::from_secs(10);
 /// could not be checked for two minutes may have ended.
 const CHECK_FAILURES: u32 = 2;
 
-/// The events, exactly as the client reads them.
-const READY: &str = r#"{"event":"ready"}"#;
+/// The events, exactly as the client reads them. `ready` announces that this
+/// Central takes a table with a report and passes it on in `table` frames
+/// (`docs/push-socket.md` §"Tables"): a client sends one to no Central that
+/// did not say so, since an older one refuses the whole report for it.
+const READY: &str = r#"{"event":"ready","tables":true}"#;
 const CHAT: &str = r#"{"event":"chat"}"#;
 const SOCIAL: &str = r#"{"event":"social"}"#;
 const REVOKED: &str = r#"{"event":"revoked"}"#;
@@ -113,6 +119,10 @@ const _: () = assert!(
         + central_api::social::MAX_CONTACTS * (r#""7fffffff","#.len() + 1)
         <= frame::TEXT
 );
+/// The longest `table` frame, for a table within its bounds, fits one too:
+/// each friend's table is a frame of its own, so no number of friends at
+/// tables can make one longer.
+const _: () = assert!(LONGEST_TABLE_FRAME <= frame::TEXT);
 
 /// A socket's work, run in the listener's set of sockets.
 pub(crate) type Job = Pin<Box<dyn Future<Output = ()> + Send>>;
@@ -481,7 +491,8 @@ trait Account {
     fn rung(&self) -> impl Future<Output = ()> + Send;
     /// The socket said `ready`.
     fn ready(&self);
-    /// The account's friends shown online, their states, its own choice.
+    /// The account's friends shown online, their states, the tables they
+    /// share, its own choice.
     fn presence(&self) -> Presence;
     /// Whether the session stands; an error is no answer.
     fn listening(&self) -> impl Future<Output = Result<bool, Error>> + Send;
@@ -564,9 +575,11 @@ struct Socket<A, R, W> {
     frames: Reader,
     stop: watch::Receiver<bool>,
     times: Times,
-    /// The presence last said, and when.
+    /// The presence last said (its tables apart), and when it or a table was.
     sent: Option<Presence>,
     said_at: Option<Instant>,
+    /// The friends' tables last said, by tag.
+    tables: BTreeMap<u32, Arc<Table>>,
     /// When a presence held back by [`Times::presence_gap`] is said.
     due: Option<Instant>,
 }
@@ -588,6 +601,7 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
             times,
             sent: None,
             said_at: None,
+            tables: BTreeMap::new(),
             due: None,
         }
     }
@@ -715,19 +729,47 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
         Ok(None)
     }
 
-    /// Say the account's presence, unless it is what was said last. Whatever
-    /// was held back is said with it: the gap begins anew, and a deadline
-    /// from before would otherwise send the next change at once.
+    /// Say the account's presence, unless it is what was said last: first a
+    /// `table` frame for each friend whose shared table is not the one said
+    /// (and one without a table for each that shares none any more), so that
+    /// a client has the table when the frame that shows the friend at it
+    /// comes; then the `presence` frame if the friends, their states or the
+    /// choice changed. Whatever was held back is said with it: the gap begins
+    /// anew, and a deadline from before would otherwise send the next change
+    /// at once.
     async fn presence(&mut self) -> Result<(), ()> {
         self.due = None;
-        let now = self.account.presence();
-        if self.sent.as_ref() == Some(&now) {
-            return Ok(());
+        let mut now = self.account.presence();
+        let tables = std::mem::take(&mut now.tables);
+        let mut said = false;
+        for (tag, table) in &tables {
+            if self.tables.get(tag) != Some(table) {
+                let text = table_frame(*tag, Some(&**table));
+                self.write(&frame::text(&text).ok_or(())?).await?;
+                said = true;
+            }
         }
-        let text = presence(&now);
-        self.write(&frame::text(&text).ok_or(())?).await?;
-        self.sent = Some(now);
-        self.said_at = Some(Instant::now());
+        let gone: Vec<u32> = self
+            .tables
+            .keys()
+            .filter(|tag| !tables.contains_key(*tag))
+            .copied()
+            .collect();
+        for tag in gone {
+            self.write(&frame::text(&table_frame(tag, None)).ok_or(())?)
+                .await?;
+            said = true;
+        }
+        self.tables = tables;
+        if self.sent.as_ref() != Some(&now) {
+            let text = presence(&now);
+            self.write(&frame::text(&text).ok_or(())?).await?;
+            self.sent = Some(now);
+            said = true;
+        }
+        if said {
+            self.said_at = Some(Instant::now());
+        }
         Ok(())
     }
 

@@ -1,5 +1,5 @@
 use super::*;
-use central_api::presence::Activity;
+use central_api::presence::{Activity, Table};
 use tokio::sync::Notify;
 
 const A: [u8; 16] = [1; 16];
@@ -452,7 +452,13 @@ fn an_account_that_chose_offline_is_never_seen_and_only_its_choice_changes_that(
     // idling, a device going: nothing
     let second = choosing(&live, A, Choice::Offline, &[B]);
     second.ready();
-    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Playing),
+        true,
+        None,
+        Instant::now(),
+    );
     drop(second);
     assert_eq!(b.take(), 0);
     assert_eq!(live.presence(&B).online, Vec::<u32>::new());
@@ -483,7 +489,13 @@ fn away_and_activity_are_shown_and_only_changes_reach_friends() {
     let _ = b.take();
     let shown = |live: &Live| live.presence(&B).states;
     assert_eq!(shown(&live), vec![ONLINE]);
-    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        None,
+        Instant::now(),
+    );
     assert_eq!(b.take(), news::PRESENCE);
     assert_eq!(
         shown(&live),
@@ -493,10 +505,22 @@ fn away_and_activity_are_shown_and_only_changes_reach_friends() {
         }]
     );
     // the same again changes nothing, and wakes nobody
-    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        None,
+        Instant::now(),
+    );
     assert_eq!(b.take(), 0);
     // idle, or a chosen afk, is away
-    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Playing),
+        true,
+        None,
+        Instant::now(),
+    );
     assert_eq!(
         shown(&live),
         vec![Shown {
@@ -504,7 +528,7 @@ fn away_and_activity_are_shown_and_only_changes_reach_friends() {
             activity: Some(Activity::Playing)
         }]
     );
-    live.report(digest(1), None, false, Instant::now());
+    live.report(digest(1), None, false, None, Instant::now());
     live.chose(&A, Choice::Afk);
     assert_eq!(
         shown(&live),
@@ -516,7 +540,13 @@ fn away_and_activity_are_shown_and_only_changes_reach_friends() {
     // what A does is no news to A's own sockets
     let _ = b.take();
     assert_eq!(a.take() & news::PRESENCE, news::PRESENCE, "the choice is");
-    live.report(digest(1), Some(Activity::Table), false, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        None,
+        Instant::now(),
+    );
     assert_eq!(a.take(), 0);
 }
 
@@ -525,7 +555,13 @@ fn a_report_without_a_socket_changes_nothing_and_keeps_nothing() {
     let live = Arc::new(Live::default());
     let b = socket(&live, B, 2, &[A]);
     b.ready();
-    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Playing),
+        true,
+        None,
+        Instant::now(),
+    );
     assert!(!live.state().accounts.contains_key(&A));
     assert!(
         live.state()
@@ -545,14 +581,14 @@ fn a_report_is_charged_before_anything_is_looked_at() {
     let now = Instant::now();
     // a session without a socket spends its reports all the same
     for _ in 0..SESSION_REPORTS {
-        live.report(digest(1), Some(Activity::Table), false, now);
+        live.report(digest(1), Some(Activity::Table), false, None, now);
     }
     let b = socket(&live, B, 2, &[A]);
     b.ready();
     let a = choosing(&live, A, Choice::Online, &[B]);
     a.ready();
     let _ = b.take();
-    live.report(digest(1), Some(Activity::Playing), false, now);
+    live.report(digest(1), Some(Activity::Playing), false, None, now);
     assert_eq!(
         live.presence(&B).states,
         vec![ONLINE],
@@ -571,7 +607,13 @@ fn a_device_s_report_goes_with_it() {
     let (second, _) = live.admit(A, Some(1), Choice::Online, digest(77)).unwrap();
     second.ready();
     // the first device plays while idle, the second says nothing
-    live.report(digest(1), Some(Activity::Playing), true, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Playing),
+        true,
+        None,
+        Instant::now(),
+    );
     let _ = b.take();
     assert_eq!(
         live.presence(&B).states,
@@ -587,8 +629,20 @@ fn a_device_s_report_goes_with_it() {
     // and an older report of a device that stays stands again
     let (third, _) = live.admit(A, Some(1), Choice::Online, digest(78)).unwrap();
     third.ready();
-    live.report(digest(77), Some(Activity::Table), false, Instant::now());
-    live.report(digest(78), Some(Activity::Playing), false, Instant::now());
+    live.report(
+        digest(77),
+        Some(Activity::Table),
+        false,
+        None,
+        Instant::now(),
+    );
+    live.report(
+        digest(78),
+        Some(Activity::Playing),
+        false,
+        None,
+        Instant::now(),
+    );
     drop(third);
     assert_eq!(
         live.presence(&B).states,
@@ -607,16 +661,22 @@ fn a_session_s_reports_and_choices_are_budgeted() {
     a.ready();
     let now = Instant::now();
     for _ in 0..SESSION_REPORTS {
-        live.report(digest(1), None, false, now);
+        live.report(digest(1), None, false, None, now);
     }
     // past the budget a report is not heard
     let b = socket(&live, B, 2, &[A]);
     b.ready();
     let _ = b.take();
-    live.report(digest(1), Some(Activity::Playing), false, now);
+    live.report(digest(1), Some(Activity::Playing), false, None, now);
     assert_eq!(live.presence(&B).states, vec![ONLINE]);
     // a new minute
-    live.report(digest(1), Some(Activity::Playing), false, now + MINUTE);
+    live.report(
+        digest(1),
+        Some(Activity::Playing),
+        false,
+        None,
+        now + MINUTE,
+    );
     assert_eq!(
         live.presence(&B).states,
         vec![Shown {
@@ -641,8 +701,20 @@ fn the_last_report_of_an_account_s_devices_stands() {
     // a second device with a session of its own
     let (second, _) = live.admit(A, Some(1), Choice::Online, digest(77)).unwrap();
     second.ready();
-    live.report(digest(1), Some(Activity::Table), false, Instant::now());
-    live.report(digest(77), Some(Activity::Playing), false, Instant::now());
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        None,
+        Instant::now(),
+    );
+    live.report(
+        digest(77),
+        Some(Activity::Playing),
+        false,
+        None,
+        Instant::now(),
+    );
     assert_eq!(
         live.presence(&B).states,
         vec![Shown {
@@ -656,6 +728,234 @@ fn the_last_report_of_an_account_s_devices_stands() {
     let again = choosing(&live, A, Choice::Online, &[B]);
     again.ready();
     assert_eq!(live.presence(&B).states, vec![ONLINE]);
+}
+
+/// A table within its bounds, with `taken` seats of four taken.
+fn table(taken: u8) -> Table {
+    Table {
+        origin: "https://gateway.example".into(),
+        game: "01937d4e-7b1c-7000-8000-000000000001".into(),
+        name: "Friday draft".into(),
+        seats: 4,
+        taken,
+    }
+}
+
+fn tables(live: &Live, account: &[u8; 16]) -> Vec<(u32, Table)> {
+    live.presence(account)
+        .tables
+        .into_iter()
+        .map(|(tag, table)| (tag, (*table).clone()))
+        .collect()
+}
+
+const AT_TABLE: Shown = Shown {
+    away: false,
+    activity: Some(Activity::Table),
+};
+
+#[test]
+fn a_shared_table_reaches_the_friends_shown_and_each_change_of_it_is_news() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let a = choosing(&live, A, Choice::Online, &[B]);
+    a.ready();
+    let _ = b.take();
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        Some(table(1)),
+        Instant::now(),
+    );
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(live.presence(&B).states, vec![AT_TABLE]);
+    assert_eq!(tables(&live, &B), vec![(1, table(1))]);
+    // the same again is no news
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        Some(table(1)),
+        Instant::now(),
+    );
+    assert_eq!(b.take(), 0);
+    // a seat taken is, though the letter stays
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        Some(table(2)),
+        Instant::now(),
+    );
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(tables(&live, &B), vec![(1, table(2))]);
+    // sharing it no more is too
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        None,
+        Instant::now(),
+    );
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(live.presence(&B).states, vec![AT_TABLE]);
+    assert!(tables(&live, &B).is_empty());
+    // its own sockets never hear of its own table
+    live.report(
+        digest(1),
+        Some(Activity::Playing),
+        false,
+        Some(table(4)),
+        Instant::now(),
+    );
+    assert_eq!(a.take(), 0);
+    assert!(tables(&live, &A).is_empty());
+    // and the table goes with the device that said it
+    let _ = b.take();
+    drop(a);
+    assert_eq!(b.take(), news::PRESENCE);
+    assert!(live.presence(&B).online.is_empty() && tables(&live, &B).is_empty());
+}
+
+#[test]
+fn a_table_out_of_bounds_or_without_an_activity_is_dropped_and_the_rest_heard() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let a = choosing(&live, A, Choice::Online, &[B]);
+    a.ready();
+    let _ = b.take();
+    for bad in [
+        Table {
+            origin: "http://gateway.example".into(),
+            ..table(1)
+        },
+        Table {
+            game: "../x".into(),
+            ..table(1)
+        },
+        Table {
+            name: "a\nb".into(),
+            ..table(1)
+        },
+        Table {
+            name: "\u{202E}a".into(),
+            ..table(1)
+        },
+        Table {
+            name: "n".repeat(Table::MAX_NAME_CHARS + 1),
+            ..table(1)
+        },
+        Table {
+            seats: 9,
+            ..table(1)
+        },
+        Table {
+            taken: 5,
+            ..table(1)
+        },
+    ] {
+        live.report(
+            digest(1),
+            Some(Activity::Table),
+            true,
+            Some(bad.clone()),
+            Instant::now(),
+        );
+        assert_eq!(
+            live.presence(&B).states,
+            vec![Shown {
+                away: true,
+                activity: Some(Activity::Table)
+            }],
+            "{bad:?}"
+        );
+        assert!(tables(&live, &B).is_empty(), "{bad:?}");
+    }
+    // a table with no activity is no table
+    live.report(digest(1), None, false, Some(table(1)), Instant::now());
+    assert_eq!(live.presence(&B).states, vec![ONLINE]);
+    assert!(tables(&live, &B).is_empty());
+    assert!(
+        live.state()
+            .sockets
+            .values()
+            .filter_map(|socket| socket.report.as_ref())
+            .all(|report| report.table.is_none()),
+        "nor is it kept"
+    );
+    drop(a);
+}
+
+#[test]
+fn an_account_that_chose_offline_shares_no_table_and_its_changes_tell_nobody() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let a = choosing(&live, A, Choice::Offline, &[B]);
+    a.ready();
+    let _ = b.take();
+    for taken in 1..=3 {
+        live.report(
+            digest(1),
+            Some(Activity::Playing),
+            false,
+            Some(table(taken)),
+            Instant::now(),
+        );
+        assert_eq!(b.take(), 0, "not even a wake-up");
+        assert!(live.presence(&B).online.is_empty() && tables(&live, &B).is_empty());
+    }
+    // shown again, its friends see the table it is at
+    live.chose(&A, Choice::Online);
+    assert_eq!(b.take(), news::PRESENCE);
+    assert_eq!(tables(&live, &B), vec![(1, table(3))]);
+    // and hidden, nothing of it
+    live.chose(&A, Choice::Offline);
+    assert_eq!(b.take(), news::PRESENCE);
+    assert!(tables(&live, &B).is_empty());
+    drop(a);
+}
+
+#[test]
+fn an_ended_friendship_or_a_block_takes_the_table_with_it() {
+    let live = Arc::new(Live::default());
+    let a = socket(&live, A, 1, &[B, C]);
+    let b = socket(&live, B, 2, &[A]);
+    let c = socket(&live, C, 3, &[A]);
+    for listener in [&a, &b, &c] {
+        listener.ready();
+    }
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        Some(table(2)),
+        Instant::now(),
+    );
+    assert_eq!(tables(&live, &B), vec![(1, table(2))]);
+    assert_eq!(tables(&live, &C), vec![(1, table(2))]);
+    let _ = (b.take(), c.take());
+    // B blocks A (a block ends the friendship): both lists are read again
+    let (for_a, for_b) = (live.reread(A).unwrap(), live.reread(B).unwrap());
+    live.friends_read(for_a, vec![C]);
+    live.friends_read(for_b, vec![]);
+    assert!(live.presence(&B).online.is_empty() && tables(&live, &B).is_empty());
+    // C, still a friend, sees it as before
+    assert_eq!(tables(&live, &C), vec![(1, table(2))]);
+    assert_eq!(c.take(), 0);
+    // and a change of the table reaches C alone
+    let _ = b.take();
+    live.report(
+        digest(1),
+        Some(Activity::Table),
+        false,
+        Some(table(3)),
+        Instant::now(),
+    );
+    assert_eq!((b.take(), c.take()), (0, news::PRESENCE));
 }
 
 /// A store that holds one account's choice, in the tests of the order in

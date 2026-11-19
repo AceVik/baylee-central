@@ -1063,6 +1063,7 @@ mod tests {
             Request::ReportPresence {
                 activity: None,
                 idle: false,
+                table: None,
             },
         ]
         .into_iter()

@@ -1,5 +1,5 @@
 use super::*;
-use central_api::presence::{Activity, Choice, Shown};
+use central_api::presence::{Activity, Choice, Shown, Table};
 use std::sync::atomic::{AtomicU8, Ordering};
 use tokio::{
     io::{AsyncReadExt, DuplexStream},
@@ -120,6 +120,18 @@ fn said(online: &[(u32, Shown)], me: Choice) -> Presence {
         online: online.iter().map(|(tag, _)| *tag).collect(),
         states: online.iter().map(|(_, state)| *state).collect(),
         me,
+        tables: BTreeMap::new(),
+    }
+}
+
+/// A table within its bounds, named `name`.
+fn table(name: &str) -> Table {
+    Table {
+        origin: "https://gateway.example".into(),
+        game: "01937d4e-7b1c-7000-8000-000000000001".into(),
+        name: name.into(),
+        seats: 4,
+        taken: 1,
     }
 }
 
@@ -233,6 +245,8 @@ struct Fake {
     bell: Notify,
     ready: AtomicU8,
     online: std::sync::Mutex<Vec<(u32, Shown)>>,
+    /// The tables friends share, by tag.
+    tables: std::sync::Mutex<BTreeMap<u32, Arc<Table>>>,
     /// What a check of the session answers.
     standing: std::sync::Mutex<Option<Result<bool, Error>>>,
 }
@@ -258,7 +272,10 @@ impl Account for Arc<Fake> {
     }
 
     fn presence(&self) -> Presence {
-        said(&self.online.lock().unwrap(), Choice::Online)
+        Presence {
+            tables: self.tables.lock().unwrap().clone(),
+            ..said(&self.online.lock().unwrap(), Choice::Online)
+        }
     }
 
     fn listening(&self) -> impl Future<Output = Result<bool, Error>> + Send {
@@ -759,4 +776,127 @@ async fn a_presence_said_at_once_takes_one_held_back_with_it() {
     *account.online.lock().unwrap() = vec![(0x12, ONLINE)];
     assert_eq!(socket.act(news::PRESENCE).await, Ok(None));
     assert!(socket.due.is_some_and(|due| due > Instant::now()));
+}
+
+/// The `table` frame for friend `tag` sharing `table`, or none.
+fn table_text(tag: u32, table: Option<&Arc<Table>>) -> Heard {
+    Heard::Text(table_frame(tag, table.map(|table| &**table)))
+}
+
+#[tokio::test]
+async fn a_friend_s_table_comes_before_the_presence_that_shows_it_and_alone_when_only_it_changed() {
+    let mut socket = opened(SHORT).await;
+    tokio::time::sleep(SHORT.presence_gap).await;
+    let at_table = Shown {
+        away: false,
+        activity: Some(Activity::Table),
+    };
+    // a friend sits down at a table it shares: the table, then the presence
+    let named = Arc::new(table("Friday \"night\" \\ draft"));
+    *socket.account.online.lock().unwrap() = vec![(0x2a, at_table), (0x30, ONLINE)];
+    *socket.account.tables.lock().unwrap() = BTreeMap::from([(0x2a, Arc::clone(&named))]);
+    socket.account.raise(news::PRESENCE);
+    assert_eq!(
+        heard(&mut socket.client).await,
+        table_text(0x2a, Some(&named))
+    );
+    assert_eq!(
+        heard(&mut socket.client).await,
+        text(r#"{"event":"presence","online":["002a","0030"],"states":"to","me":"online"}"#)
+    );
+    // somebody else sits down: the table alone, no presence (news raised
+    // after it comes next), and only after the gap
+    tokio::time::sleep(SHORT.presence_gap).await;
+    let fuller = Arc::new(Table {
+        taken: 2,
+        ..(*named).clone()
+    });
+    socket
+        .account
+        .tables
+        .lock()
+        .unwrap()
+        .insert(0x2a, Arc::clone(&fuller));
+    socket.account.raise(news::PRESENCE);
+    assert_eq!(
+        heard(&mut socket.client).await,
+        table_text(0x2a, Some(&fuller))
+    );
+    let fullest = Arc::new(Table {
+        taken: 3,
+        ..(*named).clone()
+    });
+    socket
+        .account
+        .tables
+        .lock()
+        .unwrap()
+        .insert(0x2a, Arc::clone(&fullest));
+    socket.account.raise(news::PRESENCE);
+    socket.account.raise(news::CHAT);
+    assert_eq!(heard(&mut socket.client).await, text(CHAT));
+    let started = Instant::now();
+    assert_eq!(
+        heard(&mut socket.client).await,
+        table_text(0x2a, Some(&fullest))
+    );
+    assert!(started.elapsed() >= SHORT.presence_gap / 2);
+    socket.account.raise(news::CHAT);
+    assert_eq!(heard(&mut socket.client).await, text(CHAT));
+    // it gets up: its table is cleared, then the presence shows it online
+    tokio::time::sleep(SHORT.presence_gap).await;
+    *socket.account.online.lock().unwrap() = vec![(0x2a, ONLINE), (0x30, ONLINE)];
+    socket.account.tables.lock().unwrap().clear();
+    socket.account.raise(news::PRESENCE);
+    assert_eq!(heard(&mut socket.client).await, table_text(0x2a, None));
+    assert_eq!(
+        heard(&mut socket.client).await,
+        text(r#"{"event":"presence","online":["002a","0030"],"states":"oo","me":"online"}"#)
+    );
+    // nothing changed: nothing is said
+    tokio::time::sleep(SHORT.presence_gap).await;
+    socket.account.raise(news::PRESENCE | news::CHAT);
+    assert_eq!(heard(&mut socket.client).await, text(CHAT));
+    socket.account.raise(news::SOCIAL);
+    assert_eq!(heard(&mut socket.client).await, text(SOCIAL));
+    socket.stop.send(true).unwrap();
+    let _ = socket.task.await;
+}
+
+#[tokio::test]
+async fn a_socket_opens_with_every_friend_s_table_and_a_friend_gone_has_its_table_cleared() {
+    let account = Arc::new(Fake::default());
+    let playing = Shown {
+        away: true,
+        activity: Some(Activity::Playing),
+    };
+    *account.online.lock().unwrap() = vec![(0x11, playing), (0x12, AWAY_AT_TABLE)];
+    let (first, second) = (Arc::new(table("one")), Arc::new(table("two")));
+    *account.tables.lock().unwrap() =
+        BTreeMap::from([(0x11, Arc::clone(&first)), (0x12, Arc::clone(&second))]);
+    let (mut client, server) = tokio::io::duplex(4096);
+    let (reader, writer) = tokio::io::split(server);
+    let (stop, stopped) = watch::channel(false);
+    let task =
+        tokio::spawn(Socket::new(Arc::clone(&account), reader, writer, stopped, SHORT).run());
+    assert_eq!(hear(&mut client).await, text(READY));
+    assert_eq!(hear(&mut client).await, table_text(0x11, Some(&first)));
+    assert_eq!(hear(&mut client).await, table_text(0x12, Some(&second)));
+    assert_eq!(
+        hear(&mut client).await,
+        text(r#"{"event":"presence","online":["0011","0012"],"states":"GT","me":"online"}"#)
+    );
+    // the second goes offline: its table is cleared, and the presence no
+    // longer lists it
+    tokio::time::sleep(SHORT.presence_gap).await;
+    account.online.lock().unwrap().truncate(1);
+    account.tables.lock().unwrap().remove(&0x12);
+    account.raise(news::PRESENCE);
+    assert_eq!(heard(&mut client).await, table_text(0x12, None));
+    assert_eq!(
+        heard(&mut client).await,
+        text(r#"{"event":"presence","online":["0011"],"states":"G","me":"online"}"#)
+    );
+    stop.send(true).unwrap();
+    let _ = task.await;
 }
