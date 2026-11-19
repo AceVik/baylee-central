@@ -53,8 +53,8 @@ fn control_frames_are_read_and_unmasked() {
         vec![
             Ok(Frame::Ping(b"Hello".to_vec())),
             Ok(Frame::Pong),
-            Ok(Frame::Close),
-            Ok(Frame::Close),
+            Ok(Frame::Close(Some(Code::NORMAL))),
+            Ok(Frame::Close(None)),
             Err(Ended::Gone),
         ]
     );
@@ -87,6 +87,10 @@ fn frames_the_socket_does_not_take_end_it_before_their_payload() {
         (vec![0x89, 0xff, 0, 0, 0, 0, 0, 0, 0, 0x7e], Code::PROTOCOL),
         // a close with half a code
         (masked(0x88, &[3], [1; 4]), Code::PROTOCOL),
+        // reserved bits and an unmasked frame are wrong whatever the opcode
+        (masked(0xc1, b"hi", [1; 4]), Code::PROTOCOL),
+        (masked(0xa0, b"hi", [1; 4]), Code::PROTOCOL),
+        (vec![0x81, 0x00], Code::PROTOCOL),
     ] {
         assert_eq!(
             read_all(&bytes).first(),
@@ -152,4 +156,36 @@ fn the_server_s_frames_are_rfc_6455_s() {
     assert_eq!(close(Code::GOING_AWAY), [0x88, 0x02, 0x03, 0xe9]);
     // a pong never says more than a control frame may
     assert_eq!(pong(&[1; 200]).len(), 2 + 125);
+}
+
+#[test]
+fn a_close_takes_only_codes_a_peer_may_send_and_a_utf_8_reason() {
+    let close = |code: u16, reason: &[u8]| {
+        let mut payload = code.to_be_bytes().to_vec();
+        payload.extend_from_slice(reason);
+        read_all(&masked(0x88, &payload, [7; 4])).remove(0)
+    };
+    for code in [1000, 1001, 1002, 1003, 1007, 1011, 1014, 3000, 4000, 4999] {
+        assert_eq!(
+            close(code, b"bye"),
+            Ok(Frame::Close(Some(Code(code)))),
+            "{code}"
+        );
+    }
+    // reserved, never sent on the wire, the protocol's unassigned, past the range
+    for code in [0, 999, 1004, 1005, 1006, 1015, 1016, 2999, 5000, 65_535] {
+        assert_eq!(
+            close(code, b""),
+            Err(Ended::Refused(Code::PROTOCOL)),
+            "{code}"
+        );
+    }
+    assert_eq!(
+        close(1000, &[0xff, 0xfe]),
+        Err(Ended::Refused(Code::INVALID_DATA))
+    );
+    assert_eq!(
+        close(1000, "fin ✓".as_bytes()),
+        Ok(Frame::Close(Some(Code::NORMAL)))
+    );
 }

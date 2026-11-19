@@ -33,7 +33,6 @@ const ACCEPT: &str = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
 const QUIET: Duration = Duration::from_millis(400);
 
 const READY: &str = r#"{"event":"ready"}"#;
-const CHAT: &str = r#"{"event":"chat"}"#;
 const SOCIAL: &str = r#"{"event":"social"}"#;
 const REVOKED: &str = r#"{"event":"revoked"}"#;
 
@@ -212,6 +211,31 @@ impl Socket {
     /// Nothing comes for a while.
     fn quiet(&mut self) {
         assert_eq!(self.hear(QUIET), Heard::Nothing);
+    }
+
+    /// The socket still stands: a ping of the client's own is answered.
+    fn answers_a_ping(&mut self) {
+        self.send(&masked(0x89, b"still there"));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut head = [0_u8; 2];
+        self.stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        loop {
+            assert!(Instant::now() < deadline, "no pong");
+            self.stream.read_exact(&mut head).unwrap();
+            let mut payload = vec![0; usize::from(head[1] & 0x7f)];
+            self.stream.read_exact(&mut payload).unwrap();
+            match head[0] {
+                0x8a => {
+                    assert_eq!(payload, b"still there");
+                    return;
+                }
+                // the server's own ping, answered
+                0x89 => self.send(&masked(0x8a, &payload)),
+                other => panic!("a frame other than the pong: {other:#x}"),
+            }
+        }
     }
 
     /// Opened: `ready`, then the presence it reports.
@@ -542,13 +566,22 @@ fn addressing(http: &Http, home: &Browser, [a, b, c]: [&mut Player; 3]) -> Token
         BTreeSet::from([SOCIAL.to_owned(), presence(&[])])
     );
     carol.quiet();
-    // no chat news went anywhere
-    for socket in [&mut alice, &mut bob, &mut carol] {
-        assert_ne!(
-            socket.hear(Duration::from_millis(50)),
-            Heard::Text(CHAT.into())
+    // A blocks and unblocks C, who is no contact of A's, and drops its
+    // connection as soon as the request is out, again and again: C's socket
+    // hears nothing and stays open (nothing of C's is read for a block, so
+    // there is no reading to cut short and no time to measure)
+    for change in [ContactAction::Block, ContactAction::Unblock].repeat(3) {
+        fire_and_forget(
+            http,
+            a,
+            &Request::Social {
+                request: SocialRequest::Contact { tag: c.tag, change },
+            },
         );
     }
+    a.contact(http, c, ContactAction::Unblock);
+    carol.quiet();
+    carol.answers_a_ping();
     for socket in [alice, bob, carol] {
         socket.close();
     }
@@ -634,4 +667,34 @@ fn revocation(
     carol.revoked();
     // an ended session dials no more
     assert_eq!(dial(http, &c.bearer()).err().unwrap().status, 401);
+    // B deletes its account: its socket ends with it
+    let recording = super::tokens::Recording::new(http);
+    let mut session = central_client::login(&recording, b.identity, OLD.into()).unwrap();
+    session.confirm_restored(http).unwrap();
+    b.token = recording.taken();
+    let bob = dial(http, &b.bearer()).unwrap().opened(&[]);
+    let deletion = session.start_deletion(http, OLD.into()).unwrap();
+    session.delete_account(http, deletion).unwrap();
+    bob.revoked();
+    assert_eq!(dial(http, &b.bearer()).err().unwrap().status, 401);
+}
+
+/// Send `request` with `player`'s session on a connection of its own and
+/// close the connection at once, without waiting for the answer: a caller
+/// that goes away while its request is served.
+fn fire_and_forget(http: &Http, player: &Player, request: &Request) {
+    let body = central_api::encode(request).unwrap();
+    let mut stream = TcpStream::connect_timeout(&http.address, Duration::from_secs(3)).unwrap();
+    write!(
+        stream,
+        "POST /v1/native HTTP/1.1\r\nHost: {}\r\n{}: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nAuthorization: {}\r\n\r\n",
+        http.address,
+        central_api::PROTOCOL_HEADER,
+        central_api::PROTOCOL_VERSION,
+        body.len(),
+        player.bearer(),
+    )
+    .unwrap();
+    stream.write_all(&body).unwrap();
+    drop(stream);
 }

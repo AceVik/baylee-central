@@ -25,27 +25,35 @@ const FRIENDS: &str = "SELECT count(*) FROM central_identity.social_contacts WHE
 /// Whose own view of the pair a change altered: the caller's (`me`), the
 /// other account's (`other`), both or neither. A block, and lifting one, is the
 /// blocker's alone: the blocked account sees no list of who blocked it, only a
-/// contact that ended, if there was one.
+/// contact that ended, if there was one. `friendship`: a friendship began or
+/// ended, the one change that alters what either side's presence shows. A
+/// request, or a block of somebody who was no friend, is none, so it reads
+/// nobody's friends and cannot be used to sound out whether the other side is
+/// online.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct Changed {
     pub(super) me: bool,
     pub(super) other: bool,
+    pub(super) friendship: bool,
 }
 
 impl Changed {
     const BOTH: Self = Self {
         me: true,
         other: true,
+        friendship: false,
     };
     const NEITHER: Self = Self {
         me: false,
         other: false,
+        friendship: false,
     };
 
     fn or(self, more: Self) -> Self {
         Self {
             me: self.me || more.me,
             other: self.other || more.other,
+            friendship: self.friendship || more.friendship,
         }
     }
 }
@@ -71,7 +79,7 @@ pub(super) async fn change(
                 > 0;
             Changed {
                 me: lifted,
-                other: false,
+                ..Changed::NEITHER
             }
         }
         ContactAction::Block => {
@@ -93,7 +101,7 @@ pub(super) async fn change(
             }
             let blocked = Changed {
                 me: !already,
-                other: false,
+                ..Changed::NEITHER
             };
             blocked.or(remove(db, low, high).await?)
         }
@@ -134,34 +142,42 @@ async fn request(
         room(db, me, MAX_CONTACTS, FRIENDS).await?;
         room(db, other, MAX_CONTACTS, FRIENDS).await?;
         db.execute_raw(statement("UPDATE central_identity.social_contacts SET accepted = true WHERE low = $1 AND high = $2", vec![low.into(), high.into()])).await.map_err(unavailable)?;
-    } else {
-        if action == ContactAction::Accept {
-            return Err(Error::Rejected);
-        }
-        room(db, me, MAX_CONTACTS, FRIENDS).await?;
-        room(db, other, MAX_CONTACTS, FRIENDS).await?;
-        room(db, me, MAX_OUTGOING, "SELECT count(*) FROM central_identity.social_contacts WHERE NOT accepted AND requested_by = $1").await?;
-        room(db, other, MAX_INCOMING, "SELECT count(*) FROM central_identity.social_contacts WHERE NOT accepted AND requested_by <> $1 AND (low = $1 OR high = $1)").await?;
-        limits::charge(db, me, limits::Budget::Request).await?;
-        db.execute_raw(statement("INSERT INTO central_identity.social_contacts (low, high, requested_by) VALUES ($1, $2, $3)", vec![low.into(), high.into(), me.into()])).await.map_err(unavailable)?;
+        // The other's request accepted: a friendship begins.
+        return Ok(Changed {
+            friendship: true,
+            ..Changed::BOTH
+        });
     }
+    if action == ContactAction::Accept {
+        return Err(Error::Rejected);
+    }
+    room(db, me, MAX_CONTACTS, FRIENDS).await?;
+    room(db, other, MAX_CONTACTS, FRIENDS).await?;
+    room(db, me, MAX_OUTGOING, "SELECT count(*) FROM central_identity.social_contacts WHERE NOT accepted AND requested_by = $1").await?;
+    room(db, other, MAX_INCOMING, "SELECT count(*) FROM central_identity.social_contacts WHERE NOT accepted AND requested_by <> $1 AND (low = $1 OR high = $1)").await?;
+    limits::charge(db, me, limits::Budget::Request).await?;
+    db.execute_raw(statement("INSERT INTO central_identity.social_contacts (low, high, requested_by) VALUES ($1, $2, $3)", vec![low.into(), high.into(), me.into()])).await.map_err(unavailable)?;
+    // A request: both see it, and no friendship begins yet.
     Ok(Changed::BOTH)
 }
 
 /// The pair's contact ended, whatever it was (a request either way or a
-/// friendship): both saw it. Nothing to remove changed nothing.
+/// friendship): both saw it, and a friendship ended if it was one. Nothing to
+/// remove changed nothing.
 async fn remove(db: &impl ConnectionTrait, low: Uuid, high: Uuid) -> Result<Changed, Error> {
     let removed = db
-        .execute_raw(statement(
-            "DELETE FROM central_identity.social_contacts WHERE low = $1 AND high = $2",
+        .query_one_raw(statement(
+            "DELETE FROM central_identity.social_contacts WHERE low = $1 AND high = $2
+             RETURNING accepted",
             vec![low.into(), high.into()],
         ))
         .await
-        .map_err(unavailable)?
-        .rows_affected();
-    Ok(if removed > 0 {
-        Changed::BOTH
-    } else {
-        Changed::NEITHER
+        .map_err(unavailable)?;
+    let Some(row) = removed else {
+        return Ok(Changed::NEITHER);
+    };
+    Ok(Changed {
+        friendship: row.try_get::<bool>("", "accepted").map_err(unavailable)?,
+        ..Changed::BOTH
     })
 }

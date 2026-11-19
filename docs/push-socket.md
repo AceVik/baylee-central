@@ -36,7 +36,9 @@ no more):
 frame says nothing of what changed. The client sends only control frames; it
 answers the server's pings (every 30 seconds).
 
-Closes: 1000 answers the client's own close; 1001 when the listener stops or
+Closes: the client's own close is answered with its code (1000 when it gave
+none; a code no peer may send, or a reason that is not UTF-8, is a protocol
+error, 1002 or 1007); 1001 when the listener stops or
 the socket is 12 hours old; 1002 for a frame RFC 6455 does not allow, 1003 for
 a data frame from the client, 1008 after `revoked` or for more than 16 frames
 in 10 seconds from the client, 1011 when what the socket says can no longer
@@ -96,7 +98,10 @@ frame's timing that something happened elsewhere. What names the accounts:
 - **A session's end**: a native sign-out revokes exactly that session's
   sockets; a native sign-in, a new password, a reset, a deletion, a pairing
   and ending the client's session on the website ask the account's own sockets
-  to check their session (one statement each, at most four).
+  to check their session (one statement each, at most four). A dial during
+  which any such news came (between its status and its registration, when
+  the news found no socket of it) asks the store once more before it is
+  admitted.
 - **An account's deletion** also tells the accounts that counted it among their
   friends (they forget it at once); **a new tag** set by an administrator, those
   that count the account among their friends.
@@ -109,21 +114,27 @@ accepted contacts, either side having asked; a block ends the contact, so a
 blocked account never appears, and neither does a pending request.
 
 The registry reads an account's friends once, when its first socket opens, and
-again for both accounts of a contact change (a request can accept, so it is
-read, not inferred). Going online or offline reads nothing: the accounts to
+again for both accounts of a friendship that began or ended (an acceptance, a
+removal or a block of a friend; read, not inferred). A request, or a block of
+somebody who was no friend, reads nobody's friends: otherwise anyone could
+block and unblock any tag and tell by the answer's time whether its account
+holds a socket. Going online or offline reads nothing: the accounts to
 tell are those that count the account among their friends, found in memory.
 Each list keeps its own account's view, so what a socket is told always agrees
 with what it reports. A newer reading always wins over an older one that ends
 later. A reading that fails closes the account's sockets (1011) rather than
 keep reporting a friendship that may have ended; their clients dial again.
 
-A reading is decided before its request awaits anything: if the request's
-future is dropped while it reads (its time ran out, its client went away),
-the reading ends as failed and the sockets close, so a list that was to be
-read again is never left as it was. What remains is the instant between the
-store's commit and its answer: a request dropped exactly there tells nobody,
-and the two accounts' sockets keep the friends they had until their next
-reading or their end.
+The readings run in a task of their own, begun when the change has
+committed: the request does not wait for them, so neither its answer's time
+nor its caller's connection depends on them, and a caller that goes away
+cancels nothing. A reading that fails, or a task that never runs, ends as
+failed and the sockets close, so a list that was to be read again is never
+left as it was. Readings are numbered over all accounts, so one begun before
+an account's sockets closed and opened again is older than every later one.
+What remains is the instant between the store's commit and its answer: a
+request dropped exactly there tells nobody, and the two accounts' sockets
+keep the friends they had until their next reading or their end.
 
 Presence is kept in memory only, never stored or logged, and ends with the
 socket. It is a new disclosure. Its legal basis is the contract (Art. 6(1)(b)
@@ -137,9 +148,9 @@ to hide it.
 
 | event | database | in memory |
 | --- | --- | --- |
-| dial | the session's status, the terms' acceptance, and the account's friends if no socket of it is open: 2–3 statements | bounded registry entries |
+| dial | the session's status, the terms' acceptance, the account's friends if no socket of it is open, and the session again if news of an ended session came meanwhile: 2–4 statements | bounded registry entries |
 | chat send, group change, new device | none beyond the operation's own | bits for the named accounts' sockets (at most 51 accounts × 4 sockets for a group) |
-| contact change | one read of each of the two accounts' friends, only for those with a socket (≤ 2 statements of ≤ 300 rows) | presence bits for the two and whom their lists gained or lost |
+| contact change | for a friendship that began or ended only, one read of each of the two accounts' friends that holds a socket (≤ 2 statements of ≤ 300 rows), in a task the request does not wait for; a request or a block of a stranger reads nothing | presence bits for the two and whom their lists gained or lost |
 | sign-out | none | bits for that session's sockets |
 | sign-in, password, reset, deletion, pairing, client session ended | none at the event; each of the account's sockets checks its session: ≤ 4 statements | bits |
 | online / offline | none | one pass over the accounts with a socket (≤ 512) |
@@ -151,7 +162,8 @@ sockets' sessions are otherwise checked only when their account's sessions
 changed. A check that fails twice in a row (two minutes without an answer)
 closes every socket (1011), since a session may have ended meanwhile. Sockets
 whose session ended by a path that does not pass this service (its expiry,
-the operator's tools) learn it at the next minute's check.
+the operator's tools) learn it at the next check, within 70 seconds (a
+minute between checks, ten seconds for one).
 
 ## Limits
 
@@ -161,7 +173,7 @@ the operator's tools) learn it at the next minute's check.
 | sockets an address | 32 | a sixteenth: filling the listener takes sixteen addresses with eight signed-in accounts each |
 | sockets an account | 4 | a client holds one; a redial before the old one's end is noticed holds a second for up to 75 seconds |
 | dials a minute, address | 60 | thirty clients redialling at their fastest; counted before anything is asked |
-| dials a minute, session | 12 | the client redials after 2 s at the earliest, doubling while it fails |
+| dials a minute, session | 12 | the client redials after 2 s at the earliest, doubling while it fails; counted for 4,096 sessions at once, a newcomer to a full table taking the oldest's place (tokens of ended sessions still verify until their `exp`, so they could fill it, but never lock a session out) |
 | frames from a client | 16 in 10 s | a pong a ping, and pings of its own |
 | a frame from a client | 131 bytes | a control frame's longest; a data frame is refused at its header |
 | a frame to a client | 4,096 bytes | the client's limit; the longest presence (300 friends, eight-digit tags) fits |
@@ -204,7 +216,7 @@ half). Writes are never inside a `select!` and each has its time.
 
 - It does not deliver content, and a missed frame loses nothing: the client
   reads the inbox and its contacts once a minute while the socket is live.
-- Changes that do not pass this service are told within a minute, by the
+- Changes that do not pass this service are told within 70 seconds, by the
   periodic check, not at once: a session's expiry, the operator's tools, and
   the bridge's own invalidation of a legacy account, which this service
   passes without knowing whose sessions it ended.

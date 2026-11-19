@@ -164,9 +164,11 @@ impl AccountStore {
                         .filter(|(changed, _)| *changed)
                         .map(|(_, account)| account.into_bytes())
                         .collect(),
-                    // Whether they are friends now is read again, not
-                    // inferred from the action: a request can accept.
-                    pair: (changed.me || changed.other)
+                    // Only a friendship that began or ended changes what
+                    // presence shows; the lists are then read again, not
+                    // inferred from the action.
+                    pair: changed
+                        .friendship
                         .then_some((me.into_bytes(), other.into_bytes())),
                     ..Concerns::default()
                 };
