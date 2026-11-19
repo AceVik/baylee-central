@@ -2849,6 +2849,76 @@ mod tests {
             }
         }
 
+        /// The game client reads pictures where the website's page does
+        /// (M6, 19.11.2026): a plain GET through the public proxy, with no
+        /// fetch metadata, no cookie and no bearer, maybe with its protocol
+        /// header and its own `Accept`. It gets every file with the same
+        /// headers, its revalidation, and the same 404 for an unknown key.
+        #[tokio::test]
+        async fn a_native_client_s_plain_get_reads_every_file_and_an_unknown_key_is_the_same_404() {
+            let (app, _) = listener();
+            let native = [
+                ("host", "baylee.app"),
+                ("x-forwarded-for", "198.51.100.9"),
+                ("accept", "image/avif,image/png"),
+                ("user-agent", "baylee-client"),
+                (central_api::PROTOCOL_HEADER, central_api::PROTOCOL_VERSION),
+            ];
+            let bare = [("host", "baylee.app"), ("x-forwarded-for", "198.51.100.9")];
+            for headers in [&native[..], &bare[..]] {
+                for (extension, kind) in [
+                    ("png", "image/png"),
+                    ("avif", "image/avif"),
+                    ("sequence.avif", "image/avif"),
+                ] {
+                    let (status, out, body) =
+                        get_picture(&app, "GET", &uri(PICTURE, extension), headers, LOOPBACK).await;
+                    assert_eq!(
+                        (status, body.as_slice()),
+                        (StatusCode::OK, &b"picture bytes"[..])
+                    );
+                    for (name, value) in [
+                        ("content-type", kind),
+                        ("cache-control", "private, max-age=3600"),
+                        ("x-content-type-options", "nosniff"),
+                        ("content-security-policy", "default-src 'none'; sandbox"),
+                        ("cross-origin-resource-policy", "same-origin"),
+                    ] {
+                        assert_eq!(out[name], value, "{name}");
+                    }
+                    let etag = out[header::ETAG].to_str().unwrap().to_owned();
+                    let mut again = headers.to_vec();
+                    again.push(("if-none-match", etag.as_str()));
+                    assert_eq!(
+                        get_picture(&app, "GET", &uri(PICTURE, extension), &again, LOOPBACK)
+                            .await
+                            .0,
+                        StatusCode::NOT_MODIFIED
+                    );
+                }
+                // an unknown key, its sequence, and the same client sending
+                // its bearer along: one 404, never cached
+                let reference =
+                    get_picture(&app, "GET", &uri([1; 16], "png"), &PAGE, LOOPBACK).await;
+                let mut bearer = headers.to_vec();
+                bearer.push(("authorization", "Bearer synthetic"));
+                for (uri, headers) in [
+                    (uri([1; 16], "png"), headers.to_vec()),
+                    (uri([1; 16], "sequence.avif"), headers.to_vec()),
+                    (uri(PICTURE, "png"), bearer),
+                ] {
+                    let (status, out, body) =
+                        get_picture(&app, "GET", &uri, &headers, LOOPBACK).await;
+                    assert_eq!(
+                        (status, &body),
+                        (StatusCode::NOT_FOUND, &reference.2),
+                        "{uri}"
+                    );
+                    assert_eq!(out["cache-control"], "no-store");
+                }
+            }
+        }
+
         #[tokio::test]
         async fn every_refused_or_unknown_read_is_the_same_404() {
             let (app, _) = listener();
