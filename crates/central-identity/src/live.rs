@@ -11,12 +11,13 @@
 //!
 //! Presence is derived, never kept: an account is online while one of its
 //! sockets has said `ready`; what a socket reports is the tags of its own
-//! account's friends that are online. Each account's friends are read once,
-//! when its first socket opens, and again when a contact of its changes;
-//! going online or offline reads nothing.
+//! account's friends that are online, and the tables those friends share.
+//! Each account's friends are read once, when its first socket opens, and
+//! again when a contact of its changes; going online or offline reads
+//! nothing.
 use central_api::{
     Error,
-    presence::{Activity, Choice, Shown},
+    presence::{Activity, Choice, Shown, Table},
     social::MAX_CONTACTS,
 };
 use std::{
@@ -126,13 +127,24 @@ struct Socket {
 }
 
 /// What a client said it is doing ([`Live::report`]).
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Report {
     activity: Option<Activity>,
     idle: bool,
+    /// The table it shares: only one within its bounds, and only with an
+    /// activity.
+    table: Option<Arc<Table>>,
     /// Numbered over all reports, so the newest of an account's sockets
     /// stands.
     at: u64,
+}
+
+/// How an account is shown to its friends ([`State::showing`]): its state's
+/// letter, and the table it shares. A change of either is news to them.
+#[derive(Clone, PartialEq, Eq)]
+struct Showing {
+    shown: Shown,
+    table: Option<Arc<Table>>,
 }
 
 struct Account {
@@ -215,9 +227,10 @@ impl State {
     /// How `account` is shown to its friends now; `None` while it is not:
     /// only while a socket of it said `ready` and it did not choose to be
     /// offline. Away if it chose so or the newest report of its sockets says
-    /// it is idle; doing what that report says. A socket's report goes with
-    /// it, so a device that went says nothing more.
-    fn shown(&self, account: &[u8; 16]) -> Option<Shown> {
+    /// it is idle; doing what that report says, at the table it names. A
+    /// socket's report goes with it, so a device that went says nothing
+    /// more.
+    fn showing(&self, account: &[u8; 16]) -> Option<Showing> {
         let entry = self.accounts.get(account)?;
         if entry.live == 0 || entry.choice == Choice::Offline {
             return None;
@@ -225,27 +238,36 @@ impl State {
         let report = entry
             .sockets
             .iter()
-            .filter_map(|id| self.sockets.get(id)?.report)
+            .filter_map(|id| self.sockets.get(id)?.report.as_ref())
             .max_by_key(|report| report.at);
-        Some(Shown {
-            away: entry.choice == Choice::Afk || report.is_some_and(|report| report.idle),
-            activity: report.and_then(|report| report.activity),
+        let activity = report.and_then(|report| report.activity);
+        Some(Showing {
+            shown: Shown {
+                away: entry.choice == Choice::Afk || report.is_some_and(|report| report.idle),
+                activity,
+            },
+            // A report keeps none without an activity; this says it again.
+            table: report
+                .and_then(|report| report.table.clone())
+                .filter(|_| activity.is_some()),
         })
     }
 
     /// The followers of `account` look at their presence again, if how it is
-    /// shown is not what it was: so going online, offline, away or to a table
-    /// is the only news of an account its friends get, and nothing of one
-    /// that chose to be offline ever reaches them.
-    fn shown_changed(&mut self, account: &[u8; 16], before: Option<Shown>) {
-        if self.shown(account) != before {
+    /// shown is not what it was: so going online, offline, away or to a table,
+    /// and a change of the table it shares, is the only news of an account
+    /// its friends get, and nothing of one that chose to be offline ever
+    /// reaches them.
+    fn shown_changed(&mut self, account: &[u8; 16], before: Option<Showing>) {
+        if self.showing(account) != before {
             self.raise_followers(account, news::PRESENCE);
         }
     }
 }
 
 /// What a socket reports: its account's friends that are shown online, by
-/// tag, each with its state, and the account's own choice.
+/// tag, each with its state, the tables they share, and the account's own
+/// choice.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Presence {
     /// The friends' tags, in order.
@@ -254,6 +276,22 @@ pub struct Presence {
     pub states: Vec<Shown>,
     /// What the account itself chose.
     pub me: Choice,
+    /// The tables those of them that share one are at, by tag: only friends
+    /// in `online`, and only while they play or sit at a table.
+    pub tables: BTreeMap<u32, Arc<Table>>,
+}
+
+impl Presence {
+    /// Nobody shown, nothing shared, the default choice: what a socket whose
+    /// account has no entry reports.
+    fn none() -> Self {
+        Self {
+            online: Vec::new(),
+            states: Vec::new(),
+            me: Choice::Online,
+            tables: BTreeMap::new(),
+        }
+    }
 }
 
 /// The registry; one per service, shared by both listeners' changes.
@@ -408,7 +446,7 @@ impl Live {
     /// its friends see the change if it changes how it is shown.
     pub(super) fn chose(&self, account: &[u8; 16], choice: Choice) {
         let mut state = self.state();
-        let before = state.shown(account);
+        let before = state.showing(account);
         let Some(entry) = state.accounts.get_mut(account) else {
             return;
         };
@@ -495,12 +533,15 @@ impl Live {
     /// [`SESSION_REPORTS`] a minute, charged before anything is looked at.
     /// Kept on that session's sockets and gone with them; a session without
     /// one changes nothing and keeps nothing. The newest report of the
-    /// account's sockets stands.
+    /// account's sockets stands. Its table is kept only within its bounds
+    /// ([`Table::valid`]) and with an activity; any other is dropped and the
+    /// rest of the report kept.
     pub(super) fn report(
         &self,
         digest: [u8; 32],
         activity: Option<Activity>,
         idle: bool,
+        table: Option<Table>,
         now: Instant,
     ) {
         let mut guard = self.state();
@@ -519,16 +560,19 @@ impl Live {
         else {
             return;
         };
-        let before = state.shown(&account);
+        let before = state.showing(&account);
         state.reported += 1;
         let report = Report {
             activity,
             idle,
+            table: table
+                .filter(|table| activity.is_some() && table.valid())
+                .map(Arc::new),
             at: state.reported,
         };
         for id in ids {
             if let Some(socket) = state.sockets.get_mut(&id) {
-                socket.report = Some(report);
+                socket.report = Some(report.clone());
             }
         }
         state.shown_changed(&account, before);
@@ -558,7 +602,7 @@ impl Live {
         {
             return Err(Error::Busy);
         }
-        let before = state.shown(&account);
+        let before = state.showing(&account);
         if let Some(entry) = state.accounts.get_mut(&account)
             && entry.choice != choice
         {
@@ -757,33 +801,39 @@ impl Live {
     }
 
     /// What `account`'s sockets report: its friends that are shown online
-    /// now, in the order of their tags, each with its state, and its own
-    /// choice. At most [`MAX_CONTACTS`] friends, as many as it may have.
+    /// now, in the order of their tags, each with its state, the tables they
+    /// share, and its own choice. At most [`MAX_CONTACTS`] friends, as many
+    /// as it may have.
     fn presence(&self, account: &[u8; 16]) -> Presence {
         let state = self.state();
         let Some(entry) = state.accounts.get(account) else {
-            return Presence {
-                online: Vec::new(),
-                states: Vec::new(),
-                me: Choice::Online,
-            };
+            return Presence::none();
         };
-        let mut shown: Vec<(u32, Shown)> = entry
+        let mut shown: Vec<(u32, Showing)> = entry
             .friends
             .iter()
             .filter_map(|friend| {
                 let tag = state.accounts.get(friend)?.tag?;
-                Some((tag, state.shown(friend)?))
+                Some((tag, state.showing(friend)?))
             })
             .collect();
         shown.sort_unstable_by_key(|(tag, _)| *tag);
         shown.dedup_by_key(|(tag, _)| *tag);
         shown.truncate(MAX_CONTACTS);
-        Presence {
-            online: shown.iter().map(|(tag, _)| *tag).collect(),
-            states: shown.into_iter().map(|(_, state)| state).collect(),
+        let mut presence = Presence {
+            online: Vec::with_capacity(shown.len()),
+            states: Vec::with_capacity(shown.len()),
             me: entry.choice,
+            tables: BTreeMap::new(),
+        };
+        for (tag, showing) in shown {
+            presence.online.push(tag);
+            presence.states.push(showing.shown);
+            if let Some(table) = showing.table {
+                presence.tables.insert(tag, table);
+            }
         }
+        presence
     }
 
     fn ready(&self, id: u64) {
@@ -796,7 +846,7 @@ impl Live {
         }
         socket.live = true;
         let account = socket.account;
-        let before = state.shown(&account);
+        let before = state.showing(&account);
         let Some(entry) = state.accounts.get_mut(&account) else {
             return;
         };
@@ -810,7 +860,7 @@ impl Live {
             return;
         };
         // How it was shown with this socket and its report, before both go.
-        let before = state.shown(&account);
+        let before = state.showing(&account);
         let Some(socket) = state.sockets.remove(&id) else {
             return;
         };
@@ -1018,9 +1068,11 @@ impl super::IdentityService {
                     choice: status.presence,
                 })
             }
-            central_api::wire::Request::ReportPresence { activity, idle } => {
-                self.report_presence(activity, idle, bearer, surface)
-            }
+            central_api::wire::Request::ReportPresence {
+                activity,
+                idle,
+                table,
+            } => self.report_presence(activity, idle, table, bearer, surface),
             _ => Err(Error::Rejected),
         }
     }
@@ -1053,11 +1105,12 @@ impl super::IdentityService {
 
     /// What the native client says it is doing: heard only from a session
     /// with a push socket, and always answered alike, so the answer says
-    /// nothing of whether anything was kept.
+    /// nothing of whether anything was kept, the table included.
     fn report_presence(
         &self,
         activity: Option<Activity>,
         idle: bool,
+        table: Option<Table>,
         bearer: Option<&super::Token>,
         surface: super::Surface,
     ) -> Result<central_api::wire::Response, Error> {
@@ -1066,7 +1119,7 @@ impl super::IdentityService {
         }
         let token = bearer.ok_or(Error::Rejected)?;
         self.live
-            .report(token.digest(), activity, idle, Instant::now());
+            .report(token.digest(), activity, idle, table, Instant::now());
         Ok(central_api::wire::Response::Done)
     }
 
@@ -1080,17 +1133,12 @@ impl super::IdentityService {
     }
 
     /// What `listener` reports: its account's friends that are shown online,
-    /// their states, and its own choice.
+    /// their states, the tables they share, and its own choice.
     #[must_use]
     pub fn presence(&self, listener: &Listener) -> Presence {
-        listener.account().map_or(
-            Presence {
-                online: Vec::new(),
-                states: Vec::new(),
-                me: Choice::Online,
-            },
-            |account| self.live.presence(&account),
-        )
+        listener
+            .account()
+            .map_or_else(Presence::none, |account| self.live.presence(&account))
     }
 
     /// The periodic check of every socket's session: one statement for all of

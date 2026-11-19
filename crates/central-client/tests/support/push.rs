@@ -11,7 +11,7 @@ use super::{
 use central_api::{
     Bearer, Error, SignedToken, Token,
     owner::OwnerRequest,
-    presence::{Activity, Choice},
+    presence::{Activity, Choice, Table, table_frame},
     social::{ContactAction, SocialRequest},
     terms::TermsSubject,
     wire::{Identity, Request, Response},
@@ -35,7 +35,7 @@ const ACCEPT: &str = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
 /// back is heard here rather than merged into the next one a test expects.
 const QUIET: Duration = Duration::from_millis(1_250);
 
-const READY: &str = r#"{"event":"ready"}"#;
+const READY: &str = r#"{"event":"ready","tables":true}"#;
 const SOCIAL: &str = r#"{"event":"social"}"#;
 const REVOKED: &str = r#"{"event":"revoked"}"#;
 
@@ -415,6 +415,7 @@ pub(crate) fn run(
     };
     let cookie = addressing(http, &home, [a, b, c]);
     status(http, &home, &cookie, [a, b, c]);
+    tables(http, [a, b, c]);
     revocation(http, &home, runtime, operator, [a, b, c], &cookie);
 }
 
@@ -646,7 +647,14 @@ fn status(http: &Http, home: &Browser, cookie: &Token, [a, b, c]: [&mut Player; 
     };
     let report = |player: &Player, activity: Option<Activity>, idle: bool| {
         assert!(matches!(
-            player.ask(http, &Request::ReportPresence { activity, idle }),
+            player.ask(
+                http,
+                &Request::ReportPresence {
+                    activity,
+                    idle,
+                    table: None,
+                },
+            ),
             Ok(Response::Done)
         ));
     };
@@ -700,6 +708,111 @@ fn status(http: &Http, home: &Browser, cookie: &Token, [a, b, c]: [&mut Player; 
     a.contact(http, c, ContactAction::Remove);
     assert_eq!(alice.text(), SOCIAL);
     alice.close();
+}
+
+/// A shared table (`docs/push-socket.md` §"Tables"): a friend hears the table
+/// before the presence that shows the account at it, then each change of it
+/// alone; one out of its bounds is dropped and the activity heard; nothing of
+/// it reaches anybody while the account chose offline, nor a stranger, nor
+/// across a block; and it goes with the socket.
+fn tables(http: &Http, [a, b, c]: [&mut Player; 3]) {
+    let report = |player: &Player, activity: Option<Activity>, table: Option<Table>| {
+        assert!(matches!(
+            player.ask(
+                http,
+                &Request::ReportPresence {
+                    activity,
+                    idle: false,
+                    table,
+                },
+            ),
+            Ok(Response::Done)
+        ));
+    };
+    let choose = |player: &Player, choice: Choice| {
+        assert!(matches!(
+            player.ask(http, &Request::SetPresence { choice }),
+            Ok(Response::Presence { choice: stored }) if stored == choice
+        ));
+    };
+    let table_text = |player: &Player, table: Option<&Table>| table_frame(player.tag, table);
+    let shared = Table {
+        origin: "https://gateway.example".into(),
+        game: "01937d4e-7b1c-7000-8000-000000000001".into(),
+        name: "Friday \"night\" \\ draft".into(),
+        seats: 4,
+        taken: 1,
+    };
+    // A and C are friends; B is a stranger to C
+    a.contact(http, c, ContactAction::Request);
+    c.contact(http, a, ContactAction::Accept);
+    let mut alice = dial(http, &a.bearer()).unwrap().opened(&[]);
+    let mut bob = dial(http, &b.bearer()).unwrap().opened(&[]);
+    let mut carol = dial(http, &c.bearer()).unwrap().opened(&[a.tag]);
+    assert_eq!(alice.text(), presence(&[c.tag]));
+    // C sits down at a table it shares: A hears the table, then C at a table
+    report(c, Some(Activity::Table), Some(shared.clone()));
+    assert_eq!(alice.text(), table_text(c, Some(&shared)));
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 't')], "online"));
+    // a seat taken: the table alone
+    let fuller = Table {
+        taken: 2,
+        ..shared.clone()
+    };
+    report(c, Some(Activity::Table), Some(fuller.clone()));
+    assert_eq!(alice.text(), table_text(c, Some(&fuller)));
+    alice.quiet();
+    // a table out of its bounds is dropped, and the game C plays is heard
+    let elsewhere = Table {
+        origin: "http://gateway.example".into(),
+        ..shared.clone()
+    };
+    report(c, Some(Activity::Playing), Some(elsewhere));
+    assert_eq!(alice.text(), table_text(c, None));
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 'g')], "online"));
+    report(c, Some(Activity::Playing), Some(shared.clone()));
+    assert_eq!(alice.text(), table_text(c, Some(&shared)));
+    // C's own socket and the stranger hear nothing of it
+    carol.quiet();
+    bob.quiet();
+    // C chooses offline: A sees C go with its table, and then nothing of
+    // what C shares
+    choose(c, Choice::Offline);
+    assert_eq!(alice.text(), table_text(c, None));
+    assert_eq!(alice.text(), presence_of(&[], "online"));
+    assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "offline"));
+    report(c, Some(Activity::Table), Some(fuller.clone()));
+    alice.quiet();
+    // shown again: the table it sits at now
+    choose(c, Choice::Online);
+    assert_eq!(alice.text(), table_text(c, Some(&fuller)));
+    assert_eq!(alice.text(), presence_of(&[(c.tag, 't')], "online"));
+    assert_eq!(carol.text(), presence_of(&[(a.tag, 'o')], "online"));
+    // C blocks A: the friendship and the table end for A, and what C shares
+    // from then on never reaches A
+    c.contact(http, a, ContactAction::Block);
+    assert_eq!(
+        alice.texts(3),
+        BTreeSet::from([
+            SOCIAL.to_owned(),
+            table_text(c, None),
+            presence_of(&[], "online")
+        ])
+    );
+    assert_eq!(
+        carol.texts(2),
+        BTreeSet::from([SOCIAL.to_owned(), presence_of(&[], "online")])
+    );
+    report(c, Some(Activity::Table), Some(shared.clone()));
+    alice.quiet();
+    bob.quiet();
+    // back to what the other scenarios expect: no contact between them
+    c.contact(http, a, ContactAction::Unblock);
+    assert_eq!(carol.text(), SOCIAL);
+    report(c, None, None);
+    for socket in [alice, bob, carol] {
+        socket.close();
+    }
 }
 
 /// A sign-in on the website, for its cookie.

@@ -565,14 +565,28 @@ pub enum Request {
     /// [`Response::Presence`].
     Presence,
     /// What the native client is doing (native listener only, a session with
-    /// an open push socket): its activity and whether it has been idle for
-    /// ten minutes. Kept in memory while the socket stands; without one it
-    /// changes nothing and keeps nothing. Always `Done`.
+    /// an open push socket): its activity, whether it has been idle for ten
+    /// minutes, and the table it sits at if its player shares it. Kept in
+    /// memory while the socket stands; without one it changes nothing and
+    /// keeps nothing. Always `Done`.
     ReportPresence {
         /// Playing, at a table, or neither.
         activity: Option<crate::presence::Activity>,
         /// No input for ten minutes.
         idle: bool,
+        /// The table, for the friends shown the account
+        /// ([`crate::presence::Table`]). Left out when there is none, so such
+        /// a report is the bytes it always was. Sent only to a Central whose
+        /// push socket said `"tables":true` in its `ready`: an older one
+        /// refuses the whole request for the field. A table that does not
+        /// decode, fails [`crate::presence::Table::valid`] or comes without
+        /// an activity is dropped, and the rest of the report heard.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "crate::presence::Table::lenient"
+        )]
+        table: Option<crate::presence::Table>,
     },
     /// Start a pairing for the browser session's account (browser listener
     /// only). Answered with [`Response::PairStarted`].
@@ -1189,6 +1203,118 @@ mod tests {
             panic!("an enrollment");
         };
         assert_eq!(recovery, Some(vec![4]));
+    }
+
+    /// `ReportPresence` as every Central before the table read it, frozen:
+    /// `Request` is `deny_unknown_fields`, so such a Central refuses a report
+    /// that carries a table, which is why a client sends one only after the
+    /// socket's `ready` announced tables.
+    #[derive(Deserialize)]
+    #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
+    #[allow(dead_code)] // only decoded, never read
+    enum Before {
+        ReportPresence {
+            activity: Option<crate::presence::Activity>,
+            idle: bool,
+        },
+    }
+
+    fn table() -> crate::presence::Table {
+        crate::presence::Table {
+            origin: "https://gateway.example".into(),
+            game: "01937d4e-7b1c-7000-8000-000000000001".into(),
+            name: "Friday \"night\" \\ draft".into(),
+            seats: 4,
+            taken: 2,
+        }
+    }
+
+    #[test]
+    fn a_report_without_a_table_is_the_bytes_it_always_was_both_ways() {
+        let report = Request::ReportPresence {
+            activity: Some(crate::presence::Activity::Table),
+            idle: true,
+            table: None,
+        };
+        let bytes = crate::encode(&report).unwrap();
+        assert_eq!(
+            bytes,
+            br#"{"operation":"report_presence","activity":"table","idle":true}"#
+        );
+        // an older Central reads it as before
+        assert!(crate::decode::<Before>(&bytes).is_ok());
+        // and this one reads an older client's report, with no table
+        let Request::ReportPresence {
+            activity,
+            idle,
+            table,
+        } = crate::decode(br#"{"operation":"report_presence","activity":"playing","idle":false}"#)
+            .unwrap()
+        else {
+            panic!("a report");
+        };
+        assert_eq!(activity, Some(crate::presence::Activity::Playing));
+        assert!(!idle && table.is_none());
+    }
+
+    #[test]
+    fn a_report_with_a_table_round_trips_and_an_older_central_refuses_it() {
+        let report = Request::ReportPresence {
+            activity: Some(crate::presence::Activity::Table),
+            idle: false,
+            table: Some(table()),
+        };
+        let bytes = crate::encode(&report).unwrap();
+        let Request::ReportPresence { table: read, .. } = crate::decode(&bytes).unwrap() else {
+            panic!("a report");
+        };
+        assert_eq!(read, Some(table()));
+        // the frozen reader of before refuses it whole
+        assert!(crate::decode::<Before>(&bytes).is_err());
+    }
+
+    #[test]
+    fn a_table_that_does_not_decode_is_dropped_and_the_report_still_read() {
+        for table in [
+            "null",
+            "7",
+            r#""a table""#,
+            "[]",
+            "{}",
+            r#"{"origin":"https://gateway.example","game":"g","name":"n","seats":300,"taken":1}"#,
+            r#"{"origin":"https://gateway.example","game":"g","name":"n","seats":4}"#,
+            r#"{"origin":"https://gateway.example","game":"g","name":"n","seats":"4","taken":1}"#,
+            r#"{"origin":1,"game":"g","name":"n","seats":4,"taken":1}"#,
+            r#"{"origin":"https://gateway.example","game":"g","name":{"deep":[[[]]]},"seats":4,"taken":1}"#,
+        ] {
+            let bytes = format!(
+                r#"{{"operation":"report_presence","activity":"playing","idle":true,"table":{table}}}"#
+            );
+            let Ok(Request::ReportPresence {
+                activity,
+                idle,
+                table: read,
+            }) = crate::decode(bytes.as_bytes())
+            else {
+                panic!("the report around {table} is read");
+            };
+            assert_eq!(activity, Some(crate::presence::Activity::Playing));
+            assert!(idle);
+            assert_eq!(read, None, "{table}");
+        }
+        // a later field of a table is read past, as a later field of a report is not
+        let later = r#"{"operation":"report_presence","activity":"table","idle":false,"table":{"origin":"https://gateway.example","game":"g","name":"n","seats":4,"taken":1,"format":"draft"}}"#;
+        let Request::ReportPresence { table: read, .. } = crate::decode(later.as_bytes()).unwrap()
+        else {
+            panic!("a report");
+        };
+        assert_eq!(read.map(|table| table.game), Some("g".to_owned()));
+        assert!(
+            crate::decode::<Request>(
+                br#"{"operation":"report_presence","activity":null,"idle":false,"tables":[]}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]
