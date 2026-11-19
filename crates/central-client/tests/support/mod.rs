@@ -27,6 +27,7 @@ pub(super) mod legacy;
 pub(super) mod notifications;
 pub(super) mod pairing;
 pub(super) mod password;
+pub(super) mod push;
 pub(super) mod registration;
 pub(super) mod reports;
 pub(super) mod reset;

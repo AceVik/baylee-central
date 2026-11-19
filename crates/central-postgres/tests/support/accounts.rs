@@ -20,6 +20,7 @@ mod email;
 mod gateways;
 mod kinds;
 mod legacy_store;
+mod live;
 mod migration;
 mod notifications;
 mod objects;
@@ -171,6 +172,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     reports::run(&store, operator, &keys).await;
     chat::run(&store, operator, &keys).await;
     social::run(&store, operator, &keys).await;
+    live::run(&store, operator, &keys).await;
     notifications::run(&store, operator, &keys).await;
     email::run(&store, operator, &keys).await;
     pictures::run(&store, operator, &keys).await;
