@@ -95,8 +95,9 @@ pub struct Concerns {
     /// Accounts whose contacts, requests, blocks, groups, invitations or own
     /// devices changed (`social`).
     pub social: BTreeSet<[u8; 16]>,
-    /// Two accounts whose friendship may have begun or ended: their friend
-    /// lists are read again if they hold a socket.
+    /// Two accounts whose friendship began or ended: their friend lists are
+    /// read again if they hold a socket. Never set by a request, or by a block
+    /// or its lifting between accounts that were no friends.
     pub pair: Option<([u8; 16], [u8; 16])>,
 }
 

@@ -48,7 +48,7 @@ fn the_accept_value_is_rfc_6455_s() {
 }
 
 #[test]
-fn every_other_handshake_is_refused_before_anything_is_asked() {
+fn every_other_handshake_is_refused() {
     let nonce = header::SEC_WEBSOCKET_KEY.as_str();
     let without =
         |name: &str| -> Pairs { good().into_iter().filter(|(n, _)| *n != name).collect() };
@@ -70,7 +70,7 @@ fn every_other_handshake_is_refused_before_anything_is_asked() {
             .collect()
     };
     // the sample with its last character changed: still 24 characters, no
-    // longer the canonical spelling of sixteen bytes
+    // longer the canonical spelling of sixteen bytes (the engine refuses it)
     let mut uncanonical = sample();
     uncanonical.replace_range(21..22, "R");
     for pairs in [
@@ -495,7 +495,74 @@ async fn a_client_s_close_is_answered_and_ends_the_socket() {
         .unwrap();
     assert_eq!(hear(&mut socket.client).await, Heard::Close(1000));
     assert_eq!(hear(&mut socket.client).await, Heard::End);
-    assert_eq!(socket.task.await.unwrap(), End::Answer);
+    assert_eq!(socket.task.await.unwrap(), End::Answer(Code::NORMAL));
+    // its code comes back as it was sent, and no code is answered with 1000
+    for (sent_code, answered) in [(Some(4001_u16), 4001_u16), (None, 1000)] {
+        let mut socket = opened(SHORT).await;
+        let payload = sent_code
+            .map(|code| code.to_be_bytes().to_vec())
+            .unwrap_or_default();
+        socket
+            .client
+            .write_all(&sent(0x88, &payload))
+            .await
+            .unwrap();
+        assert_eq!(hear(&mut socket.client).await, Heard::Close(answered));
+        assert_eq!(socket.task.await.unwrap(), End::Answer(Code(answered)));
+    }
+    // a code no peer may send is a protocol error
+    let mut socket = opened(SHORT).await;
+    socket
+        .client
+        .write_all(&sent(0x88, &1005_u16.to_be_bytes()))
+        .await
+        .unwrap();
+    assert_eq!(hear(&mut socket.client).await, Heard::Close(1002));
+    let _ = socket.task.await;
+}
+
+/// A check run by the test: answers in turn, and how often every socket was
+/// closed for want of one.
+#[derive(Default)]
+struct Checks {
+    answers: std::sync::Mutex<std::collections::VecDeque<Result<(), Error>>>,
+    unchecked: AtomicU8,
+}
+
+impl Sessions for Arc<Checks> {
+    fn check(&self) -> impl Future<Output = Result<(), Error>> + Send {
+        let answer = self.answers.lock().unwrap().pop_front().unwrap_or(Ok(()));
+        async move { answer }
+    }
+
+    fn unchecked(&self) {
+        self.unchecked.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+#[tokio::test]
+async fn two_checks_failed_in_a_row_close_every_socket_and_one_that_answers_resets() {
+    let every = Duration::from_millis(20);
+    let run = |answers: Vec<Result<(), Error>>| async move {
+        let checks = Arc::new(Checks::default());
+        checks.answers.lock().unwrap().extend(answers);
+        let (stop, stopped) = watch::channel(false);
+        let task = tokio::spawn(check(Arc::clone(&checks), every, every, stopped));
+        tokio::time::sleep(every * 8).await;
+        stop.send(true).unwrap();
+        tokio::time::timeout(Duration::from_secs(2), task)
+            .await
+            .expect("the check stops with the sockets")
+            .unwrap();
+        checks.unchecked.load(Ordering::Acquire)
+    };
+    let failed = Err(Error::Unavailable);
+    // one failure alone, and failures with an answer between, close nothing
+    assert_eq!(run(vec![failed]).await, 0);
+    assert_eq!(run(vec![failed, Ok(()), failed, Ok(()), failed]).await, 0);
+    // two in a row close every socket, once, and count again from there
+    assert_eq!(run(vec![failed, failed]).await, 1);
+    assert_eq!(run(vec![failed, failed, failed, failed]).await, 2);
 }
 
 #[tokio::test]

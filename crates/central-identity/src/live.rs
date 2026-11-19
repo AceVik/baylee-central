@@ -33,8 +33,10 @@ pub const ACCOUNT_SOCKETS: usize = 4;
 /// earliest, doubling while dials fail; a dial costs two or three
 /// statements, so this keeps one session from turning dials into load.
 pub const SESSION_DIALS: u32 = 12;
-/// Sessions whose dials are counted at once. A full table refuses a session
-/// it does not hold; one entry is a digest and a count.
+/// Sessions whose dials are counted at once; one entry is a digest and a
+/// count. A newcomer to a table full of live minutes takes the place of the
+/// oldest, so tokens of ended sessions (which still verify until their
+/// `exp`) can wear down others' counts but never lock a session out.
 const DIALERS: usize = 4_096;
 const MINUTE: Duration = Duration::from_secs(60);
 
@@ -88,7 +90,9 @@ struct Account {
     /// Whether `friends` was read since the entry was made.
     read: bool,
     /// The newest reading of `friends` asked for; an older one that ends
-    /// later is dropped.
+    /// later is dropped. Numbered over all accounts ([`State::readings`]),
+    /// so a reading begun before the account's sockets closed and opened
+    /// again never takes a later one's number.
     reading: u64,
 }
 
@@ -99,10 +103,18 @@ struct State {
     accounts: BTreeMap<[u8; 16], Account>,
     /// Each session's dials in its minute.
     dials: BTreeMap<[u8; 32], (Instant, u32)>,
+    /// The last reading's number, over all accounts.
+    readings: u64,
+    /// News that a session may have ended, counted: a dial compares it before
+    /// and after its socket is registered ([`Live::ends`]).
+    ends: u64,
 }
 
 impl State {
-    fn raise(&self, account: &[u8; 16], bits: u8) {
+    fn raise(&mut self, account: &[u8; 16], bits: u8) {
+        if bits & (news::CHECK | news::REVOKED) != 0 {
+            self.ends += 1;
+        }
         if let Some(entry) = self.accounts.get(account) {
             for id in &entry.sockets {
                 if let Some(socket) = self.sockets.get(id) {
@@ -124,7 +136,7 @@ impl State {
             .collect()
     }
 
-    fn raise_followers(&self, account: &[u8; 16], bits: u8) {
+    fn raise_followers(&mut self, account: &[u8; 16], bits: u8) {
         for follower in self.followers(account) {
             self.raise(&follower, bits);
         }
@@ -138,17 +150,16 @@ pub(super) struct Live {
 }
 
 /// A reading begun, which ends as read or, however else it ends (an error,
-/// or its future dropped because its request was), as unread
-/// ([`Live::friends_unread`]): a list that was to be read again is never
-/// left as it was.
-pub(super) struct Pending<'a> {
-    live: &'a Live,
+/// or its future dropped), as unread ([`Live::friends_unread`]): a list that
+/// was to be read again is never left as it was.
+pub(super) struct Pending {
+    live: Arc<Live>,
     account: [u8; 16],
     reading: Option<Reading>,
 }
 
-impl<'a> Pending<'a> {
-    pub(super) const fn new(live: &'a Live, reading: Reading) -> Self {
+impl Pending {
+    pub(super) const fn new(live: Arc<Live>, reading: Reading) -> Self {
         Self {
             live,
             account: reading.account,
@@ -169,7 +180,7 @@ impl<'a> Pending<'a> {
     }
 }
 
-impl Drop for Pending<'_> {
+impl Drop for Pending {
     fn drop(&mut self) {
         if let Some(reading) = self.reading.take() {
             self.live.friends_unread(reading);
@@ -191,8 +202,8 @@ impl Live {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Spend one of the session's dials in its minute; `Busy` when none is left
-    /// or the table holds as many sessions as it may.
+    /// Spend one of the session's dials in its minute; `Busy` when none is
+    /// left. A newcomer to a full table takes the oldest entry's place.
     pub(super) fn dial(&self, digest: [u8; 32], now: Instant) -> Result<(), Error> {
         let mut state = self.state();
         if !state.dials.contains_key(&digest) && state.dials.len() >= DIALERS {
@@ -200,7 +211,14 @@ impl Live {
                 .dials
                 .retain(|_, (start, _)| now.saturating_duration_since(*start) < MINUTE);
             if state.dials.len() >= DIALERS {
-                return Err(Error::Busy);
+                let oldest = state
+                    .dials
+                    .iter()
+                    .min_by_key(|(_, (start, _))| *start)
+                    .map(|(session, _)| *session);
+                if let Some(oldest) = oldest {
+                    state.dials.remove(&oldest);
+                }
             }
         }
         let (start, used) = state.dials.entry(digest).or_insert((now, 0));
@@ -227,7 +245,8 @@ impl Live {
         tag: Option<u32>,
         digest: [u8; 32],
     ) -> Result<(Listener, Option<Reading>), Error> {
-        let mut state = self.state();
+        let mut guard = self.state();
+        let state = &mut *guard;
         let id = state.next;
         let entry = state.accounts.entry(account).or_insert_with(|| Account {
             tag,
@@ -243,7 +262,8 @@ impl Live {
         entry.tag = tag;
         entry.sockets.insert(id);
         let reading = (!entry.read).then(|| {
-            entry.reading += 1;
+            state.readings += 1;
+            entry.reading = state.readings;
             Reading {
                 account,
                 number: entry.reading,
@@ -277,9 +297,11 @@ impl Live {
     /// A reading of `account`'s friends, if it holds a socket: its list may
     /// have changed and is to be read again.
     pub(super) fn reread(&self, account: [u8; 16]) -> Option<Reading> {
-        let mut state = self.state();
+        let mut guard = self.state();
+        let state = &mut *guard;
         let entry = state.accounts.get_mut(&account)?;
-        entry.reading += 1;
+        state.readings += 1;
+        entry.reading = state.readings;
         Some(Reading {
             account,
             number: entry.reading,
@@ -343,7 +365,8 @@ impl Live {
     /// The session `digest` ended: its sockets say `revoked`. A sign-out ends
     /// exactly the session that asked, so nothing need be read.
     pub(super) fn ended(&self, digest: &[u8; 32]) {
-        let state = self.state();
+        let mut state = self.state();
+        state.ends += 1;
         for socket in state.sockets.values() {
             if &socket.digest == digest {
                 socket.signal.raise(news::REVOKED);
@@ -366,15 +389,22 @@ impl Live {
     }
 
     /// `account`'s tag changed: whoever counts it among their friends sees the
-    /// new one, in their contacts and their presence.
+    /// new one, in their contacts and their presence, whether or not the
+    /// account itself holds a socket.
     pub(super) fn retagged(&self, account: &[u8; 16], tag: u32) {
         let mut state = self.state();
-        let Some(entry) = state.accounts.get_mut(account) else {
-            return;
-        };
-        entry.tag = Some(tag);
+        if let Some(entry) = state.accounts.get_mut(account) {
+            entry.tag = Some(tag);
+        }
         state.raise(account, news::SOCIAL);
         state.raise_followers(account, news::SOCIAL | news::PRESENCE);
+    }
+
+    /// How much news that a session may have ended there has been: a dial
+    /// whose count changed between its status and its registration asks the
+    /// store again, since that news found no socket of it to tell.
+    pub(super) fn ends(&self) -> u64 {
+        self.state().ends
     }
 
     /// The session digests of every socket, each once: what the periodic
@@ -555,6 +585,9 @@ impl super::IdentityService {
             return Err(Error::Rejected);
         };
         self.live.dial(token.digest(), Instant::now())?;
+        // Counted before the status is read: news that a session ended which
+        // comes between it and the socket's registration finds no socket.
+        let ends = self.live.ends();
         let request = central_api::wire::Request::SessionStatus;
         let told = super::limits::told(&request, Some(token));
         self.limits
@@ -580,12 +613,20 @@ impl super::IdentityService {
         let (listener, reading) =
             self.live
                 .admit(status.identity.account, status.tag, token.digest())?;
-        if let Some(reading) = reading.map(|reading| Pending::new(&self.live, reading)) {
+        if let Some(reading) = reading.map(|reading| Pending::new(Arc::clone(&self.live), reading))
+        {
             // The dial fails rather than report friends it could not read;
             // dropping the listener takes the socket back out, and the
             // reading's end closes any other socket that waited for it.
             let friends = self.store.live_friends(reading.account()).await?;
             reading.read(friends);
+        }
+        // Such news came in between: the session is asked about again, now
+        // that the socket is registered and any later news reaches it.
+        let digest = *listener.digest();
+        if self.live.ends() != ends && !self.store.live_sessions(&[digest]).await?.contains(&digest)
+        {
+            return Err(Error::Rejected);
         }
         Ok(listener)
     }
@@ -637,33 +678,43 @@ impl super::IdentityService {
     }
 
     /// What a social operation that committed concerns, told to the sockets
-    /// of exactly those accounts. A friendship that may have begun or ended is
-    /// read again for each of the two that holds a socket, before anyone is
-    /// told, so presence never shows an ended friendship's.
+    /// of exactly those accounts. A friendship that began or ended is read
+    /// again for each of the two that holds a socket.
     ///
-    /// Everything is decided before anything is awaited: the bits are raised
-    /// and the readings begun at once, so a request whose future is dropped
-    /// while it reads (its time ran out, its client went away) still closes
-    /// the sockets whose lists it did not read ([`Pending`]).
-    pub(super) async fn tell(&self, concerns: &central_postgres::Concerns) {
+    /// Nothing here is awaited by the request: the bits are raised at once
+    /// and the readings run in a task of their own, so neither the answer's
+    /// time nor the caller's connection depends on whether the other side
+    /// holds a socket, and a caller that goes away cancels nothing. A reading
+    /// that fails, or a task that never runs, ends as unread ([`Pending`]):
+    /// presence never keeps showing an ended friendship.
+    pub(super) fn tell(&self, concerns: &central_postgres::Concerns) {
         for account in &concerns.chat {
             self.live.raise(account, news::CHAT);
         }
         for account in &concerns.social {
             self.live.raise(account, news::SOCIAL);
         }
-        let readings: Vec<Pending<'_>> = concerns
+        let readings: Vec<Pending> = concerns
             .pair
             .into_iter()
             .flat_map(|(one, other)| [one, other])
             .filter_map(|account| self.live.reread(account))
-            .map(|reading| Pending::new(&self.live, reading))
+            .map(|reading| Pending::new(Arc::clone(&self.live), reading))
             .collect();
-        for reading in readings {
-            // An error drops the reading, which ends it as unread.
-            if let Ok(friends) = self.store.live_friends(reading.account()).await {
-                reading.read(friends);
-            }
+        if readings.is_empty() {
+            return;
+        }
+        let store = self.store.clone();
+        // Without a runtime the readings are dropped, which ends them as unread.
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                for reading in readings {
+                    // An error drops the reading, which ends it as unread.
+                    if let Ok(friends) = store.live_friends(reading.account()).await {
+                        reading.read(friends);
+                    }
+                }
+            });
         }
     }
 

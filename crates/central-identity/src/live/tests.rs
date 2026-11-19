@@ -179,19 +179,36 @@ fn an_account_holds_four_sockets_and_a_session_dials_twelve_times_a_minute() {
 }
 
 #[test]
-fn the_dial_table_refuses_newcomers_only_while_full_of_live_minutes() {
+fn a_full_dial_table_takes_a_newcomer_in_the_oldest_s_place() {
     let live = Live::default();
     let now = Instant::now();
-    for seed in 0..DIALERS {
+    let session = |seed: usize| {
         let mut session = [0; 32];
         session[..8].copy_from_slice(&u64::try_from(seed).unwrap().to_be_bytes());
-        live.dial(session, now).unwrap();
+        session
+    };
+    // the oldest first, then the rest a moment later
+    live.dial(session(0), now).unwrap();
+    for seed in 1..DIALERS {
+        live.dial(session(seed), now + Duration::from_millis(1))
+            .unwrap();
     }
-    assert_eq!(live.dial([0xff; 32], now), Err(Error::Busy));
-    // a session it holds still dials
-    assert_eq!(live.dial([0; 32], now), Ok(()));
-    // once the minute has passed, the table makes room
-    assert_eq!(live.dial([0xff; 32], now + MINUTE), Ok(()));
+    // Full of live minutes: a newcomer is let in, never refused for the table,
+    // and the oldest entry gives way (its count starts again).
+    let later = now + Duration::from_millis(2);
+    assert_eq!(live.dial([0xff; 32], later), Ok(()));
+    assert_eq!(live.state().dials.len(), DIALERS);
+    assert!(!live.state().dials.contains_key(&session(0)));
+    // a session it holds keeps its count
+    for _ in 1..SESSION_DIALS {
+        live.dial(session(1), later).unwrap();
+    }
+    assert_eq!(live.dial(session(1), later), Err(Error::Busy));
+    // once the minute has passed, a newcomer finds the passed minutes forgotten
+    assert_eq!(
+        live.dial([0xfe; 32], now + MINUTE + Duration::from_millis(2)),
+        Ok(())
+    );
     assert_eq!(live.state().dials.len(), 1);
 }
 
@@ -297,7 +314,7 @@ fn a_reading_given_up_closes_the_sockets_and_the_next_one_reads_anew() {
     assert_eq!(live.presence(&A), vec![2]);
     // A request's future is dropped while it reads A's friends again (its
     // time ran out, its client went away): the reading ends as unread.
-    let reading = Pending::new(&live, live.reread(A).unwrap());
+    let reading = Pending::new(Arc::clone(&live), live.reread(A).unwrap());
     drop(reading);
     assert_eq!(a.take() & news::STALE, news::STALE, "A's sockets close");
     assert_eq!(b.take() & news::STALE, 0);
@@ -309,14 +326,66 @@ fn a_reading_given_up_closes_the_sockets_and_the_next_one_reads_anew() {
     // a socket of A's that opens while the old one is still closing reads
     // the list anew instead of taking it as read
     let (again, reading) = live.admit(A, Some(1), digest(1)).unwrap();
-    let reading = Pending::new(&live, reading.expect("a new reading"));
+    let reading = Pending::new(Arc::clone(&live), reading.expect("a new reading"));
     reading.read(vec![B]);
     assert_eq!(live.presence(&A), vec![2]);
     let _ = again.take();
     drop((a, again));
     // a reading that was read is not undone by its guard
     let c = socket(&live, C, 3, &[]);
-    let reading = Pending::new(&live, live.reread(C).unwrap());
+    let reading = Pending::new(Arc::clone(&live), live.reread(C).unwrap());
     reading.read(vec![]);
     assert_eq!(c.take() & news::STALE, 0);
+}
+
+#[test]
+fn a_reading_from_before_a_reconnect_never_takes_a_later_one_s_place() {
+    let live = Arc::new(Live::default());
+    let b = socket(&live, B, 2, &[A]);
+    b.ready();
+    let a = socket(&live, A, 1, &[B]);
+    let slow = live.reread(A).unwrap();
+    // A's sockets close and open again: a new entry, new readings
+    drop(a);
+    let (again, first) = live.admit(A, Some(1), digest(1)).unwrap();
+    live.friends_read(first.unwrap(), vec![B]);
+    let newer = live.reread(A).unwrap();
+    live.friends_read(newer, vec![B]);
+    assert_eq!(live.presence(&A), vec![2]);
+    // The reading begun before the reconnect ends now, with what was true
+    // then; numbered over all accounts, it is older than every later one.
+    assert_ne!(slow, newer);
+    live.friends_read(slow, vec![]);
+    assert_eq!(live.presence(&A), vec![2], "the newer reading stands");
+    live.friends_unread(slow);
+    assert_eq!(
+        again.take() & news::STALE,
+        0,
+        "and its failure closes nothing"
+    );
+}
+
+#[test]
+fn a_new_tag_reaches_friends_of_an_account_without_a_socket() {
+    let live = Arc::new(Live::default());
+    // B counts A a friend; A holds no socket
+    let b = socket(&live, B, 2, &[A]);
+    live.retagged(&A, 0x4321);
+    assert_eq!(b.take(), news::SOCIAL | news::PRESENCE);
+}
+
+#[test]
+fn news_that_a_session_ended_is_counted_for_a_dial_in_flight() {
+    let live = Arc::new(Live::default());
+    let start = live.ends();
+    // nobody holds a socket yet: such news reaches no socket, but is counted
+    live.ended(&digest(1));
+    assert_eq!(live.ends(), start + 1);
+    live.raise(&A, news::CHECK);
+    assert_eq!(live.ends(), start + 2);
+    live.deleted(&B);
+    assert_eq!(live.ends(), start + 3);
+    // other news is not
+    live.raise(&A, news::CHAT | news::SOCIAL | news::PRESENCE);
+    assert_eq!(live.ends(), start + 3);
 }

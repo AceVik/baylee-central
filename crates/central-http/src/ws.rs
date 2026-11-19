@@ -84,7 +84,8 @@ const LIFETIME: Duration = Duration::from_hours(12);
 /// pings of its own if it likes, far fewer than this.
 const FRAMES: u32 = 16;
 const FRAME_WINDOW: Duration = Duration::from_secs(10);
-/// How often every socket's session is checked, in one statement for all.
+/// How often every socket's session is checked, in one statement for all:
+/// with [`CHECK_TIME`], an ended session's socket is told within 70 seconds.
 const CHECK_EVERY: Duration = Duration::from_secs(60);
 /// How long that check may take.
 const CHECK_TIME: Duration = Duration::from_secs(10);
@@ -225,11 +226,8 @@ impl Sockets {
     pub(crate) fn check(&self, identity: Arc<IdentityService>) {
         let stop = self.upgrades.0.stop.clone();
         // The channel is empty yet, so this always fits.
-        let _ = self
-            .upgrades
-            .0
-            .jobs
-            .try_send(Box::pin(check(identity, stop)));
+        let job = check(identity, CHECK_EVERY, CHECK_TIME, stop);
+        let _ = self.upgrades.0.jobs.try_send(Box::pin(job));
     }
 }
 
@@ -371,11 +369,12 @@ fn handshake(headers: &HeaderMap) -> Result<HeaderValue, Refusal> {
 }
 
 /// `Sec-WebSocket-Accept` for `key`: Base64 of the SHA-1 of the key and the
-/// protocol's GUID. `None` unless the key is sixteen bytes in canonical Base64.
+/// protocol's GUID. `None` unless the key is sixteen bytes in canonical Base64
+/// (the standard engine refuses padding that is not canonical and bits past
+/// the last byte, so what it decodes is what it would encode).
 fn accept(key: &str) -> Option<HeaderValue> {
     let engine = base64::engine::general_purpose::STANDARD;
-    let decoded = engine.decode(key).ok()?;
-    if decoded.len() != 16 || engine.encode(&decoded) != key {
+    if engine.decode(key).ok()?.len() != 16 {
         return None;
     }
     let digest = sha1::Sha1::new()
@@ -549,8 +548,8 @@ enum End {
     Close(Code),
     /// `revoked`, then a close: the session ended.
     Revoked,
-    /// The client closed: answer its close.
-    Answer,
+    /// The client closed: answer its close with its code, or 1000.
+    Answer(Code),
 }
 
 struct Socket<A, R, W> {
@@ -644,7 +643,7 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
                             }
                         }
                         Ok(Frame::Pong) => heard = now,
-                        Ok(Frame::Close) => return End::Answer,
+                        Ok(Frame::Close(code)) => return End::Answer(code.unwrap_or(Code::NORMAL)),
                         Err(Ended::Gone) => return End::Drop,
                         Err(Ended::Refused(code)) => return End::Close(code),
                     }
@@ -720,8 +719,8 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
     async fn end(&mut self, end: End) {
         let code = match end {
             End::Drop => return,
-            End::Answer => {
-                let _ = self.write(&frame::close(Code::NORMAL)).await;
+            End::Answer(code) => {
+                let _ = self.write(&frame::close(code)).await;
                 let _ = tokio::time::timeout(self.times.write, self.writer.shutdown()).await;
                 return;
             }
@@ -744,7 +743,7 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
         let _ = tokio::time::timeout(self.times.linger, async {
             loop {
                 match self.frames.next(&mut self.reader).await {
-                    Ok(Frame::Close) | Err(_) => break,
+                    Ok(Frame::Close(_)) | Err(_) => break,
                     Ok(_) => {}
                 }
             }
@@ -769,24 +768,49 @@ fn presence(online: &[u32]) -> String {
     text
 }
 
-/// The periodic check of every socket's session until the sockets stop.
-async fn check(identity: Arc<IdentityService>, mut stop: watch::Receiver<bool>) {
-    let mut every = tokio::time::interval_at(Instant::now() + CHECK_EVERY, CHECK_EVERY);
-    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+/// What the periodic check asks of the account service.
+trait Sessions {
+    /// Check every socket's session; an error is no answer.
+    fn check(&self) -> impl Future<Output = Result<(), Error>> + Send;
+    /// The check failed too often: every socket closes without `revoked`.
+    fn unchecked(&self);
+}
+
+impl Sessions for Arc<IdentityService> {
+    fn check(&self) -> impl Future<Output = Result<(), Error>> + Send {
+        self.check_listeners()
+    }
+
+    fn unchecked(&self) {
+        self.listeners_unchecked();
+    }
+}
+
+/// The periodic check of every socket's session, `every` so often and each
+/// within `time`, until the sockets stop; [`CHECK_FAILURES`] in a row that
+/// failed or took too long close every socket.
+async fn check(
+    sessions: impl Sessions,
+    every: Duration,
+    time: Duration,
+    mut stop: watch::Receiver<bool>,
+) {
+    let mut ticks = tokio::time::interval_at(Instant::now() + every, every);
+    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut failed = 0_u32;
     loop {
         tokio::select! {
             biased;
             _ = stop.changed() => return,
-            _ = every.tick() => {}
+            _ = ticks.tick() => {}
         }
-        let checked = tokio::time::timeout(CHECK_TIME, identity.check_listeners()).await;
+        let checked = tokio::time::timeout(time, sessions.check()).await;
         if matches!(checked, Ok(Ok(()))) {
             failed = 0;
         } else {
             failed += 1;
             if failed >= CHECK_FAILURES {
-                identity.listeners_unchecked();
+                sessions.unchecked();
                 failed = 0;
             }
         }

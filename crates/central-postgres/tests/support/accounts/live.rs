@@ -228,7 +228,8 @@ async fn contacts(store: &AccountStore, [ai, bi, ci]: [Identity; 3], [a, b, c]: 
     // A asks B: both see the request; not friends yet.
     let asked = contact(store, a, bt, ContactAction::Request).await;
     assert_eq!(asked.social, set(&[ai, bi]));
-    assert_eq!(asked.pair, Some((ai.account, bi.account)));
+    // a request begins no friendship: nobody's friends are read for it
+    assert_eq!(asked.pair, None);
     assert!(asked.chat.is_empty());
     assert!(friends(ai).await.is_empty());
     // asking again changes nothing, and nobody is told
@@ -239,14 +240,18 @@ async fn contacts(store: &AccountStore, [ai, bi, ci]: [Identity; 3], [a, b, c]: 
     // B accepts: friends both ways
     let accepted = contact(store, b, TAGS[0], ContactAction::Accept).await;
     assert_eq!(accepted.social, set(&[ai, bi]));
+    assert_eq!(accepted.pair, Some((bi.account, ai.account)));
     assert_eq!(friends(ai).await, set(&[bi]));
     assert_eq!(friends(bi).await, set(&[ai]));
     // A blocks C, who is no contact: C is told nothing
     let blocked = contact(store, a, ct, ContactAction::Block).await;
     assert_eq!(blocked.social, set(&[ai]));
     assert!(!blocked.social.contains(&ci.account));
+    // and none of C's friends is read: a block cannot sound out C's presence
+    assert_eq!(blocked.pair, None);
     let unblocked = contact(store, a, ct, ContactAction::Unblock).await;
     assert_eq!(unblocked.social, set(&[ai]));
+    assert_eq!(unblocked.pair, None);
     // lifting a block that is not there, removing a contact that is not there
     assert_eq!(
         contact(store, a, ct, ContactAction::Unblock).await,
@@ -260,6 +265,12 @@ async fn contacts(store: &AccountStore, [ai, bi, ci]: [Identity; 3], [a, b, c]: 
     contact(store, c, TAGS[0], ContactAction::Request).await;
     let crossed = contact(store, a, ct, ContactAction::Request).await;
     assert_eq!(crossed.social, set(&[ai, ci]));
+    assert_eq!(crossed.pair, Some((ai.account, ci.account)));
+    // a request withdrawn: both saw it, and no friendship ended
+    contact(store, b, ct, ContactAction::Request).await;
+    let withdrawn = contact(store, b, ct, ContactAction::Remove).await;
+    assert_eq!(withdrawn.social, set(&[bi, ci]));
+    assert_eq!(withdrawn.pair, None);
     assert_eq!(friends(ai).await, set(&[bi, ci]));
     // reads concern nobody
     for request in [
@@ -428,6 +439,8 @@ async fn groups(
     // C blocks A: their contact ends, C's membership stays
     let blocked = contact(store, c, at, ContactAction::Block).await;
     assert_eq!(blocked.social, set(&[ai, ci]));
+    // a friendship ended by the block: both lists are read again
+    assert_eq!(blocked.pair, Some((ci.account, ai.account)));
     // A writes to the group: C's devices take none of A's messages, so C is
     // not told; B is
     let conv = format!("grp:{id}");

@@ -32,6 +32,8 @@ impl Code {
     pub(crate) const PROTOCOL: Self = Self(1002);
     /// A data frame: this socket takes none.
     pub(crate) const UNSUPPORTED: Self = Self(1003);
+    /// A close's reason that is not UTF-8.
+    pub(crate) const INVALID_DATA: Self = Self(1007);
     /// The session ended, or the client sent faster than allowed.
     pub(crate) const POLICY: Self = Self(1008);
     /// What the socket says could not be kept true: dial again.
@@ -44,8 +46,9 @@ pub(crate) enum Frame {
     /// A ping, with its payload, which the pong returns.
     Ping(Vec<u8>),
     Pong,
-    /// The client closes.
-    Close,
+    /// The client closes, with its code if it gave one (a valid one, its
+    /// reason UTF-8), which the server's close returns.
+    Close(Option<Code>),
 }
 
 /// Why reading ended.
@@ -105,15 +108,20 @@ impl Reader {
         let opcode = first & 0x0f;
         let masked = second & 0x80 != 0;
         let length = usize::from(second & 0x7f);
+        // No extension was agreed, so a reserved bit is wrong on any frame;
+        // and a client masks every frame (RFC 6455 § 5.1, § 5.2).
+        if reserved != 0 || !masked {
+            return Err(Ended::Refused(Code::PROTOCOL));
+        }
         match opcode {
             // continuation, text, binary
             0x0..=0x2 => return Err(Ended::Refused(Code::UNSUPPORTED)),
             0x8..=0xa => {}
             _ => return Err(Ended::Refused(Code::PROTOCOL)),
         }
-        // A client masks every frame (RFC 6455 § 5.1); a control frame is
-        // whole and short (§ 5.5), which also rules out 126 and 127.
-        if !fin || reserved != 0 || !masked || length > 125 {
+        // A control frame is whole and short (§ 5.5), which also rules out
+        // 126 and 127.
+        if !fin || length > 125 {
             return Err(Ended::Refused(Code::PROTOCOL));
         }
         let whole = 2 + 4 + length;
@@ -133,17 +141,33 @@ impl Reader {
         self.buffer.copy_within(whole..self.filled, 0);
         self.filled -= whole;
         Ok(Some(match opcode {
-            0x8 => {
-                // a close's body is empty or holds a two-byte code first
-                if payload.len() == 1 {
-                    return Err(Ended::Refused(Code::PROTOCOL));
-                }
-                Frame::Close
-            }
+            0x8 => Frame::Close(closing(&payload)?),
             0x9 => Frame::Ping(payload),
             _ => Frame::Pong,
         }))
     }
+}
+
+/// A close's body (RFC 6455 § 5.5.1, § 7.4): empty, or a code a peer may
+/// send and a UTF-8 reason.
+fn closing(payload: &[u8]) -> Result<Option<Code>, Ended> {
+    let Some((code, reason)) = payload.split_first_chunk::<2>() else {
+        return if payload.is_empty() {
+            Ok(None)
+        } else {
+            Err(Ended::Refused(Code::PROTOCOL))
+        };
+    };
+    let code = u16::from_be_bytes(*code);
+    // 1004 to 1006 and 1015 are reserved or never sent; 1016 to 2999 are
+    // the protocol's own, unassigned; 3000 to 4999 are the applications'.
+    if !matches!(code, 1000..=1003 | 1007..=1014 | 3000..=4999) {
+        return Err(Ended::Refused(Code::PROTOCOL));
+    }
+    if std::str::from_utf8(reason).is_err() {
+        return Err(Ended::Refused(Code::INVALID_DATA));
+    }
+    Ok(Some(Code(code)))
 }
 
 /// A text frame of `text`, unmasked as a server's are. `None` for a text

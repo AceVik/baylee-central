@@ -195,7 +195,7 @@ impl IdentityService {
             .await?;
         // Committed: the push sockets of exactly the accounts it concerns are
         // told, whichever listener the change came from (`live.rs`).
-        self.tell(&concerns).await;
+        self.tell(&concerns);
         Ok(Response::Social { response })
     }
 

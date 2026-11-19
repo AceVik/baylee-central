@@ -8428,3 +8428,34 @@ speaker. What the texts now say that was not checked here: that each push provid
 under the EU-US Data Privacy Framework, which they name as the transfer's basis "as far as the
 provider is certified". Both texts await the owner's review; this is no legal advice and no claim
 of compliance.
+
+Addendum, the same day: an independent review (a separate agent, at the PM's request) of the code
+at `6f5c2bb2` found, and the implementing agent confirmed in the code:
+
+- Anyone could sound out whether an arbitrary account holds a socket, and close its sockets: a
+  block or unblock of a tag that was never a contact set the pair whose friends are read again,
+  the answer waited for that reading (one statement longer exactly when the other side held a
+  socket), and a caller that dropped its connection meanwhile dropped the reading, which closed
+  the other side's sockets (1011) and spent its dials. Now only a friendship that began or ended
+  reads friends (a row's `accepted` is returned by the deletion that ends it), and the readings
+  run in a task the request does not wait for. The store test names the pair of every contact
+  change, and over real TCP a caller that blocks and unblocks a stranger and drops its connection
+  six times leaves the stranger's socket quiet and open.
+- Reading numbers counted per account entry and started again after a reconnect, so a slow
+  reading from before could take a later one's number; they are counted over all accounts now.
+- News that a session ended which came between a dial's status and its registration reached no
+  socket; such news is counted, and a dial during which it came asks the store again.
+- A new tag reached no friend of an account that held no socket; it does now.
+- A full table of sessions' dials refused newcomers, which tokens of ended sessions (they still
+  verify) could have kept full; a newcomer now takes the oldest entry's place.
+- Smaller: a client's close is answered with its own code, and a code no peer may send or a reason
+  that is not UTF-8 is a protocol error; reserved bits and a missing mask are refused before the
+  opcode is looked at; the canonical-Base64 comparison of the key, which the standard engine made
+  unreachable, is gone; "within a minute" is 70 seconds; a test that claimed an order it could not
+  observe was renamed, one that checked nothing (no chat news in a scenario that sends none) was
+  removed; the periodic check has a test of its own (two failures in a row close every socket,
+  one answer between resets), and an account's deletion ends its socket over real TCP.
+
+Each fix's test is red without it (the store's pairs, the readings' numbers, the retag, the counted
+news, the full table), except the dropped-request scenario over TCP, which the old code failed only
+when the drop met the reading; the store's pair test covers it without timing.
