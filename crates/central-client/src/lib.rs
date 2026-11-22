@@ -24,6 +24,7 @@ mod pairing;
 mod password;
 mod pictures;
 mod presence;
+pub mod ranked;
 mod reset;
 mod session;
 mod social;

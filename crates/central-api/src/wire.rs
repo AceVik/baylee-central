@@ -54,6 +54,16 @@ pub enum Request {
         /// Exclusive database receipt cursor; at most 128 rows per response.
         after: Option<[u8; 16]>,
     },
+    /// Competitive ladders and account-owned matchmaking.
+    Ranked {
+        /// Public ladder read or session-owned queue command.
+        request: crate::ranked::Request,
+    },
+    /// Ranked execution on an administrator-verified host.
+    RankedHost {
+        /// The authenticated host identity is resolved by Central.
+        request: crate::ranked::HostRequest,
+    },
     /// Global Daily/Weekly catalogue, rankings and account-owned participation.
     Challenges {
         /// Closed public or account operation; ownership comes from the session.
@@ -735,6 +745,16 @@ pub enum Response {
     TowerAwardExport {
         /// Bounded owned receipts and exclusive continuation cursor.
         export: crate::tower_awards::Export,
+    },
+    /// Public competitive data or an account-owned queue receipt.
+    Ranked {
+        /// Public ranking data or the caller's private seat.
+        response: crate::ranked::Response,
+    },
+    /// Verified host's ranked reply.
+    RankedHost {
+        /// Private assignment or idempotent acknowledgement.
+        response: crate::ranked::HostResponse,
     },
     /// Public or account-owned challenge result.
     Challenges {
