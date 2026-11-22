@@ -22,6 +22,8 @@ Ten completed games in a format place the player. Ten games with a particular co
 
 Each account has one initial deck reference per format. A previously played composition resumes its stored Elo and placement count. Card identity and multiplicity are combined across main deck and sideboard for rating. The commitment sent for the game also covers the actual zones and play choices.
 
+When a player explicitly requests a ranked deck preview, the native client sends the selected format, normalized card identity digests and copy counts using the player's Central session. Central compares only that owner's versions in a read-only database transaction and returns the projected Elo, comparison size, deduction and placement progress. Selecting an unplayed list cannot reserve the first reference or earn a placement. Actual registration takes place with the verified result of a match.
+
 For a new composition let `q = 1 − multiset_overlap / max(reference_size, new_size)`. Its inherited Elo loses the fraction `0.2q + 0.8q²` of the reference's points above 150. A 50% rebuild from a 1,500 reference inherits 1,095. A complete rebuild inherits 150. Playing one game between edits cannot turn every intermediate deck into a new reference. A composition with at least forty results of its own can qualify as an additional reference at a season boundary.
 
 Player Elo accounts for the opponent's expected strength. The consequences of a first upset across a wide gap are capped separately for each player. Further surprising results are evaluated with recent opponent history. The same two accounts repeatedly playing each other provide less independent evidence. The reproducible experiments and their assumptions are in the [placement study](ranked-placement-study.md).

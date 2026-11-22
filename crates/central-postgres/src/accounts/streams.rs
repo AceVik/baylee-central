@@ -178,6 +178,27 @@ async fn held_sid(
     Ok(fresh)
 }
 
+async fn accepted_terms<S: AsRef<str> + Sync>(
+    tx: &DatabaseTransaction,
+    account: Uuid,
+    set: &[S],
+) -> Result<Option<TermsVersion>, Error> {
+    let accepted = tx.query_one_raw(statement(
+        &format!("SELECT version,digest FROM central_identity.terms_acceptances
+                  WHERE account_id=$1 AND subject={} ORDER BY accepted_at DESC,version DESC LIMIT 1",any_origin(2)),
+        vec![account.into(),origins(set)?],
+    )).await.map_err(|_|Error::Unavailable)?;
+    accepted
+        .map(|row| {
+            let digest: Vec<u8> = row.try_get("", "digest").map_err(|_| Error::Unavailable)?;
+            Ok(TermsVersion {
+                version: row.try_get("", "version").map_err(|_| Error::Unavailable)?,
+                digest: digest.try_into().map_err(|_| Error::Unavailable)?,
+            })
+        })
+        .transpose()
+}
+
 impl AccountStore {
     /// Record a session at one gateway and read what its token says. `set` holds the origins
     /// the gateway answers for, canonical first; `registered` is false for the official
@@ -258,27 +279,7 @@ impl AccountStore {
             fresh,
         )
         .await?;
-        let accepted = tx
-            .query_one_raw(statement(
-                &format!(
-                    "SELECT version, digest FROM central_identity.terms_acceptances
-                     WHERE account_id = $1 AND subject = {}
-                     ORDER BY accepted_at DESC, version DESC LIMIT 1",
-                    any_origin(2)
-                ),
-                vec![account.into(), origins(set)?],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        let terms = accepted
-            .map(|row| -> Result<TermsVersion, Error> {
-                let digest: Vec<u8> = row.try_get("", "digest").map_err(|_| Error::Unavailable)?;
-                Ok(TermsVersion {
-                    version: row.try_get("", "version").map_err(|_| Error::Unavailable)?,
-                    digest: digest.try_into().map_err(|_| Error::Unavailable)?,
-                })
-            })
-            .transpose()?;
+        let terms = accepted_terms(&tx, account, set).await?;
         let (display_name, tag) = super::profiles::columns(&row)?;
         let cap = row.try_get("", "cap").map_err(|_| Error::Unavailable)?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;

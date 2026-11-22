@@ -136,24 +136,7 @@ async fn game(
     let (first, again) = tokio::join!(operated(finish.clone()), operated(finish));
     assert_eq!(first.unwrap(), HostResponse::Done);
     assert_eq!(again.unwrap(), HostResponse::Done);
-    assert_eq!(operated(start).await.unwrap(), HostResponse::Done);
-    let mut changed = pools;
-    changed[0][0].copies += 1;
-    assert_eq!(
-        operated(HostRequest::Start {
-            match_id: matched,
-            game: id(21),
-            pools: changed
-        })
-        .await
-        .unwrap_err(),
-        Error::Conflict
-    );
-    let persisted=db.query_one_raw(Statement::from_sql_and_values(DbBackend::Postgres,
-        "SELECT deck_a IS NULL AND deck_b IS NULL AND octet_length(start_fingerprint)=32 AS compact
-         FROM central_identity.ranked_matches WHERE id=$1",
-        vec![Uuid::from_bytes(matched).into()])).await.unwrap().unwrap();
-    assert!(persisted.try_get::<bool>("", "compact").unwrap());
+    compacted(store,db,credential,start).await;
     assert_eq!(
         operated(HostRequest::Finish {
             match_id: matched,
@@ -164,6 +147,22 @@ async fn game(
         .unwrap_err(),
         Error::Conflict
     );
+    receipts(store,tokens,accounts,&assignment).await;
+}
+
+async fn compacted(store:&AccountStore,db:&DatabaseConnection,credential:&Token,mut retry:HostRequest) {
+    assert_eq!(store.ranked_host(Registered(credential),retry.clone()).await.unwrap(),HostResponse::Done);
+    let HostRequest::Start{match_id,pools,..} = &mut retry else {panic!("expected a start request")};
+    let matched=Uuid::from_bytes(*match_id);
+    pools[0][0].copies+=1;
+    assert_eq!(store.ranked_host(Registered(credential),retry).await.unwrap_err(),Error::Conflict);
+    let persisted=db.query_one_raw(Statement::from_sql_and_values(DbBackend::Postgres,
+        "SELECT deck_a IS NULL AND deck_b IS NULL AND octet_length(start_fingerprint)=32 AS compact
+         FROM central_identity.ranked_matches WHERE id=$1",vec![matched.into()])).await.unwrap().unwrap();
+    assert!(persisted.try_get::<bool>("","compact").unwrap());
+}
+
+async fn receipts(store:&AccountStore,tokens:[&Token;2],accounts:[api::Id;2],assignment:&api::HostAssignment) {
     let mut deltas = [0; 2];
     for index in 0..2 {
         let QueueState::Finished {
@@ -175,7 +174,7 @@ async fn game(
         else {
             panic!("expected a receipt")
         };
-        assert_eq!(matched, match_id);
+        assert_eq!(assignment.match_id, match_id);
         assert_eq!(accounts[index], assignment.accounts[usize::from(seat)]);
         assert_eq!(seat == 0, delta > 0);
         deltas[index] = delta;

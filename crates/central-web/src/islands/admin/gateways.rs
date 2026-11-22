@@ -435,7 +435,8 @@ fn tokens_view(p: &Page, gateway: [u8; 16]) -> impl IntoView + use<> {
     }
 }
 
-fn ranked_action(p: Page, gateway: &Gateway, heading: &str) -> impl IntoView + use<> {
+fn ranked_action(p: &Page, gateway: &Gateway, heading: &str) -> impl IntoView + use<> {
+    let flow = p.flow;
     let id = gateway.id;
     let lang = p.cx.lang;
     (gateway.state == GatewayState::Approved).then(|| {
@@ -450,7 +451,7 @@ fn ranked_action(p: Page, gateway: &Gateway, heading: &str) -> impl IntoView + u
         let from = format!("#{button}");
         view! {
             <button type="button" class="button" id=button aria-describedby=heading.to_owned()
-                on:click=move |_| p.flow.ask(Asked {
+                on:click=move |_| flow.ask(Asked {
                     change: Change::Ranked { gateway: id, verified },
                     title: label.to_owned(),
                     text: if verified {
@@ -527,7 +528,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 on:click=move |_| p.approval(&asked, false)>{words::admin_gw_disable(lang)}</button>
         }
     });
-    let ranked = ranked_action(p, gateway, &heading);
+    let ranked = ranked_action(&p, gateway, &heading);
     let ranked_badge = (gateway.ranked_hosting == RankedHosting::Verified).then(|| {
         view! { <span class="pill ok">{words::admin_gw_ranked_verified(lang)}</span> }
     });

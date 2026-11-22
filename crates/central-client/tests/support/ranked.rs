@@ -68,6 +68,32 @@ pub(super) fn public(http: &Http, account: Id, name: &str, tag: u32) {
 }
 
 pub(super) fn private(http: &Http, session: &Session, unverified: &Token) {
+    let selected = vec![central_api::ranked::PoolEntry {
+        card: [7; 32],
+        copies: 60,
+    }];
+    let preview_request = Request::PreviewDeck {
+        format: Format::Standard,
+        pool: selected.clone(),
+    };
+    assert!(ranked::read(http, preview_request.clone()).is_err());
+    assert!(
+        http.exchange(
+            &wire::Request::Ranked {
+                request: preview_request
+            },
+            None
+        )
+        .is_err()
+    );
+    let preview = session
+        .preview_ranked_deck(http, Format::Standard, selected)
+        .unwrap();
+    assert_eq!(preview.source, central_api::ranked::PreviewSource::New);
+    assert_eq!(
+        (preview.elo, preview.placement_games, preview.rank.league),
+        (1500, 0, League::Unranked)
+    );
     let request = wire::Request::Ranked {
         request: Request::Status,
     };

@@ -1,7 +1,9 @@
 //! Real host settlements on independently edited versions and ten-game placements.
 use central_api::{
     Token,
-    ranked::{DeckResult, HostRequest, League, Outcome, PoolEntry, Rank},
+    ranked::{
+        self as api, DeckResult, HostRequest, League, Outcome, PoolEntry, PreviewSource, Rank,
+    },
 };
 use central_postgres::AccountStore;
 use sea_orm::{
@@ -13,7 +15,7 @@ fn field<T: TryGetable>(row: &QueryResult, name: &str) -> T {
     row.try_get("", name).unwrap()
 }
 
-fn pool(replaced: u16) -> String {
+fn entries(replaced: u16) -> Vec<PoolEntry> {
     let mut entries = Vec::new();
     if replaced < 100 {
         entries.push(PoolEntry {
@@ -27,19 +29,89 @@ fn pool(replaced: u16) -> String {
             copies: replaced,
         });
     }
-    String::from_utf8(central_api::encode(&entries).unwrap()).unwrap()
+    entries
+}
+
+fn pool(replaced: u16) -> String {
+    String::from_utf8(central_api::encode(&entries(replaced)).unwrap()).unwrap()
 }
 
 struct Table<'a> {
     db: &'a DatabaseConnection,
     store: &'a AccountStore,
     accounts: [Uuid; 2],
+    owners: [&'a Token; 2],
     host: Uuid,
     credential: &'a Token,
     origin: &'a str,
 }
 
 impl Table<'_> {
+    async fn preview(&self, seat: usize, replaced: u16) -> api::DeckPreview {
+        let result = self
+            .store
+            .ranked(
+                Some(self.owners[seat].into()),
+                api::Request::PreviewDeck {
+                    format: api::Format::Commander,
+                    pool: entries(replaced),
+                },
+            )
+            .await
+            .unwrap();
+        let api::Response::DeckPreview { preview } = result else {
+            panic!("deck preview expected")
+        };
+        preview
+    }
+
+    async fn before_play(&self) {
+        let request = api::Request::PreviewDeck {
+            format: api::Format::Commander,
+            pool: entries(0),
+        };
+        assert_eq!(
+            self.store.ranked(None, request).await.unwrap_err(),
+            central_api::Error::Rejected
+        );
+        for changed in [0, 50, 100] {
+            let fresh = self.preview(0, changed).await;
+            assert_eq!(
+                (fresh.source, fresh.elo, fresh.placement_games),
+                (PreviewSource::New, 1500, 0)
+            );
+        }
+        let row = self
+            .db
+            .query_one_raw(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                "SELECT COUNT(*) AS count FROM central_identity.ranked_deck_versions
+             WHERE account_id=$1 AND format='commander'",
+                vec![self.accounts[0].into()],
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(field::<i64>(&row, "count"), 0);
+        let repeated = vec![
+            PoolEntry {
+                card: [1; 32],
+                copies: 1
+            };
+            2
+        ];
+        let bad = api::Request::PreviewDeck {
+            format: api::Format::Commander,
+            pool: repeated,
+        };
+        assert_eq!(
+            self.store
+                .ranked(Some(self.owners[0].into()), bad)
+                .await
+                .unwrap_err(),
+            central_api::Error::Rejected
+        );
+    }
     async fn draw(&self, edits: [u16; 2]) -> Uuid {
         let fixture=self.db.query_one_raw(Statement::from_sql_and_values(DbBackend::Postgres,
             "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,
@@ -111,16 +183,19 @@ pub(super) async fn run(
         db,
         store,
         accounts: accounts.map(|(id, _)| Uuid::from_bytes(id)),
+        owners: accounts.map(|(_, token)| token),
         host: Uuid::from_bytes(host),
         credential,
         origin,
     };
+    table.before_play().await;
     for completed in 1..10 {
         let id = table.draw([0, 0]).await;
         let (_, player, deck) = table.receipt(id).await;
         assert_eq!(player.league, League::Unranked);
         assert_eq!(deck.after.league, League::Unranked);
         assert_eq!(deck.placement_games, completed);
+        assert_eq!(table.preview(0, 0).await.placement_games, completed);
     }
     let tenth = table.draw([0, 0]).await;
     let (before, after, deck) = table.receipt(tenth).await;
@@ -130,6 +205,22 @@ pub(super) async fn run(
     assert_eq!((deck.placement_games, deck.elo, deck.delta), (10, 1500, 0));
     let original = table.latest(0).await;
     assert_eq!(original, (1500, 10));
+    let unchanged = table.preview(0, 0).await;
+    assert_eq!(
+        (unchanged.source, unchanged.elo, unchanged.rank),
+        (PreviewSource::Recorded, deck.elo, deck.after)
+    );
+    let direct = table.preview(0, 50).await;
+    assert_eq!(
+        (
+            direct.source,
+            direct.elo,
+            direct.edit_loss,
+            direct.changed_copies,
+            direct.compared_copies
+        ),
+        (PreviewSource::Inherited, 1095, 405, 50, 100)
+    );
 
     // Completely different lists must never consume a second 1500 seed.
     let disjoint = table.draw([100, 100]).await;
@@ -142,7 +233,10 @@ pub(super) async fn run(
     // One seat now takes intermediate steps and plays; neither seat touches
     // its fixed original. Both end with exactly half the same pool replaced.
     table.draw([100, 25]).await;
+    assert_eq!(table.preview(0, 25).await.source, PreviewSource::Inherited);
+    assert_eq!(table.preview(1, 25).await.source, PreviewSource::Recorded);
     table.draw([100, 35]).await;
+    assert_eq!(table.preview(1, 50).await, direct);
     table.draw([50, 50]).await;
     assert_eq!(table.latest(0).await, (1095, 1));
     assert_eq!(table.latest(1).await, (1095, 1));
@@ -152,21 +246,39 @@ pub(super) async fn run(
     assert_eq!(table.latest(1).await, (original.0, original.1 + 1));
     assert_eq!(table.receipt(tenth).await, (before, after, deck));
 
+    rollover(&table).await;
+}
+
+async fn rollover(table: &Table<'_>) {
     // Exactly forty matches on the half rebuild qualify it at rollover.
     // The second pilot's closer 35% variant only played once in that season.
     for _ in 1..40 {
         table.draw([50, 50]).await;
     }
     assert_eq!(table.latest(0).await, (1095, 40));
-    db.execute_unprepared(
-        "WITH closed AS (
+    table
+        .db
+        .execute_unprepared(
+            "WITH closed AS (
           UPDATE central_identity.ranked_seasons SET ends_at=statement_timestamp()
           WHERE ends_at IS NULL RETURNING ends_at)
          INSERT INTO central_identity.ranked_seasons(starts_at,name)
          SELECT ends_at,'Scoring era two' FROM closed",
-    )
-    .await
-    .unwrap();
+        )
+        .await
+        .unwrap();
+    for seat in 0..2 {
+        let preview = table.preview(seat, 33).await;
+        assert_eq!(
+            (
+                preview.source,
+                preview.elo,
+                preview.edit_loss,
+                preview.changed_copies
+            ),
+            (PreviewSource::Inherited, 1041, 54, 17)
+        );
+    }
     let after_cut = table.draw([33, 33]).await;
     let (_, pilot, new_version) = table.receipt(after_cut).await;
     assert_ne!(pilot.league, League::Unranked);
