@@ -404,6 +404,29 @@ async fn authentication(
     assert!(store.authenticate_gateway(token).await.is_ok());
 }
 
+async fn listed_main_token(store: &AccountStore, cookie: &Token, gateway: [u8; 16]) -> [u8; 16] {
+    let (page, _) = store
+        .admin_gateways(cookie, Some(GatewayState::Approved), None)
+        .await
+        .unwrap();
+    let row = page.iter().find(|g| g.id == gateway).unwrap();
+    assert_eq!(
+        (row.live_tokens, row.credential_pair, row.official),
+        (1, false, false)
+    );
+    assert_eq!(
+        row.ranked_hosting,
+        RankedHosting::Unverified,
+        "directory approval never grants ranked trust"
+    );
+    let (_, tokens) = store.admin_gateway(cookie, gateway).await.unwrap();
+    tokens
+        .into_iter()
+        .find(|token| token.name == "Main")
+        .unwrap()
+        .id
+}
+
 /// Administrators approve, disable (its sessions end) and revoke, each audited.
 async fn administration(
     store: &AccountStore,
@@ -423,21 +446,7 @@ async fn administration(
         Some(Error::Rejected)
     );
     appoint_admin(operator, "token-admin").await.unwrap();
-    let (page, _) = store
-        .admin_gateways(&cookie, Some(GatewayState::Approved), None)
-        .await
-        .unwrap();
-    let row = page.iter().find(|g| g.id == gateway).unwrap();
-    assert_eq!(
-        (row.live_tokens, row.credential_pair, row.official),
-        (1, false, false)
-    );
-    assert!(
-        row.ranked_hosting == RankedHosting::Unverified,
-        "directory approval never grants ranked trust"
-    );
-    let (_, tokens) = store.admin_gateway(&cookie, gateway).await.unwrap();
-    assert!(tokens.iter().any(|t| t.name == "Main"));
+    let main = listed_main_token(store, &cookie, gateway).await;
     let sid = admitted(store, native, owner_browser).await;
     let before = store.last_revocation(ORIGIN).await.unwrap();
     let audit = |action: &'static str| {
@@ -489,14 +498,14 @@ async fn administration(
         .await
         .unwrap();
     assert_eq!(audit("gateway.approved").await, 1);
-    assert!(
+    assert_eq!(
         store
             .admin_gateway(&cookie, gateway)
             .await
             .unwrap()
             .0
-            .ranked_hosting
-            == RankedHosting::Unverified
+            .ranked_hosting,
+        RankedHosting::Unverified
     );
     assert_eq!(
         ranked_epoch(operator, gateway).await,
@@ -504,7 +513,7 @@ async fn administration(
         "re-enabling never revives an assignment"
     );
     // revoking as an administrator
-    let main = tokens.iter().find(|t| t.name == "Main").unwrap().id;
+
     store
         .admin_revoke_gateway_token(&cookie, main)
         .await
@@ -514,21 +523,31 @@ async fn administration(
         .await
         .unwrap();
     assert_eq!(audit("gateway.token_revoked").await, 1);
+    stale_admin(store, operator, admin.account, &cookie, gateway).await;
+    (cookie, admin.account)
+}
+
+async fn stale_admin(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    account: [u8; 16],
+    cookie: &Token,
+    gateway: [u8; 16],
+) {
     // a stale sign-in changes nothing
-    age(operator, admin.account, 31).await;
+    age(operator, account, 31).await;
     assert_eq!(
-        store.set_ranked_verification(&cookie, gateway, true).await,
+        store.set_ranked_verification(cookie, gateway, true).await,
         Err(Error::Rejected)
     );
     assert_eq!(
         store
-            .set_gateway_approval(&cookie, gateway, false)
+            .set_gateway_approval(cookie, gateway, false)
             .await
             .err(),
         Some(Error::Rejected)
     );
-    age(operator, admin.account, -31).await;
-    (cookie, admin.account)
+    age(operator, account, -31).await;
 }
 
 async fn ranked_epoch(operator: &DatabaseConnection, gateway: [u8; 16]) -> i64 {

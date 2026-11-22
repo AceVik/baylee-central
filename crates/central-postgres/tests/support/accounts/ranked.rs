@@ -227,6 +227,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     );
     store.close_legacy("ranked-fixture-one", a).await.unwrap();
     store.close_legacy("ranked-fixture-two", b).await.unwrap();
+    boards::own_placements(store, &alice, a.account).await;
     let meta = GatewayMetadata {
         name: "Ranked fixture".into(),
         version: "1".into(),

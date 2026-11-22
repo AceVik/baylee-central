@@ -115,6 +115,20 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
         tied.windows(2)
             .all(|w| w[0].standing.deck < w[1].standing.deck)
     );
+    champion_board(store, season).await;
+    archive_profile(store, season).await;
+    db.execute_unprepared(
+        "DELETE FROM central_identity.accounts WHERE legacy_id LIKE 'boardfixture%'
+            AND tag BETWEEN 600000001 AND 600000109;
+         DELETE FROM central_identity.ranked_publications WHERE season_id IN (
+            SELECT id FROM central_identity.ranked_seasons WHERE name IN ('Board era one','Board era two'));
+         DELETE FROM central_identity.ranked_seasons WHERE name IN ('Board era one','Board era two')",
+    )
+    .await
+    .unwrap();
+}
+
+async fn champion_board(store: &AccountStore, season: [u8; 16]) {
     let standard = board(
         store,
         season,
@@ -164,6 +178,9 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
         .map(|r| r.account)
         .collect();
     assert_eq!(people.len(), 100);
+}
+
+async fn archive_profile(store: &AccountStore, season: [u8; 16]) {
     let inactive = board(
         store,
         season,
@@ -229,14 +246,44 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
     else {
         panic!("expected profile")
     };
-    assert!(awards.is_empty());
-    db.execute_unprepared(
-        "DELETE FROM central_identity.accounts WHERE legacy_id LIKE 'boardfixture%'
-            AND tag BETWEEN 600000001 AND 600000109;
-         DELETE FROM central_identity.ranked_publications WHERE season_id IN (
-            SELECT id FROM central_identity.ranked_seasons WHERE name IN ('Board era one','Board era two'));
-         DELETE FROM central_identity.ranked_seasons WHERE name IN ('Board era one','Board era two')",
-    )
-    .await
-    .unwrap();
+    assert_eq!(awards, []);
+}
+
+pub(super) async fn own_placements(store: &AccountStore, session: &super::Token, owner: [u8; 16]) {
+    let own = Request::OwnProfile { season: None };
+    assert!(!own.is_public());
+    assert_eq!(
+        store.ranked(None, own.clone()).await.unwrap_err(),
+        central_api::Error::Rejected
+    );
+    let public = Request::Profile {
+        target: ProfileTarget::Account(owner),
+        season: None,
+    };
+    assert_eq!(
+        store.ranked(None, public).await.unwrap_err(),
+        central_api::Error::Rejected
+    );
+    let Response::Profile {
+        account,
+        name,
+        formats,
+        awards,
+        ..
+    } = store.ranked(Some(session.into()), own).await.unwrap()
+    else {
+        panic!("expected private profile")
+    };
+    assert_eq!(owner, account);
+    assert_eq!(name, None);
+    assert_eq!(awards, []);
+    assert_eq!(formats.len(), 3);
+    for (standing, format) in formats.into_iter().zip(Format::ALL) {
+        assert_eq!(standing.format, format);
+        assert_eq!(standing.track, Track::Player);
+        assert_eq!(standing.rank.league, League::Unranked);
+        assert_eq!(standing.rank.division, None);
+        assert_eq!(standing.placement_games, 0);
+        assert_eq!(standing.career.games, 0);
+    }
 }

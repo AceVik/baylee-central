@@ -83,7 +83,11 @@ impl AccountStore {
                     state: queue::handle(&db, me, &request).await?,
                 }
             }
-            _ => boards::read(&db, &request).await?,
+            api::Request::OwnProfile { .. } => {
+                let me = actor(&db, session.ok_or(Error::Rejected)?, false).await?;
+                boards::read(&db, &request, Some(me)).await?
+            }
+            _ => boards::read(&db, &request, None).await?,
         };
         db.commit().await.map_err(unavailable)?;
         Ok(response)

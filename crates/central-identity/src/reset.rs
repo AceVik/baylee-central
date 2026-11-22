@@ -30,6 +30,9 @@ impl IdentityService {
         place: Option<Place>,
     ) -> Result<Response, Error> {
         match request {
+            Request::LoginStart { identity, message } => {
+                self.start(identity, message, surface, place).await
+            }
             request @ Request::ChangePasswordStart { .. } => {
                 self.change_password_start(request, bearer, surface, place)
                     .await

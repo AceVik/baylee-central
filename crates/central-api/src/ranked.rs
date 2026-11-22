@@ -393,6 +393,11 @@ pub enum QueueState {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Read the authenticated account's own standings, including zero-game placements.
+    OwnProfile {
+        /// Selected season. None selects the current season.
+        season: Option<Id>,
+    },
     /// Estimate the owner's explicitly selected competitive deck without registering it.
     PreviewDeck {
         /// Competitive format the list is intended for.

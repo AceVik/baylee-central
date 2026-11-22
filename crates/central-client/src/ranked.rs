@@ -1,5 +1,5 @@
 //! Competitive play through the configured Central, independent of the player's home gateway.
-use super::{Bearer, Error, Request, Response, Session, Token, Transport};
+use super::{Error, Request, Response, Session, Token, Transport};
 use central_api::ranked as api;
 
 /// Read a public board, season or profile.
@@ -16,13 +16,17 @@ pub fn read(transport: &impl Transport, request: api::Request) -> Result<api::Re
 fn exchange(
     transport: &impl Transport,
     request: api::Request,
-    bearer: Option<Bearer<'_>>,
+    session: Option<&Session>,
 ) -> Result<api::Response, Error> {
     let wire = Request::Ranked { request };
-    let reply = transport.exchange(&wire, bearer)?;
+    let reply = transport.exchange(&wire, session.map(|owner| (&owner.token).into()))?;
     match (wire, reply) {
         (Request::Ranked { request }, Response::Ranked { response })
-            if responds(&request, &response) =>
+            if responds(
+                &request,
+                &response,
+                session.map(|owner| owner.identity().account),
+            ) =>
         {
             Ok(response)
         }
@@ -30,10 +34,18 @@ fn exchange(
     }
 }
 
-fn responds(request: &api::Request, reply: &api::Response) -> bool {
+fn responds(request: &api::Request, reply: &api::Response, owner: Option<api::Id>) -> bool {
     use api::Request as Q;
     use api::Response as A;
     match (request, reply) {
+        (
+            Q::OwnProfile { season },
+            A::Profile {
+                season: actual,
+                account,
+                ..
+            },
+        ) => owner == Some(*account) && season.is_none_or(|id| id == actual.id),
         (Q::PreviewDeck { format, .. }, A::DeckPreview { preview }) => preview.format == *format,
         (Q::Join { .. } | Q::Cancel { .. } | Q::Status, A::Queue { .. })
         | (Q::Seasons { .. }, A::Seasons { .. }) => true,
@@ -116,7 +128,7 @@ impl Session {
         request: api::Request,
     ) -> Result<api::Response, Error> {
         self.same_endpoint(transport)?;
-        exchange(transport, request, Some((&self.token).into()))
+        exchange(transport, request, Some(self))
     }
 }
 

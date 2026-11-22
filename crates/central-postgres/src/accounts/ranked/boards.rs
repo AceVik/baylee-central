@@ -180,10 +180,13 @@ async fn seasons(db: &DatabaseTransaction, before: Option<Id>) -> Result<api::Re
 pub(super) async fn read(
     db: &DatabaseTransaction,
     request: &api::Request,
+    owner: Option<Uuid>,
 ) -> Result<api::Response, Error> {
     let selected = match request {
         api::Request::Seasons { before } => return seasons(db, *before).await,
-        api::Request::Profile { season, .. } | api::Request::Board { season, .. } => season,
+        api::Request::Profile { season, .. }
+        | api::Request::Board { season, .. }
+        | api::Request::OwnProfile { season } => season,
         _ => return Err(Error::Rejected),
     };
     let row = db
@@ -218,8 +221,18 @@ pub(super) async fn read(
                 next,
             })
         }
-        api::Request::Profile { target, .. } => {
-            let identity = profile_identity(db, target).await?;
+        api::Request::Profile { .. } | api::Request::OwnProfile { .. } => {
+            let identity = if let api::Request::Profile { target, .. } = request {
+                profile_identity(db, target).await?
+            } else {
+                db.query_one_raw(statement(
+                    "SELECT id,display_name,tag FROM central_identity.accounts WHERE id=$1",
+                    vec![owner.ok_or(Error::Rejected)?.into()],
+                ))
+                .await
+                .map_err(unavailable)?
+                .ok_or(Error::Rejected)?
+            };
             let id: Uuid = column(&identity, "id")?;
             let (name, tag) = super::super::profiles::columns(&identity)?;
             let formats = standings::profile(db, season_id, id).await?;
