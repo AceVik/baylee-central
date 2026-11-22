@@ -48,7 +48,7 @@ async fn join(
     deck: &[u8; 32],
 ) -> Result<(), Error> {
     if let Some(existing) = ticket(db, me, Some(key)).await? {
-        return if column::<String>(&existing, "format")? == format_name(format)
+        return if column::<String>(&existing, "format")? == format.as_str()
             && column::<Vec<u8>>(&existing, "commitment")? == deck
         {
             Ok(())
@@ -65,13 +65,13 @@ async fn join(
           AND (SELECT count(*) FROM (SELECT 1 FROM central_identity.ranked_tickets
              WHERE account_id=$1 AND created_at>now()-interval '1 hour' LIMIT 24) recent)<24
          ON CONFLICT DO NOTHING",
-        vec![me.into(),key.into(),format_name(format).into(),deck.to_vec().into()]
+        vec![me.into(),key.into(),format.as_str().into(),deck.to_vec().into()]
     )).await.map_err(unavailable)?;
     if admitted.rows_affected() == 0 {
         return match ticket(db, me, None).await? {
             Some(row)
                 if column::<Uuid>(&row, "request_id")? == key
-                    && column::<String>(&row, "format")? == format_name(format)
+                    && column::<String>(&row, "format")? == format.as_str()
                     && column::<Vec<u8>>(&row, "commitment")? == deck =>
             {
                 Ok(())
@@ -109,6 +109,16 @@ pub(super) async fn handle(
             ))
             .await
             .map_err(unavailable)?;
+            // A player can decline the selected host's terms before their own seat is
+            // claimed. Start and claim serialize on this same match row. A delayed
+            // cancellation for an older request cannot release a newer reservation.
+            db.execute_raw(statement(
+                "UPDATE central_identity.ranked_matches m SET state='void',finished_at=pg_catalog.clock_timestamp()
+                 FROM central_identity.ranked_tickets t WHERE t.account_id=$1 AND t.request_id=$2
+                 AND t.match_id=m.id AND t.state='assigned' AND m.state='reserved'
+                 AND ((m.account_a=$1 AND NOT m.claimed_a) OR (m.account_b=$1 AND NOT m.claimed_b))",
+                vec![me.into(),uuid(*key).into()],
+            )).await.map_err(unavailable)?;
         }
         _ => {}
     }
@@ -123,22 +133,15 @@ pub(super) async fn handle(
     render(db, me, &row).await
 }
 
-pub(super) fn parse_format(value: &str) -> Result<api::Format, Error> {
-    match value {
-        "standard" => Ok(api::Format::Standard),
-        "highlander" => Ok(api::Format::Highlander),
-        "commander" => Ok(api::Format::Commander),
-        _ => Err(Error::Unavailable),
-    }
-}
-
 async fn render(
     db: &DatabaseTransaction,
     me: Uuid,
     row: &QueryResult,
 ) -> Result<api::QueueState, Error> {
     let key = column::<Uuid>(row, "request_id")?.into_bytes();
-    let format = parse_format(&column::<String>(row, "format")?)?;
+    let format = column::<String>(row, "format")?
+        .parse()
+        .map_err(unavailable)?;
     if column::<String>(row, "state")? == "waiting" {
         return Ok(api::QueueState::Waiting {
             key,
@@ -194,13 +197,5 @@ async fn render(
         }
         "void" => Ok(api::QueueState::Idle),
         _ => Err(Error::Unavailable),
-    }
-}
-
-fn format_name(format: api::Format) -> &'static str {
-    match format {
-        api::Format::Standard => "standard",
-        api::Format::Highlander => "highlander",
-        api::Format::Commander => "commander",
     }
 }

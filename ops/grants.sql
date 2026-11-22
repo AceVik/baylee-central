@@ -139,3 +139,6 @@ GRANT SELECT, INSERT ON central_identity.ranked_receipts TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (published_on, finalized) ON central_identity.ranked_publications TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.ranked_champions TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (place) ON central_identity.ranked_badge_peaks TO central_runtime;
+
+-- Only the operator stages a legacy source. The authenticated transfer advances or retires it.
+GRANT SELECT, DELETE, UPDATE (next_page) ON central_identity.legacy_deck_transfers TO central_runtime;

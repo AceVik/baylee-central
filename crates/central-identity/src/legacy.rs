@@ -124,6 +124,43 @@ impl IdentityService {
         let moving = self.store.legacy_move(surface.session(bearer)?).await?;
         let legacy_id = moving.legacy_id.ok_or(Error::Rejected)?;
         match request {
+            Request::LegacySourcePage { generation, page }
+                if moving.restored
+                    && !moving.closed
+                    && moving
+                        .archive
+                        .is_some_and(|(bound, next)| bound == generation && page <= next) =>
+            {
+                let bytes = legacy.archive_page(&legacy_id, generation, page).await?;
+                self.store
+                    .accept_legacy_page(bearer.ok_or(Error::Rejected)?, generation, page)
+                    .await?;
+                Ok(Response::LegacySourcePage {
+                    generation,
+                    page,
+                    bytes,
+                })
+            }
+            Request::LegacyFinishArchive {
+                generation,
+                digest,
+                revision,
+                inventory,
+            } if moving.restored => {
+                if !moving.closed {
+                    self.store
+                        .finish_legacy_archive(
+                            bearer.ok_or(Error::Rejected)?,
+                            generation,
+                            digest,
+                            revision,
+                            inventory,
+                        )
+                        .await?;
+                }
+                legacy.remove(&legacy_id).await?;
+                Ok(Response::Done)
+            }
             Request::LegacyExport if !moving.closed => Ok(Response::LegacySnapshot {
                 snapshot: legacy.snapshot(&legacy_id).await?.ok_or(Error::Rejected)?,
             }),

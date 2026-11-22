@@ -6,7 +6,10 @@
 //! stored. Anything wrong refuses the whole import and stores nothing.
 use super::statement;
 use crate::accounts::username;
-use central_api::{legacy::MAX_SNAPSHOT_BYTES, profile};
+use central_api::{
+    legacy::{MAX_ARCHIVE_BYTES, MAX_SNAPSHOT_BYTES, source_generation},
+    profile,
+};
 use central_crypto::legacy::{HASH_BYTES, SALT_BYTES};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use sha2::{Digest, Sha256};
@@ -66,6 +69,8 @@ pub enum ImportRefusal {
     },
     /// More than [`MAX_LEGACY_ROWS`].
     TooMany,
+    /// Snapshot bytes exceeded the operator's whole-import memory limit.
+    TooLarge,
     /// The declared count is not the rows'.
     CountMismatch,
     /// The declared digest is not the rows', or not what was stored.
@@ -92,6 +97,7 @@ impl std::fmt::Display for ImportRefusal {
             Self::Malformed { legacy_id, field } => write!(f, "{legacy_id}: {field} malformed"),
             Self::Duplicate { legacy_id } => write!(f, "{legacy_id}: id or username twice"),
             Self::TooMany => write!(f, "more than {MAX_LEGACY_ROWS} accounts"),
+            Self::TooLarge => f.write_str("more than 32 MiB of source snapshots"),
             Self::CountMismatch => f.write_str("the declared count is not the accounts'"),
             Self::DigestMismatch => f.write_str("the digest does not match"),
             Self::StoreNotEmpty => f.write_str("the legacy store holds accounts already"),
@@ -181,7 +187,9 @@ fn check(row: &LegacyRow) -> Result<(), ImportRefusal> {
         return Err(malformed("terms_version"));
     }
     if row.snapshot.len() < 2
-        || row.snapshot.len() > MAX_SNAPSHOT_BYTES
+        || row.snapshot.len() > MAX_ARCHIVE_BYTES
+        || (row.snapshot.len() > MAX_SNAPSHOT_BYTES
+            && !central_api::legacy::valid_import_snapshot(&row.snapshot))
         || std::str::from_utf8(&row.snapshot).is_err()
     {
         return Err(malformed("snapshot"));
@@ -207,8 +215,12 @@ pub async fn import_legacy(
     if rows.len() as u64 != count {
         return Err(ImportRefusal::CountMismatch);
     }
+    let mut remaining = 32_usize * 1024 * 1024;
     for row in &rows {
         check(row)?;
+        remaining = remaining
+            .checked_sub(row.snapshot.len())
+            .ok_or(ImportRefusal::TooLarge)?;
     }
     rows.sort_by(|a, b| a.legacy_id.as_bytes().cmp(b.legacy_id.as_bytes()));
     for pair in rows.windows(2) {
@@ -340,6 +352,20 @@ async fn store(tx: &DatabaseTransaction, row: &LegacyRow) -> Result<(), ImportRe
     ))
     .await
     .map_err(|_| ImportRefusal::Unavailable)?;
+    if row.snapshot.len() > MAX_SNAPSHOT_BYTES {
+        let bytes = u32::try_from(row.snapshot.len()).map_err(|_| ImportRefusal::Unavailable)?;
+        let digest: [u8; 32] = Sha256::digest(&row.snapshot).into();
+        let generation = source_generation(&row.legacy_id, digest, bytes);
+        let staged = tx.execute_raw(statement(
+            "INSERT INTO central_identity.legacy_deck_transfers(account_id,generation,source_digest,source_bytes)
+             SELECT a.id,$2,$3,$4 FROM central_identity.accounts a WHERE a.legacy_id=$1",
+            vec![row.legacy_id.as_str().into(),generation.to_vec().into(),digest.to_vec().into(),
+                i32::try_from(bytes).map_err(|_| ImportRefusal::Unavailable)?.into()]
+        )).await.map_err(|_| ImportRefusal::Unavailable)?;
+        if staged.rows_affected() != 1 {
+            return Err(ImportRefusal::Unavailable);
+        }
+    }
     Ok(())
 }
 

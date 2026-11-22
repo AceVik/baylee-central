@@ -138,8 +138,8 @@ fn published(
     )
 }
 
-fn serialized(rank: &api::Rank) -> Result<String, Error> {
-    String::from_utf8(central_api::encode(rank).map_err(unavailable)?).map_err(unavailable)
+fn serialized(rank: api::Rank) -> Result<String, Error> {
+    String::from_utf8(central_api::encode(&rank).map_err(unavailable)?).map_err(unavailable)
 }
 
 /// Read the immutable scores saved with the engine result, even after later matches.
@@ -246,7 +246,7 @@ pub(super) async fn settle(
             vec![fixture.id.into(),fixture.accounts[seat].into(),fixture.format.as_str().into(),
             fixture.accounts[other].into(),(prior[other].games >= rules::PLACEMENT_GAMES).into(),
             seat_gap.into(),marks[seat].into(),(public_elo(next[seat])-elos[seat]).into(),
-            public_elo(next[seat]).into(),serialized(&before)?.into(),serialized(&after)?.into(),
+            public_elo(next[seat]).into(),serialized(before)?.into(),serialized(after)?.into(),
             String::from_utf8(central_api::encode(&deck_result)?).map_err(unavailable)?.into()],
         )).await.map_err(unavailable)?;
     }

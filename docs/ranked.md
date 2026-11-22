@@ -9,12 +9,12 @@ The native client enters Standard, Baylee Highlander or two-player Commander thr
 | Read seasons, division boards or public profiles | Anyone, including a signed-out native client. The native and browser listeners apply the directory rate budget. |
 | Join, inspect or cancel a ticket | The live native Central session for its own account. A join requires acceptance of the current terms. |
 | Enable a ranked host | A Central administrator using the existing fresh web administration session. Directory approval and ranked verification are separate stored decisions. |
-| Advertise capacity or claim, start, finish or void a game | The selected gateway using its host credential. Central checks its identity, approval and verification epoch in the match transaction. |
+| Advertise capacity or claim, start, finish or void a game | A verified host using its registered host credential, a named token explicitly granted the ranked scope, or the official bridge. Operations on a match also require its assigned host and current verification epoch. |
 | Assign ranks and award points | Central, once for the engine-confirmed result of the assigned game. |
 
 The queue holds at most one active ticket per account across all formats. A client retains its request key on retries and its frozen deck commitment. In a busy queue the matcher checks older tickets and nearby Elo neighbours. Its range grows with waiting time. In a sparse queue it opens the broadest range after 60 seconds. Recent repeats cost preference, so two people alone can still play. A fresh capacity announcement and a free slot on a verified host are required to reserve an opponent.
 
-The client connects to the assigned host for the game using a gateway-audience token. The host authenticates each player and verifies that the submitted legal deck matches the commitment. It binds two seats to one engine game. The engine supplies the terminal game state to the clients. The host delivers that result to Central. An identical delivery can be retried. Changing the game or the recorded winner conflicts. Removing host verification fences outstanding host assignments.
+The client obtains a short-lived signed token with the ranked purpose, exact match ID and selected gateway audience. A game and the home lobby use different revocable session IDs, including when the home gateway hosts the match. The host authenticates each player and verifies that the submitted legal deck matches the commitment. It binds two seats to one engine game. The engine supplies the terminal game state to the clients. The host delivers that result to Central. An identical delivery can be retried. Changing the game or the recorded winner conflicts. Removing host verification fences outstanding host assignments.
 
 ## Progress and deck edits
 

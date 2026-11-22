@@ -35,13 +35,11 @@ impl Outcome {
 
 /// Round only at a public Elo boundary. Internal player balances retain fractions.
 pub(crate) fn rounded(value: f64) -> i32 {
-    // Integral Elo is I/O-bound (settlement and queue admission). This checked
-    // conversion avoids narrowing the fractional score before the final rounding.
+    use num_traits::ToPrimitive;
     value
         .round()
         .clamp(f64::from(i32::MIN), f64::from(i32::MAX))
-        .to_string()
-        .parse()
+        .to_i32()
         .unwrap_or_default()
 }
 

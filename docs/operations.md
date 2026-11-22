@@ -910,6 +910,12 @@ the export's: the counts and digests are equal. Then add the `legacy` block
 (the `central_legacy` login, `{"database": {…, "user": "central_legacy", …}}`)
 to `central.json`, restart Central, start the gateway.
 
+Migration 000039 keeps the original SHA-256 and source bytes for accounts with larger
+deck libraries. Above 192 KiB the import stages an account-bound manifest for encrypted
+adoption in 64-KiB pages. Each such source must contain decks and its serialized
+preferences must fit within 192 KiB. The maximum source size is 8 MiB per account.
+The two input documents together must fit within 32 MiB, including JSON byte-array encoding.
+
 **The deadline** is the owner's date, **30.06.2027** (end of day,
 Europe/Berlin): migration 000015 sets it, so it holds without a step. The
 operator moves it, or clears it, only on the owner's word:

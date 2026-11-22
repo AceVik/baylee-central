@@ -112,6 +112,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::LoginFinish { .. }
         | Request::LegacyLogin { .. }
         | Request::LegacyExport
+        | Request::LegacySourcePage { .. }
+        | Request::LegacyFinishArchive { .. }
         | Request::LegacyLink { .. }
         | Request::RegisterChallenge
         | Request::RegisterChallengeFor { .. }
@@ -323,6 +325,7 @@ impl IdentityService {
             name: grant.display_name,
             tag: grant.tag,
             legacy_id: grant.legacy_id,
+            legacy_deck_source: grant.legacy_deck_source,
             terms: grant.terms.map(|terms| TermsClaim {
                 version: terms.version,
                 digest: hex(&terms.digest),

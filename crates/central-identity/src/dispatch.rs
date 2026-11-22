@@ -107,6 +107,8 @@ impl IdentityService {
             | Request::LegacyStatus { .. }
             | Request::LegacyLogin { .. }
             | Request::LegacyExport
+            | Request::LegacySourcePage { .. }
+            | Request::LegacyFinishArchive { .. }
             | Request::LegacyLink { .. }) => self.legacy(request, bearer, surface, place).await,
             request @ (Request::RegisterGateway { .. }
             | Request::GatewayDirectory { .. }
@@ -434,7 +436,10 @@ impl IdentityService {
             Request::LegacyLogin { username, password } => {
                 self.legacy_login(&username, password, surface, place).await
             }
-            request @ (Request::LegacyExport | Request::LegacyLink { .. }) => {
+            request @ (Request::LegacyExport
+            | Request::LegacyLink { .. }
+            | Request::LegacySourcePage { .. }
+            | Request::LegacyFinishArchive { .. }) => {
                 self.legacy_request(request, bearer, surface).await
             }
             Request::LegacyStatus { legacy_id } => {

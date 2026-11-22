@@ -328,6 +328,7 @@ test("signed in, each action puts the focus where its result is", async ({ page 
       return owner({ answer: "gateways", gateways: [gateway(1, "https://one.example"), gateway(2, "https://two.example")] });
     }
     if (body.operation === "owner" && body.request?.action === "create_token") {
+      expect(body.request.scopes).toEqual({ sso: false, listing: false, ranked: true });
       return owner({ answer: "token_created", id: id(9), token: Array(32).fill(5), expires_at: 4_102_444_800 });
     }
     if (body.operation === "account_export") return route.fulfill({ status: 503, body: "unavailable\n" });
@@ -340,6 +341,11 @@ test("signed in, each action puts the focus where its result is", async ({ page 
   const ids = await page.locator("[id]").evaluateAll((all) => all.map((element) => element.id));
   expect(ids.filter((value, index) => ids.indexOf(value) !== index)).toEqual([]);
   const second = page.locator("article").filter({ hasText: "Gateway 2" });
+  const ranked = second.getByRole("checkbox", { name: "Hosts ranked matches and reports results" });
+  await expect(ranked).not.toBeChecked();
+  await second.getByRole("checkbox", { name: "Signs players in" }).uncheck();
+  await second.getByRole("checkbox", { name: "Lists the gateway" }).uncheck();
+  await ranked.check();
   await second.getByLabel("Token name").fill("qa");
   await second.getByRole("button", { name: "Create token" }).click();
   // the new token takes the focus; kept, its gateway's card does

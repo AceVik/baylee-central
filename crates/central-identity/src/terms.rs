@@ -112,6 +112,8 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::Admin { .. }
             // A move's export and close wait for the terms, as gateway tokens (`docs/native-login.md` §"Legacy login").
             | Request::LegacyExport
+            | Request::LegacySourcePage { .. }
+            | Request::LegacyFinishArchive { .. }
             | Request::LegacyLink { .. }
     ) || matches!(
         // An account's own area: making something needs the terms; reading

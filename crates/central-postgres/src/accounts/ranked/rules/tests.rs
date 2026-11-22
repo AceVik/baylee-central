@@ -5,6 +5,22 @@ mod placement_study;
 
 const EPSILON: f64 = 1.0e-8;
 
+#[test]
+fn public_elo_rounds_half_away_from_zero_and_saturates() {
+    for (value, want) in [
+        (0.49, 0),
+        (-0.5, -1),
+        (0.5, 1),
+        (f64::INFINITY, i32::MAX),
+        (f64::NEG_INFINITY, i32::MIN),
+        (f64::NAN, 0),
+        (f64::from(i32::MAX) + 1.0, i32::MAX),
+        (f64::from(i32::MIN) - 1.0, i32::MIN),
+    ] {
+        assert_eq!(rounded(value), want);
+    }
+}
+
 fn near(got: f64, expected: f64) {
     assert!((got - expected).abs() < EPSILON, "{got} vs {expected}");
 }

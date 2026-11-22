@@ -419,10 +419,9 @@ pub enum RankedHosting {
     Verified,
 }
 
-impl RankedHosting {
-    const fn unverified(&self) -> bool {
-        matches!(self, Self::Unverified)
-    }
+/// Omit an additive default from admin replies for older website bundles.
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    value == &T::default()
 }
 
 /// A registered gateway as an administrator sees it.
@@ -446,7 +445,7 @@ pub struct AdminGateway {
     /// Whether it is approved.
     pub state: GatewayState,
     /// A Central administrator explicitly trusts this gateway to host ranked matches.
-    #[serde(default, skip_serializing_if = "RankedHosting::unverified")]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub ranked_hosting: RankedHosting,
     /// A heartbeat arrived in the last 90 seconds.
     pub online: bool,

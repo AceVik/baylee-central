@@ -30,6 +30,8 @@ pub struct GatewayGrant {
     pub tag: Option<u32>,
     /// The official gateway's old id, for a closed move only.
     pub legacy_id: Option<String>,
+    /// Verified source for an oversized closed move, only for its official gateway.
+    pub legacy_deck_source: Option<[u8; 32]>,
     /// This gateway's terms the account accepted last.
     pub terms: Option<TermsVersion>,
 }
@@ -185,7 +187,7 @@ impl AccountStore {
         // recorded for a session being ended, and the count below cannot be raced.
         let row = tx
             .query_one_raw(statement(
-                "SELECT a.id, a.display_name, a.tag, a.legacy_id, a.legacy_closed,
+                "SELECT a.id, a.display_name, a.tag, a.legacy_id, a.legacy_closed,a.legacy_deck_source,
                  floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)
                      + interval '12 hours'))::bigint AS cap
                  FROM central_identity.sessions s JOIN central_identity.accounts a
@@ -266,6 +268,15 @@ impl AccountStore {
             tag,
             // Only the official gateway ever learns an old id.
             legacy_id: legacy_id.filter(|_| !registered),
+            legacy_deck_source: if registered {
+                None
+            } else {
+                row.try_get::<Option<Vec<u8>>>("", "legacy_deck_source")
+                    .map_err(|_| Error::Unavailable)?
+                    .map(<[u8; 32]>::try_from)
+                    .transpose()
+                    .map_err(|_| Error::Unavailable)?
+            },
             terms,
         })
     }

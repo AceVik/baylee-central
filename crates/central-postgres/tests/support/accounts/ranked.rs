@@ -88,6 +88,8 @@ async fn game(
     let HostResponse::Assignment { assignment } = operated(claim(0)).await.unwrap() else {
         panic!("host expects both bound seats")
     };
+    assert!(matches!(queue(store,tokens[0],Request::Cancel{key:id(11)}).await.unwrap(),
+        QueueState::Assigned { .. }));
     let pools = [
         vec![api::PoolEntry {
             card: [1; 32],
@@ -198,7 +200,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     let meta = GatewayMetadata {
         name: "Ranked fixture".into(),
         version: "1".into(),
-        website: ORIGIN.into(),
+        website: format!("{ORIGIN}/status"),
     };
     let full = Token::generate().unwrap();
     let heartbeat = Token::generate().unwrap();
@@ -262,6 +264,12 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     )
     .await;
     boards::run(store, db).await;
+    // Removing our two fixture accounts also removes the gateway owned by the first,
+    // its approval and every account-scoped ticket. Other suites share this instance.
+    db.execute_raw(Statement::from_sql_and_values(DbBackend::Postgres,
+        "DELETE FROM central_identity.accounts WHERE id IN ($1,$2)",
+        vec![Uuid::from_bytes(a.account).into(),Uuid::from_bytes(b.account).into()]))
+        .await.unwrap();
 }
 
 async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {
@@ -348,6 +356,10 @@ async fn available(store: &AccountStore, credential: &Token, alice: &Token, bob:
             HostResponse::Done
         );
     }
+    let declined = play(store,[alice,bob],6).await;
+    assert_eq!(queue(store,alice,Request::Cancel {key:id(6)}).await.unwrap(),QueueState::Idle);
+    assert_eq!(queue(store,bob,Request::Status).await.unwrap(),QueueState::Idle);
+    assert_eq!(store.ranked_host(Registered(credential),HostRequest::Void{match_id:declined.match_id}).await.unwrap(),HostResponse::Done);
 }
 
 async fn expiry(

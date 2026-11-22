@@ -72,9 +72,9 @@ impl AccountStore {
         Ok(response)
     }
 
-    /// Operate an assigned game as its authenticated gateway. The identity service supplies
-    /// the origin from the credential. Verification, epoch and the reservation are rechecked
-    /// under lock in the same transaction as every host mutation.
+    /// Operate an assigned game as the configured official bridge or a registered host.
+    /// The transaction resolves the registered credential to its gateway and locks the
+    /// verification grant, scope and reservation before accepting the operation.
     ///
     /// # Errors
     /// Rejects unverified, stale or foreign hosts, conflicting retries and database failures.

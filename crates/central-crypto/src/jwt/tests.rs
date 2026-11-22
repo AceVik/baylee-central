@@ -34,6 +34,7 @@ fn gateway_claims() -> GatewayClaims {
         name: Some("Ace".into()),
         tag: Some(7),
         legacy_id: None,
+        legacy_deck_source: None,
         terms: None,
     }
 }

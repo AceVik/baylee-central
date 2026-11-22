@@ -67,6 +67,11 @@ async fn ensure(db: &DatabaseTransaction, season: Uuid, reading: bool) -> Result
             .ok_or(Error::Unavailable)?;
         return column(&winner, "finalized");
     };
+    publish_holders(db, season).await?;
+    column(&changed, "finalized")
+}
+
+async fn publish_holders(db: &DatabaseTransaction, season: Uuid) -> Result<(), Error> {
     db.execute_raw(statement(
         "DELETE FROM central_identity.ranked_champions WHERE season_id=$1",
         vec![season.into()],
@@ -130,7 +135,7 @@ async fn ensure(db: &DatabaseTransaction, season: Uuid, reading: bool) -> Result
     ))
     .await
     .map_err(unavailable)?;
-    column(&changed, "finalized")
+    Ok(())
 }
 
 pub(in super::super) async fn champion_place(

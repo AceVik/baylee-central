@@ -9,14 +9,11 @@ pub(super) use publication::{champion_place, deck_champion_place, publish};
 use super::{column, statement, unavailable, uuid};
 use central_api::{
     Error, profile,
-    ranked::{
-        self as api, Award, AwardKind, Format, Id, League, ProfileTarget, Rank, Season, Track,
-    },
+    ranked::{self as api, Award, AwardKind, Id, League, ProfileTarget, Rank, Season, Track},
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
 const PAGE: usize = 40;
-const FORMATS: [Format; 3] = [Format::Standard, Format::Highlander, Format::Commander];
 const LEAGUES: [League; 11] = [
     League::Paper,
     League::Wood,
@@ -43,28 +40,6 @@ fn season(row: &QueryResult) -> Result<Season, Error> {
         starts: column(row, "starts")?,
         ends: column(row, "ends")?,
     })
-}
-
-fn format_name(format: Format) -> &'static str {
-    match format {
-        Format::Standard => "standard",
-        Format::Highlander => "highlander",
-        Format::Commander => "commander",
-    }
-}
-
-fn format(value: &str) -> Result<Format, Error> {
-    FORMATS
-        .into_iter()
-        .find(|&f| format_name(f) == value)
-        .ok_or(Error::Unavailable)
-}
-
-fn track_name(track: Track) -> &'static str {
-    match track {
-        Track::Player => "player",
-        Track::Deck => "deck",
-    }
 }
 
 pub(super) fn wire_rank(
@@ -170,7 +145,9 @@ async fn collection(
             Ok(Award {
                 kind: AwardKind::Peak,
                 season: *column::<Uuid>(r, "season_id")?.as_bytes(),
-                format: format(&column::<String>(r, "format")?)?,
+                format: column::<String>(r, "format")?
+                    .parse()
+                    .map_err(unavailable)?,
                 track,
                 rank: wire_rank(column(r, "league")?, column(r, "division")?, 10, place)?,
             })

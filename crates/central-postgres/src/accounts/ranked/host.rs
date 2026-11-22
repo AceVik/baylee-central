@@ -1,7 +1,8 @@
 //! Fresh verified offers, immutable seat claims and retry-safe engine results.
 
-use super::{Error, api, column, queue::parse_format, scoring, statement, unavailable, uuid};
+use super::{Error, api, column, scoring, statement, unavailable, uuid};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
+use sha2::{Digest, Sha256};
 
 pub(super) struct Host {
     pub(super) id: Uuid,
@@ -128,7 +129,9 @@ fn valid(id: api::Id) -> Result<Uuid, Error> {
 fn assignment(row: &QueryResult) -> Result<api::HostAssignment, Error> {
     Ok(api::HostAssignment {
         match_id: column::<Uuid>(row, "id")?.into_bytes(),
-        format: parse_format(&column::<String>(row, "format")?)?,
+        format: column::<String>(row, "format")?
+            .parse()
+            .map_err(unavailable)?,
         accounts: [
             column::<Uuid>(row, "account_a")?.into_bytes(),
             column::<Uuid>(row, "account_b")?.into_bytes(),
@@ -209,7 +212,6 @@ async fn start(
     }
     // The sealed receipt retains this digest, not another copy of both players' lists.
     // Fixed-width binary card/count pairs and a length for each seat make boundaries unique.
-    use sha2::{Digest, Sha256};
     let mut fingerprint = Sha256::new();
     fingerprint.update(b"Baylee ranked host start v1\0");
     for entries in pools {

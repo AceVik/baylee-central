@@ -207,6 +207,8 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::GatewayStatus
         | Request::LegacyLogin { .. }
         | Request::LegacyExport
+        | Request::LegacySourcePage { .. }
+        | Request::LegacyFinishArchive { .. }
         | Request::LegacyLink { .. }
         | Request::PairClaim { .. }
         | Request::PairPoll { .. }

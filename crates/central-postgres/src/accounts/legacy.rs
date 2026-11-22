@@ -6,6 +6,8 @@ use super::{AccountStore, Error, Identity, Session, Token, identity, statement};
 use central_api::legacy::LegacyProgress;
 use sea_orm::ConnectionTrait;
 
+mod archive;
+
 /// A live session's account, as a legacy move sees it.
 pub struct LegacyMove {
     /// The account and its epoch.
@@ -16,6 +18,8 @@ pub struct LegacyMove {
     pub closed: bool,
     /// A client confirmed its restored document.
     pub restored: bool,
+    /// Operator-staged source generation and first unread page, for the native restore.
+    pub archive: Option<([u8; 32], u16)>,
 }
 
 impl AccountStore {
@@ -31,9 +35,11 @@ impl AccountStore {
         let row = self
             .db
             .query_one_raw(statement(
-                "SELECT a.id, a.vault_epoch, a.legacy_id, a.legacy_closed, a.restored
+                "SELECT a.id, a.vault_epoch, a.legacy_id, a.legacy_closed, a.restored,
+                     t.generation,t.next_page
                  FROM central_identity.accounts a JOIN central_identity.sessions s
                  ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 LEFT JOIN central_identity.legacy_deck_transfers t ON t.account_id=a.id
                  WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()
                      AND a.credential IS NOT NULL",
                 vec![session.into().digest().to_vec().into()],
@@ -43,6 +49,20 @@ impl AccountStore {
             .ok_or(Error::Rejected)?;
         Ok(LegacyMove {
             identity: identity(&row)?,
+            archive: row
+                .try_get::<Option<Vec<u8>>>("", "generation")
+                .map_err(|_| Error::Unavailable)?
+                .map(|value| {
+                    Ok::<_, Error>((
+                        value.try_into().map_err(|_| Error::Unavailable)?,
+                        u16::try_from(
+                            row.try_get::<i16>("", "next_page")
+                                .map_err(|_| Error::Unavailable)?,
+                        )
+                        .map_err(|_| Error::Unavailable)?,
+                    ))
+                })
+                .transpose()?,
             legacy_id: row
                 .try_get("", "legacy_id")
                 .map_err(|_| Error::Unavailable)?,

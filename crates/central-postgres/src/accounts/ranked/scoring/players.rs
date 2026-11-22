@@ -103,13 +103,12 @@ pub(super) async fn evidence(
             break;
         }
         let opponent = get::<sea_orm::prelude::Uuid>(&row, "opponent_id")?;
-        if opponent != game.accounts[1 - seat] {
-            opponents.insert(opponent);
-            if opponents.len() == 3 {
-                break;
-            }
+        opponents.insert(opponent);
+        if opponents.len() == 3 {
+            break;
         }
     }
+    opponents.remove(&game.accounts[1 - seat]);
     u8::try_from(opponents.len()).map_err(unavailable)
 }
 

@@ -154,6 +154,9 @@ pub struct GatewayClaims {
     /// The official gateway's old account id, for a closed move only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub legacy_id: Option<String>,
+    /// Verified original oversized source at the official gateway's closed move.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_deck_source: Option<[u8; 32]>,
     /// This gateway's terms the account accepted last.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terms: Option<TermsClaim>,
@@ -191,6 +194,7 @@ impl Claims for GatewayClaims {
             && valid_sid(&self.sid)
             && lower_hex(&self.jti, 32)
             && self.tag != Some(0)
+            && (self.legacy_deck_source.is_none() || self.legacy_id.is_some())
             && match (self.purpose, self.ranked_match) {
                 (Purpose::Ranked, Some(id)) => id[6] >> 4 == 7 && id[8] >> 6 == 2,
                 (Purpose::Admit | Purpose::Admin, None) => true,

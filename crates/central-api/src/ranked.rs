@@ -16,6 +16,31 @@ pub enum Format {
     Commander,
 }
 
+impl Format {
+    /// Formats in their lobby display order.
+    pub const ALL: [Self; 3] = [Self::Standard, Self::Highlander, Self::Commander];
+
+    /// Stable protocol, catalogue and storage key.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Highlander => "highlander",
+            Self::Commander => "commander",
+        }
+    }
+}
+
+impl std::str::FromStr for Format {
+    type Err = crate::Error;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|format| format.as_str() == value)
+            .ok_or(crate::Error::Rejected)
+    }
+}
+
 /// Subject rated by a ladder.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -24,6 +49,17 @@ pub enum Track {
     Player,
     /// One player's deck version.
     Deck,
+}
+
+impl Track {
+    /// Stable protocol and storage key.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Player => "player",
+            Self::Deck => "deck",
+        }
+    }
 }
 
 /// Leagues in ascending order.

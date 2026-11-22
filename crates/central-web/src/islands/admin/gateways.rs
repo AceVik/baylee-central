@@ -435,6 +435,37 @@ fn tokens_view(p: &Page, gateway: [u8; 16]) -> impl IntoView + use<> {
     }
 }
 
+fn ranked_action(p: Page, gateway: &Gateway, heading: &str) -> impl IntoView + use<> {
+    let id = gateway.id;
+    let lang = p.cx.lang;
+    (gateway.state == GatewayState::Approved).then(|| {
+        let verified = gateway.ranked_hosting == RankedHosting::Unverified;
+        let origin = gateway.origin.clone();
+        let label = if verified {
+            words::admin_gw_ranked_grant(lang)
+        } else {
+            words::admin_gw_ranked_revoke(lang)
+        };
+        let button = format!("admin-ranked-{}", id_hex(&id));
+        let from = format!("#{button}");
+        view! {
+            <button type="button" class="button" id=button aria-describedby=heading.to_owned()
+                on:click=move |_| p.flow.ask(Asked {
+                    change: Change::Ranked { gateway: id, verified },
+                    title: label.to_owned(),
+                    text: if verified {
+                        words::admin_gw_ranked_grant_text(lang, &origin)
+                    } else {
+                        words::admin_gw_ranked_revoke_text(lang, &origin)
+                    },
+                    action: label,
+                    danger: !verified,
+                    from: from.clone(),
+                })>{label}</button>
+        }
+    })
+}
+
 fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
     let p = *p;
     let lang = p.cx.lang;
@@ -492,32 +523,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 on:click=move |_| p.approval(&asked, false)>{words::admin_gw_disable(lang)}</button>
         }
     });
-    let ranked = (gateway.state == GatewayState::Approved).then(|| {
-        let verified = gateway.ranked_hosting == RankedHosting::Unverified;
-        let origin = gateway.origin.clone();
-        let label = if verified {
-            words::admin_gw_ranked_grant(lang)
-        } else {
-            words::admin_gw_ranked_revoke(lang)
-        };
-        let button = format!("admin-ranked-{key}");
-        let from = format!("#{button}");
-        view! {
-            <button type="button" class="button" id=button aria-describedby=heading.clone()
-                on:click=move |_| p.flow.ask(Asked {
-                    change: Change::Ranked { gateway: id, verified },
-                    title: label.to_owned(),
-                    text: if verified {
-                        words::admin_gw_ranked_grant_text(lang, &origin)
-                    } else {
-                        words::admin_gw_ranked_revoke_text(lang, &origin)
-                    },
-                    action: label,
-                    danger: !verified,
-                    from: from.clone(),
-                })>{label}</button>
-        }
-    });
+    let ranked = ranked_action(p, gateway, &heading);
     let ranked_badge = (gateway.ranked_hosting == RankedHosting::Verified).then(|| {
         view! { <span class="pill ok">{words::admin_gw_ranked_verified(lang)}</span> }
     });

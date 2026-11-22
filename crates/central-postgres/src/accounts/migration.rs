@@ -128,7 +128,8 @@ impl AccountStore {
     pub async fn close_legacy(&self, legacy: &str, expected: Identity) -> Result<(), Error> {
         let changed = self.db.execute_raw(statement(
             "UPDATE central_identity.accounts SET legacy_closed = true
-             WHERE legacy_id = $1 AND id = $2 AND vault_epoch = $3 AND restored AND credential IS NOT NULL",
+             WHERE legacy_id = $1 AND id = $2 AND vault_epoch = $3 AND restored AND credential IS NOT NULL
+             AND NOT EXISTS (SELECT 1 FROM central_identity.legacy_deck_transfers t WHERE t.account_id=$2)",
             vec![legacy.into(), uuid(expected.account).into(), number(expected.epoch)?.into()],
         )).await.map_err(|_| Error::Unavailable)?;
         if changed.rows_affected() != 1 {

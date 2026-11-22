@@ -394,7 +394,15 @@ mod tests {
         .unwrap();
         assert!(matches!(
             request,
-            OwnerRequest::CreateToken { days: 90, .. }
+            OwnerRequest::CreateToken {
+                days: 90,
+                scopes: GatewayScopes {
+                    sso: true,
+                    listing: false,
+                    ranked: false
+                },
+                ..
+            }
         ));
         for bad in [
             br#"{"action":"create_token","gateway":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"name":"Main","scopes":{"sso":true},"days":90}"#.as_slice(),

@@ -83,7 +83,8 @@ negatives included (`legacy-role.sql`, `AccountStore::legacy_store_closed`),
 and refuses to start otherwise. A row holds only what the move needs: the
 legacy id, username key, display name (when it keeps the rule) and tag; the
 Argon2id salt and output; the gateway's terms version, a forced password change
-and a ban in force; the source snapshot (at most 192 KiB) and its SHA-256,
+and a ban in force. It holds the source snapshot (inline through 192 KiB or a
+paged deck archive through 8 MiB) and its SHA-256,
 which a constraint keeps equal; the lockout's counters. No address, session or
 Central-only account. The operator imports it once and sets its deadline under
 the migrator login ([operations](operations.md#the-legacy-store)); the import
@@ -137,6 +138,27 @@ order through the two roles. Again after the close it is `Done` and deletes a
 row whose deletion was lost; so does the daily sweep. A restored account whose
 row the deadline removed still closes. A closed move is never reopened, and
 `LegacyExport` refuses it.
+
+**Oversized authored deck histories.** For an operator-staged source above
+192 KiB the enrollment document contains a versioned manifest with its byte
+length and a commitment to the original account ID, full digest and size.
+The restored native account accepts Central's terms and retrieves the exact
+source through `LegacySourcePage` in consecutive 64 KiB pages. It recomputes
+the digest and verifies the commitment. Only after this account has completed
+the read can it populate its own encrypted object inventory. The application
+converts the full source, publishes and reads back the encrypted library, and
+calls `LegacyFinishArchive`. Central checks the source digest, the root
+document revision and the ordered live object IDs and revisions under the
+same account lock used for object mutations. The original source and password
+verifier are deleted at close. The receipt's digest travels only to the
+official gateway, which verifies the retained original before linking.
+
+The historical operator export rejected oversized accounts before writing
+its output. This path accepts a complete staged export supplied by the
+operator with its original identity, history and verifier. A site whose
+pre-cutover password data was destroyed cannot recover an unstaged credential
+from a modern gateway. Accounts already linked to Central use the
+authenticated gateway's operational deck importer for retained local decks.
 
 **The bridge.** With the store configured, the bridge's `LegacyReserve`,
 `LegacyInvalidate`, `LegacyClose`, `LegacyProfile` and `LegacyStatus` are

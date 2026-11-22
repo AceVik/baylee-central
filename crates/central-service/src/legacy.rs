@@ -9,7 +9,7 @@
 //! file. Nothing is printed but counts, a digest and refusals naming legacy
 //! ids.
 use super::production::Database;
-use central_api::legacy::MAX_SNAPSHOT_BYTES;
+use central_api::legacy::valid_import_snapshot;
 use central_postgres::{LegacyRow, MAX_LEGACY_ROWS, connect_server, import_legacy};
 use serde::Deserialize;
 use std::{io::Read, process::ExitCode};
@@ -73,26 +73,8 @@ struct Ban {
     until: Option<i64>,
 }
 
-/// The snapshot is the gateway's `{"preferences": {…}, "decks": […]}` and
-/// nothing else; the client parses it again after decryption.
-fn snapshot_shaped(snapshot: &[u8]) -> bool {
-    if snapshot.len() > MAX_SNAPSHOT_BYTES {
-        return false;
-    }
-    let Ok(serde_json::Value::Object(document)) = serde_json::from_slice(snapshot) else {
-        return false;
-    };
-    document.len() == 2
-        && document
-            .get("preferences")
-            .is_some_and(serde_json::Value::is_object)
-        && document
-            .get("decks")
-            .is_some_and(serde_json::Value::is_array)
-}
-
 fn row(row: &mut Row) -> Result<LegacyRow, String> {
-    if !snapshot_shaped(&row.snapshot) {
+    if !valid_import_snapshot(&row.snapshot) {
         return Err(format!("{}: snapshot malformed", row.legacy_id));
     }
     Ok(LegacyRow {
@@ -217,10 +199,11 @@ async fn deadline() -> Result<Option<i64>, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use central_api::legacy::{MAX_ARCHIVE_BYTES, MAX_SNAPSHOT_BYTES};
 
     #[test]
     fn only_the_gateways_two_keys_are_a_snapshot() {
-        assert!(snapshot_shaped(br#"{"preferences":{},"decks":[]}"#));
+        assert!(valid_import_snapshot(br#"{"preferences":{},"decks":[]}"#));
         for bad in [
             &br#"{"preferences":{},"decks":{}}"#[..],
             br#"{"preferences":[],"decks":[]}"#,
@@ -229,12 +212,22 @@ mod tests {
             br"[]",
             b"not json",
         ] {
-            assert!(!snapshot_shaped(bad), "{}", String::from_utf8_lossy(bad));
+            assert!(
+                !valid_import_snapshot(bad),
+                "{}",
+                String::from_utf8_lossy(bad)
+            );
         }
         let mut large = br#"{"preferences":{"p":""#.to_vec();
         large.extend(std::iter::repeat_n(b'x', MAX_SNAPSHOT_BYTES));
         large.extend(br#""},"decks":[]}"#);
-        assert!(!snapshot_shaped(&large));
+        assert!(!valid_import_snapshot(&large));
+        let mut authored = br#"{"preferences":{},"decks":[{"cards":""#.to_vec();
+        authored.extend(std::iter::repeat_n(b'x', MAX_SNAPSHOT_BYTES));
+        authored.extend(br#""}]}"#);
+        assert!(valid_import_snapshot(&authored));
+        authored.resize(MAX_ARCHIVE_BYTES + 1, b' ');
+        assert!(!valid_import_snapshot(&authored));
     }
 
     #[test]

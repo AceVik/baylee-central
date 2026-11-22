@@ -14,10 +14,7 @@
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
-impl AccountStore {
-    pub(super) async fn valid_grants(&self) -> bool {
-        self.db.query_one_raw(statement(
-            "WITH required(name, privileges, updatable) AS (VALUES
+const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VALUES
              ('accounts', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL::text[]),
              ('sessions', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
              ('private_objects', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
@@ -79,6 +76,7 @@ impl AccountStore {
              ('donations', ARRAY['SELECT','INSERT'], ARRAY['euro_cents']),
              ('donation_sums', ARRAY['SELECT'], NULL),
              ('donation_count', ARRAY['SELECT'], NULL),
+             ('legacy_deck_transfers', ARRAY['SELECT','DELETE'], ARRAY['next_page']),
              ('ranked_seasons', ARRAY['SELECT'], NULL),
              ('ranked_hosts', ARRAY['SELECT'], ARRAY['ranked_epoch','capacity','seen_at','continuity_since']),
              ('ranked_matches', ARRAY['SELECT'], ARRAY['claimed_a','claimed_b','game_id','start_fingerprint','deck_a','deck_b','state','outcome','finished_at','lease_until']),
@@ -117,8 +115,16 @@ impl AccountStore {
                    AND pg_catalog.has_column_privilege(c.oid, a.attnum, 'UPDATE'))))
              ) AS allowed FROM required r LEFT JOIN insert_columns i ON i.name = r.name
              JOIN pg_catalog.pg_class c ON c.relname = r.name
-             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'central_identity'",
-            vec![],
-        )).await.ok().flatten().and_then(|row| row.try_get::<bool>("", "allowed").ok()) == Some(true)
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'central_identity'";
+
+impl AccountStore {
+    pub(super) async fn valid_grants(&self) -> bool {
+        self.db
+            .query_one_raw(statement(REQUIRED_GRANTS, vec![]))
+            .await
+            .ok()
+            .flatten()
+            .and_then(|row| row.try_get::<bool>("", "allowed").ok())
+            == Some(true)
     }
 }

@@ -3,7 +3,7 @@
 
 use super::{
     super::{column, rules, statement, unavailable},
-    FORMATS, LEAGUES, PAGE, format, format_name, track_name, wire_rank,
+    LEAGUES, PAGE, wire_rank,
 };
 use central_api::{
     Error,
@@ -70,7 +70,7 @@ impl Source {
            AND c.account_id=r.account_id AND c.{}_format=r.format {champion_version}
            AND c.season_id=r.season_id
          WHERE {filter}",
-            track_name(track)
+            track.as_str()
         )
     }
 
@@ -110,7 +110,9 @@ fn standing(row: &QueryResult, track: Track) -> Result<Standing, Error> {
         .transpose()
         .map_err(unavailable)?;
     Ok(Standing {
-        format: format(&column::<String>(row, "format")?)?,
+        format: column::<String>(row, "format")?
+            .parse()
+            .map_err(unavailable)?,
         track,
         deck,
         elo: column(row, "elo")?,
@@ -177,7 +179,7 @@ pub(super) async fn board(
     );
     let mut values: Vec<Value> = vec![
         season.into(),
-        format_name(format).into(),
+        format.as_str().into(),
         n.into(),
         division.map(i16::from).into(),
     ];
@@ -192,7 +194,7 @@ pub(super) async fn board(
             format!(
                 "AND place > (SELECT place FROM central_identity.ranked_champions
                WHERE season_id=$1 AND account_id=$5 AND {}_format=$2)",
-                track_name(track)
+                track.as_str()
             )
         } else {
             values.push(c.elo.into());
@@ -304,7 +306,7 @@ pub(super) async fn profile(
             list.push(standing(r, track)?);
         }
     }
-    for f in FORMATS {
+    for f in Format::ALL {
         if !list
             .iter()
             .any(|s| s.track == Track::Player && s.format == f)
