@@ -63,6 +63,8 @@ pub enum Purpose {
     Admit,
     /// Administer this gateway; Central checked current membership at issue.
     Admin,
+    /// Use only the selected gateway's game seat for the signed match.
+    Ranked,
 }
 
 /// The gateway's terms an account accepted last.
@@ -140,6 +142,9 @@ pub struct GatewayClaims {
     pub exp: i64,
     /// What the token admits to.
     pub purpose: Purpose,
+    /// Central's match ID. Required for a ranked seat and absent for every other purpose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ranked_match: Option<[u8; 16]>,
     /// The account's display name, while it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -186,6 +191,11 @@ impl Claims for GatewayClaims {
             && valid_sid(&self.sid)
             && lower_hex(&self.jti, 32)
             && self.tag != Some(0)
+            && match (self.purpose, self.ranked_match) {
+                (Purpose::Ranked, Some(id)) => id[6] >> 4 == 7 && id[8] >> 6 == 2,
+                (Purpose::Admit | Purpose::Admin, None) => true,
+                _ => false,
+            }
             && self
                 .terms
                 .as_ref()

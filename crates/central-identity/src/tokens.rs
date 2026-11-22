@@ -317,7 +317,9 @@ impl IdentityService {
             purpose: match purpose {
                 GatewayPurpose::Admit => Purpose::Admit,
                 GatewayPurpose::Admin => Purpose::Admin,
+                GatewayPurpose::Ranked => Purpose::Ranked,
             },
+            ranked_match: grant.ranked_match,
             name: grant.display_name,
             tag: grant.tag,
             legacy_id: grant.legacy_id,

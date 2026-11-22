@@ -16,6 +16,8 @@ pub const PUSH_ATTEMPTS: i16 = 5;
 
 /// What a token for one gateway says about its account.
 pub struct GatewayGrant {
+    /// Match binding for a game-only credential.
+    pub ranked_match: Option<[u8; 16]>,
     /// The session as this gateway knows it.
     pub sid: [u8; 16],
     /// The account.
@@ -75,6 +77,36 @@ fn count(value: i64) -> Result<u64, Error> {
 
 fn sid_bytes(bytes: &[u8]) -> Result<[u8; 16], Error> {
     bytes.try_into().map_err(|_| Error::Unavailable)
+}
+
+/// Only the account's current, live reservation can mint a game-scoped token.
+async fn assigned_match(
+    tx: &DatabaseTransaction,
+    account: Uuid,
+    origin: &str,
+    registered: bool,
+) -> Result<[u8; 16], Error> {
+    let row = tx
+        .query_one_raw(statement(
+            "SELECT m.id FROM central_identity.ranked_tickets t
+         JOIN central_identity.ranked_matches m ON m.id=t.match_id
+         JOIN central_identity.gateways g ON g.id=m.host_id AND g.origin=m.origin
+         JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id
+         JOIN central_identity.ranked_hosts h ON h.host_id=g.id
+         WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN (m.account_a,m.account_b)
+           AND g.origin=$2 AND g.official<>$3 AND p.enabled AND p.ranked_verified
+           AND p.ranked_epoch=m.ranked_epoch AND h.ranked_epoch=m.ranked_epoch
+           AND m.created_at>=h.continuity_since
+           AND h.seen_at>clock_timestamp()-interval '5 minutes'
+           AND m.state IN ('reserved','playing') AND m.lease_until>clock_timestamp()
+         FOR SHARE OF m,p",
+            vec![account.into(), origin.into(), registered.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+    let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+    Ok(*id.as_bytes())
 }
 
 /// The `sid` of this session, gateway and purpose: the one it has, or `fresh`.
@@ -173,7 +205,15 @@ impl AccountStore {
         let closed: bool = row
             .try_get("", "legacy_closed")
             .map_err(|_| Error::Unavailable)?;
-        if registered {
+        let ranked_match = if purpose == GatewayPurpose::Ranked {
+            if legacy_id.is_some() && !closed {
+                return Err(Error::Rejected);
+            }
+            Some(assigned_match(&tx, account, stream, registered).await?)
+        } else {
+            None
+        };
+        if registered && ranked_match.is_none() {
             tx.query_one_raw(statement(
                 &format!(
                     "SELECT g.id FROM central_identity.gateways g
@@ -186,7 +226,9 @@ impl AccountStore {
             .await
             .map_err(|_| Error::Unavailable)?
             .ok_or(Error::Rejected)?;
-        } else if purpose != GatewayPurpose::Admit || (legacy_id.is_some() && !closed) {
+        } else if !registered
+            && (purpose == GatewayPurpose::Admin || (legacy_id.is_some() && !closed))
+        {
             // Admission needs a closed move; the official gateway has no Central admins.
             return Err(Error::Rejected);
         }
@@ -216,6 +258,7 @@ impl AccountStore {
         let cap = row.try_get("", "cap").map_err(|_| Error::Unavailable)?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(GatewayGrant {
+            ranked_match,
             sid,
             account: *account.as_bytes(),
             cap,

@@ -11,6 +11,8 @@ pub enum GatewayPurpose {
     Admit,
     /// Administer this gateway; current membership is mandatory at issue.
     Admin,
+    /// Join or resume only the ranked game Central assigned to this native account.
+    Ranked,
 }
 
 impl GatewayPurpose {
@@ -20,6 +22,7 @@ impl GatewayPurpose {
         match self {
             Self::Admit => "admit",
             Self::Admin => "admin",
+            Self::Ranked => "ranked",
         }
     }
 }
@@ -241,6 +244,24 @@ pub enum Request {
     /// document names another digest. Answered with
     /// [`Response::LegacySnapshot`].
     LegacyExport,
+    /// Read a bounded page of this restored native account's staged source.
+    LegacySourcePage {
+        /// Generation published at enrollment.
+        generation: [u8; 32],
+        /// Zero-based page index.
+        page: u16,
+    },
+    /// Close an oversized move after publishing and reading back its encrypted library.
+    LegacyFinishArchive {
+        /// Generation published at enrollment.
+        generation: [u8; 32],
+        /// SHA-256 of the entire original account export.
+        digest: [u8; 32],
+        /// Monotone revision of the verified encrypted root document.
+        revision: u64,
+        /// Ordered live encrypted object identities and revisions.
+        inventory: [u8; 32],
+    },
     /// Close the session's account's move once its document is restored,
     /// with Central's terms accepted: `digest` must be the stored
     /// snapshot's. The account's row leaves the legacy store; the official
@@ -1013,6 +1034,15 @@ pub enum Response {
     LegacySnapshot {
         /// The account's source, as the gateway exported it.
         snapshot: crate::legacy::LegacySnapshot,
+    },
+    /// A bounded slice of the live account's original legacy archive.
+    LegacySourcePage {
+        /// Generation requested and read.
+        generation: [u8; 32],
+        /// Zero-based page index.
+        page: u16,
+        /// Original source bytes in order.
+        bytes: Vec<u8>,
     },
     /// Durable migration status; bridge-authenticated only.
     LegacyStatus {
