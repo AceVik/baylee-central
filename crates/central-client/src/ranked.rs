@@ -146,3 +146,39 @@ pub fn host(
         _ => Err(Error::Rejected),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn own_projection_binds_the_session_and_season() {
+        let owner = [1; 16];
+        let season = [2; 16];
+        let request = api::Request::OwnProfile {
+            season: Some(season),
+        };
+        let reply = api::Response::Profile {
+            season: api::Season {
+                id: season,
+                name: String::new(),
+                starts: 0,
+                ends: None,
+            },
+            account: owner,
+            name: None,
+            tag: None,
+            formats: vec![],
+            awards: vec![],
+        };
+        assert!(responds(&request, &reply, Some(owner)));
+        assert!(!responds(&request, &reply, None));
+        assert!(!responds(&request, &reply, Some([9; 16])));
+        assert!(!responds(
+            &api::Request::OwnProfile {
+                season: Some([4; 16])
+            },
+            &reply,
+            Some(owner)
+        ));
+    }
+}
