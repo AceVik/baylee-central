@@ -233,6 +233,8 @@ pub fn action_text(lang: Lang, action: &str) -> Option<&'static str> {
         "account.reset_issued" => words::admin_audit_reset_issued(lang),
         "account.tag_changed" => words::admin_audit_tag_changed(lang),
         "gateway.approved" => words::admin_audit_gateway_approved(lang),
+        "gateway.ranked_verified" => words::admin_gw_ranked_verified(lang),
+        "gateway.ranked_revoked" => words::admin_gw_ranked_revoked(lang),
         "gateway.disabled" => words::admin_audit_gateway_disabled(lang),
         "gateway.token_revoked" => words::admin_audit_token_revoked(lang),
         "registration.closed" => words::admin_audit_registration_closed(lang),
@@ -330,6 +332,8 @@ pub enum Change {
     Tag { account: [u8; 16], tag: u32 },
     /// Approve or enable a gateway again, or disable it.
     Approval { gateway: [u8; 16], enabled: bool },
+    /// Grant or revoke ranked hosting for an approved gateway.
+    Ranked { gateway: [u8; 16], verified: bool },
     /// Revoke a gateway's token.
     Revoke { gateway: [u8; 16], token: [u8; 16] },
 }
@@ -343,6 +347,9 @@ impl Change {
             Change::Approval { gateway, enabled } => {
                 AdminRequest::SetGatewayApproval { gateway, enabled }
             }
+            Change::Ranked { gateway, verified } => {
+                AdminRequest::SetRankedVerification { gateway, verified }
+            }
             Change::Revoke { token, .. } => AdminRequest::RevokeGatewayToken { token },
         }
     }
@@ -353,9 +360,9 @@ impl Change {
             Change::Role { account, .. } | Change::Tag { account, .. } => {
                 AdminRequest::Account { account }
             }
-            Change::Approval { gateway, .. } | Change::Revoke { gateway, .. } => {
-                AdminRequest::Gateway { gateway }
-            }
+            Change::Approval { gateway, .. }
+            | Change::Ranked { gateway, .. }
+            | Change::Revoke { gateway, .. } => AdminRequest::Gateway { gateway },
         }
     }
 
@@ -363,7 +370,9 @@ impl Change {
     fn missing(self) -> Came {
         match self {
             Change::Role { .. } | Change::Tag { .. } => Came::AccountGone,
-            Change::Approval { .. } | Change::Revoke { .. } => Came::GatewayGone,
+            Change::Approval { .. } | Change::Ranked { .. } | Change::Revoke { .. } => {
+                Came::GatewayGone
+            }
         }
     }
 
@@ -375,6 +384,10 @@ impl Change {
             Change::Tag { .. } => words::admin_tag_saved(lang),
             Change::Approval { enabled: true, .. } => words::admin_gw_approved(lang),
             Change::Approval { enabled: false, .. } => words::admin_gw_disabled(lang),
+            Change::Ranked { verified: true, .. } => words::admin_gw_ranked_verified(lang),
+            Change::Ranked {
+                verified: false, ..
+            } => words::admin_gw_ranked_revoked(lang),
             Change::Revoke { .. } => words::tokens_revoked_now(lang),
         }
     }
@@ -867,7 +880,7 @@ mod tests {
         Failure::Network,
     ];
 
-    fn changes() -> [Change; 6] {
+    fn changes() -> [Change; 8] {
         [
             Change::Role {
                 account: OTHER,
@@ -892,6 +905,14 @@ mod tests {
             Change::Revoke {
                 gateway: OTHER,
                 token: [3; 16],
+            },
+            Change::Ranked {
+                gateway: OTHER,
+                verified: true,
+            },
+            Change::Ranked {
+                gateway: OTHER,
+                verified: false,
             },
         ]
     }
@@ -1029,7 +1050,18 @@ mod tests {
             serde_json::to_string(&Request::Admin { request }).expect("json")
         };
         let id = |n: u8| format!("[{}]", vec![n.to_string(); 16].join(","));
-        let [grant, remove, tag, approve, disable, revoke] = changes();
+        let [
+            grant,
+            remove,
+            tag,
+            approve,
+            disable,
+            revoke,
+            verify,
+            withdraw,
+        ] = changes();
+        assert!(text(verify.request()).contains(r#""action":"set_ranked_verification""#));
+        assert!(text(withdraw.request()).ends_with(r#""verified":false}}"#));
         assert_eq!(
             text(grant.request()),
             format!(
@@ -1075,6 +1107,8 @@ mod tests {
             "gateway.approved",
             "gateway.disabled",
             "gateway.token_revoked",
+            "gateway.ranked_verified",
+            "gateway.ranked_revoked",
             "registration.closed",
             "registration.opened",
         ];

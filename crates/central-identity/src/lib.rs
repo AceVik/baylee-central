@@ -50,6 +50,7 @@ mod pictures;
 pub use central_postgres::pictures::Encoding as PictureEncoding;
 pub use pictures::{Admitted, SLOTS as PICTURE_SLOTS, UploadRefusal};
 mod push;
+mod ranked;
 pub use push::{GatewayDelivery, GatewayOutcome};
 mod reports;
 pub use reports::PartUpload;
@@ -130,6 +131,7 @@ pub struct BrowserReply {
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
+        Request::Ranked { request } => request.is_public(),
         Request::TowerProgress {}
         | Request::TowerAwardExport { .. }
         | Request::Challenges { .. }
@@ -179,6 +181,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::TowerIdentity {}
         | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
+        | Request::RankedHost { .. }
         | Request::CreateObject
         | Request::ReadObject { .. }
         | Request::ListObjects { .. }

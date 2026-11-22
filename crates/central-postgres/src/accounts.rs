@@ -30,6 +30,7 @@ mod pairing;
 mod password;
 mod pictures;
 mod profiles;
+mod ranked;
 mod recovery;
 mod registration;
 mod reports;

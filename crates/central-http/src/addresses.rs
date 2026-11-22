@@ -67,6 +67,9 @@ impl Budgets {
             Request::LegacyLogin { .. } => self.legacy.charge(client, now, LEGACY, MINUTE),
             Request::ResetStart { .. } => self.reset.charge(client, now, RESET, HOUR),
             Request::ResetMail { .. } => self.reset_mail.charge(client, now, RESET_MAIL, HOUR),
+            Request::Ranked { request } if request.is_public() => {
+                self.directory.charge(client, now, DIRECTORY, MINUTE)
+            }
             Request::GatewayDirectory { .. }
             | Request::PublicFigures { .. }
             | Request::PublicFunding {} => self.directory.charge(client, now, DIRECTORY, MINUTE),

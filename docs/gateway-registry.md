@@ -43,11 +43,19 @@ it is approved, and only under the rules of [the push](#revocations): a person's
 approval of the origin is what makes that call safe to make.
 
 
+Ranked hosting requires a separate administrator decision for each approved
+origin, including the official gateway. Registration, token creation, and a
+successful heartbeat leave ranked verification off. The approval row carries a
+generation number. Changing its ranked verification advances that generation,
+and disabling the gateway withdraws verification in the same transaction.
+Central binds the generation to each assignment so re-verifying a host cannot
+revive an earlier assignment. See [administration](administration.md#gateways-tokens-and-tags-30102026).
+
 The runtime may use these registry privileges without grant options:
 
 ```sql
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT, INSERT, UPDATE (enabled) ON central_identity.gateway_approvals TO central_runtime;
+GRANT SELECT, INSERT, UPDATE (enabled, ranked_verified) ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateway_streams TO central_runtime;
@@ -62,7 +70,7 @@ The reusable SDK exposes `gateway_directory`, `public_figures`,
 `Session::set_gateway_admins`; it validates returned IDs and public metadata.
 The runtime
 must not own these objects or inherit operator privileges. Startup rejects any
-privilege on the approval table beyond `SELECT`, `INSERT` and `UPDATE (enabled)`
+privilege on the approval table beyond `SELECT`, `INSERT` and `UPDATE (enabled, ranked_verified)`
 (no `DELETE`, no other column, no grant option), including inherited effective
 privileges. Credential-pair rotation and revocation stay an administrative DB
 operation; gateway tokens are revoked on the website.

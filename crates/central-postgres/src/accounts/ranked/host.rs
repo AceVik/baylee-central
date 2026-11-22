@@ -1,0 +1,340 @@
+//! Fresh verified offers, immutable seat claims and retry-safe engine results.
+
+use super::{Error, api, column, queue::parse_format, scoring, statement, unavailable, uuid};
+use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
+
+pub(super) struct Host {
+    pub(super) id: Uuid,
+    pub(super) epoch: i64,
+    pub(super) origin: String,
+}
+
+async fn authority(
+    db: &DatabaseTransaction,
+    id: Option<Uuid>,
+    origin: &str,
+) -> Result<Host, Error> {
+    // Same gateway -> approval lock order as verification administration, including
+    // the official bridge whose gateway id is discovered only by its pinned origin.
+    let row = db
+        .query_one_raw(statement(
+            "SELECT id FROM central_identity.gateways WHERE origin=$1
+         AND (($2::uuid IS NULL AND official) OR (id=$2 AND NOT official)) FOR SHARE",
+            vec![origin.into(), id.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Rejected)?;
+    let id: Uuid = column(&row, "id")?;
+    let row=db.query_one_raw(statement(
+        "SELECT ranked_epoch FROM central_identity.gateway_approvals WHERE gateway_id=$1 AND enabled AND ranked_verified FOR SHARE",
+        vec![id.into()]
+    )).await.map_err(unavailable)?.ok_or(Error::Rejected)?;
+    Ok(Host {
+        id,
+        epoch: column(&row, "ranked_epoch")?,
+        origin: origin.to_owned(),
+    })
+}
+
+pub(super) async fn allocate(db: &DatabaseTransaction) -> Result<Option<Host>, Error> {
+    let row=db.query_one_raw(statement(
+        "SELECT h.host_id,g.origin FROM central_identity.ranked_hosts h
+         JOIN central_identity.gateways g ON g.id=h.host_id
+         JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.ranked_epoch=h.ranked_epoch
+         CROSS JOIN LATERAL (SELECT count(*) AS games FROM central_identity.ranked_matches m
+           WHERE m.host_id=h.host_id AND m.ranked_epoch=h.ranked_epoch AND m.created_at>=h.continuity_since
+            AND m.state IN ('reserved','playing') AND m.lease_until>pg_catalog.clock_timestamp()) load
+         WHERE p.enabled AND p.ranked_verified AND h.capacity>0 AND load.games<h.capacity
+          AND h.seen_at>pg_catalog.clock_timestamp()-interval '90 seconds'
+         ORDER BY load.games::double precision/h.capacity,load.games,h.seen_at DESC,h.host_id
+         LIMIT 1 FOR UPDATE OF h SKIP LOCKED",
+        vec![]
+    )).await.map_err(unavailable)?;
+    let Some(row) = row else { return Ok(None) };
+    let id: Uuid = column(&row, "host_id")?;
+    // Re-read occupancy after locking the offer. A concurrent allocator may have
+    // committed a reservation between the first statement's snapshot and its row lock.
+    let row = db
+        .query_one_raw(statement(
+            "SELECT g.origin,p.ranked_epoch FROM central_identity.ranked_hosts h
+         JOIN central_identity.gateways g ON g.id=h.host_id
+         JOIN central_identity.gateway_approvals p ON p.gateway_id=h.host_id
+         WHERE h.host_id=$1 AND p.enabled AND p.ranked_verified AND p.ranked_epoch=h.ranked_epoch
+          AND h.seen_at>pg_catalog.clock_timestamp()-interval '90 seconds' AND h.capacity>(
+            SELECT count(*) FROM central_identity.ranked_matches m WHERE m.host_id=h.host_id
+            AND m.ranked_epoch=h.ranked_epoch AND m.created_at>=h.continuity_since
+            AND m.state IN ('reserved','playing') AND m.lease_until>pg_catalog.clock_timestamp())
+         FOR SHARE OF p",
+            vec![id.into()],
+        ))
+        .await
+        .map_err(unavailable)?;
+    row.as_ref()
+        .map(|row| {
+            Ok(Host {
+                id,
+                origin: column(row, "origin")?,
+                epoch: column(row, "ranked_epoch")?,
+            })
+        })
+        .transpose()
+}
+
+/// Check only the polling account's assigned match, including host revocation and liveness.
+pub(super) async fn expire(db: &DatabaseTransaction, account: Uuid) -> Result<(), Error> {
+    db.execute_raw(statement(
+        "WITH dead AS (SELECT m.id FROM central_identity.ranked_matches m
+         WHERE m.state IN ('reserved','playing') AND
+           m.id=(SELECT t.match_id FROM central_identity.ranked_tickets t
+              WHERE t.account_id=$1 AND t.state='assigned')
+           AND (m.lease_until<=pg_catalog.clock_timestamp() OR NOT EXISTS (
+             SELECT 1 FROM central_identity.gateway_approvals p JOIN central_identity.ranked_hosts h
+              ON h.host_id=p.gateway_id WHERE p.gateway_id=m.host_id AND p.enabled AND p.ranked_verified
+              AND p.ranked_epoch=m.ranked_epoch AND h.ranked_epoch=m.ranked_epoch
+              AND m.created_at>=h.continuity_since AND h.seen_at>pg_catalog.clock_timestamp()-interval '5 minutes'))
+         FOR UPDATE OF m SKIP LOCKED)
+         UPDATE central_identity.ranked_matches m SET state='void',finished_at=pg_catalog.clock_timestamp()
+         FROM dead WHERE m.id=dead.id",vec![account.into()]
+    )).await.map_err(unavailable)?;
+    Ok(())
+}
+
+async fn ready(
+    db: &DatabaseTransaction,
+    host: &Host,
+    capacity: u8,
+) -> Result<api::HostResponse, Error> {
+    if capacity > 64 {
+        return Err(Error::Rejected);
+    }
+    db.execute_raw(statement(
+        "INSERT INTO central_identity.ranked_hosts AS h(host_id,ranked_epoch,capacity) VALUES ($1,$2,$3)
+         ON CONFLICT(host_id) DO UPDATE SET capacity=EXCLUDED.capacity,ranked_epoch=EXCLUDED.ranked_epoch,
+          continuity_since=CASE WHEN h.ranked_epoch<>EXCLUDED.ranked_epoch OR
+            h.seen_at<=pg_catalog.clock_timestamp()-interval '5 minutes' THEN EXCLUDED.seen_at ELSE h.continuity_since END,
+          seen_at=EXCLUDED.seen_at",
+        vec![host.id.into(),host.epoch.into(),i16::from(capacity).into()]
+    )).await.map_err(unavailable)?;
+    db.execute_raw(statement(
+        "WITH stale AS (SELECT id FROM central_identity.ranked_matches WHERE state IN ('reserved','playing')
+          AND lease_until<=now() ORDER BY lease_until LIMIT 64 FOR UPDATE SKIP LOCKED)
+         UPDATE central_identity.ranked_matches m SET state='void',finished_at=pg_catalog.clock_timestamp()
+          FROM stale WHERE m.id=stale.id",
+        vec![],
+    )).await.map_err(unavailable)?;
+    db.execute_raw(statement(
+        "WITH stale AS (SELECT account_id,request_id FROM central_identity.ranked_tickets
+           WHERE state='waiting' AND expires_at<=pg_catalog.clock_timestamp() ORDER BY expires_at
+           LIMIT 128 FOR UPDATE SKIP LOCKED)
+         UPDATE central_identity.ranked_tickets t SET state='closed' FROM stale
+          WHERE t.account_id=stale.account_id AND t.request_id=stale.request_id",
+        vec![],
+    ))
+    .await
+    .map_err(unavailable)?;
+    Ok(api::HostResponse::Ready)
+}
+
+pub(super) fn outcome(value: i16) -> Result<api::Outcome, Error> {
+    match value {
+        0 => Ok(api::Outcome::Draw),
+        1 => Ok(api::Outcome::FirstWins),
+        2 => Ok(api::Outcome::SecondWins),
+        _ => Err(Error::Unavailable),
+    }
+}
+
+fn valid(id: api::Id) -> Result<Uuid, Error> {
+    if super::super::gateways::valid_id(id) {
+        Ok(uuid(id))
+    } else {
+        Err(Error::Rejected)
+    }
+}
+
+fn assignment(row: &QueryResult) -> Result<api::HostAssignment, Error> {
+    Ok(api::HostAssignment {
+        match_id: column::<Uuid>(row, "id")?.into_bytes(),
+        format: parse_format(&column::<String>(row, "format")?)?,
+        accounts: [
+            column::<Uuid>(row, "account_a")?.into_bytes(),
+            column::<Uuid>(row, "account_b")?.into_bytes(),
+        ],
+        decks: [
+            column::<Vec<u8>>(row, "commitment_a")?
+                .try_into()
+                .map_err(unavailable)?,
+            column::<Vec<u8>>(row, "commitment_b")?
+                .try_into()
+                .map_err(unavailable)?,
+        ],
+        game: column::<Option<Uuid>>(row, "game_id")?.map(Uuid::into_bytes),
+    })
+}
+
+async fn claim(
+    db: &DatabaseTransaction,
+    row: &QueryResult,
+    account: api::Id,
+    deck: &[u8; 32],
+) -> Result<api::HostResponse, Error> {
+    let assignment = assignment(row)?;
+    let seat = assignment
+        .accounts
+        .iter()
+        .position(|&id| id == account)
+        .ok_or(Error::Rejected)?;
+    if assignment.decks[seat] != *deck {
+        return Err(Error::Rejected);
+    }
+    if !matches!(
+        column::<String>(row, "state")?.as_str(),
+        "reserved" | "playing"
+    ) {
+        return Err(Error::Conflict);
+    }
+    let sql = if seat == 0 {
+        "UPDATE central_identity.ranked_matches SET claimed_a=true WHERE id=$1 AND NOT claimed_a"
+    } else {
+        "UPDATE central_identity.ranked_matches SET claimed_b=true WHERE id=$1 AND NOT claimed_b"
+    };
+    db.execute_raw(statement(sql, vec![uuid(assignment.match_id).into()]))
+        .await
+        .map_err(unavailable)?;
+    Ok(api::HostResponse::Assignment { assignment })
+}
+
+/// Validates the shape of a host-attested combined deck. The trusted game host verifies format
+/// legality against its catalog. Distinct sorted card digests keep persistence deterministic.
+fn pool(entries: &[api::PoolEntry]) -> Result<String, Error> {
+    if entries.is_empty()
+        || entries.len() > 250
+        || entries.windows(2).any(|p| p[0].card >= p[1].card)
+        || entries.iter().any(|card| card.copies == 0)
+        || entries
+            .iter()
+            .map(|card| u32::from(card.copies))
+            .sum::<u32>()
+            > 250
+    {
+        return Err(Error::Rejected);
+    }
+    String::from_utf8(central_api::encode(&entries)?).map_err(unavailable)
+}
+
+async fn start(
+    db: &DatabaseTransaction,
+    row: &QueryResult,
+    game: api::Id,
+    pools: &[Vec<api::PoolEntry>; 2],
+) -> Result<api::HostResponse, Error> {
+    let id: Uuid = column(row, "id")?;
+    let game = valid(game)?;
+    let decks = [pool(&pools[0])?, pool(&pools[1])?];
+    if !column::<bool>(row, "claimed_a")? || !column::<bool>(row, "claimed_b")? {
+        return Err(Error::Conflict);
+    }
+    let values = vec![
+        id.into(),
+        game.into(),
+        decks[0].as_str().into(),
+        decks[1].as_str().into(),
+    ];
+    match column::<String>(row, "state")?.as_str() {
+        "reserved" => {
+            db.execute_raw(statement(
+                "UPDATE central_identity.ranked_matches SET game_id=$2,deck_a=$3::jsonb,deck_b=$4::jsonb,state='playing',
+                 lease_until=pg_catalog.clock_timestamp()+interval '12 hours' WHERE id=$1",
+                values
+            )).await.map_err(|error| match error.sql_err() {Some(sea_orm::SqlErr::UniqueConstraintViolation(_))=>Error::Conflict,_=>Error::Unavailable})?;
+        }
+        "playing" | "finished" => {
+            let same=db.query_one_raw(statement("SELECT id FROM central_identity.ranked_matches WHERE id=$1 AND game_id=$2 AND deck_a=$3::jsonb AND deck_b=$4::jsonb",values)).await.map_err(unavailable)?;
+            if same.is_none() {
+                return Err(Error::Conflict);
+            }
+        }
+        _ => return Err(Error::Conflict),
+    }
+    Ok(api::HostResponse::Done)
+}
+
+async fn finish(
+    db: &DatabaseTransaction,
+    row: &QueryResult,
+    game: api::Id,
+    result: api::Outcome,
+) -> Result<api::HostResponse, Error> {
+    let id: Uuid = column(row, "id")?;
+    if column::<Option<Uuid>>(row, "game_id")? != Some(valid(game)?) {
+        return Err(Error::Conflict);
+    }
+    let score = match result {
+        api::Outcome::Draw => 0_i16,
+        api::Outcome::FirstWins => 1,
+        api::Outcome::SecondWins => 2,
+    };
+    match column::<String>(row, "state")?.as_str() {
+        "finished" if column::<Option<i16>>(row, "outcome")? == Some(score) => {}
+        "playing" => {
+            // Settlement reads finished_at and both frozen pools under this same match row lock.
+            db.execute_raw(statement("UPDATE central_identity.ranked_matches SET state='finished',outcome=$2,finished_at=pg_catalog.clock_timestamp() WHERE id=$1",
+                vec![id.into(),score.into()])).await.map_err(unavailable)?;
+            scoring::settle(db, id, score).await?;
+        }
+        _ => return Err(Error::Conflict),
+    }
+    Ok(api::HostResponse::Done)
+}
+
+pub(super) async fn handle(
+    db: &DatabaseTransaction,
+    gateway: Option<api::Id>,
+    origin: &str,
+    request: &api::HostRequest,
+) -> Result<api::HostResponse, Error> {
+    let host = authority(db, gateway.map(uuid), origin).await?;
+    let id = match request {
+        api::HostRequest::Ready { capacity } => return ready(db, &host, *capacity).await,
+        api::HostRequest::Claim { match_id, .. }
+        | api::HostRequest::Start { match_id, .. }
+        | api::HostRequest::Void { match_id }
+        | api::HostRequest::Finish { match_id, .. } => valid(*match_id)?,
+    };
+    let row = db
+        .query_one_raw(statement(
+            "SELECT m.*, (m.lease_until>pg_catalog.clock_timestamp() AND EXISTS (
+         SELECT 1 FROM central_identity.ranked_hosts h WHERE h.host_id=m.host_id AND
+         h.ranked_epoch=m.ranked_epoch AND m.created_at>=h.continuity_since
+         AND h.seen_at>pg_catalog.clock_timestamp()-interval '5 minutes')) AS live
+         FROM central_identity.ranked_matches m WHERE id=$1 AND host_id=$2 AND ranked_epoch=$3
+         FOR UPDATE OF m",
+            vec![id.into(), host.id.into(), host.epoch.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Rejected)?;
+    let state: String = column(&row, "state")?;
+    if matches!(state.as_str(), "reserved" | "playing")
+        && !column::<bool>(&row, "live")?
+        && !matches!(request, api::HostRequest::Void { .. })
+    {
+        return Err(Error::Conflict);
+    }
+    match request {
+        api::HostRequest::Claim { account, deck, .. } => claim(db, &row, *account, deck).await,
+        api::HostRequest::Start { game, pools, .. } => start(db, &row, *game, pools).await,
+        api::HostRequest::Finish { game, outcome, .. } => finish(db, &row, *game, *outcome).await,
+        api::HostRequest::Void { .. } => {
+            if state == "finished" {
+                return Err(Error::Conflict);
+            }
+            if state != "void" {
+                db.execute_raw(statement("UPDATE central_identity.ranked_matches SET state='void',finished_at=pg_catalog.clock_timestamp() WHERE id=$1",vec![id.into()])).await.map_err(unavailable)?;
+            }
+            Ok(api::HostResponse::Done)
+        }
+        api::HostRequest::Ready { .. } => Err(Error::Rejected),
+    }
+}

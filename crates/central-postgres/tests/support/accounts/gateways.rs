@@ -238,6 +238,14 @@ async fn privilege_gate(operator: &DatabaseConnection) {
             "REVOKE DELETE ON central_identity.gateway_approvals FROM central_runtime",
         ),
         (
+            "GRANT UPDATE (ranked_epoch) ON central_identity.gateway_approvals TO central_runtime",
+            "REVOKE UPDATE (ranked_epoch) ON central_identity.gateway_approvals FROM central_runtime",
+        ),
+        (
+            "REVOKE UPDATE (ranked_verified) ON central_identity.gateway_approvals FROM central_runtime",
+            "GRANT UPDATE (ranked_verified) ON central_identity.gateway_approvals TO central_runtime",
+        ),
+        (
             "GRANT UPDATE (approved_at) ON central_identity.gateway_approvals TO central_runtime",
             "REVOKE UPDATE (approved_at) ON central_identity.gateway_approvals FROM central_runtime",
         ),

@@ -26,7 +26,7 @@ impl AccountStore {
              ('gateway_streams', ARRAY['SELECT','INSERT','UPDATE'], NULL),
              ('gateway_sids', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('gateway_revocations', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('gateway_approvals', ARRAY['SELECT','INSERT'], ARRAY['enabled']),
+             ('gateway_approvals', ARRAY['SELECT','INSERT'], ARRAY['enabled','ranked_verified']),
              ('gateway_tokens', ARRAY['SELECT','INSERT'], ARRAY['revoked_at','last_used_at']),
              ('migration_archives', ARRAY['SELECT','INSERT'], NULL),
              ('gateway_terms', ARRAY['SELECT','INSERT'], NULL),
@@ -78,8 +78,23 @@ impl AccountStore {
              ('tower_award_receipts', ARRAY['SELECT','INSERT'], NULL),
              ('donations', ARRAY['SELECT','INSERT'], ARRAY['euro_cents']),
              ('donation_sums', ARRAY['SELECT'], NULL),
-             ('donation_count', ARRAY['SELECT'], NULL))
-             SELECT count(*) = 61 AND bool_and(
+             ('donation_count', ARRAY['SELECT'], NULL),
+             ('ranked_seasons', ARRAY['SELECT'], NULL),
+             ('ranked_hosts', ARRAY['SELECT'], ARRAY['ranked_epoch','capacity','seen_at','continuity_since']),
+             ('ranked_matches', ARRAY['SELECT'], ARRAY['claimed_a','claimed_b','game_id','deck_a','deck_b','state','outcome','finished_at','lease_until']),
+             ('ranked_tickets', ARRAY['SELECT'], ARRAY['state','match_id']),
+             ('ranked_ratings', ARRAY['SELECT','INSERT'], ARRAY['elo','queue_elo','score','placement','allowance','games','wins','losses','draws','league','division','last_at']),
+             ('ranked_deck_versions', ARRAY['SELECT','INSERT'], ARRAY['elo','anchor']),
+             ('ranked_deck_ratings', ARRAY['SELECT','INSERT'], ARRAY['elo','games','season_games','wins','losses','draws','league','division','last_at']),
+             ('ranked_receipts', ARRAY['SELECT','INSERT'], NULL),
+             ('ranked_publications', ARRAY['SELECT','INSERT'], ARRAY['published_on']),
+             ('ranked_champions', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place'])),
+             insert_columns(name,cols) AS (VALUES
+               ('ranked_hosts', ARRAY['host_id','ranked_epoch','capacity','seen_at']),
+               ('ranked_matches', ARRAY['season_id','format','account_a','account_b','commitment_a','commitment_b','host_id','ranked_epoch','origin']),
+               ('ranked_tickets', ARRAY['account_id','request_id','season_id','format','commitment','queue_elo']))
+             SELECT count(*) = (SELECT count(*) FROM required) AND bool_and(
                NOT pg_catalog.pg_has_role(c.relowner, 'USAGE')
                AND (SELECT bool_and(pg_catalog.has_table_privilege(c.oid, p)) FROM unnest(r.privileges) p)
                AND NOT pg_catalog.has_table_privilege(c.oid, 'TRUNCATE, REFERENCES, TRIGGER, MAINTAIN, SELECT WITH GRANT OPTION, INSERT WITH GRANT OPTION, UPDATE WITH GRANT OPTION, DELETE WITH GRANT OPTION')
@@ -87,15 +102,21 @@ impl AccountStore {
                AND NOT EXISTS (SELECT 1 FROM unnest(ARRAY['INSERT','UPDATE','DELETE']) p
                  WHERE NOT p = ANY(r.privileges) AND pg_catalog.has_table_privilege(c.oid, p))
                AND NOT EXISTS (SELECT 1 FROM unnest(ARRAY['INSERT','UPDATE']) p
-                 WHERE NOT p = ANY(r.privileges) AND (p = 'INSERT' OR r.updatable IS NULL)
+                 WHERE NOT p = ANY(r.privileges) AND CASE p WHEN 'INSERT' THEN i.cols IS NULL ELSE r.updatable IS NULL END
                  AND pg_catalog.has_any_column_privilege(c.oid, p))
+               AND (i.cols IS NULL OR (
+                 (SELECT bool_and(pg_catalog.has_column_privilege(c.oid, u, 'INSERT')) FROM unnest(i.cols) u)
+                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = c.oid
+                   AND a.attnum > 0 AND NOT a.attisdropped AND NOT a.attname::text = ANY(i.cols)
+                   AND pg_catalog.has_column_privilege(c.oid, a.attnum, 'INSERT'))))
                -- A table with updatable columns: UPDATE on exactly those columns.
                AND (r.updatable IS NULL OR (
                  (SELECT bool_and(pg_catalog.has_column_privilege(c.oid, u, 'UPDATE')) FROM unnest(r.updatable) u)
                  AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid = c.oid
                    AND a.attnum > 0 AND NOT a.attisdropped AND NOT a.attname::text = ANY(r.updatable)
                    AND pg_catalog.has_column_privilege(c.oid, a.attnum, 'UPDATE'))))
-             ) AS allowed FROM required r JOIN pg_catalog.pg_class c ON c.relname = r.name
+             ) AS allowed FROM required r LEFT JOIN insert_columns i ON i.name = r.name
+             JOIN pg_catalog.pg_class c ON c.relname = r.name
              JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'central_identity'",
             vec![],
         )).await.ok().flatten().and_then(|row| row.try_get::<bool>("", "allowed").ok()) == Some(true)

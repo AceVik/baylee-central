@@ -181,7 +181,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        32
+        36
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -296,14 +296,20 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
         .await,
         1
     );
-    // A database at the 31 migrations before presence runs the one after them
-    // alone: every other file would fail if it ran twice. Its accounts take the
-    // default, and the previous binary's statements, which never name the
-    // column, run on.
+    // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "ALTER TABLE central_identity.accounts DROP COLUMN presence;
-             DELETE FROM public.seaql_migrations WHERE version = 'm20261119_000033_presence'",
+            "DROP TABLE central_identity.ranked_badge_peaks, central_identity.ranked_champions,
+                        central_identity.ranked_publications, central_identity.ranked_receipts, central_identity.ranked_deck_ratings,
+                        central_identity.ranked_deck_versions, central_identity.ranked_ratings,
+                        central_identity.ranked_tickets, central_identity.ranked_matches,
+                        central_identity.ranked_hosts, central_identity.ranked_seasons;
+             DROP FUNCTION central_identity.ranked_earned_badge();
+             DROP TRIGGER ranked_approval_changed ON central_identity.gateway_approvals;
+             DROP FUNCTION central_identity.ranked_approval_changed();
+             ALTER TABLE central_identity.gateway_approvals DROP COLUMN ranked_verified, DROP COLUMN ranked_epoch;
+             ALTER TABLE central_identity.accounts DROP COLUMN presence;
+             DELETE FROM public.seaql_migrations WHERE version >= 'm20261119_000033_presence'",
         )
         .await
         .unwrap();
@@ -314,7 +320,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        32
+        36
     );
     assert_eq!(
         scalar(

@@ -427,6 +427,10 @@ async fn administration(
         (row.live_tokens, row.credential_pair, row.official),
         (1, false, false)
     );
+    assert!(
+        !row.ranked_verified,
+        "directory approval never grants ranked trust"
+    );
     let (_, tokens) = store.admin_gateway(&cookie, gateway).await.unwrap();
     assert!(tokens.iter().any(|t| t.name == "Main"));
     let sid = admitted(store, native, owner_browser).await;
@@ -438,10 +442,15 @@ async fn administration(
             vec![action.into(), Uuid::from_bytes(gateway).into()],
         )
     };
+    ranked_verification(store, operator, gateway, &cookie, owner_browser, native).await;
     store
         .set_gateway_approval(&cookie, gateway, false)
         .await
         .unwrap();
+    assert_eq!(
+        store.set_ranked_verification(&cookie, gateway, true).await,
+        Err(Error::Conflict)
+    );
     store
         .set_gateway_approval(&cookie, gateway, false)
         .await
@@ -475,6 +484,19 @@ async fn administration(
         .await
         .unwrap();
     assert_eq!(audit("gateway.approved").await, 1);
+    assert!(
+        !store
+            .admin_gateway(&cookie, gateway)
+            .await
+            .unwrap()
+            .0
+            .ranked_verified
+    );
+    assert_eq!(
+        ranked_epoch(operator, gateway).await,
+        4,
+        "re-enabling never revives an assignment"
+    );
     // revoking as an administrator
     let main = tokens.iter().find(|t| t.name == "Main").unwrap().id;
     store
@@ -489,6 +511,10 @@ async fn administration(
     // a stale sign-in changes nothing
     age(operator, admin.account, 31).await;
     assert_eq!(
+        store.set_ranked_verification(&cookie, gateway, true).await,
+        Err(Error::Rejected)
+    );
+    assert_eq!(
         store
             .set_gateway_approval(&cookie, gateway, false)
             .await
@@ -497,6 +523,66 @@ async fn administration(
     );
     age(operator, admin.account, -31).await;
     (cookie, admin.account)
+}
+
+async fn ranked_epoch(operator: &DatabaseConnection, gateway: [u8; 16]) -> i64 {
+    count(
+        operator,
+        "SELECT ranked_epoch AS n FROM central_identity.gateway_approvals WHERE gateway_id = $1",
+        vec![Uuid::from_bytes(gateway).into()],
+    )
+    .await
+}
+
+/// Ordinary credentials cannot grant trust. Repeated admin requests have no side effects.
+async fn ranked_verification(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    gateway: [u8; 16],
+    admin: &Token,
+    owner: &Token,
+    native: &Token,
+) {
+    for caller in [owner, native] {
+        assert_eq!(
+            store.set_ranked_verification(caller, gateway, true).await,
+            Err(Error::Rejected)
+        );
+    }
+    assert_eq!(ranked_epoch(operator, gateway).await, 0);
+    for (verified, epoch) in [(true, 1), (false, 2), (true, 3)] {
+        for _ in 0..2 {
+            store
+                .set_ranked_verification(admin, gateway, verified)
+                .await
+                .unwrap();
+            assert_eq!(ranked_epoch(operator, gateway).await, epoch);
+            assert_eq!(
+                store
+                    .admin_gateway(admin, gateway)
+                    .await
+                    .unwrap()
+                    .0
+                    .ranked_verified,
+                verified
+            );
+        }
+    }
+    for (action, events) in [
+        ("gateway.ranked_verified", 2),
+        ("gateway.ranked_revoked", 1),
+    ] {
+        assert_eq!(
+            count(
+                operator,
+                "SELECT count(*) AS n FROM central_identity.audit_events
+             WHERE action = $1 AND gateway_id = $2 AND actor_kind = 'admin'",
+                vec![action.into(), Uuid::from_bytes(gateway).into()],
+            )
+            .await,
+            events
+        );
+    }
 }
 
 /// A player admitted at the gateway, while it is pending or after: a `sid`, which the owner's

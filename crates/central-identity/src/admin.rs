@@ -105,6 +105,12 @@ impl IdentityService {
                     .await?;
                 return Ok(Response::Done);
             }
+            AdminRequest::SetRankedVerification { gateway, verified } => {
+                self.store
+                    .set_ranked_verification(cookie, gateway, verified)
+                    .await?;
+                return Ok(Response::Done);
+            }
             AdminRequest::RevokeGatewayToken { token } => {
                 self.store.admin_revoke_gateway_token(cookie, token).await?;
                 return Ok(Response::Done);

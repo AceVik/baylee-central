@@ -76,6 +76,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         Request::TowerIdentity {}
         | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
+        | Request::RankedHost { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::GatewayPulse { .. }
         | Request::GatewayStatus
@@ -91,6 +92,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::TowerProgress {}
         | Request::TowerAwardExport { .. }
         | Request::Challenges { .. }
+        | Request::Ranked { .. }
         | Request::Notifications { .. }
         | Request::Social { .. }
         | Request::SessionStatus

@@ -41,6 +41,7 @@ struct Gateway {
     created_at: i64,
     live_tokens: u32,
     credential_pair: bool,
+    ranked_verified: bool,
 }
 
 impl From<AdminGateway> for Gateway {
@@ -58,6 +59,7 @@ impl From<AdminGateway> for Gateway {
             created_at: gateway.created_at,
             live_tokens: gateway.live_tokens,
             credential_pair: gateway.credential_pair,
+            ranked_verified: gateway.ranked_verified,
         }
     }
 }
@@ -320,7 +322,7 @@ impl Page {
     /// A change ended: the list (and the open tokens) are read again.
     fn ended(self, change: Change, came: Came) {
         let place = match change {
-            Change::Approval { gateway, .. } => self
+            Change::Approval { gateway, .. } | Change::Ranked { gateway, .. } => self
                 .items
                 .with_untracked(|items| items.iter().position(|g| g.id == gateway)),
             _ => None,
@@ -496,6 +498,35 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 on:click=move |_| p.approval(&asked, false)>{words::admin_gw_disable(lang)}</button>
         }
     });
+    let ranked = (gateway.state == GatewayState::Approved).then(|| {
+        let verified = !gateway.ranked_verified;
+        let origin = gateway.origin.clone();
+        let label = if verified {
+            words::admin_gw_ranked_grant(lang)
+        } else {
+            words::admin_gw_ranked_revoke(lang)
+        };
+        let button = format!("admin-ranked-{key}");
+        let from = format!("#{button}");
+        view! {
+            <button type="button" class="button" id=button aria-describedby=heading.clone()
+                on:click=move |_| p.flow.ask(Asked {
+                    change: Change::Ranked { gateway: id, verified },
+                    title: label.to_owned(),
+                    text: if verified {
+                        words::admin_gw_ranked_grant_text(lang, &origin)
+                    } else {
+                        words::admin_gw_ranked_revoke_text(lang, &origin)
+                    },
+                    action: label,
+                    danger: !verified,
+                    from: from.clone(),
+                })>{label}</button>
+        }
+    });
+    let ranked_badge = gateway.ranked_verified.then(|| {
+        view! { <span class="pill ok">{words::admin_gw_ranked_verified(lang)}</span> }
+    });
     let shown = move || p.open.get() == Some(id);
     view! {
         <li class="card admin-gw">
@@ -507,7 +538,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                         {common::copy_button(lang, gateway.origin.clone(), words::gws_address(lang))}
                     </p>
                 </div>
-                <p class="pills">{official}<span class=format!("pill {tone}")>{state}</span>{online}</p>
+                <p class="pills">{official}<span class=format!("pill {tone}")>{state}</span>{online}{ranked_badge}</p>
             </div>
             <dl class="facts">
                 <dt>{words::admin_gw_owner(lang)}</dt>
@@ -522,6 +553,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
             <p class="actions">
                 {approve}
                 {disable}
+                {ranked}
                 <button type="button" class="button quiet" id=format!("admin-tokens-{key}") aria-describedby=heading
                     aria-expanded=move || if shown() { "true" } else { "false" }
                     on:click=move |_| p.toggle(id)>
@@ -529,7 +561,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 </button>
             </p>
             {p.flow.panel(move |change| match change {
-                Change::Approval { gateway, .. } | Change::Revoke { gateway, .. } => *gateway == id,
+                Change::Approval { gateway, .. } | Change::Ranked { gateway, .. } | Change::Revoke { gateway, .. } => *gateway == id,
                 _ => false,
             })}
             {move || shown().then(|| view! { <div class="admin-tokens">{tokens_view(&p, id)}</div> })}

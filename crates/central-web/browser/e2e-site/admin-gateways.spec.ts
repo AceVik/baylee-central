@@ -64,7 +64,7 @@ test("the queue first: gateways awaiting approval, their owners and facts, and t
   const official = card(page, "Baylee");
   await expect(official.locator(".pill")).toHaveText(["Official", "Approved", "Online"]);
   await expect(official.locator("dd").first()).toHaveText("The bridge (official)");
-  await expect(official.getByRole("button")).toHaveText(["Copy Address", "Disable", "Show tokens"]);
+  await expect(official.getByRole("button")).toHaveText(["Copy Address", "Disable", "Authorize ranked hosting", "Show tokens"]);
   await sound(page);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
@@ -78,6 +78,22 @@ test("the queue first: gateways awaiting approval, their owners and facts, and t
   // reading is all that was asked
   expect(changes(seen)).toEqual([]);
   expect(problems).toEqual([]);
+});
+
+test("ranked hosting requires a separate confirmed grant, including for the official gateway", async ({ page }) => {
+  const { seen } = await open(page, world(), "/en/account/admin/gateways#state=approved");
+  const official = card(page, "Baylee");
+  for (const [label, verified] of [["Authorize ranked hosting", true], ["Revoke ranked hosting", false]] as const) {
+    const from = seen.length;
+    await button(official, label).click();
+    await expect(confirm(official)).toContainText(verified ? "report results to Central" : "invalidated");
+    expect(changes(seen, from)).toEqual([]);
+    await button(confirm(official), label).click();
+    await expect(done(page)).toHaveText(verified ? "Ranked hosting verified" : "Ranked hosting revoked");
+    await expect(official.locator(".pill", { hasText: "Ranked hosting verified" })).toHaveCount(verified ? 1 : 0);
+    expect(changes(seen, from)).toHaveLength(1);
+    expect(changes(seen, from)[0]).toEqual({ action: "set_ranked_verification", gateway: GW.official, verified });
+  }
 });
 
 test("approving asks first, is sent once, and the keyboard goes on down the queue", async ({ page }) => {
