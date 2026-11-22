@@ -10,6 +10,7 @@ use sea_orm::{
 
 mod decks;
 mod players;
+pub(super) use decks::preview;
 
 struct Fixture {
     id: Uuid,

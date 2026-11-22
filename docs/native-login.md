@@ -152,6 +152,10 @@ document revision and the ordered live object IDs and revisions under the
 same account lock used for object mutations. The original source and password
 verifier are deleted at close. The receipt's digest travels only to the
 official gateway, which verifies the retained original before linking.
+Page reads stop at the existing legacy-store deadline. A client that has
+already verified and persisted the complete encrypted library can retry its
+final receipt after that deadline. An incomplete source must be recovered
+before the operator's retention window ends.
 
 The historical operator export rejected oversized accounts before writing
 its output. This path accepts a complete staged export supplied by the

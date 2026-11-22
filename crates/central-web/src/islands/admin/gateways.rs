@@ -466,6 +466,20 @@ fn ranked_action(p: Page, gateway: &Gateway, heading: &str) -> impl IntoView + u
     })
 }
 
+fn gateway_owner(lang: Lang, gateway: &Gateway) -> impl IntoView + use<> {
+    match gateway.owner {
+        Some(owner) => {
+            let name = gateway
+                .owner_name
+                .clone()
+                .unwrap_or_else(|| common::id_end(&owner));
+            view! { <a href=common::user_path(lang, &owner)><bdi translate="no">{name}</bdi></a> }
+                .into_any()
+        }
+        None => words::admin_gw_bridge(lang).into_any(),
+    }
+}
+
 fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
     let p = *p;
     let lang = p.cx.lang;
@@ -481,17 +495,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
     } else {
         view! { <span class="pill off">{words::gws_offline(lang)}</span> }
     };
-    let owner = match gateway.owner {
-        Some(owner) => {
-            let name = gateway
-                .owner_name
-                .clone()
-                .unwrap_or_else(|| common::id_end(&owner));
-            view! { <a href=common::user_path(lang, &owner)><bdi translate="no">{name}</bdi></a> }
-                .into_any()
-        }
-        None => words::admin_gw_bridge(lang).into_any(),
-    };
+    let owner = gateway_owner(lang, gateway);
     let seen = gateway
         .last_seen
         .map_or_else(|| "–".to_owned(), |at| when(lang, at));

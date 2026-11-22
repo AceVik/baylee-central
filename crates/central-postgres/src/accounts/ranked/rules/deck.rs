@@ -1,6 +1,6 @@
 use super::{Outcome, rounded};
 
-/// Starting Elo for a brand-new composition with no established reference,
+/// Minimum inherited rating after edits against an established reference,
 /// also the minimum deck score and the residue after a complete replacement.
 pub(crate) const DECK_FLOOR: i32 = 150;
 

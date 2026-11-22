@@ -23,7 +23,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('gateway_streams', ARRAY['SELECT','INSERT','UPDATE'], NULL),
              ('gateway_sids', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('gateway_revocations', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('gateway_approvals', ARRAY['SELECT','INSERT'], ARRAY['enabled','ranked_verified']),
+             ('gateway_approvals', ARRAY['SELECT'], ARRAY['enabled','ranked_verified']),
              ('gateway_tokens', ARRAY['SELECT','INSERT'], ARRAY['revoked_at','last_used_at']),
              ('migration_archives', ARRAY['SELECT','INSERT'], NULL),
              ('gateway_terms', ARRAY['SELECT','INSERT'], NULL),
@@ -89,6 +89,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('ranked_champions', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place'])),
              insert_columns(name,cols) AS (VALUES
+               ('gateway_approvals', ARRAY['gateway_id','enabled']),
                ('ranked_hosts', ARRAY['host_id','ranked_epoch','capacity','seen_at']),
                ('ranked_matches', ARRAY['season_id','format','account_a','account_b','commitment_a','commitment_b','host_id','ranked_epoch','origin']),
                ('ranked_tickets', ARRAY['account_id','request_id','season_id','format','commitment','queue_elo']))

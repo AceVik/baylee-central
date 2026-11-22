@@ -244,6 +244,49 @@ pub struct PoolEntry {
     pub copies: u16,
 }
 
+/// Check the bounded canonical multiset shared by engine attestations and owner previews.
+pub fn valid_pool(entries: &[PoolEntry]) -> bool {
+    !entries.is_empty()
+        && entries.len() <= 250
+        && entries.windows(2).all(|pair| pair[0].card < pair[1].card)
+        && entries.iter().all(|row| row.copies > 0)
+        && entries.iter().map(|row| u32::from(row.copies)).sum::<u32>() <= 250
+}
+
+/// Whether a deck projection restores play history or inherits a starting score.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum PreviewSource {
+    /// This account has never played a deck in the selected format.
+    New,
+    /// This exact composition has never played; a stable reference applies.
+    Inherited,
+    /// Resume the exact composition's confirmed Elo and placement games.
+    Recorded,
+}
+
+/// Private, read-only estimate for the selected pool as of one database snapshot.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeckPreview {
+    /// Competitive format.
+    pub format: Format,
+    /// Origin of this version's rating.
+    pub source: PreviewSource,
+    /// Current or inherited deck rating before any further result.
+    pub elo: i32,
+    /// Points deducted from the selected stable reference for these edits.
+    pub edit_loss: i32,
+    /// Current published rank of this composition.
+    pub rank: Rank,
+    /// Confirmed placement progress, capped at ten.
+    pub placement_games: u8,
+    /// Unmatched copies between the proposed composition and the closest reference.
+    pub changed_copies: u16,
+    /// Number of copies in the larger pool for that comparison.
+    pub compared_copies: u16,
+}
+
 /// One account's private seat assignment.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -349,6 +392,13 @@ pub enum QueueState {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Estimate the owner's explicitly selected competitive deck without registering it.
+    PreviewDeck {
+        /// Competitive format the list is intended for.
+        format: Format,
+        /// Sorted combined rules-identity commitments and copy counts.
+        pool: Vec<PoolEntry>,
+    },
     /// Enter one global format queue.
     Join {
         /// Stable queue request ID, reused on retries.
@@ -398,6 +448,11 @@ pub enum Request {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Private valuation of the selected deck.
+    DeckPreview {
+        /// The result of the owner's read-only comparison.
+        preview: DeckPreview,
+    },
     /// Private queue or receipt.
     Queue {
         /// Current status.

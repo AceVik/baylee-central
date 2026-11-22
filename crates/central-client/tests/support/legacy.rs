@@ -150,6 +150,10 @@ fn archived_path(http: &Http, runtime: &Runtime, operator: &DatabaseConnection) 
         .legacy_finish_archive(http, manifest.generation, digest)
         .unwrap();
     assert!(session.migration_closed(http).unwrap());
+    let (grant, _) = session.gateway_token(http, GATEWAY.into(), Admit).unwrap();
+    let claims = http.gateway_claims(&grant, GATEWAY);
+    assert_eq!(claims.legacy_id.as_deref(), Some("archived-id"));
+    assert_eq!(claims.legacy_deck_source, Some(digest));
     session
         .legacy_finish_archive(http, manifest.generation, digest)
         .unwrap();

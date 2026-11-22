@@ -688,7 +688,8 @@ gateways on the website (`/{lang}/account/admin/gateways` since 12.11.2026; the
 old build's `/admin/gateways` before), and owners mint and revoke their
 gateways' tokens there ([gateway registry](gateway-registry.md) §"Gateway
 tokens"). The deploy hook applies `ops/grants.sql` after the migration,
-which gives the runtime `INSERT` and `UPDATE (enabled, ranked_verified)` on
+which gives the runtime `INSERT (gateway_id, enabled)` and
+`UPDATE (enabled, ranked_verified)` on
 `gateway_approvals` and its rights on `gateway_tokens`; a binary from before
 migration 000014 refuses to start over the wider grants, so roll back the
 grants with the binary. The operator's SQL stays the fallback when no

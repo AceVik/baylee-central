@@ -183,16 +183,7 @@ async fn claim(
 /// Validates the shape of a host-attested combined deck. The trusted game host verifies format
 /// legality against its catalog. Distinct sorted card digests keep persistence deterministic.
 fn pool(entries: &[api::PoolEntry]) -> Result<String, Error> {
-    if entries.is_empty()
-        || entries.len() > 250
-        || entries.windows(2).any(|p| p[0].card >= p[1].card)
-        || entries.iter().any(|card| card.copies == 0)
-        || entries
-            .iter()
-            .map(|card| u32::from(card.copies))
-            .sum::<u32>()
-            > 250
-    {
+    if !api::valid_pool(entries) {
         return Err(Error::Rejected);
     }
     String::from_utf8(central_api::encode(&entries)?).map_err(unavailable)

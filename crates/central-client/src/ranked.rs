@@ -34,6 +34,7 @@ fn responds(request: &api::Request, reply: &api::Response) -> bool {
     use api::Request as Q;
     use api::Response as A;
     match (request, reply) {
+        (Q::PreviewDeck { format, .. }, A::DeckPreview { preview }) => preview.format == *format,
         (Q::Join { .. } | Q::Cancel { .. } | Q::Status, A::Queue { .. })
         | (Q::Seasons { .. }, A::Seasons { .. }) => true,
         (
@@ -85,6 +86,26 @@ fn responds(request: &api::Request, reply: &api::Response) -> bool {
 }
 
 impl Session {
+    /// Preview the explicitly selected pool in this account's private deck history.
+    ///
+    /// # Errors
+    /// Rejects foreign endpoints, invalid pools, expired sessions and mismatched replies.
+    pub fn preview_ranked_deck(
+        &self,
+        transport: &impl Transport,
+        format: api::Format,
+        pool: Vec<api::PoolEntry>,
+    ) -> Result<api::DeckPreview, Error> {
+        if !api::valid_pool(&pool) {
+            return Err(Error::Rejected);
+        }
+        let api::Response::DeckPreview { preview } =
+            self.ranked(transport, api::Request::PreviewDeck { format, pool })?
+        else {
+            return Err(Error::Rejected);
+        };
+        Ok(preview)
+    }
     /// Manage this account's private queue entry or read the ladder.
     ///
     /// # Errors

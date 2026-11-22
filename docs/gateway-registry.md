@@ -55,7 +55,7 @@ The runtime may use these registry privileges without grant options:
 
 ```sql
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT, INSERT, UPDATE (enabled, ranked_verified) ON central_identity.gateway_approvals TO central_runtime;
+GRANT SELECT, INSERT (gateway_id, enabled), UPDATE (enabled, ranked_verified) ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateway_streams TO central_runtime;
@@ -70,7 +70,8 @@ The reusable SDK exposes `gateway_directory`, `public_figures`,
 `Session::set_gateway_admins`; it validates returned IDs and public metadata.
 The runtime
 must not own these objects or inherit operator privileges. Startup rejects any
-privilege on the approval table beyond `SELECT`, `INSERT` and `UPDATE (enabled, ranked_verified)`
+privilege on the approval table beyond `SELECT`, `INSERT (gateway_id, enabled)`
+and `UPDATE (enabled, ranked_verified)`
 (no `DELETE`, no other column, no grant option), including inherited effective
 privileges. Credential-pair rotation and revocation stay an administrative DB
 operation; gateway tokens are revoked on the website.
@@ -332,7 +333,7 @@ no gateway operation. Renewal changes nothing in the token. A website's session 
 `GatewayToken { token, expires_at }`. It is refused for Central's terms not accepted, an
 unfinished move, a disabled or unknown gateway, an `admin` purpose without current
 membership. The official gateway has no Central administrators, and admits a moved account
-once its move is closed. `purpose` is `admit` or `admin`. Other claims: `sub`, `sid`, `jti`,
+once its move is closed. `purpose` is `admit`, `admin`, or the game-scoped `ranked`. Other claims: `sub`, `sid`, `jti`,
 `iat`, `nbf`, `exp`, and, while there is one, `name` and `tag` (a gateway learns the names of
 the people who sign in there, nobody else's), `legacy_id` (the official gateway, closed moves
 only) and `terms` (the newest of this gateway's terms the account accepted, which the gateway
@@ -344,6 +345,11 @@ Asking again refreshes: `exp` moves, `name`, `tag` and `terms` are read again, `
 gateways cannot tell they saw the same session. `exp` is capped by the 12-hour cap rather than
 the session's 30-minute expiry, which would make every token half an hour: a session the client
 stops renewing leaves its token valid until `exp`, an hour at most, and it cannot be refreshed.
+
+A ranked seat carries its Central match ID in the signed grant. Renewals of that match at
+the assigned host keep its SID. The next ranked assignment issues a fresh SID and revokes
+the previous ranked SID, including when both games use the same host. A lobby or admin
+session keeps its own SID.
 
 **Keys.** `GET /.well-known/jwks.json` is public: RFC 8037 OKP keys, at most eight and 16 KiB,
 `application/jwk-set+json`, `Cache-Control: public, max-age=300`, 256 reads a second in all,

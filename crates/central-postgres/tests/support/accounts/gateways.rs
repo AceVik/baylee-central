@@ -266,8 +266,16 @@ async fn privilege_gate(operator: &DatabaseConnection) {
             "REVOKE UPDATE (expires_at) ON central_identity.gateway_tokens FROM central_runtime",
         ),
         (
-            "REVOKE INSERT ON central_identity.gateway_approvals FROM central_runtime",
-            "GRANT INSERT ON central_identity.gateway_approvals TO central_runtime",
+            "REVOKE INSERT (enabled) ON central_identity.gateway_approvals FROM central_runtime",
+            "GRANT INSERT (enabled) ON central_identity.gateway_approvals TO central_runtime",
+        ),
+        (
+            "GRANT INSERT (ranked_epoch) ON central_identity.gateway_approvals TO central_runtime",
+            "REVOKE INSERT (ranked_epoch) ON central_identity.gateway_approvals FROM central_runtime",
+        ),
+        (
+            "GRANT INSERT (ranked_verified) ON central_identity.gateway_approvals TO central_runtime",
+            "REVOKE INSERT (ranked_verified) ON central_identity.gateway_approvals FROM central_runtime",
         ),
         (
             "REVOKE UPDATE (last_used_at) ON central_identity.gateway_tokens FROM central_runtime",
