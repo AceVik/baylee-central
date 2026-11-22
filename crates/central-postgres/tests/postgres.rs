@@ -299,7 +299,9 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "DROP TABLE central_identity.ranked_badge_peaks, central_identity.ranked_champions,
+            "ALTER TABLE central_identity.gateway_sids DROP COLUMN ranked_match;
+             DROP INDEX central_identity.gateway_sids_one_ranked;
+             DROP TABLE central_identity.ranked_badge_peaks, central_identity.ranked_champions,
                         central_identity.ranked_publications, central_identity.ranked_receipts, central_identity.ranked_deck_ratings,
                         central_identity.ranked_deck_versions, central_identity.ranked_ratings,
                         central_identity.ranked_tickets, central_identity.ranked_matches,

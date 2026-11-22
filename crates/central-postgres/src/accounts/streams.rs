@@ -111,22 +111,25 @@ async fn assigned_match(
     Ok(*id.as_bytes())
 }
 
-/// The `sid` of this session, gateway and purpose: the one it has, or `fresh`.
+/// Reuse the SID for a refresh. A new ranked game gets its own revocable session.
 async fn held_sid(
     tx: &DatabaseTransaction,
     digest: &[u8],
     stream: &str,
     purpose: GatewayPurpose,
+    ranked_match: Option<Uuid>,
     fresh: [u8; 16],
 ) -> Result<[u8; 16], Error> {
     let found = tx
         .query_one_raw(statement(
             "SELECT sid FROM central_identity.gateway_sids
-             WHERE session_digest = $1 AND stream = $2 AND purpose = $3",
+             WHERE session_digest = $1 AND stream = $2 AND purpose = $3
+             AND ranked_match IS NOT DISTINCT FROM $4",
             vec![
                 digest.to_vec().into(),
                 stream.into(),
                 purpose.as_str().into(),
+                ranked_match.into(),
             ],
         ))
         .await
@@ -134,6 +137,17 @@ async fn held_sid(
     if let Some(row) = found {
         let sid: Vec<u8> = row.try_get("", "sid").map_err(|_| Error::Unavailable)?;
         return sid_bytes(&sid);
+    }
+    if let Some(matched) = ranked_match {
+        // The session is locked. Removing its previous ranked SID also publishes the normal
+        // revocation to the previous host, which can be on a different gateway.
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.gateway_sids WHERE session_digest=$1 AND purpose='ranked'
+             AND ranked_match IS DISTINCT FROM $2",
+            vec![digest.to_vec().into(), matched.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
     }
     tx.execute_raw(statement(
         "INSERT INTO central_identity.gateway_streams(origin) VALUES ($1)
@@ -144,8 +158,8 @@ async fn held_sid(
     .map_err(|_| Error::Unavailable)?;
     let inserted = tx
         .execute_raw(statement(
-            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose)
-             SELECT $1, $2, $3, $4 WHERE (SELECT count(*) FROM central_identity.gateway_sids
+            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose, ranked_match)
+             SELECT $1, $2, $3, $4, $6 WHERE (SELECT count(*) FROM central_identity.gateway_sids
                  WHERE session_digest = $2) < $5",
             vec![
                 fresh.to_vec().into(),
@@ -153,6 +167,7 @@ async fn held_sid(
                 stream.into(),
                 purpose.as_str().into(),
                 MAX_SIDS_PER_SESSION.into(),
+                ranked_match.into(),
             ],
         ))
         .await
@@ -234,7 +249,15 @@ impl AccountStore {
             // Admission needs a closed move; the official gateway has no Central admins.
             return Err(Error::Rejected);
         }
-        let sid = held_sid(&tx, &digest, stream, purpose, fresh).await?;
+        let sid = held_sid(
+            &tx,
+            &digest,
+            stream,
+            purpose,
+            ranked_match.map(Uuid::from_bytes),
+            fresh,
+        )
+        .await?;
         let accepted = tx
             .query_one_raw(statement(
                 &format!(
