@@ -245,6 +245,7 @@ pub struct PoolEntry {
 }
 
 /// Check the bounded canonical multiset shared by engine attestations and owner previews.
+#[must_use]
 pub fn valid_pool(entries: &[PoolEntry]) -> bool {
     !entries.is_empty()
         && entries.len() <= 250

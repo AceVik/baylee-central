@@ -28,6 +28,16 @@ fn row(legacy_id: &str, username: &str) -> LegacyRow {
     }
 }
 
+fn oversized_source() -> Vec<u8> {
+    let mut snapshot = br#"{"preferences":{},"decks":[{"cards":""#.to_vec();
+    snapshot.extend(std::iter::repeat_n(
+        b'x',
+        central_api::legacy::MAX_SNAPSHOT_BYTES,
+    ));
+    snapshot.extend(br#""}]}"#);
+    snapshot
+}
+
 /// The rows, the count and the digest the gateway would declare for them.
 fn declared(mut rows: Vec<LegacyRow>) -> (Vec<LegacyRow>, u64, [u8; 32]) {
     rows.sort_by(|a, b| a.legacy_id.as_bytes().cmp(b.legacy_id.as_bytes()));
@@ -49,12 +59,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         banned.display_name = None;
         banned.tag = Some(8);
         banned.ban = Some(None);
-        banned.snapshot = br#"{"preferences":{},"decks":[{"cards":""#.to_vec();
-        banned.snapshot.extend(std::iter::repeat_n(
-            b'x',
-            central_api::legacy::MAX_SNAPSHOT_BYTES,
-        ));
-        banned.snapshot.extend(br#""}]}"#);
+        banned.snapshot = oversized_source();
         banned
     }]);
     let imported = import_legacy(operator, rows, total, digest).await.unwrap();
@@ -331,7 +336,10 @@ async fn refusals(operator: &DatabaseConnection) {
     // `alice` is an enrolled Central account by now; `restart-legacy`'s
     // move closed in `migration::run`.
     let (rows, total, digest) = declared(vec![
-        row("refused-a", "refused-a"),
+        LegacyRow {
+            snapshot: oversized_source(),
+            ..row("refused-a", "refused-a")
+        },
         row("refused-b", "alice"),
     ]);
     assert_eq!(
@@ -351,6 +359,15 @@ async fn refusals(operator: &DatabaseConnection) {
         })
     );
     assert_eq!(empty(operator).await, 0, "a refused import stores nothing");
+    assert_eq!(
+        count(
+            operator,
+            "SELECT count(*)::bigint AS value FROM central_identity.legacy_deck_transfers"
+        )
+        .await,
+        0,
+        "a later refused row also rolls back the earlier staged manifest"
+    );
 }
 
 /// Ten failures in a row lock an account out for the hour; while locked it

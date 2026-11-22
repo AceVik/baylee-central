@@ -32,6 +32,8 @@ A second run followed 384 careers at each of three fixed strengths for 320 conse
 
 Every simulated Master had played 2,000 games over at least 200 play days. Grandmaster required at least 2,500. With repeated chances over 320 days, even some 2100-strength players briefly crossed the 2240 threshold. First passage does not measure how long they remained there.
 
+The Baylee league lab measured rarity in eight mixed-activity fields of 12,000 accounts (seeds 610–617). On day 364, 567 of 96,000 held Master, 96 held Grandmaster and 39 held Champion. Those mutually exclusive shares were 0.59%, 0.10% and 0.041%. A separate field of 150,000 filled exactly 100 Champion seats from 198 candidates. The combined queue-and-rating study's six 5,000-account peak fields put 225 of 30,000 into Master or above (0.75%), 34 into Grandmaster or above (0.113%) and five into Champion (0.017%). These are end-of-period snapshots of the lab's shared player ladder. Live Central assigns per-format standings and deduplicates the global Champion allocation by account.
+
 ## Changes to a placed deck
 
 The deck-revision study started with three established reference ratings and a 60-card main deck plus 15 sideboard cards. Copies shared identities. Each experiment changed one to 75 copies, applied the production inheritance and settlement functions, compared direct changes to staging with a match between edits, and then played ten games on the final version along both paths. The in-memory test book models a single established reference and indexes version records by the sorted multiset. The PostgreSQL store suite separately exercises persisted records.
