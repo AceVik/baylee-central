@@ -246,6 +246,22 @@ pub struct HostAssignment {
     pub game: Option<Id>,
 }
 
+/// Settlement of the played deck version, delivered with its owner's result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeckResult {
+    /// Rank of this exact composition before play.
+    pub before: Rank,
+    /// Rank of this exact composition after play.
+    pub after: Rank,
+    /// New deck rating.
+    pub elo: i32,
+    /// Change due to this game.
+    pub delta: i32,
+    /// Completed deck placement games, capped at ten.
+    pub placement_games: u8,
+}
+
 /// Status of this account's most recent queue request.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -270,6 +286,8 @@ pub enum QueueState {
     },
     /// Terminal player receipt for the completed match.
     Finished {
+        /// Settlement for this account's deck in the same transaction.
+        deck: DeckResult,
         /// Stable queue request ID, reused on retries.
         key: Id,
         /// Central's match ID.

@@ -1,5 +1,5 @@
 //! Competitive play through the configured Central, independent of the player's home gateway.
-use super::{Error, Request, Response, Session, Token, Transport};
+use super::{Bearer, Error, Request, Response, Session, Token, Transport};
 use central_api::ranked as api;
 
 /// Read a public board, season or profile.
@@ -10,9 +10,77 @@ pub fn read(transport: &impl Transport, request: api::Request) -> Result<api::Re
     if !request.is_public() {
         return Err(Error::Rejected);
     }
-    match transport.exchange(&Request::Ranked { request }, None)? {
-        Response::Ranked { response } => Ok(response),
+    exchange(transport, request, None)
+}
+
+fn exchange(
+    transport: &impl Transport,
+    request: api::Request,
+    bearer: Option<Bearer<'_>>,
+) -> Result<api::Response, Error> {
+    let wire = Request::Ranked { request };
+    let reply = transport.exchange(&wire, bearer)?;
+    match (wire, reply) {
+        (Request::Ranked { request }, Response::Ranked { response })
+            if responds(&request, &response) =>
+        {
+            Ok(response)
+        }
         _ => Err(Error::Rejected),
+    }
+}
+
+fn responds(request: &api::Request, reply: &api::Response) -> bool {
+    use api::Request as Q;
+    use api::Response as A;
+    match (request, reply) {
+        (Q::Join { .. } | Q::Cancel { .. } | Q::Status, A::Queue { .. })
+        | (Q::Seasons { .. }, A::Seasons { .. }) => true,
+        (
+            Q::Board {
+                season,
+                format,
+                track,
+                league,
+                division,
+                ..
+            },
+            A::Board {
+                season: actual,
+                entries,
+                ..
+            },
+        ) => {
+            season.is_none_or(|id| id == actual.id)
+                && entries.iter().all(|entry| {
+                    let s = &entry.standing;
+                    s.format == *format
+                        && s.track == *track
+                        && s.rank.league == *league
+                        && division.is_none_or(|number| s.rank.division == Some(number))
+                })
+        }
+        (
+            Q::Profile { target, season },
+            A::Profile {
+                season: actual,
+                account,
+                name,
+                tag,
+                ..
+            },
+        ) => {
+            season.is_none_or(|id| id == actual.id)
+                && match target {
+                    api::ProfileTarget::Account(id) => account == id,
+                    api::ProfileTarget::Handle(handle) => {
+                        name.as_deref().zip(*tag).is_some_and(|(n, t)| {
+                            central_api::profile::handle(n, t).eq_ignore_ascii_case(handle)
+                        })
+                    }
+                }
+        }
+        _ => false,
     }
 }
 
@@ -27,10 +95,7 @@ impl Session {
         request: api::Request,
     ) -> Result<api::Response, Error> {
         self.same_endpoint(transport)?;
-        match transport.exchange(&Request::Ranked { request }, Some((&self.token).into()))? {
-            Response::Ranked { response } => Ok(response),
-            _ => Err(Error::Rejected),
-        }
+        exchange(transport, request, Some((&self.token).into()))
     }
 }
 
