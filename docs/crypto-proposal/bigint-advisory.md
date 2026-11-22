@@ -332,3 +332,7 @@ The same day the source fingerprint of `central-crypto` was renewed to
 line of its manifest: `zeroize` 1.9.1 → 1.9.2. No source file, feature or
 other dependency of the crate changed; `opaque-sha2` 0.10.9 and `rand`
 0.8.8 stay pinned to OPAQUE's generation.
+
+### 22 November 2026 · Ranked seats and large legacy deck imports
+
+The change to the reviewed crate is confined to the gateway JWT claims and their tests. The ranked purpose binds an already signed gateway token to a required 16-byte match ID. A paginated legacy import can attach an optional 32-byte source digest to a claim that already carries the legacy account ID. Validation inspects enum tags, fixed-length bytes, and the public UUID version and variant bits. The signing and verification functions, Ristretto suite, KDFs, and hash-to-group code are unchanged. An independent source review checked both the crate diff and its resolved arithmetic dependency paths against the existing advisory scope. The source fingerprint for this revision is `f626b2a4fa0ede961db84fafe99112bfed8e943fb30b20b2d10ae1948cf70e17`. Source and graph checks continue to fail closed on changes. [RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2026-0387.html)

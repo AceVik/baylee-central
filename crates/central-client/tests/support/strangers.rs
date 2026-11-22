@@ -431,6 +431,7 @@ fn one_owner_s_tokens(
     let scopes = GatewayScopes {
         sso: true,
         listing: true,
+        ranked: false,
     };
     let mut tokens = Vec::new();
     for origin in ["http://127.0.0.1:28771", "http://127.0.0.1:28772"] {

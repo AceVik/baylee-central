@@ -28,6 +28,7 @@ mod pairing;
 mod password;
 mod pictures;
 mod profiles;
+mod ranked;
 mod recovery;
 mod register;
 mod registration;
@@ -152,6 +153,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     assert!(store.discover("nobody").await.unwrap().is_none());
     sessions(&store, &alice, &bob).await;
     expiry_and_revision(&store, operator, &keys, first).await;
+    ranked::run(&store, operator, &keys).await;
     gateways::run(&store, operator, &keys).await;
     single_session::run(&store, &keys).await;
     revocation_race::run(&store, operator, &keys).await;

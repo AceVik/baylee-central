@@ -76,6 +76,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         Request::TowerIdentity {}
         | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
+        | Request::RankedHost { .. }
         | Request::GatewayHeartbeat { .. }
         | Request::GatewayPulse { .. }
         | Request::GatewayStatus
@@ -91,6 +92,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::TowerProgress {}
         | Request::TowerAwardExport { .. }
         | Request::Challenges { .. }
+        | Request::Ranked { .. }
         | Request::Notifications { .. }
         | Request::Social { .. }
         | Request::SessionStatus
@@ -110,6 +112,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::LoginFinish { .. }
         | Request::LegacyLogin { .. }
         | Request::LegacyExport
+        | Request::LegacySourcePage { .. }
+        | Request::LegacyFinishArchive { .. }
         | Request::LegacyLink { .. }
         | Request::RegisterChallenge
         | Request::RegisterChallengeFor { .. }
@@ -315,10 +319,13 @@ impl IdentityService {
             purpose: match purpose {
                 GatewayPurpose::Admit => Purpose::Admit,
                 GatewayPurpose::Admin => Purpose::Admin,
+                GatewayPurpose::Ranked => Purpose::Ranked,
             },
+            ranked_match: grant.ranked_match,
             name: grant.display_name,
             tag: grant.tag,
             legacy_id: grant.legacy_id,
+            legacy_deck_source: grant.legacy_deck_source,
             terms: grant.terms.map(|terms| TermsClaim {
                 version: terms.version,
                 digest: hex(&terms.digest),

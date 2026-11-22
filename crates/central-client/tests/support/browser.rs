@@ -395,6 +395,7 @@ fn summary(
     assert_eq!(username, "web-player");
     // The name chosen at registration, as typed, and the tag drawn with it.
     assert_eq!(display_name, "Web_Player");
+    super::ranked::public(http, identity.account, &display_name, tag);
     assert!((REGISTERED_TAG_FLOOR..=0xffff).contains(&tag), "{tag}");
     assert_eq!(expires_at - signed_in_at, 1800, "issued at the sign-in");
     assert_eq!(

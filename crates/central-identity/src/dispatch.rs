@@ -67,13 +67,16 @@ impl IdentityService {
                 self.tower_award_export(after, bearer, surface).await
             }
             Request::Challenges { request } => self.challenges(request, bearer, surface).await,
+            Request::Ranked { request } => self.ranked(request, bearer, surface).await,
+            Request::RankedHost { request } => self.ranked_host(request, bearer).await,
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
             Request::Notifications { request } => self.notifications(request, bearer).await,
             Request::Social { request } => self.social(request, bearer, surface).await,
-            request @ (Request::SetPresence { .. } | Request::ReportPresence { .. }) => {
+            request @ (Request::Presence
+            | Request::SetPresence { .. }
+            | Request::ReportPresence { .. }) => {
                 self.presence_request(request, bearer, surface).await
             }
-            request @ Request::Presence => self.presence_request(request, bearer, surface).await,
             Request::PublicFunding {} => self.public_funding(),
             request @ (Request::Terms
             | Request::GatewayTerms { .. }
@@ -105,6 +108,8 @@ impl IdentityService {
             | Request::LegacyStatus { .. }
             | Request::LegacyLogin { .. }
             | Request::LegacyExport
+            | Request::LegacySourcePage { .. }
+            | Request::LegacyFinishArchive { .. }
             | Request::LegacyLink { .. }) => self.legacy(request, bearer, surface, place).await,
             request @ (Request::RegisterGateway { .. }
             | Request::GatewayDirectory { .. }
@@ -132,10 +137,8 @@ impl IdentityService {
             | Request::PairPoll { .. }
             | Request::PairRedeem { .. }) => self.pairing_request(request, bearer, surface).await,
             Request::Discover { username } => self.discover(&username).await,
-            Request::LoginStart { identity, message } => {
-                self.start(identity, message, surface, place).await
-            }
-            request @ (Request::ChangePasswordStart { .. }
+            request @ (Request::LoginStart { .. }
+            | Request::ChangePasswordStart { .. }
             | Request::ResetStart { .. }
             | Request::ResetFinish { .. }
             | Request::LoginFinish { .. }
@@ -143,39 +146,45 @@ impl IdentityService {
                 self.credential_request(request, bearer, surface, place)
                     .await
             }
-            Request::RegisterChallenge => Self::older_challenge(surface),
-            Request::RegisterChallengeFor { signals } => {
-                self.register_challenge(surface, seen, signals).await
-            }
-            request @ Request::Register { .. } => self.register_request(request, surface).await,
-            Request::EnrollmentStart { ticket, message } => {
-                self.enrollment_challenge(&ticket, message).await
-            }
-            request @ Request::EnrollmentFinish { .. } => self.enrollment_finish(request).await,
+            request @ (Request::RegisterChallenge
+            | Request::RegisterChallengeFor { .. }
+            | Request::Register { .. }
+            | Request::EnrollmentStart { .. }
+            | Request::EnrollmentFinish { .. }) => self.enrollment(request, surface, seen).await,
             request @ (Request::ReadDocument
             | Request::WriteDocument { .. }
             | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
         }
     }
 
-    /// A registration, with its proof of work (`docs/registration-abuse.md`).
-    async fn register_request(
+    /// Registration challenges, proof of work and credential enrollment.
+    async fn enrollment(
         &self,
         request: Request,
         surface: Surface,
+        seen: Seen,
     ) -> Result<Response, Error> {
-        let Request::Register {
-            username,
-            display_name,
-            nonce,
-            counters,
-        } = request
-        else {
-            return Err(Error::Rejected);
-        };
-        let proof = (nonce.as_str(), counters.as_slice());
-        self.register(&username, display_name.as_deref(), proof, surface)
-            .await
+        match request {
+            Request::RegisterChallenge => Self::older_challenge(surface),
+            Request::RegisterChallengeFor { signals } => {
+                self.register_challenge(surface, seen, signals).await
+            }
+            Request::Register {
+                username,
+                display_name,
+                nonce,
+                counters,
+            } => {
+                let proof = (nonce.as_str(), counters.as_slice());
+                self.register(&username, display_name.as_deref(), proof, surface)
+                    .await
+            }
+            Request::EnrollmentStart { ticket, message } => {
+                self.enrollment_challenge(&ticket, message).await
+            }
+            request @ Request::EnrollmentFinish { .. } => self.enrollment_finish(request).await,
+            _ => Err(Error::Rejected),
+        }
     }
 
     async fn social(
@@ -432,7 +441,10 @@ impl IdentityService {
             Request::LegacyLogin { username, password } => {
                 self.legacy_login(&username, password, surface, place).await
             }
-            request @ (Request::LegacyExport | Request::LegacyLink { .. }) => {
+            request @ (Request::LegacyExport
+            | Request::LegacyLink { .. }
+            | Request::LegacySourcePage { .. }
+            | Request::LegacyFinishArchive { .. }) => {
                 self.legacy_request(request, bearer, surface).await
             }
             Request::LegacyStatus { legacy_id } => {

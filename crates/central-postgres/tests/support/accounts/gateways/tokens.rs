@@ -8,23 +8,27 @@ use super::{
     AccountStore, Admit, DatabaseConnection, Error, ServerKeys, Token, approval, enroll, login,
 };
 use central_api::LEGACY_ORIGIN;
+use central_api::admin::RankedHosting;
 use central_api::gateway::{GatewayMetadata, GatewayState};
 use central_api::owner::{GatewayScopes, SessionKind};
 use central_postgres::{Session, appoint_admin};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 const ORIGIN: &str = "https://tokens.invalid";
-const BOTH: GatewayScopes = GatewayScopes {
+const ALL: GatewayScopes = GatewayScopes {
     sso: true,
     listing: true,
+    ranked: true,
 };
 const SSO: GatewayScopes = GatewayScopes {
     sso: true,
     listing: false,
+    ranked: false,
 };
 const LISTING: GatewayScopes = GatewayScopes {
     sso: false,
     listing: true,
+    ranked: false,
 };
 
 async fn count(operator: &DatabaseConnection, sql: &str, values: Vec<sea_orm::Value>) -> i64 {
@@ -173,17 +177,18 @@ async fn minting(
 ) -> Token {
     let token = Token::generate().unwrap();
     for (name, scopes, days) in [
-        ("", BOTH, 30),
+        ("", ALL, 30),
         (
             "Main",
             GatewayScopes {
                 sso: false,
                 listing: false,
+                ranked: false,
             },
             30,
         ),
-        ("Main", BOTH, 0),
-        ("Main", BOTH, 367),
+        ("Main", ALL, 0),
+        ("Main", ALL, 367),
     ] {
         assert_eq!(
             store
@@ -196,7 +201,7 @@ async fn minting(
     }
     assert_eq!(
         store
-            .create_gateway_token(stranger, gateway, "Theirs", BOTH, 30, &token)
+            .create_gateway_token(stranger, gateway, "Theirs", ALL, 30, &token)
             .await
             .err(),
         Some(Error::Rejected),
@@ -205,7 +210,7 @@ async fn minting(
     age(operator, owner, 31).await;
     assert_eq!(
         store
-            .create_gateway_token(browser, gateway, "Main", BOTH, 30, &token)
+            .create_gateway_token(browser, gateway, "Main", ALL, 30, &token)
             .await
             .err(),
         Some(Error::Rejected),
@@ -213,7 +218,7 @@ async fn minting(
     );
     age(operator, owner, -31).await;
     let (_, expires_at) = store
-        .create_gateway_token(browser, gateway, "Main", BOTH, 366, &token)
+        .create_gateway_token(browser, gateway, "Main", ALL, 366, &token)
         .await
         .unwrap();
     let now = i64::try_from(
@@ -322,7 +327,7 @@ async fn authentication(
     let (id, origin, _, state, scopes, _) = store.gateway_status(token).await.unwrap();
     assert_eq!(
         (id, origin.as_str(), state, scopes),
-        (gateway, ORIGIN, GatewayState::Pending, BOTH)
+        (gateway, ORIGIN, GatewayState::Pending, ALL)
     );
     approval(operator, gateway, true).await;
     assert_eq!(
@@ -399,6 +404,29 @@ async fn authentication(
     assert!(store.authenticate_gateway(token).await.is_ok());
 }
 
+async fn listed_main_token(store: &AccountStore, cookie: &Token, gateway: [u8; 16]) -> [u8; 16] {
+    let (page, _) = store
+        .admin_gateways(cookie, Some(GatewayState::Approved), None)
+        .await
+        .unwrap();
+    let row = page.iter().find(|g| g.id == gateway).unwrap();
+    assert_eq!(
+        (row.live_tokens, row.credential_pair, row.official),
+        (1, false, false)
+    );
+    assert_eq!(
+        row.ranked_hosting,
+        RankedHosting::Unverified,
+        "directory approval never grants ranked trust"
+    );
+    let (_, tokens) = store.admin_gateway(cookie, gateway).await.unwrap();
+    tokens
+        .into_iter()
+        .find(|token| token.name == "Main")
+        .unwrap()
+        .id
+}
+
 /// Administrators approve, disable (its sessions end) and revoke, each audited.
 async fn administration(
     store: &AccountStore,
@@ -418,17 +446,7 @@ async fn administration(
         Some(Error::Rejected)
     );
     appoint_admin(operator, "token-admin").await.unwrap();
-    let (page, _) = store
-        .admin_gateways(&cookie, Some(GatewayState::Approved), None)
-        .await
-        .unwrap();
-    let row = page.iter().find(|g| g.id == gateway).unwrap();
-    assert_eq!(
-        (row.live_tokens, row.credential_pair, row.official),
-        (1, false, false)
-    );
-    let (_, tokens) = store.admin_gateway(&cookie, gateway).await.unwrap();
-    assert!(tokens.iter().any(|t| t.name == "Main"));
+    let main = listed_main_token(store, &cookie, gateway).await;
     let sid = admitted(store, native, owner_browser).await;
     let before = store.last_revocation(ORIGIN).await.unwrap();
     let audit = |action: &'static str| {
@@ -438,10 +456,15 @@ async fn administration(
             vec![action.into(), Uuid::from_bytes(gateway).into()],
         )
     };
+    ranked_verification(store, operator, gateway, &cookie, owner_browser, native).await;
     store
         .set_gateway_approval(&cookie, gateway, false)
         .await
         .unwrap();
+    assert_eq!(
+        store.set_ranked_verification(&cookie, gateway, true).await,
+        Err(Error::Conflict)
+    );
     store
         .set_gateway_approval(&cookie, gateway, false)
         .await
@@ -475,8 +498,22 @@ async fn administration(
         .await
         .unwrap();
     assert_eq!(audit("gateway.approved").await, 1);
+    assert_eq!(
+        store
+            .admin_gateway(&cookie, gateway)
+            .await
+            .unwrap()
+            .0
+            .ranked_hosting,
+        RankedHosting::Unverified
+    );
+    assert_eq!(
+        ranked_epoch(operator, gateway).await,
+        4,
+        "re-enabling never revives an assignment"
+    );
     // revoking as an administrator
-    let main = tokens.iter().find(|t| t.name == "Main").unwrap().id;
+
     store
         .admin_revoke_gateway_token(&cookie, main)
         .await
@@ -486,17 +523,92 @@ async fn administration(
         .await
         .unwrap();
     assert_eq!(audit("gateway.token_revoked").await, 1);
+    stale_admin(store, operator, admin.account, &cookie, gateway).await;
+    (cookie, admin.account)
+}
+
+async fn stale_admin(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    account: [u8; 16],
+    cookie: &Token,
+    gateway: [u8; 16],
+) {
     // a stale sign-in changes nothing
-    age(operator, admin.account, 31).await;
+    age(operator, account, 31).await;
+    assert_eq!(
+        store.set_ranked_verification(cookie, gateway, true).await,
+        Err(Error::Rejected)
+    );
     assert_eq!(
         store
-            .set_gateway_approval(&cookie, gateway, false)
+            .set_gateway_approval(cookie, gateway, false)
             .await
             .err(),
         Some(Error::Rejected)
     );
-    age(operator, admin.account, -31).await;
-    (cookie, admin.account)
+    age(operator, account, -31).await;
+}
+
+async fn ranked_epoch(operator: &DatabaseConnection, gateway: [u8; 16]) -> i64 {
+    count(
+        operator,
+        "SELECT ranked_epoch AS n FROM central_identity.gateway_approvals WHERE gateway_id = $1",
+        vec![Uuid::from_bytes(gateway).into()],
+    )
+    .await
+}
+
+/// Ordinary credentials cannot grant trust. Repeated admin requests have no side effects.
+async fn ranked_verification(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    gateway: [u8; 16],
+    admin: &Token,
+    owner: &Token,
+    native: &Token,
+) {
+    for caller in [owner, native] {
+        assert_eq!(
+            store.set_ranked_verification(caller, gateway, true).await,
+            Err(Error::Rejected)
+        );
+    }
+    assert_eq!(ranked_epoch(operator, gateway).await, 0);
+    for (verified, epoch) in [(true, 1), (false, 2), (true, 3)] {
+        for _ in 0..2 {
+            store
+                .set_ranked_verification(admin, gateway, verified)
+                .await
+                .unwrap();
+            assert_eq!(ranked_epoch(operator, gateway).await, epoch);
+            assert_eq!(
+                store
+                    .admin_gateway(admin, gateway)
+                    .await
+                    .unwrap()
+                    .0
+                    .ranked_hosting
+                    == RankedHosting::Verified,
+                verified
+            );
+        }
+    }
+    for (action, events) in [
+        ("gateway.ranked_verified", 2),
+        ("gateway.ranked_revoked", 1),
+    ] {
+        assert_eq!(
+            count(
+                operator,
+                "SELECT count(*) AS n FROM central_identity.audit_events
+             WHERE action = $1 AND gateway_id = $2 AND actor_kind = 'admin'",
+                vec![action.into(), Uuid::from_bytes(gateway).into()],
+            )
+            .await,
+            events
+        );
+    }
 }
 
 /// A player admitted at the gateway, while it is pending or after: a `sid`, which the owner's
@@ -524,7 +636,7 @@ async fn disabled_status(
 ) -> GatewayState {
     let token = Token::generate().unwrap();
     store
-        .create_gateway_token(owner_browser, gateway, "While disabled", BOTH, 1, &token)
+        .create_gateway_token(owner_browser, gateway, "While disabled", ALL, 1, &token)
         .await
         .unwrap();
     // a disabled gateway's token signs nobody in and keeps no entry

@@ -52,7 +52,12 @@ guessing after total server compromise or a malicious client.
 While migration remains open, the official gateway invalidates pending enrollment
 before changing a legacy password. Central atomically archives the old encrypted
 credential/wrapper/document, revokes sessions, clears enrollment and advances the
-vault epoch. No private-object upload is permitted until migration has closed.
+vault epoch. The bridge workflow enables private objects after close. The
+native operator-staged deck archive also enables them during restore, after
+the restored account has retrieved every source page. Account ownership,
+revision checks, quotas and Central's terms continue to apply. The final
+archive receipt covers the root revision and the live object inventory.
+See [native login](native-login.md#legacy-login).
 The archive is bounded to 32 entries; exhaustion fails rather than silently
 destroying a retained encrypted copy. The archive currently supports operator-led
 recovery investigation, not an automatic password recovery UI.

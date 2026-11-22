@@ -28,6 +28,16 @@ fn row(legacy_id: &str, username: &str) -> LegacyRow {
     }
 }
 
+fn oversized_source() -> Vec<u8> {
+    let mut snapshot = br#"{"preferences":{},"decks":[{"cards":""#.to_vec();
+    snapshot.extend(std::iter::repeat_n(
+        b'x',
+        central_api::legacy::MAX_SNAPSHOT_BYTES,
+    ));
+    snapshot.extend(br#""}]}"#);
+    snapshot
+}
+
 /// The rows, the count and the digest the gateway would declare for them.
 fn declared(mut rows: Vec<LegacyRow>) -> (Vec<LegacyRow>, u64, [u8; 32]) {
     rows.sort_by(|a, b| a.legacy_id.as_bytes().cmp(b.legacy_id.as_bytes()));
@@ -49,10 +59,37 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
         banned.display_name = None;
         banned.tag = Some(8);
         banned.ban = Some(None);
+        banned.snapshot = oversized_source();
         banned
     }]);
     let imported = import_legacy(operator, rows, total, digest).await.unwrap();
     assert_eq!((imported.count, imported.digest), (2, digest));
+    let staged = operator.query_one_raw(sea_orm::Statement::from_string(sea_orm::DbBackend::Postgres,
+        "SELECT t.generation,t.source_bytes,t.source_digest,t.next_page,
+         t.source_digest=pg_catalog.sha256(l.snapshot) AS exact
+         FROM central_identity.legacy_deck_transfers t JOIN central_identity.accounts a ON a.id=t.account_id
+         JOIN central_legacy.accounts l USING(legacy_id) WHERE a.legacy_id='legacy-two'"
+    )).await.unwrap().unwrap();
+    assert!(staged.try_get::<bool>("", "exact").unwrap());
+    let bytes = u32::try_from(staged.try_get::<i32>("", "source_bytes").unwrap()).unwrap();
+    let digest: [u8; 32] = staged
+        .try_get::<Vec<u8>>("", "source_digest")
+        .unwrap()
+        .try_into()
+        .unwrap();
+    assert_eq!(
+        staged.try_get::<Vec<u8>>("", "generation").unwrap(),
+        central_api::legacy::source_generation("legacy-two", digest, bytes)
+    );
+    assert_eq!(staged.try_get::<i16>("", "next_page").unwrap(), 0);
+    assert_eq!(
+        count(
+            operator,
+            "SELECT count(*)::bigint AS value FROM central_identity.legacy_deck_transfers"
+        )
+        .await,
+        1
+    );
     let (again, total, digest) = declared(vec![row("legacy-three", "legacy-three")]);
     assert_eq!(
         import_legacy(operator, again, total, digest).await,
@@ -299,7 +336,10 @@ async fn refusals(operator: &DatabaseConnection) {
     // `alice` is an enrolled Central account by now; `restart-legacy`'s
     // move closed in `migration::run`.
     let (rows, total, digest) = declared(vec![
-        row("refused-a", "refused-a"),
+        LegacyRow {
+            snapshot: oversized_source(),
+            ..row("refused-a", "refused-a")
+        },
         row("refused-b", "alice"),
     ]);
     assert_eq!(
@@ -319,6 +359,15 @@ async fn refusals(operator: &DatabaseConnection) {
         })
     );
     assert_eq!(empty(operator).await, 0, "a refused import stores nothing");
+    assert_eq!(
+        count(
+            operator,
+            "SELECT count(*)::bigint AS value FROM central_identity.legacy_deck_transfers"
+        )
+        .await,
+        0,
+        "a later refused row also rolls back the earlier staged manifest"
+    );
 }
 
 /// Ten failures in a row lock an account out for the hour; while locked it

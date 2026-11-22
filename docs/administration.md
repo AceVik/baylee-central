@@ -47,7 +47,8 @@ pages are to go.*
   administrator's account id, or the operator), the action from a closed
   list in `central-postgres` (`Action`: `account.admin_granted`,
   `account.admin_removed`, `account.reset_issued`, `account.tag_changed`,
-  `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`) and the
+  `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`,
+  `gateway.ranked_verified`, `gateway.ranked_revoked`) and the
   ids it touched. No name, reason, note or key; a tag change keeps the two
   tags, which are numbers. Reads are not audited. Each change writes its
   event in the same transaction. Reading a page of it joins today's names
@@ -128,7 +129,7 @@ writes its audit event in its transaction; reads do not.
 - `Gateways { state, before }` → `Gateways { gateways, more }`: newest first,
   50 a page, all or those `pending`, `approved` or `disabled`. Each row: id,
   origin, metadata, official, the owner's id, display name and tag, state,
-  online, last heartbeat, created, live tokens, and whether it still has a
+  ranked hosting verification, online, last heartbeat, created, live tokens, and whether it still has a
   `RegisterGateway` credential pair. `Gateway { gateway }` adds its latest 20
   tokens (name, scopes, times; never a token or digest).
 - `SetGatewayApproval { gateway, enabled }`: approve or enable again
@@ -140,6 +141,15 @@ writes its audit event in its transaction; reads do not.
   at once, stops its credentials and tokens (the joins that authenticate
   them), and ends its sessions, each revoked. The official gateway's row can be disabled too, which hides it; its
   bridge is no approval's to stop. The same state again writes nothing.
+- `SetRankedVerification { gateway, verified }` grants or withdraws ranked
+  hosting authority. On the Gateways page, select **Approved**, check the
+  operator and origin, then use **Authorize ranked hosting**. A verified host
+  may report match outcomes to Central. The official gateway needs the same
+  explicit grant. Both operations require a fresh browser administrator and
+  record the actor and gateway in `gateway.ranked_verified` or
+  `gateway.ranked_revoked`. Retrying the current state writes nothing.
+  Withdrawing authority or disabling the gateway invalidates its outstanding
+  assignments. Re-enabling ordinary directory approval leaves verification off.
 - `RevokeGatewayToken { token }` (`gateway.token_revoked`, with the gateway's
   id): the token stops at once. Revoked already is `Done`.
 - `SetTag { account, tag }` (`account.tag_changed`): an enrolled account
@@ -157,7 +167,7 @@ writes its audit event in its transaction; reads do not.
   the change. Re-keying the old threads when a gateway's `take_profile` sees
   a changed tag is not built (an open point).
 
-The runtime gains `INSERT` and `UPDATE (enabled)` on `gateway_approvals`
+The runtime has `INSERT` and `UPDATE (enabled, ranked_verified)` on `gateway_approvals`
 (never `DELETE`) and `SELECT, INSERT, UPDATE (revoked_at, last_used_at)` on
 `gateway_tokens`; the startup check names updatable columns as a list now and
 refuses any other column.

@@ -13,9 +13,9 @@
 //! overview links to it): it stays when the page is loaded again and never
 //! reaches the site.
 
-use central_api::admin::{AdminAnswer, AdminGateway, AdminOverview, AdminRequest};
+use central_api::admin::{AdminAnswer, AdminGateway, AdminOverview, AdminRequest, RankedHosting};
 use central_api::gateway::GatewayState;
-use central_api::owner::TokenInfo;
+use central_api::owner::{GatewayScopes, TokenInfo};
 use leptos::prelude::*;
 
 use super::Listing;
@@ -41,6 +41,7 @@ struct Gateway {
     created_at: i64,
     live_tokens: u32,
     credential_pair: bool,
+    ranked_hosting: RankedHosting,
 }
 
 impl From<AdminGateway> for Gateway {
@@ -58,6 +59,7 @@ impl From<AdminGateway> for Gateway {
             created_at: gateway.created_at,
             live_tokens: gateway.live_tokens,
             credential_pair: gateway.credential_pair,
+            ranked_hosting: gateway.ranked_hosting,
         }
     }
 }
@@ -67,8 +69,7 @@ impl From<AdminGateway> for Gateway {
 struct Token {
     id: [u8; 16],
     name: String,
-    sso: bool,
-    listing: bool,
+    scopes: GatewayScopes,
     expires_at: i64,
     revoked_at: Option<i64>,
     last_used_at: Option<i64>,
@@ -79,8 +80,7 @@ impl From<TokenInfo> for Token {
         Token {
             id: token.id,
             name: token.name,
-            sso: token.scopes.sso,
-            listing: token.scopes.listing,
+            scopes: token.scopes,
             expires_at: token.expires_at,
             revoked_at: token.revoked_at,
             last_used_at: token.last_used_at,
@@ -320,7 +320,7 @@ impl Page {
     /// A change ended: the list (and the open tokens) are read again.
     fn ended(self, change: Change, came: Came) {
         let place = match change {
-            Change::Approval { gateway, .. } => self
+            Change::Approval { gateway, .. } | Change::Ranked { gateway, .. } => self
                 .items
                 .with_untracked(|items| items.iter().position(|g| g.id == gateway)),
             _ => None,
@@ -404,11 +404,7 @@ fn tokens_view(p: &Page, gateway: [u8; 16]) -> impl IntoView + use<> {
                 .into_iter()
                 .map(|token| {
                     let live = token.revoked_at.is_none() && token.expires_at > now;
-                    let what = match (token.sso, token.listing) {
-                        (true, true) => words::tokens_both(lang),
-                        (true, false) => words::tokens_sso(lang),
-                        _ => words::tokens_listing(lang),
-                    };
+                    let what = crate::islands::account::scope_text(lang, token.scopes);
                     let standing = if token.revoked_at.is_some() {
                         words::tokens_revoked(lang).to_owned()
                     } else {
@@ -439,6 +435,52 @@ fn tokens_view(p: &Page, gateway: [u8; 16]) -> impl IntoView + use<> {
     }
 }
 
+fn ranked_action(p: &Page, gateway: &Gateway, heading: &str) -> impl IntoView + use<> {
+    let flow = p.flow;
+    let id = gateway.id;
+    let lang = p.cx.lang;
+    (gateway.state == GatewayState::Approved).then(|| {
+        let verified = gateway.ranked_hosting == RankedHosting::Unverified;
+        let origin = gateway.origin.clone();
+        let label = if verified {
+            words::admin_gw_ranked_grant(lang)
+        } else {
+            words::admin_gw_ranked_revoke(lang)
+        };
+        let button = format!("admin-ranked-{}", id_hex(&id));
+        let from = format!("#{button}");
+        view! {
+            <button type="button" class="button" id=button aria-describedby=heading.to_owned()
+                on:click=move |_| flow.ask(Asked {
+                    change: Change::Ranked { gateway: id, verified },
+                    title: label.to_owned(),
+                    text: if verified {
+                        words::admin_gw_ranked_grant_text(lang, &origin)
+                    } else {
+                        words::admin_gw_ranked_revoke_text(lang, &origin)
+                    },
+                    action: label,
+                    danger: !verified,
+                    from: from.clone(),
+                })>{label}</button>
+        }
+    })
+}
+
+fn gateway_owner(lang: Lang, gateway: &Gateway) -> impl IntoView + use<> {
+    match gateway.owner {
+        Some(owner) => {
+            let name = gateway
+                .owner_name
+                .clone()
+                .unwrap_or_else(|| common::id_end(&owner));
+            view! { <a href=common::user_path(lang, &owner)><bdi translate="no">{name}</bdi></a> }
+                .into_any()
+        }
+        None => words::admin_gw_bridge(lang).into_any(),
+    }
+}
+
 fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
     let p = *p;
     let lang = p.cx.lang;
@@ -454,17 +496,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
     } else {
         view! { <span class="pill off">{words::gws_offline(lang)}</span> }
     };
-    let owner = match gateway.owner {
-        Some(owner) => {
-            let name = gateway
-                .owner_name
-                .clone()
-                .unwrap_or_else(|| common::id_end(&owner));
-            view! { <a href=common::user_path(lang, &owner)><bdi translate="no">{name}</bdi></a> }
-                .into_any()
-        }
-        None => words::admin_gw_bridge(lang).into_any(),
-    };
+    let owner = gateway_owner(lang, gateway);
     let seen = gateway
         .last_seen
         .map_or_else(|| "–".to_owned(), |at| when(lang, at));
@@ -496,6 +528,10 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 on:click=move |_| p.approval(&asked, false)>{words::admin_gw_disable(lang)}</button>
         }
     });
+    let ranked = ranked_action(&p, gateway, &heading);
+    let ranked_badge = (gateway.ranked_hosting == RankedHosting::Verified).then(|| {
+        view! { <span class="pill ok">{words::admin_gw_ranked_verified(lang)}</span> }
+    });
     let shown = move || p.open.get() == Some(id);
     view! {
         <li class="card admin-gw">
@@ -507,7 +543,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                         {common::copy_button(lang, gateway.origin.clone(), words::gws_address(lang))}
                     </p>
                 </div>
-                <p class="pills">{official}<span class=format!("pill {tone}")>{state}</span>{online}</p>
+                <p class="pills">{official}<span class=format!("pill {tone}")>{state}</span>{online}{ranked_badge}</p>
             </div>
             <dl class="facts">
                 <dt>{words::admin_gw_owner(lang)}</dt>
@@ -522,6 +558,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
             <p class="actions">
                 {approve}
                 {disable}
+                {ranked}
                 <button type="button" class="button quiet" id=format!("admin-tokens-{key}") aria-describedby=heading
                     aria-expanded=move || if shown() { "true" } else { "false" }
                     on:click=move |_| p.toggle(id)>
@@ -529,7 +566,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 </button>
             </p>
             {p.flow.panel(move |change| match change {
-                Change::Approval { gateway, .. } | Change::Revoke { gateway, .. } => *gateway == id,
+                Change::Approval { gateway, .. } | Change::Ranked { gateway, .. } | Change::Revoke { gateway, .. } => *gateway == id,
                 _ => false,
             })}
             {move || shown().then(|| view! { <div class="admin-tokens">{tokens_view(&p, id)}</div> })}

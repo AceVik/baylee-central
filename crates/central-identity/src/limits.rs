@@ -163,6 +163,9 @@ enum Class {
 }
 
 fn class(request: &Request) -> Class {
+    if matches!(request, Request::Ranked { request } if request.is_public()) {
+        return Class::Public;
+    }
     // A client's claim, polls and redeem carry no session; their own
     // window keeps a few pairings' polling from spending the sign-ins'.
     if matches!(
@@ -241,6 +244,7 @@ enum Tells {
 /// `central-postgres` to refuse a token it does not know.
 fn tells(request: &Request) -> Tells {
     match request {
+        Request::Ranked { request } if !request.is_public() => Tells::Proves,
         Request::Challenges { request }
             if !matches!(
                 request,
@@ -259,6 +263,7 @@ fn tells(request: &Request) -> Tells {
         | Request::TowerProgress {}
         | Request::TowerAwardExport { .. }
         | Request::ChallengeHost { .. }
+        | Request::RankedHost { .. }
         | Request::SessionStatus
         | Request::RenewSession
         | Request::AccountSummary

@@ -17,20 +17,29 @@ fn state(row: &QueryResult) -> Result<ObjectState, Error> {
 
 // The same account lock serializes login replacement, quota changes and object
 // mutations. Recheck the session after acquiring it to reject a concurrent logout.
-// `require_closed`: the account no longer depends on the legacy gateway, being a
-// closed legacy migration or a restored registered account.
+// A restored, operator-staged archive can populate its encrypted library only
+// after this same native account has fetched its entire generation.
+const OBJECT_ACCESS: &str = "a.restored AND (a.legacy_closed OR a.source='registered'
+    OR EXISTS (SELECT 1 FROM central_identity.legacy_deck_transfers t WHERE t.account_id=a.id
+    AND t.next_page=(t.source_bytes+65535)/65536))";
+
 pub(super) async fn locked_owner(
     db: &impl ConnectionTrait,
     session: &Token,
-    require_closed: bool,
+    require_object_access: bool,
 ) -> Result<Uuid, Error> {
     let row = db
         .query_one_raw(statement(
-            "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
+            &format!(
+                "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
          ON s.account_id = a.id AND s.credential_revision = a.credential_revision
          WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()
-         AND (NOT $2 OR (a.restored AND (a.legacy_closed OR a.source = 'registered'))) FOR UPDATE OF a",
-            vec![session.digest().to_vec().into(), require_closed.into()],
+         AND (NOT $2 OR ({OBJECT_ACCESS})) FOR UPDATE OF a"
+            ),
+            vec![
+                session.digest().to_vec().into(),
+                require_object_access.into(),
+            ],
         ))
         .await
         .map_err(|_| Error::Unavailable)?
@@ -91,11 +100,11 @@ impl AccountStore {
         id: [u8; 16],
     ) -> Result<(ObjectState, Option<Vec<u8>>), Error> {
         let row = self.db.query_one_raw(statement(
-            "SELECT o.id, o.revision, o.deleted, o.document FROM central_identity.private_objects o
+            &format!("SELECT o.id, o.revision, o.deleted, o.document FROM central_identity.private_objects o
              JOIN central_identity.accounts a ON a.id = o.account_id
              JOIN central_identity.sessions s ON s.account_id = a.id AND s.credential_revision = a.credential_revision
              WHERE s.digest = $1 AND s.expires_at > pg_catalog.clock_timestamp()
-             AND a.restored AND (a.legacy_closed OR a.source = 'registered') AND o.id = $2",
+             AND ({OBJECT_ACCESS}) AND o.id = $2"),
             vec![session.digest().to_vec().into(), uuid(id).into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         Ok((

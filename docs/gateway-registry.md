@@ -43,11 +43,19 @@ it is approved, and only under the rules of [the push](#revocations): a person's
 approval of the origin is what makes that call safe to make.
 
 
+Ranked hosting requires a separate administrator decision for each approved
+origin, including the official gateway. Registration, token creation, and a
+successful heartbeat leave ranked verification off. The approval row carries a
+generation number. Changing its ranked verification advances that generation,
+and disabling the gateway withdraws verification in the same transaction.
+Central binds the generation to each assignment so re-verifying a host cannot
+revive an earlier assignment. See [administration](administration.md#gateways-tokens-and-tags-30102026).
+
 The runtime may use these registry privileges without grant options:
 
 ```sql
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateways TO central_runtime;
-GRANT SELECT, INSERT, UPDATE (enabled) ON central_identity.gateway_approvals TO central_runtime;
+GRANT SELECT, INSERT (gateway_id, enabled), UPDATE (enabled, ranked_verified) ON central_identity.gateway_approvals TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (revoked_at, last_used_at) ON central_identity.gateway_tokens TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.gateway_admins TO central_runtime;
 GRANT SELECT, INSERT, UPDATE ON central_identity.gateway_streams TO central_runtime;
@@ -62,7 +70,8 @@ The reusable SDK exposes `gateway_directory`, `public_figures`,
 `Session::set_gateway_admins`; it validates returned IDs and public metadata.
 The runtime
 must not own these objects or inherit operator privileges. Startup rejects any
-privilege on the approval table beyond `SELECT`, `INSERT` and `UPDATE (enabled)`
+privilege on the approval table beyond `SELECT`, `INSERT (gateway_id, enabled)`
+and `UPDATE (enabled, ranked_verified)`
 (no `DELETE`, no other column, no grant option), including inherited effective
 privileges. Credential-pair rotation and revocation stay an administrative DB
 operation; gateway tokens are revoked on the website.
@@ -96,13 +105,22 @@ Central for its players' sign-ins and its entry in the gateway list.
     direction override; `central_api::gateway::shown_char`, the rule of a
     gateway's own name as well);
   - **scopes**: `sso` (read its revocations, name its invalidate path, publish its
-    terms) and `listing` (its directory heartbeat, and its pulse if it reports its
-    activity), at least one;
+    terms), `listing` (its directory heartbeat and activity), and `ranked`
+    (host ranked matches and report their results while the gateway has an
+    administrator's current verification). Choose at least one. Migration
+    000038 leaves `ranked` off for every existing token; the owner explicitly
+    enables it on a newly issued token.
   - an **expiry**, 1 to 366 days (the table's CHECK holds both ends);
   - a **revocation**, by its owner or an administrator, at once.
 - **Minting** needs a password sign-in less than 30 minutes old, as an
   administrator's change does: a stolen cookie mints nothing after that.
   A gateway holds at most eight live tokens, and is given at most 32 a day.
+- **Ranked authentication.** The configured official bridge and a registered
+  gateway's full redemption credential may identify their host for ranked
+  play. A named gateway token needs the `ranked` scope. A directory heartbeat
+  credential or an ordinary SSO-only token cannot report a result. In all
+  cases Central requires the same current administrative verification and
+  assignment generation.
 - **Authentication.** `authenticate_gateway` (every SSO request) accepts the
   credential pair's redemption credential or a live token with `sso`;
   `gateway_heartbeat` the heartbeat credential or a live token with
@@ -315,7 +333,7 @@ no gateway operation. Renewal changes nothing in the token. A website's session 
 `GatewayToken { token, expires_at }`. It is refused for Central's terms not accepted, an
 unfinished move, a disabled or unknown gateway, an `admin` purpose without current
 membership. The official gateway has no Central administrators, and admits a moved account
-once its move is closed. `purpose` is `admit` or `admin`. Other claims: `sub`, `sid`, `jti`,
+once its move is closed. `purpose` is `admit`, `admin`, or the game-scoped `ranked`. Other claims: `sub`, `sid`, `jti`,
 `iat`, `nbf`, `exp`, and, while there is one, `name` and `tag` (a gateway learns the names of
 the people who sign in there, nobody else's), `legacy_id` (the official gateway, closed moves
 only) and `terms` (the newest of this gateway's terms the account accepted, which the gateway
@@ -327,6 +345,11 @@ Asking again refreshes: `exp` moves, `name`, `tag` and `terms` are read again, `
 gateways cannot tell they saw the same session. `exp` is capped by the 12-hour cap rather than
 the session's 30-minute expiry, which would make every token half an hour: a session the client
 stops renewing leaves its token valid until `exp`, an hour at most, and it cannot be refreshed.
+
+A ranked seat carries its Central match ID in the signed grant. Renewals of that match at
+the assigned host keep its SID. The next ranked assignment issues a fresh SID and revokes
+the previous ranked SID, including when both games use the same host. A lobby or admin
+session keeps its own SID.
 
 **Keys.** `GET /.well-known/jwks.json` is public: RFC 8037 OKP keys, at most eight and 16 KiB,
 `application/jwk-set+json`, `Cache-Control: public, max-age=300`, 256 reads a second in all,

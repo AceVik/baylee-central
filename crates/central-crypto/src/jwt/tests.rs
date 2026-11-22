@@ -30,9 +30,11 @@ fn gateway_claims() -> GatewayClaims {
         nbf: NOW,
         exp: NOW + GATEWAY_TOKEN_SECONDS,
         purpose: Purpose::Admit,
+        ranked_match: None,
         name: Some("Ace".into()),
         tag: Some(7),
         legacy_id: None,
+        legacy_deck_source: None,
         terms: None,
     }
 }
@@ -48,6 +50,23 @@ fn central_claims() -> CentralClaims {
         nbf: NOW,
         exp: NOW + CENTRAL_TOKEN_SECONDS,
     }
+}
+
+#[test]
+fn only_the_ranked_purpose_can_bind_an_assigned_match() {
+    let signing = key(3);
+    let mut claims = gateway_claims();
+    let mut id = [0; 16];
+    id[6] = 0x70;
+    id[8] = 0x80;
+    claims.ranked_match = Some(id);
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
+    claims.purpose = Purpose::Ranked;
+    assert!(signing.sign(&claims).is_ok());
+    claims.ranked_match = Some([0; 16]);
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
+    claims.ranked_match = None;
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
 }
 
 fn revocation_claims() -> RevocationClaims {

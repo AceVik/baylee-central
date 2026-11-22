@@ -82,19 +82,7 @@ impl IdentityService {
                 return self.report_admin(request, cookie).await;
             }
             // Changes: the store checks the sign-in's age and writes the audit.
-            AdminRequest::ResetLogin { account } => {
-                let code = ResetCode::generate()?;
-                let done = self
-                    .store
-                    .issue_reset(cookie, account, &code.digest())
-                    .await;
-                // The account's confirmed address is told, later, that a
-                // code exists; the code is in the answer only.
-                let expires_at = self.mails.committed(done, account, |to, account, lang| {
-                    Mail::reset_issued(to, account, lang, ISSUED_HOURS)
-                })?;
-                AdminAnswer::ResetCode { code, expires_at }
-            }
+            AdminRequest::ResetLogin { account } => self.admin_reset_login(cookie, account).await?,
             AdminRequest::SetAdmin { account, admin } => {
                 self.store.set_admin(cookie, account, admin).await?;
                 return Ok(Response::Done);
@@ -102,6 +90,12 @@ impl IdentityService {
             AdminRequest::SetGatewayApproval { gateway, enabled } => {
                 self.store
                     .set_gateway_approval(cookie, gateway, enabled)
+                    .await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetRankedVerification { gateway, verified } => {
+                self.store
+                    .set_ranked_verification(cookie, gateway, verified)
                     .await?;
                 return Ok(Response::Done);
             }
@@ -116,6 +110,24 @@ impl IdentityService {
             }
         };
         Ok(Response::Admin { answer })
+    }
+
+    /// Tell the account's confirmed address only that a reset was issued. The
+    /// code itself is returned to the administrator after the store commits.
+    async fn admin_reset_login(
+        &self,
+        cookie: &Token,
+        account: [u8; 16],
+    ) -> Result<AdminAnswer, Error> {
+        let code = ResetCode::generate()?;
+        let done = self
+            .store
+            .issue_reset(cookie, account, &code.digest())
+            .await;
+        let expires_at = self.mails.committed(done, account, |to, account, lang| {
+            Mail::reset_issued(to, account, lang, ISSUED_HOURS)
+        })?;
+        Ok(AdminAnswer::ResetCode { code, expires_at })
     }
 
     /// An account's tag (`docs/administration.md`): the store checks the

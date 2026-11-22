@@ -85,6 +85,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
                 | central_api::notifications::NotificationRequest::Set { enabled: true, .. }
         }
         | Request::Social { .. }
+            | Request::Ranked { request: central_api::ranked::Request::Join { .. } }
             | Request::SetPresence { .. }
             | Request::Challenges {
                 request: central_api::challenges::Request::Begin { .. }
@@ -111,6 +112,8 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::Admin { .. }
             // A move's export and close wait for the terms, as gateway tokens (`docs/native-login.md` §"Legacy login").
             | Request::LegacyExport
+            | Request::LegacySourcePage { .. }
+            | Request::LegacyFinishArchive { .. }
             | Request::LegacyLink { .. }
     ) || matches!(
         // An account's own area: making something needs the terms; reading
@@ -386,6 +389,7 @@ mod tests {
                 scopes: central_api::owner::GatewayScopes {
                     sso: true,
                     listing: true,
+                    ranked: false,
                 },
                 days: 30,
             },

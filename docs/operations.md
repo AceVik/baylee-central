@@ -688,7 +688,8 @@ gateways on the website (`/{lang}/account/admin/gateways` since 12.11.2026; the
 old build's `/admin/gateways` before), and owners mint and revoke their
 gateways' tokens there ([gateway registry](gateway-registry.md) §"Gateway
 tokens"). The deploy hook applies `ops/grants.sql` after the migration,
-which gives the runtime `INSERT` and `UPDATE (enabled)` on
+which gives the runtime `INSERT (gateway_id, enabled)` and
+`UPDATE (enabled, ranked_verified)` on
 `gateway_approvals` and its rights on `gateway_tokens`; a binary from before
 migration 000014 refuses to start over the wider grants, so roll back the
 grants with the binary. The operator's SQL stays the fallback when no
@@ -701,6 +702,18 @@ UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
     WHERE gateway_id = (SELECT id FROM central_identity.gateways WHERE origin = 'https://…')
     AND revoked_at IS NULL;
 ```
+
+### Enabling a ranked host
+
+Sign in as a Central administrator, open **Administration → Gateways**, select
+the approved origin and choose **Authorize ranked hosting**. The confirmation
+names the origin entrusted with match results. When the host uses a named
+gateway token, its owner opens the gateway's token form and explicitly selects
+**Hosts ranked matches and reports results**. Deploy this newly issued token
+through the host's normal credential store. Existing scoped tokens keep their
+previous permissions. Withdrawing ranked hosting under Administration invalidates
+outstanding assignments. To rotate a compromised named credential, revoke it
+and withdraw ranked hosting before issuing a replacement.
 
 ### An origin's host may not end in a dot (12.11.2026)
 
@@ -897,6 +910,12 @@ and digest again from what it stored. Compare its line on standard error with
 the export's: the counts and digests are equal. Then add the `legacy` block
 (the `central_legacy` login, `{"database": {…, "user": "central_legacy", …}}`)
 to `central.json`, restart Central, start the gateway.
+
+Migration 000039 keeps the original SHA-256 and source bytes for accounts with larger
+deck libraries. Above 192 KiB the import stages an account-bound manifest for encrypted
+adoption in 64-KiB pages. Each such source must contain decks and its serialized
+preferences must fit within 192 KiB. The maximum source size is 8 MiB per account.
+The two input documents together must fit within 32 MiB, including JSON byte-array encoding.
 
 **The deadline** is the owner's date, **30.06.2027** (end of day,
 Europe/Berlin): migration 000015 sets it, so it holds without a step. The

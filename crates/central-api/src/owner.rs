@@ -35,6 +35,9 @@ pub struct GatewayScopes {
     /// Beat for the public gateway directory: its name, version, website and
     /// whether it is online.
     pub listing: bool,
+    /// Host assigned ranked games and attest their results after administrator verification.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ranked: bool,
 }
 
 impl GatewayScopes {
@@ -43,7 +46,7 @@ impl GatewayScopes {
     /// # Errors
     /// `Rejected` for a token that would allow nothing.
     pub const fn validate(self) -> Result<Self, Error> {
-        if self.sso || self.listing {
+        if self.sso || self.listing || self.ranked {
             Ok(self)
         } else {
             Err(Error::Rejected)
@@ -330,13 +333,27 @@ mod tests {
         assert!(
             GatewayScopes {
                 sso: false,
-                listing: false
+                listing: false,
+                ranked: false,
             }
             .validate()
             .is_err()
         );
-        for (sso, listing) in [(true, false), (false, true), (true, true)] {
-            assert!(GatewayScopes { sso, listing }.validate().is_ok());
+        for (sso, listing, ranked) in [
+            (true, false, false),
+            (false, true, false),
+            (true, true, false),
+            (false, false, true),
+        ] {
+            assert!(
+                GatewayScopes {
+                    sso,
+                    listing,
+                    ranked
+                }
+                .validate()
+                .is_ok()
+            );
         }
     }
 
@@ -348,7 +365,8 @@ mod tests {
                 name: "x".into(),
                 scopes: GatewayScopes {
                     sso: true,
-                    listing: true
+                    listing: true,
+                    ranked: false,
                 },
                 days: 30,
             }
@@ -376,7 +394,15 @@ mod tests {
         .unwrap();
         assert!(matches!(
             request,
-            OwnerRequest::CreateToken { days: 90, .. }
+            OwnerRequest::CreateToken {
+                days: 90,
+                scopes: GatewayScopes {
+                    sso: true,
+                    listing: false,
+                    ranked: false
+                },
+                ..
+            }
         ));
         for bad in [
             br#"{"action":"create_token","gateway":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"name":"Main","scopes":{"sso":true},"days":90}"#.as_slice(),

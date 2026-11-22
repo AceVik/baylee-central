@@ -16,6 +16,8 @@ pub const PUSH_ATTEMPTS: i16 = 5;
 
 /// What a token for one gateway says about its account.
 pub struct GatewayGrant {
+    /// Match binding for a game-only credential.
+    pub ranked_match: Option<[u8; 16]>,
     /// The session as this gateway knows it.
     pub sid: [u8; 16],
     /// The account.
@@ -28,6 +30,8 @@ pub struct GatewayGrant {
     pub tag: Option<u32>,
     /// The official gateway's old id, for a closed move only.
     pub legacy_id: Option<String>,
+    /// Verified source for an oversized closed move, only for its official gateway.
+    pub legacy_deck_source: Option<[u8; 32]>,
     /// This gateway's terms the account accepted last.
     pub terms: Option<TermsVersion>,
 }
@@ -77,22 +81,55 @@ fn sid_bytes(bytes: &[u8]) -> Result<[u8; 16], Error> {
     bytes.try_into().map_err(|_| Error::Unavailable)
 }
 
-/// The `sid` of this session, gateway and purpose: the one it has, or `fresh`.
+/// Only the account's current, live reservation can mint a game-scoped token.
+async fn assigned_match(
+    tx: &DatabaseTransaction,
+    account: Uuid,
+    origin: &str,
+    registered: bool,
+) -> Result<[u8; 16], Error> {
+    let row = tx
+        .query_one_raw(statement(
+            "SELECT m.id FROM central_identity.ranked_tickets t
+         JOIN central_identity.ranked_matches m ON m.id=t.match_id
+         JOIN central_identity.gateways g ON g.id=m.host_id AND g.origin=m.origin
+         JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id
+         JOIN central_identity.ranked_hosts h ON h.host_id=g.id
+         WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN (m.account_a,m.account_b)
+           AND g.origin=$2 AND g.official<>$3 AND p.enabled AND p.ranked_verified
+           AND p.ranked_epoch=m.ranked_epoch AND h.ranked_epoch=m.ranked_epoch
+           AND m.created_at>=h.continuity_since
+           AND h.seen_at>clock_timestamp()-interval '5 minutes'
+           AND m.state IN ('reserved','playing') AND m.lease_until>clock_timestamp()
+         FOR SHARE OF m,p",
+            vec![account.into(), origin.into(), registered.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+    let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+    Ok(*id.as_bytes())
+}
+
+/// Reuse the SID for a refresh. A new ranked game gets its own revocable session.
 async fn held_sid(
     tx: &DatabaseTransaction,
     digest: &[u8],
     stream: &str,
     purpose: GatewayPurpose,
+    ranked_match: Option<Uuid>,
     fresh: [u8; 16],
 ) -> Result<[u8; 16], Error> {
     let found = tx
         .query_one_raw(statement(
             "SELECT sid FROM central_identity.gateway_sids
-             WHERE session_digest = $1 AND stream = $2 AND purpose = $3",
+             WHERE session_digest = $1 AND stream = $2 AND purpose = $3
+             AND ranked_match IS NOT DISTINCT FROM $4",
             vec![
                 digest.to_vec().into(),
                 stream.into(),
                 purpose.as_str().into(),
+                ranked_match.into(),
             ],
         ))
         .await
@@ -100,6 +137,17 @@ async fn held_sid(
     if let Some(row) = found {
         let sid: Vec<u8> = row.try_get("", "sid").map_err(|_| Error::Unavailable)?;
         return sid_bytes(&sid);
+    }
+    if let Some(matched) = ranked_match {
+        // The session is locked. Removing its previous ranked SID also publishes the normal
+        // revocation to the previous host, which can be on a different gateway.
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.gateway_sids WHERE session_digest=$1 AND purpose='ranked'
+             AND ranked_match IS DISTINCT FROM $2",
+            vec![digest.to_vec().into(), matched.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
     }
     tx.execute_raw(statement(
         "INSERT INTO central_identity.gateway_streams(origin) VALUES ($1)
@@ -110,8 +158,8 @@ async fn held_sid(
     .map_err(|_| Error::Unavailable)?;
     let inserted = tx
         .execute_raw(statement(
-            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose)
-             SELECT $1, $2, $3, $4 WHERE (SELECT count(*) FROM central_identity.gateway_sids
+            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose, ranked_match)
+             SELECT $1, $2, $3, $4, $6 WHERE (SELECT count(*) FROM central_identity.gateway_sids
                  WHERE session_digest = $2) < $5",
             vec![
                 fresh.to_vec().into(),
@@ -119,6 +167,7 @@ async fn held_sid(
                 stream.into(),
                 purpose.as_str().into(),
                 MAX_SIDS_PER_SESSION.into(),
+                ranked_match.into(),
             ],
         ))
         .await
@@ -127,6 +176,27 @@ async fn held_sid(
         return Err(Error::Busy);
     }
     Ok(fresh)
+}
+
+async fn accepted_terms<S: AsRef<str> + Sync>(
+    tx: &DatabaseTransaction,
+    account: Uuid,
+    set: &[S],
+) -> Result<Option<TermsVersion>, Error> {
+    let accepted = tx.query_one_raw(statement(
+        &format!("SELECT version,digest FROM central_identity.terms_acceptances
+                  WHERE account_id=$1 AND subject={} ORDER BY accepted_at DESC,version DESC LIMIT 1",any_origin(2)),
+        vec![account.into(),origins(set)?],
+    )).await.map_err(|_|Error::Unavailable)?;
+    accepted
+        .map(|row| {
+            let digest: Vec<u8> = row.try_get("", "digest").map_err(|_| Error::Unavailable)?;
+            Ok(TermsVersion {
+                version: row.try_get("", "version").map_err(|_| Error::Unavailable)?,
+                digest: digest.try_into().map_err(|_| Error::Unavailable)?,
+            })
+        })
+        .transpose()
 }
 
 impl AccountStore {
@@ -153,7 +223,7 @@ impl AccountStore {
         // recorded for a session being ended, and the count below cannot be raced.
         let row = tx
             .query_one_raw(statement(
-                "SELECT a.id, a.display_name, a.tag, a.legacy_id, a.legacy_closed,
+                "SELECT a.id, a.display_name, a.tag, a.legacy_id, a.legacy_closed,a.legacy_deck_source,
                  floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)
                      + interval '12 hours'))::bigint AS cap
                  FROM central_identity.sessions s JOIN central_identity.accounts a
@@ -173,7 +243,15 @@ impl AccountStore {
         let closed: bool = row
             .try_get("", "legacy_closed")
             .map_err(|_| Error::Unavailable)?;
-        if registered {
+        let ranked_match = if purpose == GatewayPurpose::Ranked {
+            if legacy_id.is_some() && !closed {
+                return Err(Error::Rejected);
+            }
+            Some(assigned_match(&tx, account, stream, registered).await?)
+        } else {
+            None
+        };
+        if registered && ranked_match.is_none() {
             tx.query_one_raw(statement(
                 &format!(
                     "SELECT g.id FROM central_identity.gateways g
@@ -186,36 +264,27 @@ impl AccountStore {
             .await
             .map_err(|_| Error::Unavailable)?
             .ok_or(Error::Rejected)?;
-        } else if purpose != GatewayPurpose::Admit || (legacy_id.is_some() && !closed) {
+        } else if !registered
+            && (purpose == GatewayPurpose::Admin || (legacy_id.is_some() && !closed))
+        {
             // Admission needs a closed move; the official gateway has no Central admins.
             return Err(Error::Rejected);
         }
-        let sid = held_sid(&tx, &digest, stream, purpose, fresh).await?;
-        let accepted = tx
-            .query_one_raw(statement(
-                &format!(
-                    "SELECT version, digest FROM central_identity.terms_acceptances
-                     WHERE account_id = $1 AND subject = {}
-                     ORDER BY accepted_at DESC, version DESC LIMIT 1",
-                    any_origin(2)
-                ),
-                vec![account.into(), origins(set)?],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        let terms = accepted
-            .map(|row| -> Result<TermsVersion, Error> {
-                let digest: Vec<u8> = row.try_get("", "digest").map_err(|_| Error::Unavailable)?;
-                Ok(TermsVersion {
-                    version: row.try_get("", "version").map_err(|_| Error::Unavailable)?,
-                    digest: digest.try_into().map_err(|_| Error::Unavailable)?,
-                })
-            })
-            .transpose()?;
+        let sid = held_sid(
+            &tx,
+            &digest,
+            stream,
+            purpose,
+            ranked_match.map(Uuid::from_bytes),
+            fresh,
+        )
+        .await?;
+        let terms = accepted_terms(&tx, account, set).await?;
         let (display_name, tag) = super::profiles::columns(&row)?;
         let cap = row.try_get("", "cap").map_err(|_| Error::Unavailable)?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(GatewayGrant {
+            ranked_match,
             sid,
             account: *account.as_bytes(),
             cap,
@@ -223,6 +292,15 @@ impl AccountStore {
             tag,
             // Only the official gateway ever learns an old id.
             legacy_id: legacy_id.filter(|_| !registered),
+            legacy_deck_source: if registered {
+                None
+            } else {
+                row.try_get::<Option<Vec<u8>>>("", "legacy_deck_source")
+                    .map_err(|_| Error::Unavailable)?
+                    .map(<[u8; 32]>::try_from)
+                    .transpose()
+                    .map_err(|_| Error::Unavailable)?
+            },
             terms,
         })
     }

@@ -851,6 +851,20 @@ fn gateway_key(id: &[u8; 16]) -> String {
     })
 }
 
+pub(super) fn scope_text(lang: Lang, scopes: GatewayScopes) -> String {
+    let mut parts = Vec::with_capacity(2);
+    match (scopes.sso, scopes.listing) {
+        (true, true) => parts.push(words::tokens_both(lang)),
+        (true, false) => parts.push(words::tokens_sso(lang)),
+        (false, true) => parts.push(words::tokens_listing(lang)),
+        (false, false) => {}
+    }
+    if scopes.ranked {
+        parts.push(words::tokens_ranked(lang));
+    }
+    parts.join(" · ")
+}
+
 fn gateway_card(
     lang: Lang,
     gateway: &MyGateway,
@@ -869,11 +883,7 @@ fn gateway_card(
         .map(|token| {
             let id = token.id;
             let live = token.revoked_at.is_none();
-            let what = match (token.scopes.sso, token.scopes.listing) {
-                (true, true) => words::tokens_both(lang),
-                (true, false) => words::tokens_sso(lang),
-                _ => words::tokens_listing(lang),
-            };
+            let what = scope_text(lang, token.scopes);
             let action = live.then(|| view! {
                 <button type="button" class="button danger" on:click=move |_| revoke.run((gateway_id, id))>{words::tokens_revoke(lang)}</button>
             });
@@ -893,6 +903,7 @@ fn gateway_card(
     let days = RwSignal::new(90_u16);
     let sso = RwSignal::new(true);
     let listing = RwSignal::new(true);
+    let ranked = RwSignal::new(false);
     let make = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         mint.run((
@@ -902,6 +913,7 @@ fn gateway_card(
             GatewayScopes {
                 sso: sso.get_untracked(),
                 listing: listing.get_untracked(),
+                ranked: ranked.get_untracked(),
             },
         ));
     };
@@ -934,6 +946,10 @@ fn gateway_card(
                 <div class="check">
                     <input id=format!("{form_id}-listing") type="checkbox" checked=true on:change=move |ev| listing.set(event_target_checked(&ev)) />
                     <label for=format!("{form_id}-listing")>{words::tokens_listing(lang)}</label>
+                </div>
+                <div class="check">
+                    <input id=format!("{form_id}-ranked") type="checkbox" on:change=move |ev| ranked.set(event_target_checked(&ev)) />
+                    <label for=format!("{form_id}-ranked")>{words::tokens_ranked(lang)}</label>
                 </div>
                 <button type="submit" class="button">{words::tokens_make(lang)}</button>
             </form>
@@ -1069,7 +1085,7 @@ fn gateways(lang: Lang, worker: String) -> AnyView {
     });
     let mint = Callback::new(
         move |(gateway, name, days, scopes): ([u8; 16], String, u16, GatewayScopes)| {
-            if central_api::owner::token_name(&name).is_err() || !(scopes.sso || scopes.listing) {
+            if central_api::owner::token_name(&name).is_err() || scopes.validate().is_err() {
                 notice.set(Some(words::tokens_invalid(lang)));
                 return;
             }

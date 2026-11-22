@@ -84,6 +84,7 @@ export type Gateway = {
   created_at: number;
   live_tokens: number;
   credential_pair: boolean;
+  ranked_hosting: "verified" | "unverified";
   tokens: Token[];
 };
 
@@ -93,7 +94,7 @@ export const gatewayOf = (n: number, name: string, state: Gateway["state"], more
   id: id(0x40 + n), origin: `https://${name.toLowerCase().replaceAll(" ", "-")}.example`,
   metadata: { name, version: "0.1.0", website: `https://${name.toLowerCase().replaceAll(" ", "-")}.example/` },
   official: false, owner: ID.erika, owner_name: "Erika", owner_tag: 0x1a2b, state, online: false, last_seen: null,
-  created_at: THEN - n * 3600, live_tokens: 0, credential_pair: false, tokens: [], ...more,
+  created_at: THEN - n * 3600, live_tokens: 0, credential_pair: false, ranked_hosting: "unverified", tokens: [], ...more,
 });
 
 export const tokenOf = (n: number, name: string, more: Partial<Token> = {}): Token => ({
@@ -182,7 +183,7 @@ export const world = (more: Partial<World> = {}): World => ({
 
 export type Asked = {
   action?: string; query?: string | null; before?: number[] | null; account?: number[] | null; admin?: boolean;
-  tag?: number; gateway?: number[]; enabled?: boolean; token?: number[]; state?: string | null; filter?: unknown;
+  tag?: number; gateway?: number[]; enabled?: boolean; verified?: boolean; token?: number[]; state?: string | null; filter?: unknown;
 };
 export type Body = { operation?: string; request?: Asked; identity?: unknown } & Record<string, unknown>;
 
@@ -255,6 +256,15 @@ function change(w: World, asked: Asked, done: (other: boolean) => Promise<void>,
       const one = w.gateways.find((g) => same(g.id, asked.gateway));
       if (!one) return refused(401);
       one.state = asked.enabled ? "approved" : "disabled";
+      if (!asked.enabled) one.ranked_hosting = "unverified";
+      made = true;
+      break;
+    }
+    case "set_ranked_verification": {
+      const one = w.gateways.find((g) => same(g.id, asked.gateway));
+      if (!one) return refused(401);
+      if (asked.verified && one.state !== "approved") return refused(409);
+      one.ranked_hosting = asked.verified ? "verified" : "unverified";
       made = true;
       break;
     }
@@ -336,6 +346,7 @@ function admin(w: World, asked: Asked, answer: Answer, done: (other: boolean) =>
     case "set_admin":
     case "set_tag":
     case "set_gateway_approval":
+    case "set_ranked_verification":
     case "revoke_gateway_token":
       return change(w, asked, done, refused, abort);
     default:
@@ -419,7 +430,7 @@ export const asked = (seen: Body[], from = 0) => seen.slice(from).filter((body) 
 export const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
 /** The changes since `from`. */
 export const changes = (seen: Body[], from = 0) =>
-  asked(seen, from).filter((r) => ["set_admin", "set_tag", "set_gateway_approval", "revoke_gateway_token"].includes(r?.action ?? ""));
+  asked(seen, from).filter((r) => ["set_admin", "set_tag", "set_gateway_approval", "set_ranked_verification", "revoke_gateway_token"].includes(r?.action ?? ""));
 
 export const button = (scope: Page | Locator, name: string) => scope.getByRole("button", { name, exact: true });
 

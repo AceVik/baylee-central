@@ -190,10 +190,16 @@ impl LegacyStore {
             .db
             .query_one_raw(statement(
                 &format!(
-                    "SELECT legacy_id, username_key, snapshot, snapshot_digest
+                    "SELECT legacy_id,username_key,snapshot_digest,octet_length(snapshot) AS bytes,
+                     CASE WHEN octet_length(snapshot)<=$2 THEN snapshot END AS inline_snapshot
                      FROM central_legacy.accounts WHERE legacy_id = $1 AND {BEFORE_DEADLINE}"
                 ),
-                vec![legacy_id.into()],
+                vec![
+                    legacy_id.into(),
+                    i32::try_from(central_api::legacy::MAX_SNAPSHOT_BYTES)
+                        .map_err(|_| Error::Unavailable)?
+                        .into(),
+                ],
             ))
             .await
             .map_err(|_| Error::Unavailable)?;
@@ -201,6 +207,35 @@ impl LegacyStore {
             let digest: Vec<u8> = row
                 .try_get("", "snapshot_digest")
                 .map_err(|_| Error::Unavailable)?;
+            let digest: [u8; 32] = digest.try_into().map_err(|_| Error::Unavailable)?;
+            let inline: Option<Vec<u8>> = row
+                .try_get("", "inline_snapshot")
+                .map_err(|_| Error::Unavailable)?;
+            let (document, digest) = if let Some(inline) = inline {
+                (inline, digest)
+            } else {
+                use central_api::legacy::{
+                    ArchiveManifest, ArchiveSource, source_digest, source_generation,
+                };
+                let bytes = u32::try_from(
+                    row.try_get::<i32>("", "bytes")
+                        .map_err(|_| Error::Unavailable)?,
+                )
+                .map_err(|_| Error::Unavailable)?;
+                let manifest = ArchiveManifest {
+                    version: 1,
+                    bytes,
+                    generation: source_generation(legacy_id, digest, bytes),
+                };
+                if !manifest.valid() {
+                    return Err(Error::Unavailable);
+                }
+                let wrapped = central_api::encode(&ArchiveSource {
+                    paged_deck_source: manifest,
+                })?;
+                let envelope_digest = source_digest(&wrapped);
+                (wrapped, envelope_digest)
+            };
             Ok(LegacySnapshot {
                 legacy_id: row
                     .try_get("", "legacy_id")
@@ -208,13 +243,52 @@ impl LegacyStore {
                 username: row
                     .try_get("", "username_key")
                     .map_err(|_| Error::Unavailable)?,
-                digest: digest.try_into().map_err(|_| Error::Unavailable)?,
-                document: row
-                    .try_get("", "snapshot")
-                    .map_err(|_| Error::Unavailable)?,
+                digest,
+                document,
             })
         })
         .transpose()
+    }
+
+    /// Read a single staged source page while the operator's deadline remains open.
+    ///
+    /// # Errors
+    /// Rejects a wrong generation, out-of-range page, changed source or unavailable store.
+    pub async fn archive_page(
+        &self,
+        legacy_id: &str,
+        generation: [u8; 32],
+        page: u16,
+    ) -> Result<Vec<u8>, Error> {
+        use central_api::legacy::{ARCHIVE_PAGE_BYTES, ArchiveManifest, source_generation};
+        let size = i32::try_from(ARCHIVE_PAGE_BYTES).map_err(|_| Error::Unavailable)?;
+        let offset = i32::from(page)
+            .checked_mul(size)
+            .and_then(|n| n.checked_add(1))
+            .ok_or(Error::Rejected)?;
+        let row=self.db.query_one_raw(statement(&format!(
+            "SELECT snapshot_digest,octet_length(snapshot) AS size,substring(snapshot FROM $2 FOR $3) AS chunk
+             FROM central_legacy.accounts WHERE legacy_id=$1 AND octet_length(snapshot)>=$2 AND {BEFORE_DEADLINE}"),
+             vec![legacy_id.into(),offset.into(),size.into()])).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
+        let digest = row
+            .try_get::<Vec<u8>>("", "snapshot_digest")
+            .map_err(|_| Error::Unavailable)?
+            .try_into()
+            .map_err(|_| Error::Unavailable)?;
+        let bytes = u32::try_from(
+            row.try_get::<i32>("", "size")
+                .map_err(|_| Error::Unavailable)?,
+        )
+        .map_err(|_| Error::Unavailable)?;
+        let manifest = ArchiveManifest {
+            version: 1,
+            bytes,
+            generation: source_generation(legacy_id, digest, bytes),
+        };
+        if generation != manifest.generation || page >= manifest.pages() {
+            return Err(Error::Conflict);
+        }
+        row.try_get("", "chunk").map_err(|_| Error::Unavailable)
     }
 
     /// Delete the account's row once its move is closed. Gone already is no

@@ -23,7 +23,7 @@ const TOKENS_PER_DAY: i64 = 32;
 /// The state of `gateways g` from `gateway_approvals p`, left-joined.
 pub(super) const STATE: &str = "CASE WHEN p.gateway_id IS NULL THEN 'pending' WHEN p.enabled THEN 'approved' ELSE 'disabled' END";
 /// The columns of a [`TokenInfo`], from `gateway_tokens t`.
-pub(super) const TOKEN_COLUMNS: &str = "t.id, t.name, t.sso, t.listing,
+pub(super) const TOKEN_COLUMNS: &str = "t.id, t.name, t.sso, t.listing, t.ranked,
     floor(extract(epoch FROM t.created_at))::bigint AS created_at,
     floor(extract(epoch FROM t.expires_at))::bigint AS expires_at,
     floor(extract(epoch FROM t.revoked_at))::bigint AS revoked_at,
@@ -57,6 +57,7 @@ pub(super) fn token_info(row: &QueryResult) -> Result<TokenInfo, Error> {
         scopes: GatewayScopes {
             sso: get("sso")?,
             listing: get("listing")?,
+            ranked: get("ranked")?,
         },
         created_at: row
             .try_get("", "created_at")
@@ -402,8 +403,8 @@ impl AccountStore {
             .query_one_raw(statement(
                 "WITH now AS (SELECT pg_catalog.clock_timestamp() AS at)
                  INSERT INTO central_identity.gateway_tokens
-                     (gateway_id, name, digest, sso, listing, created_at, expires_at)
-                 SELECT $1, $2, $3, $4, $5, now.at, now.at + pg_catalog.make_interval(days => $6) FROM now
+                     (gateway_id, name, digest, sso, listing, ranked, created_at, expires_at)
+                 SELECT $1, $2, $3, $4, $5, $7, now.at, now.at + pg_catalog.make_interval(days => $6) FROM now
                  RETURNING id, floor(extract(epoch FROM expires_at))::bigint AS expires_at",
                 vec![
                     gateway.into(),
@@ -412,6 +413,7 @@ impl AccountStore {
                     scopes.sso.into(),
                     scopes.listing.into(),
                     i32::from(days).into(),
+                    scopes.ranked.into(),
                 ],
             ))
             .await
@@ -489,7 +491,7 @@ impl AccountStore {
             .db
             .query_one_raw(statement(
                 &format!(
-                    "SELECT g.id, g.origin, g.name, g.version, g.website, {STATE} AS state, t.sso, t.listing,
+                    "SELECT g.id, g.origin, g.name, g.version, g.website, {STATE} AS state, t.sso, t.listing,t.ranked,
                          floor(extract(epoch FROM t.expires_at))::bigint AS expires_at
                      FROM central_identity.gateway_tokens t JOIN central_identity.gateways g ON g.id = t.gateway_id
                      LEFT JOIN central_identity.gateway_approvals p ON p.gateway_id = g.id
@@ -514,6 +516,7 @@ impl AccountStore {
             GatewayScopes {
                 sso: get("sso")?,
                 listing: get("listing")?,
+                ranked: get("ranked")?,
             },
             row.try_get("", "expires_at")
                 .map_err(|_| Error::Unavailable)?,

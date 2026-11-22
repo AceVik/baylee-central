@@ -63,6 +63,116 @@ fn copy(token: &Token) -> Token {
     Token::from_secret_bytes(token.to_secret_bytes())
 }
 
+fn archive_fixture() -> Vec<u8> {
+    // Repeated legal-looking authored versions make the original cutover
+    // document too large, while no individual page exceeds the native bound.
+    #[derive(serde::Serialize)]
+    struct Version {
+        version: u16,
+        cards: Vec<&'static str>,
+    }
+    #[derive(serde::Serialize)]
+    struct Deck {
+        id: &'static str,
+        history: Vec<Version>,
+    }
+    #[derive(serde::Serialize)]
+    struct Export {
+        preferences: std::collections::BTreeMap<&'static str, bool>,
+        decks: Vec<Deck>,
+    }
+    let history = (1..=50)
+        .map(|version| Version {
+            version,
+            cards: vec!["4 Island"; 420],
+        })
+        .collect();
+    central_api::encode(&Export {
+        preferences: [("synthetic", true)].into(),
+        decks: vec![Deck {
+            id: "018fe0ba-cc24-7000-8000-000000000006",
+            history,
+        }],
+    })
+    .unwrap()
+}
+
+fn archived_path(http: &Http, runtime: &Runtime, operator: &DatabaseConnection) {
+    use central_api::legacy::{ArchiveSource, MAX_SNAPSHOT_BYTES, source_digest};
+    let original = archive_fixture();
+    assert!(original.len() > MAX_SNAPSHOT_BYTES);
+    let enrollment = central_client::legacy_login(http, "archived".into(), PASSWORD).unwrap();
+    let header: ArchiveSource = central_api::decode(&enrollment.snapshot.document).unwrap();
+    let manifest = header.paged_deck_source;
+    assert!(manifest.valid() && manifest.pages() > 3);
+    let identity = enrollment.identity;
+    central_client::enroll(http, identity, enrollment.ticket, PASSWORD.into(), DOCUMENT).unwrap();
+    let mut session = central_client::login(http, identity, PASSWORD.into()).unwrap();
+    session.confirm_restored(http).unwrap();
+    assert!(matches!(
+        session.legacy_archive(http, "archived-id", &manifest),
+        Err(Error::TermsRequired)
+    ));
+    accept(http, &session);
+    assert!(session.create_object(http).is_err());
+    assert!(
+        session
+            .legacy_link(http, enrollment.snapshot.digest)
+            .is_err()
+    );
+    let fetched = session
+        .legacy_archive(http, "archived-id", &manifest)
+        .unwrap();
+    assert_eq!(fetched.as_slice(), original);
+    let digest = source_digest(&fetched);
+    assert!(session.legacy_link(http, digest).is_err());
+    assert!(
+        session
+            .legacy_finish_archive(http, manifest.generation, digest)
+            .is_err()
+    );
+    let object = session.create_object(http).unwrap();
+    session
+        .write_object(http, object.id, 0, b"synthetic restored source history")
+        .unwrap();
+    assert!(
+        session
+            .legacy_finish_archive(http, manifest.generation, [0; 32])
+            .is_err()
+    );
+    session
+        .save(
+            http,
+            b"synthetic encrypted document pointing to restored decks",
+        )
+        .unwrap();
+    session
+        .legacy_finish_archive(http, manifest.generation, digest)
+        .unwrap();
+    assert!(session.migration_closed(http).unwrap());
+    let (grant, _) = session.gateway_token(http, GATEWAY.into(), Admit).unwrap();
+    let claims = http.gateway_claims(&grant, GATEWAY);
+    assert_eq!(claims.legacy_id.as_deref(), Some("archived-id"));
+    assert_eq!(claims.legacy_deck_source, Some(digest));
+    session
+        .legacy_finish_archive(http, manifest.generation, digest)
+        .unwrap();
+    assert_eq!(
+        count(
+            runtime,
+            operator,
+            "SELECT count(*) FROM central_legacy.accounts WHERE legacy_id='archived-id'"
+        ),
+        0
+    );
+    assert!(
+        session
+            .legacy_archive(http, "archived-id", &manifest)
+            .is_err()
+    );
+    session.logout(http).unwrap();
+}
+
 fn count(runtime: &Runtime, operator: &DatabaseConnection, sql: &str) -> i64 {
     runtime
         .block_on(operator.query_one_raw(sea_orm::Statement::from_string(
@@ -129,10 +239,13 @@ pub(crate) fn run(
         .collect();
     rows[4].ban = Some(None);
     rows[5].must_change_password = true;
+    let mut archived = row("archived");
+    archived.snapshot = archive_fixture();
+    rows.push(archived);
     rows.sort_by(|a, b| a.legacy_id.as_bytes().cmp(b.legacy_id.as_bytes()));
     let digest = legacy_digest(&rows);
     runtime
-        .block_on(import_legacy(operator, rows, 6, digest))
+        .block_on(import_legacy(operator, rows, 7, digest))
         .unwrap();
     let legacy = runtime
         .block_on(LegacyStore::connect_dev(config(
@@ -179,6 +292,7 @@ pub(crate) fn run(
     };
     let tested = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         good_path(&http, &bridge, runtime, operator);
+        archived_path(&http, runtime, operator);
         open_move_is_not_admitted(&http);
         budget_and_lockout(&http, runtime, operator);
         refusals(&http, original, &central_only);

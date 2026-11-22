@@ -89,6 +89,13 @@ pub enum AdminRequest {
         /// Approved and enabled afterwards.
         enabled: bool,
     },
+    /// Grant or withdraw an approved gateway's authority to host ranked matches.
+    SetRankedVerification {
+        /// The registered gateway's id.
+        gateway: [u8; 16],
+        /// Whether this gateway may host ranked matches.
+        verified: bool,
+    },
     /// Revoke one gateway token at once: a change. `Done` again for one
     /// revoked already.
     RevokeGatewayToken {
@@ -257,6 +264,7 @@ impl AdminRequest {
             Self::SetAdmin { .. }
             | Self::ResetLogin { .. }
             | Self::SetGatewayApproval { .. }
+            | Self::SetRankedVerification { .. }
             | Self::RevokeGatewayToken { .. }
             | Self::SetTag { .. }
             | Self::SetReport { .. }
@@ -400,6 +408,22 @@ pub struct OwnedGateway {
     pub approved: bool,
 }
 
+/// The administrator's distinct decision about ranked hosting.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RankedHosting {
+    /// Ordinary gateway registration and approval start here.
+    #[default]
+    Unverified,
+    /// This host may accept ranked assignments.
+    Verified,
+}
+
+/// Omit an additive default from admin replies for older website bundles.
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    value == &T::default()
+}
+
 /// A registered gateway as an administrator sees it.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -420,6 +444,9 @@ pub struct AdminGateway {
     pub owner_tag: Option<u32>,
     /// Whether it is approved.
     pub state: GatewayState,
+    /// A Central administrator explicitly trusts this gateway to host ranked matches.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub ranked_hosting: RankedHosting,
     /// A heartbeat arrived in the last 90 seconds.
     pub online: bool,
     /// Its last heartbeat, in Unix seconds, if any.
@@ -700,6 +727,10 @@ mod tests {
             AdminRequest::SetGatewayApproval {
                 gateway: [0; 16],
                 enabled: false,
+            },
+            AdminRequest::SetRankedVerification {
+                gateway: [0; 16],
+                verified: true,
             },
             AdminRequest::RevokeGatewayToken { token: [0; 16] },
             AdminRequest::SetTag {

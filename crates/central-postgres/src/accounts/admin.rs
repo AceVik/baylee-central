@@ -7,7 +7,7 @@ use super::tokens::{LIVE_TOKEN, STATE, TOKEN_COLUMNS, metadata, state, token_inf
 use super::{AccountStore, Error, Session, Token, statement, username};
 use central_api::admin::{
     ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AdminGateway, AuditEvent, NamedAccount,
-    NamedGateway, OwnedGateway, PAGE,
+    NamedGateway, OwnedGateway, PAGE, RankedHosting,
 };
 use central_api::gateway::GatewayState;
 use central_api::owner::TokenInfo;
@@ -33,6 +33,10 @@ pub enum Action {
     GatewayApproved,
     /// A gateway was disabled.
     GatewayDisabled,
+    /// A gateway was explicitly trusted to host ranked matches.
+    RankedVerified,
+    /// A gateway's ranked hosting authority was withdrawn.
+    RankedRevoked,
     /// A gateway token was revoked by an administrator.
     GatewayTokenRevoked,
     /// An administrator closed registration.
@@ -61,6 +65,8 @@ impl Action {
             Self::TagChanged => "account.tag_changed",
             Self::GatewayApproved => "gateway.approved",
             Self::GatewayDisabled => "gateway.disabled",
+            Self::RankedVerified => "gateway.ranked_verified",
+            Self::RankedRevoked => "gateway.ranked_revoked",
             Self::GatewayTokenRevoked => "gateway.token_revoked",
             Self::RegistrationClosed => "registration.closed",
             Self::RegistrationOpened => "registration.opened",
@@ -240,7 +246,7 @@ async fn audit_gateway(
 /// The columns of an [`AdminGateway`], from `gateways g` with `gateway_approvals p`
 /// left-joined and the owner `accounts o` left-joined.
 const GATEWAY_COLUMNS: &str = "g.id, g.origin, g.name, g.version, g.website, g.official, g.owner_id,
-    o.display_name AS owner_name, o.tag AS owner_tag,
+    o.display_name AS owner_name, o.tag AS owner_tag, COALESCE(p.ranked_verified, false) AS ranked_verified,
     CASE WHEN p.gateway_id IS NULL THEN 'pending' WHEN p.enabled THEN 'approved' ELSE 'disabled' END AS state,
     COALESCE(g.last_seen > pg_catalog.clock_timestamp() - interval '90 seconds', false) AS online,
     floor(extract(epoch FROM g.last_seen))::bigint AS last_seen,
@@ -275,6 +281,14 @@ fn admin_gateway(row: &QueryResult) -> Result<AdminGateway, Error> {
             .transpose()
             .map_err(|_| Error::Unavailable)?,
         state: state(row)?,
+        ranked_hosting: if row
+            .try_get("", "ranked_verified")
+            .map_err(|_| Error::Unavailable)?
+        {
+            RankedHosting::Verified
+        } else {
+            RankedHosting::Unverified
+        },
         online: row.try_get("", "online").map_err(|_| Error::Unavailable)?,
         last_seen: row
             .try_get("", "last_seen")
@@ -682,6 +696,64 @@ impl AccountStore {
                 Action::GatewayApproved
             } else {
                 Action::GatewayDisabled
+            };
+            audit_gateway(&tx, actor, action, gateway).await?;
+        }
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Grant or revoke ranked hosting for an approved gateway. Changes and
+    /// their audit events commit together. Retries have no side effects.
+    ///
+    /// # Errors
+    /// `Rejected` for an unknown gateway or without a fresh administrator's
+    /// browser session, `Conflict` when a grant requires directory approval.
+    pub async fn set_ranked_verification(
+        &self,
+        browser: &Token,
+        gateway: [u8; 16],
+        verified: bool,
+    ) -> Result<(), Error> {
+        let (tx, actor) = self.acting_administrator(browser).await?;
+        let gateway = Uuid::from_bytes(gateway);
+        tx.query_one_raw(statement(
+            "SELECT id FROM central_identity.gateways WHERE id = $1 FOR UPDATE",
+            vec![gateway.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT enabled, ranked_verified FROM central_identity.gateway_approvals
+             WHERE gateway_id = $1 FOR UPDATE",
+                vec![gateway.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        let (enabled, was_verified) = match row {
+            Some(row) => (
+                row.try_get::<bool>("", "enabled")
+                    .map_err(|_| Error::Unavailable)?,
+                row.try_get::<bool>("", "ranked_verified")
+                    .map_err(|_| Error::Unavailable)?,
+            ),
+            None => (false, false),
+        };
+        if verified && !enabled {
+            return Err(Error::Conflict);
+        }
+        if was_verified != verified {
+            tx.execute_raw(statement(
+                "UPDATE central_identity.gateway_approvals SET ranked_verified = $2 WHERE gateway_id = $1",
+                vec![gateway.into(), verified.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+            let action = if verified {
+                Action::RankedVerified
+            } else {
+                Action::RankedRevoked
             };
             audit_gateway(&tx, actor, action, gateway).await?;
         }

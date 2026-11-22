@@ -927,6 +927,7 @@ dependencies = [
  "central-api",
  "central-crypto",
  "central-migration",
+ "num-traits",
  "sea-orm",
  "secrecy",
  "sha2 0.11.1",

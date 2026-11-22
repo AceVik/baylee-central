@@ -181,7 +181,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        32
+        39
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -296,14 +296,31 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
         .await,
         1
     );
-    // A database at the 31 migrations before presence runs the one after them
-    // alone: every other file would fail if it ran twice. Its accounts take the
-    // default, and the previous binary's statements, which never name the
-    // column, run on.
+    // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "ALTER TABLE central_identity.accounts DROP COLUMN presence;
-             DELETE FROM public.seaql_migrations WHERE version = 'm20261119_000033_presence'",
+            "ALTER TABLE central_identity.gateway_sids DROP COLUMN ranked_match;
+             DROP INDEX central_identity.gateway_sids_one_ranked;
+             DROP TABLE central_identity.ranked_badge_peaks, central_identity.ranked_champions,
+                        central_identity.ranked_publications, central_identity.ranked_receipts, central_identity.ranked_deck_ratings,
+                        central_identity.ranked_deck_versions, central_identity.ranked_ratings,
+                        central_identity.ranked_tickets, central_identity.ranked_matches,
+                        central_identity.ranked_hosts, central_identity.ranked_seasons;
+             DROP TABLE central_identity.legacy_deck_transfers;
+             ALTER TABLE central_identity.accounts DROP COLUMN legacy_deck_source;
+             ALTER TABLE central_legacy.accounts DROP CONSTRAINT legacy_source_size,
+                 ADD CONSTRAINT accounts_snapshot_check CHECK (octet_length(snapshot) BETWEEN 2 AND 196608),
+                 ALTER COLUMN snapshot SET STORAGE EXTENDED;
+             ALTER TABLE central_identity.gateway_sids DROP CONSTRAINT gateway_sids_purpose_check,
+                 ADD CONSTRAINT gateway_sids_purpose_check CHECK (purpose IN ('admit','admin'));
+             DROP FUNCTION central_identity.ranked_earned_badge();
+             ALTER TABLE central_identity.gateway_tokens DROP CONSTRAINT gateway_token_scope,
+                 DROP COLUMN ranked, ADD CONSTRAINT gateway_token_scope CHECK (sso OR listing);
+             DROP TRIGGER ranked_approval_changed ON central_identity.gateway_approvals;
+             DROP FUNCTION central_identity.ranked_approval_changed();
+             ALTER TABLE central_identity.gateway_approvals DROP COLUMN ranked_verified, DROP COLUMN ranked_epoch;
+             ALTER TABLE central_identity.accounts DROP COLUMN presence;
+             DELETE FROM public.seaql_migrations WHERE version >= 'm20261119_000033_presence'",
         )
         .await
         .unwrap();
@@ -314,7 +331,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        32
+        39
     );
     assert_eq!(
         scalar(

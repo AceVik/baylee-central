@@ -601,6 +601,9 @@ impl Budgets {
                 self.challenge.charge(client, now, 20, HOUR)
             }
             Request::Discover { .. } => self.discover.charge(client, now, 30, MINUTE),
+            Request::Ranked { request } if request.is_public() => {
+                self.directory.charge(client, now, 60, MINUTE)
+            }
             Request::LoginStart { .. } => self.login.charge(client, now, 30, MINUTE),
             // The public directory needs no session; a page reads it a few
             // times, so a minute's budget leaves room for paging. The public

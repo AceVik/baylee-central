@@ -104,3 +104,90 @@ impl Session {
         }
     }
 }
+
+impl Session {
+    /// Fetch the complete, account-bound archive through bounded pages after restoration and terms.
+    ///
+    /// # Errors
+    /// Rejects a malformed manifest, incomplete or substituted page, changed source or closed move.
+    pub fn legacy_archive(
+        &self,
+        transport: &impl Transport,
+        legacy_id: &str,
+        manifest: &central_api::legacy::ArchiveManifest,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, Error> {
+        use central_api::legacy::{ARCHIVE_PAGE_BYTES, source_digest, source_generation};
+        self.same_endpoint(transport)?;
+        if !manifest.valid() || legacy_id.is_empty() || legacy_id.len() > 64 {
+            return Err(Error::Rejected);
+        }
+        let length = usize::try_from(manifest.bytes).map_err(|_| Error::Rejected)?;
+        let mut source = zeroize::Zeroizing::new(Vec::with_capacity(length));
+        for index in 0..manifest.pages() {
+            let request = Request::LegacySourcePage {
+                generation: manifest.generation,
+                page: index,
+            };
+            let Response::LegacySourcePage {
+                generation,
+                page,
+                bytes,
+            } = transport.exchange(&request, Some((&self.token).into()))?
+            else {
+                return Err(Error::Rejected);
+            };
+            let bytes = zeroize::Zeroizing::new(bytes);
+            if generation != manifest.generation
+                || page != index
+                || bytes.len() != (length - source.len()).min(ARCHIVE_PAGE_BYTES)
+            {
+                return Err(Error::Rejected);
+            }
+            source.extend_from_slice(&bytes);
+        }
+        let digest = source_digest(&source);
+        if source_generation(legacy_id, digest, manifest.bytes) != manifest.generation {
+            return Err(Error::Conflict);
+        }
+        Ok(source)
+    }
+
+    /// Close an archived move once the account application has verified its encrypted library.
+    ///
+    /// # Errors
+    /// Detects changes to the document or live private objects since readback, stale sources and
+    /// missing pages. A retry after the same account closed succeeds.
+    pub fn legacy_finish_archive(
+        &self,
+        transport: &impl Transport,
+        generation: [u8; 32],
+        source_digest: [u8; 32],
+    ) -> Result<(), Error> {
+        use central_api::{legacy::object_inventory, object::MAX_ACCOUNT_OBJECTS};
+        self.same_endpoint(transport)?;
+        let mut objects = Vec::new();
+        let mut after = None;
+        loop {
+            let page = self.list_objects(transport, after)?;
+            let complete = page.len() < 100;
+            if objects.len() + page.len() > MAX_ACCOUNT_OBJECTS {
+                return Err(Error::Rejected);
+            }
+            after = page.last().map(|o| o.id);
+            objects.extend(page);
+            if complete {
+                break;
+            }
+        }
+        let request = Request::LegacyFinishArchive {
+            generation,
+            digest: source_digest,
+            revision: self.revision(),
+            inventory: object_inventory(&objects),
+        };
+        match transport.exchange(&request, Some((&self.token).into()))? {
+            Response::Done => Ok(()),
+            _ => Err(Error::Rejected),
+        }
+    }
+}

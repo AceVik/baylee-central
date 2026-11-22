@@ -23,6 +23,7 @@ pub(crate) fn run(
     let registered = session
         .register_gateway(http, origin.into(), metadata.clone())
         .unwrap();
+    super::ranked::private(http, session, &registered.credential);
     assert!(
         central_client::gateway_directory(http, None)
             .unwrap()
