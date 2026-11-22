@@ -30,6 +30,8 @@ pub enum Track {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum League {
+    /// Still completing the ten placement games for this format and track.
+    Unranked,
     /// Paper league.
     Paper,
     /// Wood league.
@@ -96,6 +98,8 @@ pub struct Rank {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Standing {
+    /// Completed placement games for this player or exact deck pool, capped at ten.
+    pub placement_games: u8,
     /// Competitive format.
     pub format: Format,
     /// Player or deck ladder.
