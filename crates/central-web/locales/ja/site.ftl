@@ -696,6 +696,7 @@ tokens-name = トークン名
 tokens-days = 有効期間（日）
 tokens-sso = プレイヤーをログインさせる
 tokens-listing = Gateway を一覧に載せる
+tokens-ranked = ランク戦を開催し、結果を報告する
 tokens-both = プレイヤーをログインさせ、Gateway を一覧に載せる
 tokens-make = トークンを作成
 tokens-revoke = 失効させる

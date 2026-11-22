@@ -181,7 +181,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        36
+        37
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -305,6 +305,8 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
                         central_identity.ranked_tickets, central_identity.ranked_matches,
                         central_identity.ranked_hosts, central_identity.ranked_seasons;
              DROP FUNCTION central_identity.ranked_earned_badge();
+             ALTER TABLE central_identity.gateway_tokens DROP CONSTRAINT gateway_token_scope,
+                 DROP COLUMN ranked, ADD CONSTRAINT gateway_token_scope CHECK (sso OR listing);
              DROP TRIGGER ranked_approval_changed ON central_identity.gateway_approvals;
              DROP FUNCTION central_identity.ranked_approval_changed();
              ALTER TABLE central_identity.gateway_approvals DROP COLUMN ranked_verified, DROP COLUMN ranked_epoch;
@@ -320,7 +322,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        36
+        37
     );
     assert_eq!(
         scalar(

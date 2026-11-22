@@ -128,15 +128,15 @@ fn queue_calibrates_newcomers_and_draws_use_both_ratings() {
 #[test]
 fn divisions_apply_hysteresis_only_to_previously_held_steps() {
     let fresh = Rank::default();
-    let gold_iv = Rank {
+    let entry = Rank {
         league: 5,
         division: 4,
     };
-    let gold_iii = Rank {
+    let third = Rank {
         league: 5,
         division: 3,
     };
-    let gold_ii = Rank {
+    let second = Rank {
         league: 5,
         division: 2,
     };
@@ -152,12 +152,12 @@ fn divisions_apply_hysteresis_only_to_previously_held_steps() {
             division: 3
         }
     );
-    assert_eq!(rank(1759, 700, 0, 0, gold_iv), gold_iii);
-    assert_eq!(rank(1760, 619, 0, 0, gold_iii), gold_iii);
-    assert_eq!(rank(1760, 620, 0, 0, gold_iii), gold_ii);
-    assert_eq!(rank(1745, 700, 0, 0, gold_ii), gold_ii);
-    assert_eq!(rank(1744, 700, 0, 0, gold_ii), gold_iii);
-    assert_eq!(rank(1679, 700, 0, 0, gold_iv).league, 4);
+    assert_eq!(rank(1759, 700, 0, 0, entry), third);
+    assert_eq!(rank(1760, 619, 0, 0, third), third);
+    assert_eq!(rank(1760, 620, 0, 0, third), second);
+    assert_eq!(rank(1745, 700, 0, 0, second), second);
+    assert_eq!(rank(1744, 700, 0, 0, second), third);
+    assert_eq!(rank(1679, 700, 0, 0, entry).league, 4);
 }
 
 #[test]

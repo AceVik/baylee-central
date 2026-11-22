@@ -696,6 +696,7 @@ tokens-name = Token name
 tokens-days = Valid for (days)
 tokens-sso = Signs players in
 tokens-listing = Lists the gateway
+tokens-ranked = Hosts ranked matches and reports results
 tokens-both = signs players in and lists the gateway
 tokens-make = Create token
 tokens-revoke = Revoke

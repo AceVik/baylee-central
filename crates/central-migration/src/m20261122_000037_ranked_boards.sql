@@ -8,7 +8,8 @@ ALTER TABLE central_identity.ranked_deck_versions ADD COLUMN public_id bytea
 -- person may have one qualified player row and one qualified deck row.
 CREATE TABLE central_identity.ranked_publications (
     season_id uuid PRIMARY KEY REFERENCES central_identity.ranked_seasons(id),
-    published_on date NOT NULL
+    published_on date NOT NULL,
+    finalized boolean NOT NULL DEFAULT false
 );
 CREATE TABLE central_identity.ranked_champions (
     season_id uuid NOT NULL REFERENCES central_identity.ranked_seasons(id),
@@ -69,5 +70,12 @@ CREATE TRIGGER ranked_deck_earned AFTER INSERT OR UPDATE OF games,league,divisio
 ALTER TABLE central_identity.ranked_seasons ADD COLUMN name text
     CHECK (name IS NULL OR octet_length(name) BETWEEN 1 AND 96);
 CREATE UNIQUE INDEX ranked_seasons_by_start ON central_identity.ranked_seasons(starts_at);
+CREATE INDEX ranked_awaiting_final_result ON central_identity.ranked_matches(season_id)
+    WHERE state IN ('reserved','playing');
 CREATE INDEX ranked_deck_profile_season ON central_identity.ranked_deck_ratings
     (account_id,format,last_at DESC,season_id DESC);
+-- Pages of an entire league interleave all of its divisions by score.
+CREATE INDEX ranked_players_by_league ON central_identity.ranked_ratings
+    (season_id,format,league,elo DESC,account_id);
+CREATE INDEX ranked_decks_by_league ON central_identity.ranked_deck_ratings
+    (season_id,format,league,elo DESC,account_id,version);

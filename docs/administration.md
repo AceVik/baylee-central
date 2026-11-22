@@ -167,7 +167,7 @@ writes its audit event in its transaction; reads do not.
   the change. Re-keying the old threads when a gateway's `take_profile` sees
   a changed tag is not built (an open point).
 
-The runtime gains `INSERT` and `UPDATE (enabled)` on `gateway_approvals`
+The runtime has `INSERT` and `UPDATE (enabled, ranked_verified)` on `gateway_approvals`
 (never `DELETE`) and `SELECT, INSERT, UPDATE (revoked_at, last_used_at)` on
 `gateway_tokens`; the startup check names updatable columns as a list now and
 refuses any other column.

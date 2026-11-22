@@ -13,9 +13,9 @@
 //! overview links to it): it stays when the page is loaded again and never
 //! reaches the site.
 
-use central_api::admin::{AdminAnswer, AdminGateway, AdminOverview, AdminRequest};
+use central_api::admin::{AdminAnswer, AdminGateway, AdminOverview, AdminRequest, RankedHosting};
 use central_api::gateway::GatewayState;
-use central_api::owner::TokenInfo;
+use central_api::owner::{GatewayScopes, TokenInfo};
 use leptos::prelude::*;
 
 use super::Listing;
@@ -41,7 +41,7 @@ struct Gateway {
     created_at: i64,
     live_tokens: u32,
     credential_pair: bool,
-    ranked_verified: bool,
+    ranked_hosting: RankedHosting,
 }
 
 impl From<AdminGateway> for Gateway {
@@ -59,7 +59,7 @@ impl From<AdminGateway> for Gateway {
             created_at: gateway.created_at,
             live_tokens: gateway.live_tokens,
             credential_pair: gateway.credential_pair,
-            ranked_verified: gateway.ranked_verified,
+            ranked_hosting: gateway.ranked_hosting,
         }
     }
 }
@@ -69,8 +69,7 @@ impl From<AdminGateway> for Gateway {
 struct Token {
     id: [u8; 16],
     name: String,
-    sso: bool,
-    listing: bool,
+    scopes: GatewayScopes,
     expires_at: i64,
     revoked_at: Option<i64>,
     last_used_at: Option<i64>,
@@ -81,8 +80,7 @@ impl From<TokenInfo> for Token {
         Token {
             id: token.id,
             name: token.name,
-            sso: token.scopes.sso,
-            listing: token.scopes.listing,
+            scopes: token.scopes,
             expires_at: token.expires_at,
             revoked_at: token.revoked_at,
             last_used_at: token.last_used_at,
@@ -406,11 +404,7 @@ fn tokens_view(p: &Page, gateway: [u8; 16]) -> impl IntoView + use<> {
                 .into_iter()
                 .map(|token| {
                     let live = token.revoked_at.is_none() && token.expires_at > now;
-                    let what = match (token.sso, token.listing) {
-                        (true, true) => words::tokens_both(lang),
-                        (true, false) => words::tokens_sso(lang),
-                        _ => words::tokens_listing(lang),
-                    };
+                    let what = crate::islands::account::scope_text(lang, token.scopes);
                     let standing = if token.revoked_at.is_some() {
                         words::tokens_revoked(lang).to_owned()
                     } else {
@@ -499,7 +493,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
         }
     });
     let ranked = (gateway.state == GatewayState::Approved).then(|| {
-        let verified = !gateway.ranked_verified;
+        let verified = gateway.ranked_hosting == RankedHosting::Unverified;
         let origin = gateway.origin.clone();
         let label = if verified {
             words::admin_gw_ranked_grant(lang)
@@ -524,7 +518,7 @@ fn card(p: &Page, gateway: &Gateway) -> impl IntoView + use<> {
                 })>{label}</button>
         }
     });
-    let ranked_badge = gateway.ranked_verified.then(|| {
+    let ranked_badge = (gateway.ranked_hosting == RankedHosting::Verified).then(|| {
         view! { <span class="pill ok">{words::admin_gw_ranked_verified(lang)}</span> }
     });
     let shown = move || p.open.get() == Some(id);

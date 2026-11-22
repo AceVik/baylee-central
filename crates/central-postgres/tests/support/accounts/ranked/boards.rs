@@ -39,6 +39,16 @@ async fn fixture(db: &DatabaseConnection) {
           CASE WHEN a.tag=600000106 THEN 2900 ELSE 2800 END,3100,3100,3100,9,'2000-01-01 UTC','2001-12-30 UTC'
          FROM central_identity.ranked_deck_versions v JOIN central_identity.accounts a ON v.account_id=a.id
          WHERE a.tag IN (600000106,600000107);
+         INSERT INTO central_identity.ranked_deck_versions
+          (account_id,format,version,cards,copies,elo,initial_pool,first_season)
+         SELECT a.id,'standard',sha256(int4send(i)),'{}',60,1700,false,s.id
+         FROM central_identity.accounts a CROSS JOIN central_identity.ranked_seasons s
+         CROSS JOIN generate_series(1,43) i WHERE a.tag=600000001 AND s.name='Board era one';
+         INSERT INTO central_identity.ranked_deck_ratings
+          (season_id,account_id,format,version,elo,games,season_games,wins,league,division,first_at,last_at)
+         SELECT v.first_season,v.account_id,v.format,v.version,1700,500,500,500,5,4,'2000-01-01 UTC','2000-12-30 UTC'
+         FROM central_identity.ranked_deck_versions v JOIN central_identity.accounts a ON v.account_id=a.id
+         WHERE a.tag=600000001 AND v.format='standard';
          INSERT INTO central_identity.ranked_ratings
           (season_id,format,account_id,elo,games,wins,league,division,first_at,last_at)
          SELECT s.id,'standard',a.id,CASE WHEN a.tag=600000108 THEN 2900 ELSE 1500 END,
@@ -98,6 +108,13 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
         panic!("expected seasons")
     };
     let season = items.iter().find(|s| s.name == "Board era two").unwrap().id;
+    let earlier = items.iter().find(|s| s.name == "Board era one").unwrap().id;
+    let tied = board(store, earlier, Format::Standard, Track::Deck, League::Gold).await;
+    assert_eq!(tied.len(), 43);
+    assert!(
+        tied.windows(2)
+            .all(|w| w[0].standing.deck < w[1].standing.deck)
+    );
     let standard = board(
         store,
         season,

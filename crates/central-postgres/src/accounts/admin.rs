@@ -7,7 +7,7 @@ use super::tokens::{LIVE_TOKEN, STATE, TOKEN_COLUMNS, metadata, state, token_inf
 use super::{AccountStore, Error, Session, Token, statement, username};
 use central_api::admin::{
     ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AdminGateway, AuditEvent, NamedAccount,
-    NamedGateway, OwnedGateway, PAGE,
+    NamedGateway, OwnedGateway, PAGE, RankedHosting,
 };
 use central_api::gateway::GatewayState;
 use central_api::owner::TokenInfo;
@@ -281,9 +281,14 @@ fn admin_gateway(row: &QueryResult) -> Result<AdminGateway, Error> {
             .transpose()
             .map_err(|_| Error::Unavailable)?,
         state: state(row)?,
-        ranked_verified: row
+        ranked_hosting: if row
             .try_get("", "ranked_verified")
-            .map_err(|_| Error::Unavailable)?,
+            .map_err(|_| Error::Unavailable)?
+        {
+            RankedHosting::Verified
+        } else {
+            RankedHosting::Unverified
+        },
         online: row.try_get("", "online").map_err(|_| Error::Unavailable)?,
         last_seen: row
             .try_get("", "last_seen")

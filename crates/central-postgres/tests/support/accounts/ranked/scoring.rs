@@ -35,6 +35,7 @@ struct Table<'a> {
     store: &'a AccountStore,
     accounts: [Uuid; 2],
     host: Uuid,
+    credential: &'a Token,
     origin: &'a str,
 }
 
@@ -42,9 +43,9 @@ impl Table<'_> {
     async fn draw(&self, edits: [u16; 2]) -> Uuid {
         let fixture=self.db.query_one_raw(Statement::from_sql_and_values(DbBackend::Postgres,
             "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,
-             commitment_a,commitment_b,claimed_a,claimed_b,deck_a,deck_b,host_id,ranked_epoch,origin,state,game_id)
+             commitment_a,commitment_b,claimed_a,claimed_b,deck_a,deck_b,host_id,ranked_epoch,origin,state,game_id,start_fingerprint)
              SELECT s.id,'commander',$1,$2,decode(repeat('00',32),'hex'),decode(repeat('01',32),'hex'),
-             true,true,$3::jsonb,$4::jsonb,$5,p.ranked_epoch,$6,'playing',pg_catalog.uuidv7()
+             true,true,$3::jsonb,$4::jsonb,$5,p.ranked_epoch,$6,'playing',pg_catalog.uuidv7(),decode(repeat('02',32),'hex')
              FROM central_identity.ranked_seasons s, central_identity.gateway_approvals p
              WHERE p.gateway_id=$5 AND s.starts_at<=now() AND (s.ends_at IS NULL OR s.ends_at>now())
              RETURNING id,game_id",
@@ -57,8 +58,7 @@ impl Table<'_> {
         );
         self.store
             .ranked_host(
-                Some(*self.host.as_bytes()),
-                self.origin,
+                central_postgres::RankedHostCredential::Registered(self.credential),
                 HostRequest::Finish {
                     match_id: *id.as_bytes(),
                     game: *game.as_bytes(),
@@ -104,6 +104,7 @@ pub(super) async fn run(
     db: &DatabaseConnection,
     accounts: [([u8; 16], &Token); 2],
     host: [u8; 16],
+    credential: &Token,
     origin: &str,
 ) {
     let table = Table {
@@ -111,6 +112,7 @@ pub(super) async fn run(
         store,
         accounts: accounts.map(|(id, _)| Uuid::from_bytes(id)),
         host: Uuid::from_bytes(host),
+        credential,
         origin,
     };
     for completed in 1..10 {

@@ -1,6 +1,7 @@
 -- Seasons use half-open periods. Even two concurrent operator writes cannot overlap.
 CREATE TABLE central_identity.ranked_seasons (
-    id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),
+    id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7()
+        CHECK (pg_catalog.uuid_extract_version(id) IS NOT DISTINCT FROM 7),
     starts_at timestamptz NOT NULL,
     ends_at timestamptz,
     CHECK (ends_at IS NULL OR starts_at < ends_at),
@@ -19,7 +20,8 @@ CREATE TABLE central_identity.ranked_hosts (
 CREATE INDEX ranked_hosts_recent ON central_identity.ranked_hosts(seen_at DESC) WHERE capacity > 0;
 
 CREATE TABLE central_identity.ranked_matches (
-    id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),
+    id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7()
+        CHECK (pg_catalog.uuid_extract_version(id) IS NOT DISTINCT FROM 7),
     season_id uuid NOT NULL REFERENCES central_identity.ranked_seasons(id),
     format text NOT NULL CHECK (format IN ('standard','highlander','commander')),
     account_a uuid NOT NULL REFERENCES central_identity.accounts(id) ON DELETE CASCADE,
@@ -32,6 +34,7 @@ CREATE TABLE central_identity.ranked_matches (
     -- Only a verified host supplies these combined pools after both seats have claimed.
     deck_a jsonb CHECK (jsonb_typeof(deck_a) = 'array' AND octet_length(deck_a::text) <= 65536),
     deck_b jsonb CHECK (jsonb_typeof(deck_b) = 'array' AND octet_length(deck_b::text) <= 65536),
+    start_fingerprint bytea CHECK (octet_length(start_fingerprint) = 32),
     host_id uuid NOT NULL,
     ranked_epoch bigint NOT NULL,
     origin text NOT NULL CHECK (octet_length(origin) BETWEEN 1 AND 256),
@@ -43,8 +46,9 @@ CREATE TABLE central_identity.ranked_matches (
     finished_at timestamptz,
     CHECK ((state IN ('finished','void')) = (finished_at IS NOT NULL)),
     CHECK ((state = 'finished') = (outcome IS NOT NULL)),
+    CHECK ((state='playing') = (deck_a IS NOT NULL) AND (state='playing') = (deck_b IS NOT NULL)),
     CHECK (state NOT IN ('playing','finished') OR
-        (claimed_a AND claimed_b AND game_id IS NOT NULL AND deck_a IS NOT NULL AND deck_b IS NOT NULL))
+        (claimed_a AND claimed_b AND game_id IS NOT NULL AND start_fingerprint IS NOT NULL))
 );
 CREATE INDEX ranked_matches_host_load ON central_identity.ranked_matches(host_id,lease_until)
     WHERE state IN ('reserved','playing');

@@ -20,6 +20,18 @@ Every account stayed unranked through game nine and received a rank at game ten.
 
 Repeated games against just one opponent gave little information about absolute skill. A true 1900-Elo player who won 95.54 of 100 games against the same initially 1000-Elo rival finished at 1531 on average. This is the trade-off for reduced repeat stakes and bounded adjustments. These results support showing the number of opponents played alongside public Elo when presenting sparse-pool statistics. Queue waiting times and seasonal progression were examined in the separate Baylee league lab.
 
+## Time to the elite leagues
+
+A second run followed 384 careers at each of three fixed strengths for 320 consecutive days, ten games per day, in the dense field. Central processed 3,686,400 additional results. The table counts the first occasion a player held each league. Day 1 is the first day played. The median only includes players who reached the league.
+
+| True player Elo | Reached Master | First / median day | Reached Grandmaster | First / median day |
+| ---: | ---: | ---: | ---: | ---: |
+| 2100 | 158 of 384 | 200 / 249 | 0 of 384 | — |
+| 2300 | 384 of 384 | 200 / 200 | 384 of 384 | 250 / 254 |
+| 2500 | 384 of 384 | 200 / 200 | 384 of 384 | 250 / 250 |
+
+Every simulated Master had played 2,000 games over at least 200 play days. Grandmaster required at least 2,500. With repeated chances over 320 days, even some 2100-strength players briefly crossed the 2240 threshold. First passage does not measure how long they remained there.
+
 ## Changes to a placed deck
 
 The deck-revision study started with three established reference ratings and a 60-card main deck plus 15 sideboard cards. Copies shared identities. Each experiment changed one to 75 copies, applied the production inheritance and settlement functions, compared direct changes to staging with a match between edits, and then played ten games on the final version along both paths. The in-memory test book models a single established reference and indexes version records by the sorted multiset. The PostgreSQL store suite separately exercises persisted records.
@@ -28,7 +40,7 @@ Across 71,100 result applications, direct and staged edits had the same final-ve
 
 ## Replaying the study
 
-From the Central workspace, invoke the two opt-in tests with the pinned toolchain.
+From the Central workspace, invoke the three opt-in tests with the pinned toolchain.
 
 ```sh
 cargo test --locked -p central-postgres --lib placement_study -- --ignored --nocapture

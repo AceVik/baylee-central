@@ -387,6 +387,7 @@ mod tests {
                 scopes: central_api::owner::GatewayScopes {
                     sso: true,
                     listing: true,
+                    ranked: false,
                 },
                 days: 30,
             },

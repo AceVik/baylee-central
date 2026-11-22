@@ -8,23 +8,27 @@ use super::{
     AccountStore, Admit, DatabaseConnection, Error, ServerKeys, Token, approval, enroll, login,
 };
 use central_api::LEGACY_ORIGIN;
+use central_api::admin::RankedHosting;
 use central_api::gateway::{GatewayMetadata, GatewayState};
 use central_api::owner::{GatewayScopes, SessionKind};
 use central_postgres::{Session, appoint_admin};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 const ORIGIN: &str = "https://tokens.invalid";
-const BOTH: GatewayScopes = GatewayScopes {
+const ALL: GatewayScopes = GatewayScopes {
     sso: true,
     listing: true,
+    ranked: true,
 };
 const SSO: GatewayScopes = GatewayScopes {
     sso: true,
     listing: false,
+    ranked: false,
 };
 const LISTING: GatewayScopes = GatewayScopes {
     sso: false,
     listing: true,
+    ranked: false,
 };
 
 async fn count(operator: &DatabaseConnection, sql: &str, values: Vec<sea_orm::Value>) -> i64 {
@@ -173,17 +177,18 @@ async fn minting(
 ) -> Token {
     let token = Token::generate().unwrap();
     for (name, scopes, days) in [
-        ("", BOTH, 30),
+        ("", ALL, 30),
         (
             "Main",
             GatewayScopes {
                 sso: false,
                 listing: false,
+                ranked: false,
             },
             30,
         ),
-        ("Main", BOTH, 0),
-        ("Main", BOTH, 367),
+        ("Main", ALL, 0),
+        ("Main", ALL, 367),
     ] {
         assert_eq!(
             store
@@ -196,7 +201,7 @@ async fn minting(
     }
     assert_eq!(
         store
-            .create_gateway_token(stranger, gateway, "Theirs", BOTH, 30, &token)
+            .create_gateway_token(stranger, gateway, "Theirs", ALL, 30, &token)
             .await
             .err(),
         Some(Error::Rejected),
@@ -205,7 +210,7 @@ async fn minting(
     age(operator, owner, 31).await;
     assert_eq!(
         store
-            .create_gateway_token(browser, gateway, "Main", BOTH, 30, &token)
+            .create_gateway_token(browser, gateway, "Main", ALL, 30, &token)
             .await
             .err(),
         Some(Error::Rejected),
@@ -213,7 +218,7 @@ async fn minting(
     );
     age(operator, owner, -31).await;
     let (_, expires_at) = store
-        .create_gateway_token(browser, gateway, "Main", BOTH, 366, &token)
+        .create_gateway_token(browser, gateway, "Main", ALL, 366, &token)
         .await
         .unwrap();
     let now = i64::try_from(
@@ -322,7 +327,7 @@ async fn authentication(
     let (id, origin, _, state, scopes, _) = store.gateway_status(token).await.unwrap();
     assert_eq!(
         (id, origin.as_str(), state, scopes),
-        (gateway, ORIGIN, GatewayState::Pending, BOTH)
+        (gateway, ORIGIN, GatewayState::Pending, ALL)
     );
     approval(operator, gateway, true).await;
     assert_eq!(
@@ -428,7 +433,7 @@ async fn administration(
         (1, false, false)
     );
     assert!(
-        !row.ranked_verified,
+        row.ranked_hosting == RankedHosting::Unverified,
         "directory approval never grants ranked trust"
     );
     let (_, tokens) = store.admin_gateway(&cookie, gateway).await.unwrap();
@@ -485,12 +490,13 @@ async fn administration(
         .unwrap();
     assert_eq!(audit("gateway.approved").await, 1);
     assert!(
-        !store
+        store
             .admin_gateway(&cookie, gateway)
             .await
             .unwrap()
             .0
-            .ranked_verified
+            .ranked_hosting
+            == RankedHosting::Unverified
     );
     assert_eq!(
         ranked_epoch(operator, gateway).await,
@@ -563,7 +569,8 @@ async fn ranked_verification(
                     .await
                     .unwrap()
                     .0
-                    .ranked_verified,
+                    .ranked_hosting
+                    == RankedHosting::Verified,
                 verified
             );
         }
@@ -610,7 +617,7 @@ async fn disabled_status(
 ) -> GatewayState {
     let token = Token::generate().unwrap();
     store
-        .create_gateway_token(owner_browser, gateway, "While disabled", BOTH, 1, &token)
+        .create_gateway_token(owner_browser, gateway, "While disabled", ALL, 1, &token)
         .await
         .unwrap();
     // a disabled gateway's token signs nobody in and keeps no entry

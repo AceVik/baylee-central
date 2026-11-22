@@ -696,6 +696,7 @@ tokens-name = Название токена
 tokens-days = Действует (дней)
 tokens-sso = Выполняет вход игроков
 tokens-listing = Размещает Gateway в каталоге
+tokens-ranked = Проводит рейтинговые матчи и отправляет результаты
 tokens-both = выполняет вход игроков и размещает Gateway в каталоге
 tokens-make = Создать токен
 tokens-revoke = Отозвать

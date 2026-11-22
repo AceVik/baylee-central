@@ -696,6 +696,7 @@ tokens-name = Nome do token
 tokens-days = Válido por (dias)
 tokens-sso = Faz os jogadores entrarem
 tokens-listing = Lista o gateway
+tokens-ranked = Hospeda partidas ranqueadas e informa os resultados
 tokens-both = faz os jogadores entrarem e lista o gateway
 tokens-make = Criar token
 tokens-revoke = Revogar

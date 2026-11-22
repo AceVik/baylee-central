@@ -719,6 +719,7 @@ tokens-name = Nom du jeton
 tokens-days = Valable (jours)
 tokens-sso = Connecte les joueurs
 tokens-listing = Référence la gateway
+tokens-ranked = Héberge des parties classées et transmet leurs résultats
 tokens-both = connecte les joueurs et référence la gateway
 tokens-make = Créer un jeton
 tokens-revoke = Révoquer

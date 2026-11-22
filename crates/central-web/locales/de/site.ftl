@@ -697,6 +697,7 @@ tokens-name = Name des Tokens
 tokens-days = Gültigkeit in Tagen
 tokens-sso = Meldet Spieler an
 tokens-listing = Führt das Gateway im Verzeichnis
+tokens-ranked = Richtet Ranglistenspiele aus und meldet Ergebnisse
 tokens-both = meldet Spieler an und führt das Gateway im Verzeichnis
 tokens-make = Token erstellen
 tokens-revoke = Widerrufen

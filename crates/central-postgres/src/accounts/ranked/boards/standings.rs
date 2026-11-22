@@ -164,10 +164,11 @@ pub(super) async fn board(
     }
     let src = Source::new(track);
     // Keep an indexable base predicate in addition to the projected league.
-    let eligible = match n {
-        -1 => "r.games<10",
-        7 => "r.league BETWEEN 7 AND 9",
-        10 => "c.place IS NOT NULL",
+    let eligible = match (n, division) {
+        (-1, _) => "r.league=0 AND r.games<10",
+        (7, None | Some(1)) => "r.league BETWEEN 7 AND 9",
+        (10, _) => "c.place IS NOT NULL",
+        (_, Some(_)) => "r.league=$3 AND r.division=$4",
         _ => "r.league=$3",
     };
     let rows = src.rows(

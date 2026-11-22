@@ -104,13 +104,22 @@ Central for its players' sign-ins and its entry in the gateway list.
     direction override; `central_api::gateway::shown_char`, the rule of a
     gateway's own name as well);
   - **scopes**: `sso` (read its revocations, name its invalidate path, publish its
-    terms) and `listing` (its directory heartbeat, and its pulse if it reports its
-    activity), at least one;
+    terms), `listing` (its directory heartbeat and activity), and `ranked`
+    (host ranked matches and report their results while the gateway has an
+    administrator's current verification). Choose at least one. Migration
+    000038 leaves `ranked` off for every existing token; the owner explicitly
+    enables it on a newly issued token.
   - an **expiry**, 1 to 366 days (the table's CHECK holds both ends);
   - a **revocation**, by its owner or an administrator, at once.
 - **Minting** needs a password sign-in less than 30 minutes old, as an
   administrator's change does: a stolen cookie mints nothing after that.
   A gateway holds at most eight live tokens, and is given at most 32 a day.
+- **Ranked authentication.** The configured official bridge and a registered
+  gateway's full redemption credential may identify their host for ranked
+  play. A named gateway token needs the `ranked` scope. A directory heartbeat
+  credential or an ordinary SSO-only token cannot report a result. In all
+  cases Central requires the same current administrative verification and
+  assignment generation.
 - **Authentication.** `authenticate_gateway` (every SSO request) accepts the
   credential pair's redemption credential or a live token with `sso`;
   `gateway_heartbeat` the heartbeat credential or a live token with

@@ -31,6 +31,7 @@ mod password;
 mod pictures;
 mod profiles;
 mod ranked;
+pub use ranked::RankedHostCredential;
 mod recovery;
 mod registration;
 mod reports;

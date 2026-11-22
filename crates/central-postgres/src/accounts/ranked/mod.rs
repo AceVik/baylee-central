@@ -6,11 +6,21 @@ use central_api::ranked as api;
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, prelude::Uuid};
 
 pub(super) mod boards;
+mod credentials;
 mod host;
 mod matchmaking;
 mod queue;
 mod rules;
 mod scoring;
+
+/// Host identity evidence supplied by the authenticated service.
+#[derive(Clone, Copy)]
+pub enum RankedHostCredential<'a> {
+    /// Configured official origin after verification of the service's bridge secret.
+    Official(&'a str),
+    /// Registered full gateway credential or explicitly ranked-scoped token.
+    Registered(&'a central_api::Token),
+}
 
 fn unavailable(_: impl Sized) -> Error {
     Error::Unavailable
@@ -28,7 +38,8 @@ async fn actor(db: &DatabaseTransaction, session: Session<'_>) -> Result<Uuid, E
             "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
          ON s.account_id=a.id AND s.credential_revision=a.credential_revision
          WHERE s.digest=$1 AND s.kind=$2 AND s.expires_at>pg_catalog.clock_timestamp()
-         AND a.credential IS NOT NULL FOR SHARE OF a,s",
+         AND a.credential IS NOT NULL AND a.restored AND (a.legacy_id IS NULL OR a.legacy_closed)
+         FOR SHARE OF a,s",
             vec![session.digest().to_vec().into(), session.kind().into()],
         ))
         .await
@@ -69,12 +80,13 @@ impl AccountStore {
     /// Rejects unverified, stale or foreign hosts, conflicting retries and database failures.
     pub async fn ranked_host(
         &self,
-        gateway: Option<api::Id>,
-        origin: &str,
+        credential: RankedHostCredential<'_>,
         request: api::HostRequest,
     ) -> Result<api::HostResponse, Error> {
         let db = self.db.begin().await.map_err(unavailable)?;
-        let response = host::handle(&db, gateway, origin, &request).await?;
+        let authority = credentials::authorize(&db, credential).await?;
+        let response = host::handle(&db, &authority.host, &request).await?;
+        authority.check_expiry(&db).await?;
         db.commit().await.map_err(unavailable)?;
         Ok(response)
     }

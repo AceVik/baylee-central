@@ -125,6 +125,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     let scopes = GatewayScopes {
         sso: true,
         listing: false,
+        ranked: false,
     };
     store
         .create_gateway_token(&owner_browser, gateway, "reports", scopes, 30, &token)

@@ -24,10 +24,15 @@ impl IdentityService {
         request: HostRequest,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
-        let (gateway, origins) = self.gateway_authority(bearer).await?;
-        let origin = origins.first().ok_or(Error::Rejected)?;
+        let credential = if self.bridge(bearer).is_ok() {
+            central_postgres::RankedHostCredential::Official(
+                self.official.first().ok_or(Error::Rejected)?,
+            )
+        } else {
+            central_postgres::RankedHostCredential::Registered(bearer.ok_or(Error::Rejected)?)
+        };
         Ok(Response::RankedHost {
-            response: self.store.ranked_host(gateway, origin, request).await?,
+            response: self.store.ranked_host(credential, request).await?,
         })
     }
 }

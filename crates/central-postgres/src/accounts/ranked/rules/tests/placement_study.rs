@@ -180,3 +180,6 @@ fn placement_population() {
 
 #[path = "placement_decks.rs"]
 mod deck_edits;
+
+#[path = "placement_progression.rs"]
+mod progression;

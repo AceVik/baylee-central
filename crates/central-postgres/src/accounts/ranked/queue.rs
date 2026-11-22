@@ -115,9 +115,10 @@ pub(super) async fn handle(
     let Some(row) = ticket(db, me, key).await? else {
         return Ok(api::QueueState::Idle);
     };
-    if column::<String>(&row, "state")? == "waiting" {
-        matchmaking::pair(db, &row).await?;
+    if column::<String>(&row, "state")? != "waiting" {
+        return render(db, me, &row).await;
     }
+    matchmaking::pair(db, &row).await?;
     let row = ticket(db, me, key).await?.ok_or(Error::Unavailable)?;
     render(db, me, &row).await
 }

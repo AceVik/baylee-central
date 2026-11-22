@@ -9,34 +9,6 @@ pub(super) struct Host {
     pub(super) origin: String,
 }
 
-async fn authority(
-    db: &DatabaseTransaction,
-    id: Option<Uuid>,
-    origin: &str,
-) -> Result<Host, Error> {
-    // Same gateway -> approval lock order as verification administration, including
-    // the official bridge whose gateway id is discovered only by its pinned origin.
-    let row = db
-        .query_one_raw(statement(
-            "SELECT id FROM central_identity.gateways WHERE origin=$1
-         AND (($2::uuid IS NULL AND official) OR (id=$2 AND NOT official)) FOR SHARE",
-            vec![origin.into(), id.into()],
-        ))
-        .await
-        .map_err(unavailable)?
-        .ok_or(Error::Rejected)?;
-    let id: Uuid = column(&row, "id")?;
-    let row=db.query_one_raw(statement(
-        "SELECT ranked_epoch FROM central_identity.gateway_approvals WHERE gateway_id=$1 AND enabled AND ranked_verified FOR SHARE",
-        vec![id.into()]
-    )).await.map_err(unavailable)?.ok_or(Error::Rejected)?;
-    Ok(Host {
-        id,
-        epoch: column(&row, "ranked_epoch")?,
-        origin: origin.to_owned(),
-    })
-}
-
 pub(super) async fn allocate(db: &DatabaseTransaction) -> Result<Option<Host>, Error> {
     let row=db.query_one_raw(statement(
         "SELECT h.host_id,g.origin FROM central_identity.ranked_hosts h
@@ -94,7 +66,7 @@ pub(super) async fn expire(db: &DatabaseTransaction, account: Uuid) -> Result<()
               AND p.ranked_epoch=m.ranked_epoch AND h.ranked_epoch=m.ranked_epoch
               AND m.created_at>=h.continuity_since AND h.seen_at>pg_catalog.clock_timestamp()-interval '5 minutes'))
          FOR UPDATE OF m SKIP LOCKED)
-         UPDATE central_identity.ranked_matches m SET state='void',finished_at=pg_catalog.clock_timestamp()
+         UPDATE central_identity.ranked_matches m SET state='void',deck_a=NULL,deck_b=NULL,finished_at=pg_catalog.clock_timestamp()
          FROM dead WHERE m.id=dead.id",vec![account.into()]
     )).await.map_err(unavailable)?;
     Ok(())
@@ -119,7 +91,7 @@ async fn ready(
     db.execute_raw(statement(
         "WITH stale AS (SELECT id FROM central_identity.ranked_matches WHERE state IN ('reserved','playing')
           AND lease_until<=now() ORDER BY lease_until LIMIT 64 FOR UPDATE SKIP LOCKED)
-         UPDATE central_identity.ranked_matches m SET state='void',finished_at=pg_catalog.clock_timestamp()
+         UPDATE central_identity.ranked_matches m SET state='void',deck_a=NULL,deck_b=NULL,finished_at=pg_catalog.clock_timestamp()
           FROM stale WHERE m.id=stale.id",
         vec![],
     )).await.map_err(unavailable)?;
@@ -235,23 +207,36 @@ async fn start(
     if !column::<bool>(row, "claimed_a")? || !column::<bool>(row, "claimed_b")? {
         return Err(Error::Conflict);
     }
-    let values = vec![
-        id.into(),
-        game.into(),
-        decks[0].as_str().into(),
-        decks[1].as_str().into(),
-    ];
+    // The sealed receipt retains this digest, not another copy of both players' lists.
+    // Fixed-width binary card/count pairs and a length for each seat make boundaries unique.
+    use sha2::{Digest, Sha256};
+    let mut fingerprint = Sha256::new();
+    fingerprint.update(b"Baylee ranked host start v1\0");
+    for entries in pools {
+        fingerprint.update(
+            u16::try_from(entries.len())
+                .map_err(unavailable)?
+                .to_be_bytes(),
+        );
+        for entry in entries {
+            fingerprint.update(entry.card);
+            fingerprint.update(entry.copies.to_be_bytes());
+        }
+    }
+    let fingerprint = fingerprint.finalize().to_vec();
     match column::<String>(row, "state")?.as_str() {
         "reserved" => {
             db.execute_raw(statement(
-                "UPDATE central_identity.ranked_matches SET game_id=$2,deck_a=$3::jsonb,deck_b=$4::jsonb,state='playing',
+                "UPDATE central_identity.ranked_matches SET game_id=$2,deck_a=$3::jsonb,deck_b=$4::jsonb,start_fingerprint=$5,state='playing',
                  lease_until=pg_catalog.clock_timestamp()+interval '12 hours' WHERE id=$1",
-                values
+                vec![id.into(),game.into(),decks[0].as_str().into(),decks[1].as_str().into(),fingerprint.into()]
             )).await.map_err(|error| match error.sql_err() {Some(sea_orm::SqlErr::UniqueConstraintViolation(_))=>Error::Conflict,_=>Error::Unavailable})?;
         }
         "playing" | "finished" => {
-            let same=db.query_one_raw(statement("SELECT id FROM central_identity.ranked_matches WHERE id=$1 AND game_id=$2 AND deck_a=$3::jsonb AND deck_b=$4::jsonb",values)).await.map_err(unavailable)?;
-            if same.is_none() {
+            if column::<Option<Uuid>>(row, "game_id")? != Some(game)
+                || column::<Option<Vec<u8>>>(row, "start_fingerprint")?.as_ref()
+                    != Some(&fingerprint)
+            {
                 return Err(Error::Conflict);
             }
         }
@@ -278,10 +263,16 @@ async fn finish(
     match column::<String>(row, "state")?.as_str() {
         "finished" if column::<Option<i16>>(row, "outcome")? == Some(score) => {}
         "playing" => {
-            // Settlement reads finished_at and both frozen pools under this same match row lock.
-            db.execute_raw(statement("UPDATE central_identity.ranked_matches SET state='finished',outcome=$2,finished_at=pg_catalog.clock_timestamp() WHERE id=$1",
-                vec![id.into(),score.into()])).await.map_err(unavailable)?;
+            // The scorer saves the exact deck versions before the two temporary pools are
+            // removed. Ratings, receipt and terminal state commit together under the row lock.
             scoring::settle(db, id, score).await?;
+            db.execute_raw(statement(
+                "UPDATE central_identity.ranked_matches SET state='finished',outcome=$2,
+                 deck_a=NULL,deck_b=NULL,finished_at=pg_catalog.clock_timestamp() WHERE id=$1",
+                vec![id.into(), score.into()],
+            ))
+            .await
+            .map_err(unavailable)?;
         }
         _ => return Err(Error::Conflict),
     }
@@ -290,13 +281,11 @@ async fn finish(
 
 pub(super) async fn handle(
     db: &DatabaseTransaction,
-    gateway: Option<api::Id>,
-    origin: &str,
+    host: &Host,
     request: &api::HostRequest,
 ) -> Result<api::HostResponse, Error> {
-    let host = authority(db, gateway.map(uuid), origin).await?;
     let id = match request {
-        api::HostRequest::Ready { capacity } => return ready(db, &host, *capacity).await,
+        api::HostRequest::Ready { capacity } => return ready(db, host, *capacity).await,
         api::HostRequest::Claim { match_id, .. }
         | api::HostRequest::Start { match_id, .. }
         | api::HostRequest::Void { match_id }
@@ -331,7 +320,7 @@ pub(super) async fn handle(
                 return Err(Error::Conflict);
             }
             if state != "void" {
-                db.execute_raw(statement("UPDATE central_identity.ranked_matches SET state='void',finished_at=pg_catalog.clock_timestamp() WHERE id=$1",vec![id.into()])).await.map_err(unavailable)?;
+                db.execute_raw(statement("UPDATE central_identity.ranked_matches SET state='void',deck_a=NULL,deck_b=NULL,finished_at=pg_catalog.clock_timestamp() WHERE id=$1",vec![id.into()])).await.map_err(unavailable)?;
             }
             Ok(api::HostResponse::Done)
         }

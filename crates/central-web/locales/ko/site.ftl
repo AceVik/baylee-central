@@ -696,6 +696,7 @@ tokens-name = 토큰 이름
 tokens-days = 유효 기간(일)
 tokens-sso = 플레이어 로그인
 tokens-listing = Gateway 등록
+tokens-ranked = 랭크전을 진행하고 결과를 보고합니다
 tokens-both = 플레이어를 로그인시키고 Gateway를 목록에 올려요
 tokens-make = 토큰 만들기
 tokens-revoke = 폐기

@@ -5,42 +5,68 @@ use super::super::{column, rules, statement, unavailable};
 use central_api::Error;
 use sea_orm::{ConnectionTrait, DatabaseTransaction, prelude::Uuid};
 
-const PUBLICATION_DAY: &str = "((LEAST(transaction_timestamp(),
-    s.ends_at - interval '1 microsecond')) AT TIME ZONE 'UTC')::date";
+// A game assigned before close may finish in its pinned season. Another
+// transaction still sees its open row until the scoring transaction commits.
+// Abandoned rows cannot delay the archive past the longest possible lease
+// (two minutes to claim and twelve hours to finish).
+const TARGET: &str = "SELECT s.id,((LEAST(transaction_timestamp(),
+    s.ends_at - interval '1 microsecond')) AT TIME ZONE 'UTC')::date AS publication_day,
+    ($2::boolean AND s.ends_at<=transaction_timestamp() AND
+     (s.ends_at<=transaction_timestamp()-interval '24 hours' OR NOT EXISTS (
+        SELECT 1 FROM central_identity.ranked_matches m WHERE m.season_id=s.id
+        AND m.state IN ('reserved','playing')))) IS TRUE AS final
+    FROM central_identity.ranked_seasons s WHERE s.id=$1";
 
 pub(in super::super) async fn publish(db: &DatabaseTransaction, season: Uuid) -> Result<(), Error> {
+    ensure(db, season, false).await.map(drop)
+}
+
+pub(super) async fn visible(db: &DatabaseTransaction, season: Uuid) -> Result<bool, Error> {
+    ensure(db, season, true).await
+}
+
+async fn ensure(db: &DatabaseTransaction, season: Uuid, reading: bool) -> Result<bool, Error> {
     // The normal hot path is a read. Competing first callers must recheck the
     // date after acquiring the same publication row, before replacing any title.
     let current = db
         .query_one_raw(statement(
             &format!(
-                "SELECT EXISTS (SELECT 1 FROM central_identity.ranked_publications p
-         JOIN central_identity.ranked_seasons s ON s.id=p.season_id
-         WHERE p.season_id=$1 AND p.published_on >= {PUBLICATION_DAY}) AS current"
+                "SELECT COALESCE(p.finalized OR (p.published_on>=t.publication_day AND NOT t.final),false) AS current,
+                 COALESCE(p.finalized,false) AS finalized FROM ({TARGET}) t
+                 LEFT JOIN central_identity.ranked_publications p ON p.season_id=t.id"
             ),
-            vec![season.into()],
+            vec![season.into(),reading.into()],
         ))
         .await
         .map_err(unavailable)?
         .ok_or(Error::Unavailable)?;
     if column::<bool>(&current, "current")? {
-        return Ok(());
+        return column(&current, "finalized");
     }
     let changed = db
         .query_one_raw(statement(
             &format!(
-                "INSERT INTO central_identity.ranked_publications AS p (season_id,published_on)
-            SELECT s.id,{PUBLICATION_DAY} FROM central_identity.ranked_seasons s WHERE s.id=$1
-            ON CONFLICT(season_id) DO UPDATE SET published_on=EXCLUDED.published_on
-            WHERE p.published_on < EXCLUDED.published_on RETURNING season_id"
+                "INSERT INTO central_identity.ranked_publications AS p (season_id,published_on,finalized)
+            SELECT t.id,t.publication_day,t.final FROM ({TARGET}) t
+            ON CONFLICT(season_id) DO UPDATE SET published_on=EXCLUDED.published_on,finalized=EXCLUDED.finalized
+            WHERE NOT p.finalized AND (p.published_on < EXCLUDED.published_on OR EXCLUDED.finalized)
+            RETURNING finalized"
             ),
-            vec![season.into()],
+            vec![season.into(),reading.into()],
         ))
         .await
         .map_err(unavailable)?;
-    if changed.is_none() {
-        return Ok(());
-    }
+    let Some(changed) = changed else {
+        let winner = db
+            .query_one_raw(statement(
+                "SELECT finalized FROM central_identity.ranked_publications WHERE season_id=$1",
+                vec![season.into()],
+            ))
+            .await
+            .map_err(unavailable)?
+            .ok_or(Error::Unavailable)?;
+        return column(&winner, "finalized");
+    };
     db.execute_raw(statement(
         "DELETE FROM central_identity.ranked_champions WHERE season_id=$1",
         vec![season.into()],
@@ -49,7 +75,8 @@ pub(in super::super) async fn publish(db: &DatabaseTransaction, season: Uuid) ->
     .map_err(unavailable)?;
     db.execute_raw(statement(
         "WITH cutoff AS (
-            SELECT GREATEST(s.starts_at,p.published_on::timestamp AT TIME ZONE 'UTC') AS instant
+            SELECT CASE WHEN p.finalized THEN s.ends_at ELSE
+                GREATEST(s.starts_at,p.published_on::timestamp AT TIME ZONE 'UTC') END AS instant
             FROM central_identity.ranked_publications p JOIN central_identity.ranked_seasons s
             ON s.id=p.season_id WHERE s.id=$1
         ), candidates AS (
@@ -103,7 +130,7 @@ pub(in super::super) async fn publish(db: &DatabaseTransaction, season: Uuid) ->
     ))
     .await
     .map_err(unavailable)?;
-    Ok(())
+    column(&changed, "finalized")
 }
 
 pub(in super::super) async fn champion_place(

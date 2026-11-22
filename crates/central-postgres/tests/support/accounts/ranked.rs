@@ -4,9 +4,12 @@ use central_api::{
     gateway::GatewayMetadata,
     ranked::{self as api, Format, HostRequest, HostResponse, Outcome, QueueState, Request},
 };
+use central_postgres::RankedHostCredential::{Official, Registered};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod boards;
+mod credentials;
+mod grants;
 mod scoring;
 
 const ORIGIN: &str = "https://ranked-test.example";
@@ -55,10 +58,18 @@ async fn verify(db: &DatabaseConnection, host: api::Id, enabled: bool) {
         vec![Uuid::from_bytes(host).into(),enabled.into()])).await.unwrap();
 }
 
-async fn game(store: &AccountStore, host: api::Id, accounts: [api::Id; 2], tokens: [&Token; 2]) {
+async fn game(
+    store: &AccountStore,
+    db: &DatabaseConnection,
+    credential: &Token,
+    denied: &[Token],
+    accounts: [api::Id; 2],
+    tokens: [&Token; 2],
+) {
     let assigned = play(store, tokens, 11).await;
-    let operated = |request| store.ranked_host(Some(host), ORIGIN, request);
+    let operated = |request| store.ranked_host(Registered(credential), request);
     let matched = assigned.match_id;
+    grants::assigned(store, tokens[0], matched).await;
     let claim = |n: usize| HostRequest::Claim {
         match_id: matched,
         account: accounts[n],
@@ -101,15 +112,42 @@ async fn game(store: &AccountStore, host: api::Id, accounts: [api::Id; 2], token
     };
     assert_eq!(operated(bad).await.unwrap_err(), Error::Rejected);
     assert_eq!(operated(start.clone()).await.unwrap(), HostResponse::Done);
-    assert_eq!(operated(start).await.unwrap(), HostResponse::Done);
+    assert_eq!(operated(start.clone()).await.unwrap(), HostResponse::Done);
     let finish = HostRequest::Finish {
         match_id: matched,
         game: id(21),
         outcome: Outcome::FirstWins,
     };
+    for token in denied {
+        assert_eq!(
+            store
+                .ranked_host(Registered(token), finish.clone())
+                .await
+                .unwrap_err(),
+            Error::Rejected
+        );
+    }
     let (first, again) = tokio::join!(operated(finish.clone()), operated(finish));
     assert_eq!(first.unwrap(), HostResponse::Done);
     assert_eq!(again.unwrap(), HostResponse::Done);
+    assert_eq!(operated(start).await.unwrap(), HostResponse::Done);
+    let mut changed = pools;
+    changed[0][0].copies += 1;
+    assert_eq!(
+        operated(HostRequest::Start {
+            match_id: matched,
+            game: id(21),
+            pools: changed
+        })
+        .await
+        .unwrap_err(),
+        Error::Conflict
+    );
+    let persisted=db.query_one_raw(Statement::from_sql_and_values(DbBackend::Postgres,
+        "SELECT deck_a IS NULL AND deck_b IS NULL AND octet_length(start_fingerprint)=32 AS compact
+         FROM central_identity.ranked_matches WHERE id=$1",
+        vec![Uuid::from_bytes(matched).into()])).await.unwrap().unwrap();
+    assert!(persisted.try_get::<bool>("", "compact").unwrap());
     assert_eq!(
         operated(HostRequest::Finish {
             match_id: matched,
@@ -137,89 +175,200 @@ async fn game(store: &AccountStore, host: api::Id, accounts: [api::Id; 2], token
         deltas[index] = delta;
     }
     assert_ne!(deltas[0].signum(), deltas[1].signum());
+    grants::ended(store, tokens[0]).await;
 }
 
 pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &ServerKeys) {
     let a = enroll(store, keys, "ranked-fixture-one", "rankedone").await;
     let b = enroll(store, keys, "ranked-fixture-two", "rankedtwo").await;
-    store.close_legacy("ranked-fixture-one", a).await.unwrap();
     let alice = login(store, keys, a).await;
+    store.confirm_restore(&alice, 1).await.unwrap();
     let bob = login(store, keys, b).await;
+    assert_eq!(
+        queue(store, &bob, join(1, 1)).await.unwrap_err(),
+        Error::Rejected
+    );
+    store.confirm_restore(&bob, 1).await.unwrap();
+    assert_eq!(
+        queue(store, &bob, join(1, 1)).await.unwrap_err(),
+        Error::Rejected
+    );
+    store.close_legacy("ranked-fixture-one", a).await.unwrap();
+    store.close_legacy("ranked-fixture-two", b).await.unwrap();
     let meta = GatewayMetadata {
         name: "Ranked fixture".into(),
         version: "1".into(),
         website: ORIGIN.into(),
     };
+    let full = Token::generate().unwrap();
+    let heartbeat = Token::generate().unwrap();
     let host = store
-        .register_gateway(
-            &alice,
-            ORIGIN,
-            &meta,
-            &Token::generate().unwrap(),
-            &Token::generate().unwrap(),
-            false,
-        )
+        .register_gateway(&alice, ORIGIN, &meta, &full, &heartbeat, false)
         .await
         .unwrap();
-    let ready = || store.ranked_host(Some(host), ORIGIN, HostRequest::Ready { capacity: 1 });
+    let (credential, mut denied) = credentials::named(db, host).await;
+    denied.push(heartbeat);
+    let ready = || store.ranked_host(Registered(&credential), HostRequest::Ready { capacity: 1 });
     verify(db, host, false).await;
     assert_eq!(ready().await.unwrap_err(), Error::Rejected);
     verify(db, host, true).await;
+    denied.push(credentials::revocation_in_flight(store, db, host).await);
     assert_eq!(
         store
-            .ranked_host(None, ORIGIN, HostRequest::Ready { capacity: 1 })
+            .ranked_host(Official(ORIGIN), HostRequest::Ready { capacity: 1 })
             .await
             .unwrap_err(),
         Error::Rejected
     );
     assert_eq!(ready().await.unwrap(), HostResponse::Ready);
     assert_eq!(
+        store.authenticate_gateway(&credential).await.unwrap_err(),
+        Error::Rejected
+    );
+    assert!(
+        store
+            .ranked_host(Registered(&full), HostRequest::Ready { capacity: 1 })
+            .await
+            .is_ok()
+    );
+    for token in &denied {
+        assert_eq!(
+            store
+                .ranked_host(Registered(token), HostRequest::Ready { capacity: 1 })
+                .await
+                .unwrap_err(),
+            Error::Rejected
+        );
+    }
+    admission(store, &alice, &bob).await;
+    available(store, &credential, &alice, &bob).await;
+    game(
+        store,
+        db,
+        &credential,
+        &denied,
+        [a.account, b.account],
+        [&alice, &bob],
+    )
+    .await;
+    expiry(store, db, host, &credential, &alice, &bob).await;
+    scoring::run(
+        store,
+        db,
+        [(a.account, &alice), (b.account, &bob)],
+        host,
+        &credential,
+        ORIGIN,
+    )
+    .await;
+    boards::run(store, db).await;
+}
+
+async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {
+    assert_eq!(
         store.ranked(None, join(1, 1)).await.unwrap_err(),
         Error::Rejected
     );
     let (left, right) = tokio::join!(
-        queue(store, &alice, join(1, 1)),
-        queue(store, &alice, join(1, 1))
+        queue(store, alice, join(1, 1)),
+        queue(store, alice, join(1, 1))
     );
     assert_eq!(left.unwrap(), right.unwrap());
     assert_eq!(
-        queue(store, &alice, join(1, 9)).await.unwrap_err(),
+        queue(store, alice, join(1, 9)).await.unwrap_err(),
         Error::Conflict
     );
     assert_eq!(
-        queue(store, &alice, join(2, 1)).await.unwrap_err(),
+        queue(store, alice, join(2, 1)).await.unwrap_err(),
         Error::Conflict
     );
     assert_eq!(
-        queue(store, &bob, Request::Cancel { key: id(1) })
+        queue(store, bob, Request::Cancel { key: id(1) })
             .await
             .unwrap(),
         QueueState::Idle
     );
     assert!(matches!(
-        queue(store, &alice, Request::Status).await.unwrap(),
+        queue(store, alice, Request::Status).await.unwrap(),
         QueueState::Waiting { .. }
     ));
     assert_eq!(
-        queue(store, &alice, Request::Cancel { key: id(1) })
+        queue(store, alice, Request::Cancel { key: id(1) })
             .await
             .unwrap(),
         QueueState::Idle
     );
     assert_eq!(
-        queue(store, &alice, join(1, 1)).await.unwrap(),
+        queue(store, alice, join(1, 1)).await.unwrap(),
         QueueState::Idle
     );
-    game(store, host, [a.account, b.account], [&alice, &bob]).await;
-    let revoked = play(store, [&alice, &bob], 31).await;
+}
+
+async fn available(store: &AccountStore, credential: &Token, alice: &Token, bob: &Token) {
+    store
+        .ranked_host(Registered(credential), HostRequest::Ready { capacity: 0 })
+        .await
+        .unwrap();
+    for (token, key) in [(alice, 3), (bob, 4)] {
+        assert!(matches!(
+            queue(store, token, join(key, key)).await.unwrap(),
+            QueueState::Waiting { .. }
+        ));
+    }
+    store
+        .ranked_host(Registered(credential), HostRequest::Ready { capacity: 1 })
+        .await
+        .unwrap();
+    let (left, right) = tokio::join!(
+        queue(store, alice, Request::Status),
+        queue(store, bob, Request::Status)
+    );
+    assert!(matches!(
+        left.unwrap(),
+        QueueState::Assigned { .. } | QueueState::Waiting { .. }
+    ));
+    assert!(matches!(
+        right.unwrap(),
+        QueueState::Assigned { .. } | QueueState::Waiting { .. }
+    ));
+    let QueueState::Assigned { assignment, .. } =
+        queue(store, alice, Request::Status).await.unwrap()
+    else {
+        panic!("the newly available host must receive both queued seats")
+    };
+    let release = HostRequest::Void {
+        match_id: assignment.match_id,
+    };
+    for _ in 0..2 {
+        assert_eq!(
+            store
+                .ranked_host(Registered(credential), release.clone())
+                .await
+                .unwrap(),
+            HostResponse::Done
+        );
+    }
+}
+
+async fn expiry(
+    store: &AccountStore,
+    db: &DatabaseConnection,
+    host: api::Id,
+    credential: &Token,
+    alice: &Token,
+    bob: &Token,
+) {
+    let revoked = play(store, [alice, bob], 31).await;
     verify(db, host, false).await;
     verify(db, host, true).await;
-    ready().await.unwrap();
+    store
+        .ranked_host(Registered(credential), HostRequest::Ready { capacity: 1 })
+        .await
+        .unwrap();
     assert_eq!(
         store
             .ranked_host(
-                Some(host),
-                ORIGIN,
+                Registered(credential),
                 HostRequest::Void {
                     match_id: revoked.match_id
                 }
@@ -229,24 +378,15 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         Error::Rejected
     );
     assert_eq!(
-        queue(store, &alice, Request::Status).await.unwrap(),
+        queue(store, alice, Request::Status).await.unwrap(),
         QueueState::Idle
     );
-    let timed = play(store, [&alice, &bob], 41).await;
+    let timed = play(store, [alice, bob], 41).await;
     db.execute_raw(Statement::from_sql_and_values(DbBackend::Postgres,
         "UPDATE central_identity.ranked_matches SET lease_until=now()-interval '1 second' WHERE id=$1",
         vec![Uuid::from_bytes(timed.match_id).into()])).await.unwrap();
     assert_eq!(
-        queue(store, &alice, Request::Status).await.unwrap(),
+        queue(store, alice, Request::Status).await.unwrap(),
         QueueState::Idle
     );
-    scoring::run(
-        store,
-        db,
-        [(a.account, &alice), (b.account, &bob)],
-        host,
-        ORIGIN,
-    )
-    .await;
-    boards::run(store, db).await;
 }

@@ -702,6 +702,18 @@ UPDATE central_identity.gateway_tokens SET revoked_at = clock_timestamp()
     AND revoked_at IS NULL;
 ```
 
+### Enabling a ranked host
+
+Sign in as a Central administrator, open **Administration → Gateways**, select
+the approved origin and choose **Authorize ranked hosting**. The confirmation
+names the origin entrusted with match results. When the host uses a named
+gateway token, its owner opens the gateway's token form and explicitly selects
+**Hosts ranked matches and reports results**. Deploy this newly issued token
+through the host's normal credential store. Existing scoped tokens keep their
+previous permissions. Withdrawing ranked hosting under Administration invalidates
+outstanding assignments. To rotate a compromised named credential, revoke it
+and withdraw ranked hosting before issuing a replacement.
+
 ### An origin's host may not end in a dot (12.11.2026)
 
 `https://host.` names the same host as `https://host` and was taken as a

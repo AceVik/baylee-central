@@ -718,6 +718,7 @@ tokens-name = Nome del token
 tokens-days = Validità (giorni)
 tokens-sso = Fa accedere i giocatori
 tokens-listing = Inserisce il gateway nell'elenco
+tokens-ranked = Ospita partite classificate e comunica i risultati
 tokens-both = fa accedere i giocatori e inserisce il gateway nell'elenco
 tokens-make = Crea token
 tokens-revoke = Revoca

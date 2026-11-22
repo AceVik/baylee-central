@@ -696,6 +696,7 @@ tokens-name = 權杖名稱
 tokens-days = 有效天數
 tokens-sso = 讓玩家登入
 tokens-listing = 列出 Gateway
+tokens-ranked = 代管排名賽並提交結果
 tokens-both = 讓玩家登入並列出 Gateway
 tokens-make = 建立權杖
 tokens-revoke = 撤銷

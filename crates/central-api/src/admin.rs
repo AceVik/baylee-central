@@ -408,6 +408,23 @@ pub struct OwnedGateway {
     pub approved: bool,
 }
 
+/// The administrator's distinct decision about ranked hosting.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RankedHosting {
+    /// Ordinary gateway registration and approval start here.
+    #[default]
+    Unverified,
+    /// This host may accept ranked assignments.
+    Verified,
+}
+
+impl RankedHosting {
+    const fn unverified(&self) -> bool {
+        matches!(self, Self::Unverified)
+    }
+}
+
 /// A registered gateway as an administrator sees it.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -429,8 +446,8 @@ pub struct AdminGateway {
     /// Whether it is approved.
     pub state: GatewayState,
     /// A Central administrator explicitly trusts this gateway to host ranked matches.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub ranked_verified: bool,
+    #[serde(default, skip_serializing_if = "RankedHosting::unverified")]
+    pub ranked_hosting: RankedHosting,
     /// A heartbeat arrived in the last 90 seconds.
     pub online: bool,
     /// Its last heartbeat, in Unix seconds, if any.

@@ -33,8 +33,7 @@ const LEAGUES: [League; 11] = [
 const SEASONS: &str =
     "SELECT s.id,COALESCE(s.name,to_char(s.starts_at AT TIME ZONE 'UTC','YYYY-MM-DD')) AS name,
     floor(extract(epoch FROM s.starts_at))::bigint AS starts,
-    floor(extract(epoch FROM s.ends_at))::bigint AS ends,
-    s.ends_at IS NOT NULL AND s.ends_at <= transaction_timestamp() AS finished
+    floor(extract(epoch FROM s.ends_at))::bigint AS ends
     FROM central_identity.ranked_seasons s WHERE s.starts_at <= transaction_timestamp()";
 
 fn season(row: &QueryResult) -> Result<Season, Error> {
@@ -223,7 +222,7 @@ pub(super) async fn read(
         .ok_or(Error::Rejected)?;
     let season = season(&row)?;
     let season_id = uuid(season.id);
-    publish(db, season_id).await?;
+    let finalized = publication::visible(db, season_id).await?;
     match request {
         api::Request::Board {
             format,
@@ -248,7 +247,7 @@ pub(super) async fn read(
             let (name, tag) = super::super::profiles::columns(&identity)?;
             let formats = standings::profile(db, season_id, id).await?;
             let mut awards = collection(db, id, season_id).await?;
-            if column(&row, "finished")? {
+            if finalized {
                 awards.extend(
                     formats
                         .iter()

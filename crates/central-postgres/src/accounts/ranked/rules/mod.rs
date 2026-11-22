@@ -4,12 +4,13 @@ mod deck;
 mod ladder;
 mod player;
 
-pub(crate) use deck::{DECK_FLOOR, deck_after_match, deck_start};
+pub(crate) use deck::{deck_after_match, deck_start};
 pub(crate) use ladder::{
-    CHAMPION_ELO, CHAMPION_GAMES, CHAMPION_LIMIT, ELITE_AGE_DAYS, ELITE_IDLE_DAYS, Rank,
-    champion_eligible, rank,
+    CHAMPION_ELO, CHAMPION_GAMES, CHAMPION_LIMIT, ELITE_AGE_DAYS, ELITE_IDLE_DAYS, Rank, rank,
 };
 pub(crate) use player::{EVIDENCE_GAP, PLACEMENT_GAMES, Player, queue_elo, settle};
+#[cfg(test)]
+use {deck::DECK_FLOOR, ladder::champion_eligible};
 
 /// The authoritative result, relative to the first seat of the supplied pair.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

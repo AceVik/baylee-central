@@ -126,7 +126,7 @@ GRANT SELECT ON central_identity.ranked_seasons, central_identity.ranked_hosts,
 GRANT INSERT (host_id, ranked_epoch, capacity, seen_at), UPDATE (ranked_epoch, capacity, seen_at, continuity_since)
   ON central_identity.ranked_hosts TO central_runtime;
 GRANT INSERT (season_id, format, account_a, account_b, commitment_a, commitment_b, host_id, ranked_epoch, origin),
-  UPDATE (claimed_a, claimed_b, game_id, deck_a, deck_b, state, outcome, finished_at, lease_until)
+  UPDATE (claimed_a, claimed_b, game_id, start_fingerprint, deck_a, deck_b, state, outcome, finished_at, lease_until)
   ON central_identity.ranked_matches TO central_runtime;
 GRANT INSERT (account_id, request_id, season_id, format, commitment, queue_elo), UPDATE (state, match_id)
   ON central_identity.ranked_tickets TO central_runtime;
@@ -136,6 +136,6 @@ GRANT SELECT, INSERT, UPDATE (elo, anchor) ON central_identity.ranked_deck_versi
 GRANT SELECT, INSERT, UPDATE (elo, games, season_games, wins, losses, draws, league, division, last_at)
   ON central_identity.ranked_deck_ratings TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.ranked_receipts TO central_runtime;
-GRANT SELECT, INSERT, UPDATE (published_on) ON central_identity.ranked_publications TO central_runtime;
+GRANT SELECT, INSERT, UPDATE (published_on, finalized) ON central_identity.ranked_publications TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.ranked_champions TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (place) ON central_identity.ranked_badge_peaks TO central_runtime;

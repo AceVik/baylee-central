@@ -21,10 +21,12 @@ const OFFICIAL: &[&str] = &[LEGACY_ORIGIN];
 const LISTING: GatewayScopes = GatewayScopes {
     sso: false,
     listing: true,
+    ranked: false,
 };
 const SSO: GatewayScopes = GatewayScopes {
     sso: true,
     listing: false,
+    ranked: false,
 };
 
 /// A gateway with a credential pair, approved.

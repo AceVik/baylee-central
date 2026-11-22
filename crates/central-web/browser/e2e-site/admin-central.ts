@@ -84,7 +84,7 @@ export type Gateway = {
   created_at: number;
   live_tokens: number;
   credential_pair: boolean;
-  ranked_verified: boolean;
+  ranked_hosting: "verified" | "unverified";
   tokens: Token[];
 };
 
@@ -94,7 +94,7 @@ export const gatewayOf = (n: number, name: string, state: Gateway["state"], more
   id: id(0x40 + n), origin: `https://${name.toLowerCase().replaceAll(" ", "-")}.example`,
   metadata: { name, version: "0.1.0", website: `https://${name.toLowerCase().replaceAll(" ", "-")}.example/` },
   official: false, owner: ID.erika, owner_name: "Erika", owner_tag: 0x1a2b, state, online: false, last_seen: null,
-  created_at: THEN - n * 3600, live_tokens: 0, credential_pair: false, ranked_verified: false, tokens: [], ...more,
+  created_at: THEN - n * 3600, live_tokens: 0, credential_pair: false, ranked_hosting: "unverified", tokens: [], ...more,
 });
 
 export const tokenOf = (n: number, name: string, more: Partial<Token> = {}): Token => ({
@@ -256,7 +256,7 @@ function change(w: World, asked: Asked, done: (other: boolean) => Promise<void>,
       const one = w.gateways.find((g) => same(g.id, asked.gateway));
       if (!one) return refused(401);
       one.state = asked.enabled ? "approved" : "disabled";
-      if (!asked.enabled) one.ranked_verified = false;
+      if (!asked.enabled) one.ranked_hosting = "unverified";
       made = true;
       break;
     }
@@ -264,7 +264,7 @@ function change(w: World, asked: Asked, done: (other: boolean) => Promise<void>,
       const one = w.gateways.find((g) => same(g.id, asked.gateway));
       if (!one) return refused(401);
       if (asked.verified && one.state !== "approved") return refused(409);
-      one.ranked_verified = asked.verified === true;
+      one.ranked_hosting = asked.verified ? "verified" : "unverified";
       made = true;
       break;
     }

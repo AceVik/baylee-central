@@ -41,6 +41,7 @@ fn elite_eligible(age_days: i64, idle_days: i64) -> bool {
 }
 
 /// Determine eligibility before global top-100 selection and tiebreaking.
+#[cfg(test)]
 pub(crate) fn champion_eligible(elo: i32, games: i32, age_days: i64, idle_days: i64) -> bool {
     let (points, matches, _) = GATES[CHAMPION];
     elo >= points && games >= matches && elite_eligible(age_days, idle_days)

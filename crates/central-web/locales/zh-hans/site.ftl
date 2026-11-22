@@ -696,6 +696,7 @@ tokens-name = 令牌名称
 tokens-days = 有效期（天）
 tokens-sso = 让玩家登录
 tokens-listing = 列出该 Gateway
+tokens-ranked = 托管排位赛并提交结果
 tokens-both = 让玩家登录并列出该 Gateway
 tokens-make = 创建令牌
 tokens-revoke = 吊销
