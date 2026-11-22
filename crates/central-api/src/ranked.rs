@@ -94,10 +94,26 @@ pub struct Rank {
     pub champion_place: Option<u8>,
 }
 
+/// Aggregate confirmed results across seasons.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Record {
+    /// Completed games, including draws.
+    pub games: u32,
+    /// Victories.
+    pub wins: u32,
+    /// Defeats.
+    pub losses: u32,
+    /// Drawn games.
+    pub draws: u32,
+}
+
 /// One format and track in a season.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Standing {
+    /// Career total as of this season.
+    pub career: Record,
     /// Completed placement games for this player or exact deck pool, capped at ten.
     pub placement_games: u8,
     /// Competitive format.
