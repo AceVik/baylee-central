@@ -68,6 +68,32 @@ pub(super) fn public(http: &Http, account: Id, name: &str, tag: u32) {
 }
 
 pub(super) fn private(http: &Http, session: &Session, unverified: &Token) {
+    let own = Request::OwnProfile { season: None };
+    assert!(
+        central_api::decode::<Request>(br#"{"own_profile":{"season":null,"target":"other"}}"#)
+            .is_err()
+    );
+    assert!(ranked::read(http, own.clone()).is_err());
+    assert!(
+        http.exchange(
+            &wire::Request::Ranked {
+                request: own.clone()
+            },
+            None
+        )
+        .is_err()
+    );
+    let Response::Profile {
+        account, formats, ..
+    } = session.ranked(http, own).unwrap()
+    else {
+        panic!("owner's authenticated standings expected");
+    };
+    assert_eq!(account, session.identity().account);
+    assert_eq!(formats.len(), 3);
+    assert!(formats.iter().all(|s| s.track == Track::Player
+        && s.placement_games == 0
+        && s.rank.league == League::Unranked));
     let selected = vec![central_api::ranked::PoolEntry {
         card: [7; 32],
         copies: 60,

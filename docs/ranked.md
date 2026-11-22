@@ -7,6 +7,7 @@ The native client enters Standard, Baylee Highlander or two-player Commander thr
 | Operation | Authority |
 | --- | --- |
 | Read seasons, division boards or public profiles | Anyone, including a signed-out native client. The native and browser listeners apply the directory rate budget. |
+| Read your own placement progress | An authenticated session. The account comes from that session. Before the first confirmed game, each format shows Unranked at 0/10, including for accounts without a public handle. |
 | Join, inspect or cancel a ticket | The live native Central session for its own account. A join requires acceptance of the current terms. |
 | Enable a ranked host | A Central administrator using the existing fresh web administration session. Directory approval and ranked verification are separate stored decisions. |
 | Advertise capacity or claim, start, finish or void a game | A verified host using its registered host credential, a named token explicitly granted the ranked scope, or the official bridge. Operations on a match also require its assigned host and current verification epoch. |
