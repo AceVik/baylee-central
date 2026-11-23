@@ -123,6 +123,12 @@ pub(super) async fn run(
     f.call(&f.alice, candidate).await.unwrap();
     let player = fresh(f, keys).await;
     assert!(
+        f.inventory(&player)
+            .await
+            .iter()
+            .any(|owned| owned.id == mat.id && owned.asset == mat.asset)
+    );
+    assert!(
         art(f.store, home, game, &proof, mat.asset.digest)
             .await
             .is_err()

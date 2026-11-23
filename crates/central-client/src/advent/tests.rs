@@ -97,3 +97,47 @@ fn verify_content_and_conditional_cache_scope() {
         Err(Error::Rejected)
     );
 }
+
+#[test]
+fn independent_page_jobs_cannot_switch_art_or_skip_a_range() {
+    let scope = api::AssetScope::Owned { item: [7; 16] };
+    let meta = api::AssetMeta {
+        size: api::PAGE_BYTES + 1,
+        width: 1,
+        height: 1,
+        mime: api::Mime::Webp,
+        tier: api::Finish::Standard,
+        digest: [3; 32],
+    };
+    for changed_digest in [false, true] {
+        let mut calls = 0;
+        let result = read_asset(scope, None, |query| {
+            let api::Request::Asset { offset, .. } = query else {
+                panic!("expected an asset range")
+            };
+            calls += 1;
+            let page = if calls == 1 {
+                assert_eq!(offset, 0);
+                api::AssetPage {
+                    asset: meta,
+                    offset,
+                    bytes: vec![8; api::PAGE_BYTES as usize],
+                }
+            } else {
+                assert_eq!(offset, api::PAGE_BYTES);
+                let mut asset = meta;
+                if changed_digest {
+                    asset.digest = [4; 32];
+                }
+                api::AssetPage {
+                    asset,
+                    offset: if changed_digest { offset } else { offset + 1 },
+                    bytes: vec![9],
+                }
+            };
+            Ok(api::Response::Asset { page })
+        });
+        assert_eq!(result, Err(Error::Rejected));
+        assert_eq!(calls, 2);
+    }
+}
