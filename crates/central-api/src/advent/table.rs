@@ -32,6 +32,15 @@ impl Clone for Proof {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Recover the last confirmed appearance for this native account's actual prior chair.
+    Resume {
+        #[doc = "Exact gateway origin of the new live ordinary admission."]
+        origin: String,
+        #[doc = "Prior logical table identifier."]
+        game: Id,
+        #[doc = "Prior seat index."]
+        seat: u8,
+    },
     /// Create a five-minute invitation for the specific seat this player joined.
     Begin {
         /// Exact gateway origin associated with this account's live ordinary admission.
@@ -45,10 +54,22 @@ pub enum Request {
     },
 }
 
+impl Request {
+    /// The client-chosen gateway, checked against a live admission by Central.
+    #[must_use]
+    pub fn origin(&self) -> &str {
+        match self {
+            Self::Begin { origin, .. } | Self::Resume { origin, .. } => origin,
+        }
+    }
+}
+
 /// Native-only response. No peer or account identifier is exposed to the table.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Nothing was saved at that chair or the player cleared both slots.
+    NoLook,
     /// Present to this game's seat-authorized admission endpoint.
     Grant {
         #[doc = "Transient bearer."]
@@ -72,6 +93,11 @@ pub struct Worn {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostRequest {
+    /// Retire all live grants and recovery records for a finished game at this host.
+    Closed {
+        #[doc = "Completed logical table."]
+        game: Id,
+    },
     /// Bind the native wearer's table grant to the same authenticated gateway chair.
     Confirm {
         #[doc = "Logical table UUID."]
@@ -104,6 +130,8 @@ pub enum HostRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostResponse {
+    /// The host's table has no retained appearance.
+    Closed,
     /// Release exactly this seat's selected metadata.
     Confirmed {
         #[doc = "Approved surface metadata."]

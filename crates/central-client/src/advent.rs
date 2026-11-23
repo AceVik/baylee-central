@@ -104,40 +104,57 @@ impl Session {
         scope: api::AssetScope,
         cached: Option<api::Digest>,
     ) -> Result<(api::AssetMeta, Option<Vec<u8>>), Error> {
-        let mut request = api::Request::Asset {
-            scope,
-            offset: 0,
-            cached,
-        };
-        let mut metadata = None;
-        let mut bytes = Vec::new();
-        loop {
-            let page = match self.advent(transport, request)? {
-                api::Response::Asset { page } => page,
-                api::Response::Cached { asset } if bytes.is_empty() => return Ok((asset, None)),
-                _ => return Err(Error::Rejected),
-            };
-            if metadata.is_some_and(|m| m != page.asset) {
-                return Err(Error::Rejected);
-            }
-            if metadata.is_none() {
-                metadata = Some(page.asset);
-                bytes
-                    .try_reserve_exact(page.asset.size as usize)
-                    .map_err(|_| Error::Unavailable)?;
-            }
-            bytes.extend_from_slice(&page.bytes);
-            let offset = u32::try_from(bytes.len()).map_err(|_| Error::Rejected)?;
-            if offset == page.asset.size {
-                page.asset.verify(&bytes)?;
-                return Ok((page.asset, Some(bytes)));
-            }
-            request = api::Request::Asset {
-                scope,
-                offset,
-                cached: None,
-            };
+        read_asset(scope, cached, |request| self.advent(transport, request))
+    }
+}
+
+/// Reassemble private art while the caller schedules each authorized page independently.
+/// A UI can interleave these requests with time-sensitive game operations.
+///
+/// # Errors
+/// Rejects invalid ranges, cache responses, changing metadata or incomplete content.
+pub fn read_asset(
+    scope: api::AssetScope,
+    cached: Option<api::Digest>,
+    mut request: impl FnMut(api::Request) -> Result<api::Response, Error>,
+) -> Result<(api::AssetMeta, Option<Vec<u8>>), Error> {
+    let mut query = api::Request::Asset {
+        scope,
+        offset: 0,
+        cached,
+    };
+    let mut metadata = None;
+    let mut bytes = Vec::new();
+    loop {
+        let reply = request(query.clone())?;
+        if !answers(&query, &reply) {
+            return Err(Error::Rejected);
         }
+        let page = match reply {
+            api::Response::Asset { page } => page,
+            api::Response::Cached { asset } if bytes.is_empty() => return Ok((asset, None)),
+            _ => return Err(Error::Rejected),
+        };
+        if metadata.is_some_and(|m| m != page.asset) {
+            return Err(Error::Rejected);
+        }
+        if metadata.is_none() {
+            metadata = Some(page.asset);
+            bytes
+                .try_reserve_exact(page.asset.size as usize)
+                .map_err(|_| Error::Unavailable)?;
+        }
+        bytes.extend_from_slice(&page.bytes);
+        let offset = u32::try_from(bytes.len()).map_err(|_| Error::Rejected)?;
+        if offset == page.asset.size {
+            page.asset.verify(&bytes)?;
+            return Ok((page.asset, Some(bytes)));
+        }
+        query = api::Request::Asset {
+            scope,
+            offset,
+            cached: None,
+        };
     }
 }
 

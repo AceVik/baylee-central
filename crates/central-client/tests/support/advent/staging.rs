@@ -60,7 +60,8 @@ pub(super) fn verify(
     assert!(owner.advent_asset(http, hero, None).is_err());
     assert!(matches!(
         owner.advent(http, Q::CurrentCalendar {}).unwrap(),
-        A::NoCalendar {}
+        A::Calendar { year:current, hero:None, doors, .. }
+            if current==year && doors.iter().all(|entry|entry.state==api::DoorState::Locked)
     ));
     runtime.block_on(material::elapsed(db, year, 24 * 86_400));
     assert!(

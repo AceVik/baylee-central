@@ -163,3 +163,5 @@ GRANT SELECT, INSERT (account_id,year,door,art_id) ON central_identity.advent_en
 GRANT SELECT, INSERT, DELETE ON central_identity.advent_ranked_looks TO central_runtime;
 GRANT SELECT, DELETE, INSERT (proof,account_id,gateway_id,sid,game,seat,sleeve,playmat),
       UPDATE (confirmed,expires_at) ON central_identity.advent_table_looks TO central_runtime;
+GRANT SELECT, DELETE, INSERT (account_id,gateway_id,game,seat,stream,sleeve,playmat)
+  ON central_identity.advent_table_outfits TO central_runtime;

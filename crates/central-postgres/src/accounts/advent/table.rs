@@ -8,6 +8,8 @@ use crate::accounts::{NOT_DISABLED, gateways::valid_id};
 use api::table::{HostRequest, HostResponse, Proof, Request, Response, Worn};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
+mod recovery;
+
 fn chair(game: api::Id, seat: u8) -> Result<(Uuid, i16), Error> {
     if !valid_id(game) || seat >= 8 {
         return Err(Error::Rejected);
@@ -15,18 +17,12 @@ fn chair(game: api::Id, seat: u8) -> Result<(Uuid, i16), Error> {
     Ok((uuid(game), i16::from(seat)))
 }
 
-// Begin and Confirm share a per-chair transaction lock so a slower, older
-// confirmation cannot replace a newer selection. Only the digest is stored.
-async fn lock_chair(
-    db: &DatabaseTransaction,
-    sid: &[u8],
-    game: Uuid,
-    seat: i16,
-) -> Result<(), Error> {
+// Serialize confirmations with replacement, explicit removal and host close.
+async fn lock_table(db: &DatabaseTransaction, host: Uuid, game: Uuid) -> Result<(), Error> {
     db.query_one_raw(statement(
         "SELECT pg_advisory_xact_lock(hashtextextended(
-        'advent-table/'||encode($1::bytea,'hex')||'/'||$2::uuid::text||'/'||$3::smallint::text,0))",
-        vec![sid.to_vec().into(), game.into(), seat.into()],
+        'advent-table/'||$1::uuid::text||'/'||$2::uuid::text,0))",
+        vec![host.into(), game.into()],
     ))
     .await
     .map_err(unavailable)?;
@@ -49,17 +45,17 @@ async fn begin(
     request: Request,
     official_stream: Option<&str>,
 ) -> Result<Response, Error> {
-    let Request::Begin {
-        origin,
-        game,
-        seat,
-        look,
-    } = request;
+    let (origin, game, seat, look) = match request {
+        Request::Begin {
+            origin,
+            game,
+            seat,
+            look,
+        } => (origin, game, seat, Some(look)),
+        Request::Resume { origin, game, seat } => (origin, game, seat, None),
+    };
     let (game, seat) = chair(game, seat)?;
-    if !matches!(session, Session::Native(_))
-        || origin.len() > 256
-        || look == api::Equipment::default()
-    {
+    if !matches!(session, Session::Native(_)) || origin.len() > 256 {
         return Err(Error::Rejected);
     }
     let row = db
@@ -80,8 +76,20 @@ async fn begin(
         .ok_or(Error::Rejected)?;
     let host: Uuid = col(&row, "id")?;
     let sid: Vec<u8> = col(&row, "sid")?;
+    lock_table(db, host, game).await?;
+    recovery::prune(db).await?;
+    let look = match look {
+        Some(look) if look == api::Equipment::default() => {
+            recovery::clear(db, me, host, game, seat).await?;
+            return Ok(Response::NoLook);
+        }
+        Some(look) => look,
+        None => match recovery::prior(db, me, host, game, seat).await? {
+            Some(look) => look,
+            None => return Ok(Response::NoLook),
+        },
+    };
     inventory::check_look(db, me, look).await?;
-    lock_chair(db, &sid, game, seat).await?;
     db.execute_raw(statement(
         "DELETE FROM central_identity.advent_table_looks WHERE proof IN (
         SELECT proof FROM central_identity.advent_table_looks WHERE expires_at<=clock_timestamp()
@@ -159,7 +167,8 @@ async fn confirm(
     proof: &Proof,
     sid: &[u8],
 ) -> Result<HostResponse, Error> {
-    lock_chair(db, sid, game, seat).await?;
+    lock_table(db, host, game).await?;
+    let fresh = !selection(db, host, game, seat, proof).await?.confirmed;
     let verified=db.execute_raw(statement("UPDATE central_identity.advent_table_looks SET confirmed=true,
         expires_at=CASE WHEN confirmed THEN expires_at ELSE clock_timestamp()+interval '10 minutes' END
         WHERE proof=$1 AND sid=$2 AND gateway_id=$3 AND game=$4 AND seat=$5 AND expires_at>clock_timestamp()",
@@ -168,11 +177,14 @@ async fn confirm(
         return Err(Error::Rejected);
     }
     let selected = selection(db, host, game, seat, proof).await?;
+    if fresh {
+        recovery::remember(db, host, game, seat, proof).await?;
+    }
     db.execute_raw(statement(
         "DELETE FROM central_identity.advent_table_looks
-        WHERE sid=$1 AND game=$2 AND seat=$3 AND proof<>$4 AND confirmed",
+        WHERE gateway_id=$1 AND game=$2 AND seat=$3 AND proof<>$4 AND confirmed",
         vec![
-            sid.to_vec().into(),
+            host.into(),
             game.into(),
             seat.into(),
             proof.digest().to_vec().into(),
@@ -201,10 +213,9 @@ impl AccountStore {
         request: Request,
         origins: &[String],
     ) -> Result<api::Response, Error> {
-        let Request::Begin { origin, .. } = &request;
         let canonical = origins
             .first()
-            .filter(|_| origins.contains(origin))
+            .filter(|_| origins.iter().any(|origin| origin == request.origin()))
             .ok_or(Error::Rejected)?;
         let db = self.db.begin().await.map_err(unavailable)?;
         let me = super::caller(&db, session, true).await?;
@@ -228,25 +239,42 @@ impl AccountStore {
                 uuid(Self::authenticate_gateway_on(&db, token).await?.0)
             }
             RankedHostCredential::Official(origin) => {
-                let proof = match &request {
-                    HostRequest::Confirm { proof, .. } | HostRequest::Art { proof, .. } => proof,
+                let id = match &request {
+                    HostRequest::Closed { game }
+                    | HostRequest::Confirm { game, .. }
+                    | HostRequest::Art { game, .. } => uuid(*game),
                 };
                 let row = db
                     .query_one_raw(statement(
                         &format!(
-                            "SELECT g.id FROM central_identity.gateways g JOIN central_identity.advent_table_looks l ON l.gateway_id=g.id
-                    JOIN central_identity.gateway_sids i ON i.sid=l.sid
-                    WHERE i.stream=$1 AND l.proof=$2 AND g.official AND {NOT_DISABLED}"
+                            "SELECT g.id FROM central_identity.gateways g WHERE g.official AND {NOT_DISABLED}
+                    AND (EXISTS (SELECT 1 FROM central_identity.advent_table_looks l
+                        JOIN central_identity.gateway_sids i ON i.sid=l.sid
+                        WHERE l.gateway_id=g.id AND i.stream=$1 AND l.game=$2)
+                    OR EXISTS (SELECT 1 FROM central_identity.advent_table_outfits o
+                        WHERE o.gateway_id=g.id AND o.stream=$1 AND o.game=$2))"
                         ),
-                        vec![origin.to_owned().into(),proof.digest().to_vec().into()],
+                        vec![origin.to_owned().into(),id.into()],
                     ))
                     .await
-                    .map_err(unavailable)?
-                    .ok_or(Error::Rejected)?;
+                    .map_err(unavailable)?;
+                let Some(row) = row else {
+                    return if matches!(request, HostRequest::Closed { .. }) {
+                        Ok(HostResponse::Closed)
+                    } else {
+                        Err(Error::Rejected)
+                    };
+                };
                 col(&row, "id")?
             }
         };
         let response = match request {
+            HostRequest::Closed { game } => {
+                let (game, _) = chair(game, 0)?;
+                lock_table(&db, host, game).await?;
+                recovery::close(&db, host, game).await?;
+                HostResponse::Closed
+            }
             HostRequest::Confirm {
                 game,
                 seat,
