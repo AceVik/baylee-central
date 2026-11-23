@@ -14,9 +14,9 @@ use std::{
 };
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+pub(crate) mod ranked;
 #[cfg(test)]
 mod tests;
-pub(crate) mod ranked;
 
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
 #[serde(deny_unknown_fields)]
@@ -189,7 +189,7 @@ fn settings() -> Result<(Connection, PathBuf, PathBuf), ()> {
             "central-picture-worker{}",
             std::env::consts::EXE_SUFFIX
         ));
-    Ok((database,root,worker))
+    Ok((database, root, worker))
 }
 
 async fn connect(mut database: Connection) -> Result<central_postgres::DatabaseConnection, ()> {

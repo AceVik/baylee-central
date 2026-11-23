@@ -3,7 +3,7 @@ use super::{AccountStore, DatabaseConnection};
 use central_api::ranked::{
     AwardKind, Format, League, ProfileTarget, Request, Response, Row, Track,
 };
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 use std::collections::BTreeSet;
 
 async fn fixture(db: &DatabaseConnection) {
@@ -115,7 +115,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
         tied.windows(2)
             .all(|w| w[0].standing.deck < w[1].standing.deck)
     );
-    champion_board(store, season).await;
+    champion_board(store, db, season).await;
     archive_profile(store, season).await;
     db.execute_unprepared(
         "DELETE FROM central_identity.accounts WHERE legacy_id LIKE 'boardfixture%'
@@ -128,7 +128,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
     .unwrap();
 }
 
-async fn champion_board(store: &AccountStore, season: [u8; 16]) {
+async fn champion_board(store: &AccountStore, db: &DatabaseConnection, season: [u8; 16]) {
     let standard = board(
         store,
         season,
@@ -178,6 +178,27 @@ async fn champion_board(store: &AccountStore, season: [u8; 16]) {
         .map(|r| r.account)
         .collect();
     assert_eq!(people.len(), 100);
+    // The publisher found 100 distinct people, including one deck-only title.
+    // Exactly its 99 published player accounts own the Champion equipment.
+    let players: BTreeSet<_> = standard
+        .iter()
+        .chain(&commander)
+        .map(|r| r.account)
+        .collect();
+    assert_eq!(players.len(), 99);
+    let grants: BTreeSet<_> = db
+        .query_all_raw(Statement::from_string(
+            DbBackend::Postgres,
+            "SELECT u.account_id FROM central_identity.ranked_cosmetic_unlocks u
+         JOIN central_identity.accounts a ON a.id=u.account_id
+         WHERE u.league=10 AND u.division=0 AND a.tag BETWEEN 600000001 AND 600000109",
+        ))
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.try_get_by_index::<Uuid>(0).unwrap().into_bytes())
+        .collect();
+    assert_eq!(grants, players);
 }
 
 async fn archive_profile(store: &AccountStore, season: [u8; 16]) {

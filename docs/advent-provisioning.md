@@ -32,6 +32,20 @@ The publication opens on December 1 at 00:00 Europe/Berlin and closes on January
 
 For a private end-to-end release rehearsal, clone the staging database into an isolated native test fixture called `central_native_test`. Set its database comment to `advent-disposable-clone-v1` and point `CENTRAL_TEST_PROVISIONED_ADVENT_PACK` at the trusted source directory before running the existing native HTTP PostgreSQL suite. Only this marked clone can run the calendar time-shift check. It exercises the SDK, independent synthetic native sessions, automatic inventory delivery and byte equality with each approved local file. Destroy the disposable clone after the check and stop the test service.
 
+## Private ranked catalog
+
+Use `central-service --ranked-cosmetics-import-stdin` with the same stdin settings, picture worker and confined file layout. The DBA also applies `ops/ranked-cosmetics-importer-grants.sql` for the trusted catalog operator. Keep this pack separate from seasonal calendar content. Its root contains `catalog.json` with one `sets` array of 28 objects. Each has integer `league` and `division`, plus the two image objects `sleeve` and `playmat`. Use the image path, SHA-256 and bilingual title fields described above. A playmat can also carry its original composition and multiplayer overrides in `mat_framing`.
+
+| League codes | Required divisions | Finish |
+| --- | --- | --- |
+| 0 Paper | 0 | Standard |
+| 1 Wood through 4 Silver | I, II and III, encoded as 1 to 3 | Standard |
+| 5 Gold through 7 Diamond | I through IV, encoded as 1 to 4 | Standard |
+| 8 Master and 9 Grandmaster | 0 | Special |
+| 10 Champion | 0 | Finale |
+
+Each of the 56 slots uses distinct artwork. The operator validates and commits all 28 pairs in one transaction. Reimporting checks titles, digests, image dimensions, finish and the complete composition. A missing, duplicate or changed slot aborts the transaction. Account rewards follow the independently recorded league and division acquisitions when the matching catalog entries become available.
+
 ## Optional playmat composition
 
 A playmat image object may include `mat_framing`. Its `duel` object defines the original one-on-one composition. `focus: [x,y]` locates the motif from the top left of the source. Both coordinates range from 0 to 10000, with 10000 indicating the opposite edge. The optional `safe: [left,top,right,bottom]` marks a positive-area rectangle which contains the focus and should remain visible.

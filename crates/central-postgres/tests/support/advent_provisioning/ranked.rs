@@ -43,18 +43,17 @@ pub(super) async fn run(owner: &DatabaseConnection, db: &DatabaseConnection) {
         .await
         .unwrap();
     let count = "SELECT count(*) AS value FROM central_identity.ranked_cosmetic_catalog";
-    let n = super::super::scalar;
     let mut partial = RankedCatalog::begin(db).await.unwrap();
     partial
         .pair(0, 0, image(0, 0, Kind::Sleeve), image(0, 0, Kind::Playmat))
         .await
         .unwrap();
     assert!(partial.finish().await.is_err());
-    assert_eq!(n(owner, count).await, 0);
+    assert_eq!(super::super::scalar(owner, count).await, 0);
     let (first, retry) = tokio::join!(full(db), full(db));
     first.unwrap();
     retry.unwrap();
-    assert_eq!(n(owner, count).await, 56);
+    assert_eq!(super::super::scalar(owner, count).await, 56);
     for (division, framing) in [(0, None), (1, Some(MatFraming::default()))] {
         let league = u8::from(division == 1);
         let mut changed = image(league, division, Kind::Playmat);
@@ -84,11 +83,19 @@ pub(super) async fn run(owner: &DatabaseConnection, db: &DatabaseConnection) {
     );
     assert!(transaction.finish().await.is_err());
     assert_eq!(
-        n(
+        super::super::scalar(
             owner,
             "SELECT count(*) AS value FROM central_identity.advent_art WHERE source='ranked'"
         )
         .await,
         56
     );
+    owner.execute_unprepared("BEGIN;
+        DELETE FROM central_identity.ranked_cosmetic_catalog c USING central_identity.advent_art a
+          WHERE c.art_id=a.id AND a.source='ranked' AND a.size=4 AND a.title_en='Fixture art' AND get_byte(a.content,0)=231;
+        DELETE FROM central_identity.advent_art WHERE source='ranked' AND size=4 AND title_en='Fixture art' AND get_byte(content,0)=231;
+        REVOKE INSERT (source) ON central_identity.advent_art FROM central_advent_importer;
+        REVOKE SELECT (league,division,kind,art_id), INSERT (league,division,kind,art_id)
+          ON central_identity.ranked_cosmetic_catalog FROM central_advent_importer;
+        COMMIT;").await.unwrap();
 }

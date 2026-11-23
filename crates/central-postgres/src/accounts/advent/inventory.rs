@@ -107,13 +107,14 @@ pub(super) async fn list(
     };
     Ok(api::Response::Inventory { items, next })
 }
-pub(super) async fn owned(
-    db: &DatabaseTransaction,
-    me: Uuid,
-    id: Uuid,
-) -> Result<(), Error> {
-    db.query_one_raw(statement("SELECT 1 FROM central_identity.cosmetic_collection WHERE account_id=$1 AND art_id=$2",vec![me.into(),id.into()]))
-        .await.map_err(unavailable)?.ok_or(Error::Rejected)?;
+pub(super) async fn owned(db: &DatabaseTransaction, me: Uuid, id: Uuid) -> Result<(), Error> {
+    db.query_one_raw(statement(
+        "SELECT 1 FROM central_identity.cosmetic_collection WHERE account_id=$1 AND art_id=$2",
+        vec![me.into(), id.into()],
+    ))
+    .await
+    .map_err(unavailable)?
+    .ok_or(Error::Rejected)?;
     Ok(())
 }
 pub(super) async fn check_look(

@@ -72,7 +72,7 @@ async fn store_art(tx: &DatabaseTransaction, art: Art, source: Source) -> Result
     let width = i32::try_from(width).map_err(|_| StoreError::InvalidConfig)?;
     let height = i32::try_from(height).map_err(|_| StoreError::InvalidConfig)?;
     let digest = Sha256::digest(&art.bytes).to_vec();
-    let keys = vec![
+    let mut keys = vec![
         digest.into(),
         art.kind.map_or("hero", Kind::as_str).into(),
         art.tier.into(),
@@ -81,12 +81,23 @@ async fn store_art(tx: &DatabaseTransaction, art: Art, source: Source) -> Result
         size.into(),
         width.into(),
         height.into(),
-        match source { Source::Advent => "advent", Source::Ranked => "ranked" }.into(),
     ];
     let mut values = keys.clone();
     values.push(art.bytes.into());
-    let inserted = tx.execute_raw(sql("INSERT INTO central_identity.advent_art(digest,kind,tier,title_de,title_en,size,width,height,source,mime,content)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'image/webp',$10) ON CONFLICT(digest) DO NOTHING",values)).await.map_err(|_| StoreError::Unavailable)?.rows_affected();
+    // The calendar-only role uses the immutable source default. Explicitly setting a
+    // source is a separate column grant available only to the private catalog operator.
+    let (column, value, family) = match source {
+        Source::Advent => ("", "", "advent"),
+        Source::Ranked => (",source", ",'ranked'", "ranked"),
+    };
+    let insert = format!("INSERT INTO central_identity.advent_art(digest,kind,tier,title_de,title_en,size,width,height,mime,content{column})
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'image/webp',$9{value}) ON CONFLICT(digest) DO NOTHING");
+    let inserted = tx
+        .execute_raw(sql(&insert, values))
+        .await
+        .map_err(|_| StoreError::Unavailable)?
+        .rows_affected();
+    keys.push(family.into());
     let id: Uuid = tx.query_one_raw(sql("SELECT id FROM central_identity.advent_art WHERE digest=$1 AND kind=$2 AND tier=$3 AND title_de=$4
         AND title_en=$5 AND size=$6 AND width=$7 AND height=$8 AND source=$9 AND mime='image/webp'",keys)).await
         .map_err(|_|StoreError::Unavailable)?.ok_or(StoreError::InvalidConfig)?.try_get("","id").map_err(|_|StoreError::Unavailable)?;

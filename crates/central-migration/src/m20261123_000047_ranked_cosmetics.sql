@@ -47,6 +47,10 @@ CREATE TABLE central_identity.ranked_cosmetic_unlocks (
 CREATE FUNCTION central_identity.earn_ranked_cosmetics() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM central_identity.ranked_cosmetic_steps
+                   WHERE league=NEW.league AND division=NEW.division) THEN
+        RETURN NULL;
+    END IF;
     INSERT INTO central_identity.ranked_cosmetic_unlocks(account_id,league,division)
     SELECT NEW.account_id,s.league,s.division FROM central_identity.ranked_cosmetic_steps s
     WHERE s.league<NEW.league OR (s.league=NEW.league AND s.division>=NEW.division)
@@ -62,7 +66,8 @@ FOR EACH ROW WHEN (NEW.track='player') EXECUTE FUNCTION central_identity.earn_ra
 INSERT INTO central_identity.ranked_cosmetic_unlocks(account_id,league,division)
 SELECT p.account_id,s.league,s.division FROM (
     SELECT DISTINCT ON(account_id) account_id,league,division
-    FROM central_identity.ranked_badge_peaks WHERE track='player'
+    FROM central_identity.ranked_badge_peaks JOIN central_identity.ranked_cosmetic_steps USING(league,division)
+    WHERE track='player'
     ORDER BY account_id,league DESC,division ASC
 ) p JOIN central_identity.ranked_cosmetic_steps s
     ON s.league<p.league OR (s.league=p.league AND s.division>=p.division)

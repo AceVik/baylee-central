@@ -17,13 +17,12 @@ pub(super) async fn check_framing(
     expected: Option<&MatFraming>,
 ) -> Result<(), StoreError> {
     let json = expected
-        .map(|f| {
-            central_api::encode(f)
-                .ok()
-                .and_then(|v| String::from_utf8(v).ok())
-                .ok_or(StoreError::InvalidConfig)
-        })
-        .transpose()?;
+        .map(central_api::encode)
+        .transpose()
+        .map_err(|_| StoreError::InvalidConfig)?
+        .map(String::from_utf8)
+        .transpose()
+        .map_err(|_| StoreError::InvalidConfig)?;
     tx.query_one_raw(sql(
         "SELECT 1 WHERE (SELECT framing FROM central_identity.playmat_framing WHERE art_id=$1)
         IS NOT DISTINCT FROM $2::text::jsonb",
