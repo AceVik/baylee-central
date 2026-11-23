@@ -31,6 +31,7 @@ fn gateway_claims() -> GatewayClaims {
         exp: NOW + GATEWAY_TOKEN_SECONDS,
         purpose: Purpose::Admit,
         ranked_match: None,
+        ranked_generation: None,
         name: Some("Ace".into()),
         tag: Some(7),
         legacy_id: None,
@@ -62,7 +63,25 @@ fn only_the_ranked_purpose_can_bind_an_assigned_match() {
     claims.ranked_match = Some(id);
     assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
     claims.purpose = Purpose::Ranked;
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
+    claims.name = None;
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
+    claims.tag = None;
     assert!(signing.sign(&claims).is_ok());
+    claims.legacy_id = Some("old".into());
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
+    claims.legacy_id = None;
+    claims.terms = Some(TermsClaim {
+        version: "release".into(),
+        digest: "00".repeat(32),
+    });
+    assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
+    claims.terms = None;
+    assert!(serde_json::from_str::<Purpose>(r#""ranked""#).is_err());
+    assert_eq!(
+        serde_json::to_string(&Purpose::Ranked).unwrap(),
+        r#""ranked_seat""#
+    );
     claims.ranked_match = Some([0; 16]);
     assert_eq!(signing.sign(&claims).err(), Some(JwtError::Claims));
     claims.ranked_match = None;

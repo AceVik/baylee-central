@@ -14,6 +14,9 @@ impl IdentityService {
         } else {
             Some(surface.session(bearer)?)
         };
+        if let Request::Replicate { request } = &request {
+            request.validate(self.development)?;
+        }
         Ok(Response::Ranked {
             response: self.store.ranked(session, request).await?,
         })
@@ -31,6 +34,9 @@ impl IdentityService {
         } else {
             central_postgres::RankedHostCredential::Registered(bearer.ok_or(Error::Rejected)?)
         };
+        if let HostRequest::Replicate { request } = &request {
+            request.validate()?;
+        }
         Ok(Response::RankedHost {
             response: self.store.ranked_host(credential, request).await?,
         })

@@ -1128,6 +1128,7 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         .await
         .map_err(|_| Error::Unavailable)?
         .rows_affected();
+    super::ranked::replication::sweep(&tx).await?;
     let reports = super::reports::sweep(&tx).await?;
     // After the codes: what a confirmed address keeps of a mailed code is
     // tidied against the codes that are left.

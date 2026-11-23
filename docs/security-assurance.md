@@ -10,6 +10,8 @@ need a written rationale. Source: https://github.com/OWASP/ASVS/tree/v5.0.0
 
 ## Three-pass method for every security milestone
 
+The trust boundaries and reproducible checks for two-host ranked games are in the [ranked replication assurance record](ranked-replication-assurance.md).
+
 The separate native Tower identity scope is recorded in
 [Tower access](tower-access.md), including design, implementation and targeted
 real-transport adversarial evidence. It adds no Tower gameplay authority to Central.

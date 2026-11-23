@@ -31,8 +31,7 @@ use zeroize::Zeroizing;
 
 /// Seconds of clock difference tolerated on `exp` and `nbf`.
 pub const LEEWAY_SECONDS: i64 = 30;
-/// A gateway token's longest life.
-pub const GATEWAY_TOKEN_SECONDS: i64 = 3600;
+pub use crate::GATEWAY_TOKEN_SECONDS;
 /// A Central token's longest life: the session's cap.
 pub const CENTRAL_TOKEN_SECONDS: i64 = 12 * 3600;
 /// A revocation message's life.

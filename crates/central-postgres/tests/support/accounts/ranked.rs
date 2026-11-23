@@ -10,6 +10,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 mod boards;
 mod credentials;
 mod grants;
+mod replicas;
 mod scoring;
 
 const ORIGIN: &str = "https://ranked-test.example";
@@ -24,16 +25,21 @@ fn id(number: u8) -> api::Id {
 
 async fn queue(store: &AccountStore, token: &Token, request: Request) -> Result<QueueState, Error> {
     match store.ranked(Some(token.into()), request).await? {
-        api::Response::Queue { state } => Ok(state),
+        api::Response::Queue { state }
+        | api::Response::Replica {
+            response: api::replica::SeatResponse::Queue { state },
+        } => Ok(state),
         _ => panic!("ranked queue returned a public response"),
     }
 }
 
 fn join(key: u8, deck: u8) -> Request {
-    Request::Join {
-        key: id(key),
-        format: Format::Standard,
-        deck: [deck; 32],
+    Request::Replicate {
+        request: api::replica::SeatRequest::Join {
+            key: id(key),
+            format: Format::Standard,
+            deck: [deck; 32],
+        },
     }
 }
 
@@ -48,6 +54,9 @@ async fn play(store: &AccountStore, tokens: [&Token; 2], seed: u8) -> api::Assig
     };
     assert_eq!(assignment.origin, ORIGIN);
     assert_eq!(assignment.deck, [2; 32]);
+    for token in tokens {
+        replicas::privacy::approve_all(store, token, assignment.match_id).await;
+    }
     assignment
 }
 
@@ -56,6 +65,36 @@ async fn verify(db: &DatabaseConnection, host: api::Id, enabled: bool) {
         "INSERT INTO central_identity.gateway_approvals (gateway_id,enabled,ranked_verified) VALUES($1,true,$2)
          ON CONFLICT(gateway_id) DO UPDATE SET ranked_verified=EXCLUDED.ranked_verified",
         vec![Uuid::from_bytes(host).into(),enabled.into()])).await.unwrap();
+}
+
+async fn rejected_claims(
+    store: &AccountStore,
+    credential: &Token,
+    matched: api::Id,
+    seats: [(api::Id, [u8; 16]); 2],
+) {
+    let operated = |request| store.ranked_host(Registered(credential), request);
+    let aliases = seats.map(|(alias, _)| alias);
+    assert_eq!(
+        operated(HostRequest::Claim {
+            match_id: matched,
+            account: aliases[0],
+            proof: api::SeatProof::from_bytes(seats[0].1),
+            deck: [2; 32]
+        })
+        .await
+        .unwrap_err(),
+        Error::Rejected
+    );
+    for invalid in [seats[1].1, id(80)] {
+        let request = HostRequest::Claim {
+            match_id: matched,
+            account: aliases[0],
+            deck: [1; 32],
+            proof: api::SeatProof::from_bytes(invalid),
+        };
+        assert_eq!(operated(request).await.unwrap_err(), Error::Rejected);
+    }
 }
 
 async fn game(
@@ -69,22 +108,22 @@ async fn game(
     let assigned = play(store, tokens, 11).await;
     let operated = |request| store.ranked_host(Registered(credential), request);
     let matched = assigned.match_id;
-    grants::assigned(store, tokens[0], matched).await;
+    let seats = [
+        grants::assigned(store, tokens[0], matched).await,
+        grants::alias(store, tokens[1], matched).await,
+    ];
+    let aliases = seats.map(|(alias, _)| alias);
+    assert_ne!(aliases[0], aliases[1]);
+    for alias in aliases {
+        assert!(!accounts.contains(&alias));
+    }
     let claim = |n: usize| HostRequest::Claim {
         match_id: matched,
-        account: accounts[n],
+        account: aliases[n],
+        proof: api::SeatProof::from_bytes(seats[n].1),
         deck: [u8::try_from(n + 1).unwrap(); 32],
     };
-    assert_eq!(
-        operated(HostRequest::Claim {
-            match_id: matched,
-            account: accounts[0],
-            deck: [2; 32]
-        })
-        .await
-        .unwrap_err(),
-        Error::Rejected
-    );
+    rejected_claims(store, credential, matched, seats).await;
     let HostResponse::Assignment { assignment } = operated(claim(0)).await.unwrap() else {
         panic!("host expects both bound seats")
     };
@@ -147,7 +186,7 @@ async fn game(
         .unwrap_err(),
         Error::Conflict
     );
-    receipts(store, tokens, accounts, &assignment).await;
+    receipts(store, tokens, aliases, &assignment).await;
 }
 
 async fn compacted(
@@ -210,24 +249,11 @@ async fn receipts(
     grants::ended(store, tokens[0]).await;
 }
 
-pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &ServerKeys) {
-    let a = enroll(store, keys, "ranked-fixture-one", "rankedone").await;
-    let b = enroll(store, keys, "ranked-fixture-two", "rankedtwo").await;
-    let alice = login(store, keys, a).await;
-    store.confirm_restore(&alice, 1).await.unwrap();
-    let bob = login(store, keys, b).await;
-    assert_eq!(
-        queue(store, &bob, join(1, 1)).await.unwrap_err(),
-        Error::Rejected
-    );
-    store.confirm_restore(&bob, 1).await.unwrap();
-    assert_eq!(
-        queue(store, &bob, join(1, 1)).await.unwrap_err(),
-        Error::Rejected
-    );
-    store.close_legacy("ranked-fixture-one", a).await.unwrap();
-    store.close_legacy("ranked-fixture-two", b).await.unwrap();
-    boards::own_placements(store, &alice, a.account).await;
+async fn setup_gateway(
+    store: &AccountStore,
+    db: &DatabaseConnection,
+    alice: &Token,
+) -> (api::Id, Token, Vec<Token>) {
     let meta = GatewayMetadata {
         name: "Ranked fixture".into(),
         version: "1".into(),
@@ -236,7 +262,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     let full = Token::generate().unwrap();
     let heartbeat = Token::generate().unwrap();
     let host = store
-        .register_gateway(&alice, ORIGIN, &meta, &full, &heartbeat, false)
+        .register_gateway(alice, ORIGIN, &meta, &full, &heartbeat, false)
         .await
         .unwrap();
     let (credential, mut denied) = credentials::named(db, host).await;
@@ -273,6 +299,28 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
             Error::Rejected
         );
     }
+    (host, credential, denied)
+}
+
+pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &ServerKeys) {
+    let a = enroll(store, keys, "ranked-fixture-one", "rankedone").await;
+    let b = enroll(store, keys, "ranked-fixture-two", "rankedtwo").await;
+    let alice = login(store, keys, a).await;
+    store.confirm_restore(&alice, 1).await.unwrap();
+    let bob = login(store, keys, b).await;
+    assert_eq!(
+        queue(store, &bob, join(1, 1)).await.unwrap_err(),
+        Error::Rejected
+    );
+    store.confirm_restore(&bob, 1).await.unwrap();
+    assert_eq!(
+        queue(store, &bob, join(1, 1)).await.unwrap_err(),
+        Error::Rejected
+    );
+    store.close_legacy("ranked-fixture-one", a).await.unwrap();
+    store.close_legacy("ranked-fixture-two", b).await.unwrap();
+    boards::own_placements(store, &alice, a.account).await;
+    let (host, credential, denied) = setup_gateway(store, db, &alice).await;
     admission(store, &alice, &bob).await;
     available(store, &credential, &alice, &bob).await;
     game(
@@ -294,6 +342,11 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         ORIGIN,
     )
     .await;
+    store
+        .ranked_host(Registered(&credential), HostRequest::Ready { capacity: 0 })
+        .await
+        .unwrap();
+    replicas::run(store, db, keys, [(a.account, &alice), (b.account, &bob)]).await;
     boards::run(store, db).await;
     // Removing our two fixture accounts also removes the gateway owned by the first,
     // its approval and every account-scoped ticket. Other suites share this instance.
@@ -310,6 +363,19 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
 }
 
 async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {
+    assert_eq!(
+        queue(
+            store,
+            alice,
+            Request::Join {
+                key: id(1),
+                format: Format::Standard,
+                deck: [1; 32]
+            }
+        )
+        .await,
+        Err(Error::UpdateRequired)
+    );
     assert_eq!(
         store.ranked(None, join(1, 1)).await.unwrap_err(),
         Error::Rejected
@@ -349,9 +415,18 @@ async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {
     );
 }
 
+fn ready(capacity: u8) -> HostRequest {
+    HostRequest::Replicate {
+        request: api::replica::HostRequest::Ready {
+            capacity,
+            compatibility: [9; 32],
+        },
+    }
+}
+
 async fn available(store: &AccountStore, credential: &Token, alice: &Token, bob: &Token) {
     store
-        .ranked_host(Registered(credential), HostRequest::Ready { capacity: 0 })
+        .ranked_host(Registered(credential), ready(0))
         .await
         .unwrap();
     for (token, key) in [(alice, 3), (bob, 4)] {
@@ -361,7 +436,7 @@ async fn available(store: &AccountStore, credential: &Token, alice: &Token, bob:
         ));
     }
     store
-        .ranked_host(Registered(credential), HostRequest::Ready { capacity: 1 })
+        .ranked_host(Registered(credential), ready(1))
         .await
         .unwrap();
     let (left, right) = tokio::join!(
@@ -431,7 +506,7 @@ async fn expiry(
     verify(db, host, false).await;
     verify(db, host, true).await;
     store
-        .ranked_host(Registered(credential), HostRequest::Ready { capacity: 1 })
+        .ranked_host(Registered(credential), ready(1))
         .await
         .unwrap();
     assert_eq!(

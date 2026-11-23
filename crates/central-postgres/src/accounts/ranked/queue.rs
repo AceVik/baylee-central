@@ -3,7 +3,8 @@
 use super::{Error, api, column, matchmaking, scoring, statement, unavailable, uuid};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
-const FIELDS: &str = "request_id,account_id,state,season_id,format,commitment,queue_elo,match_id,
+const FIELDS: &str =
+    "request_id,account_id,state,replicable,season_id,format,commitment,queue_elo,match_id,
     floor(extract(epoch FROM created_at))::bigint AS at";
 
 async fn ticket(
@@ -46,9 +47,11 @@ async fn join(
     key: Uuid,
     format: api::Format,
     deck: &[u8; 32],
+    replicable: bool,
 ) -> Result<(), Error> {
     if let Some(existing) = ticket(db, me, Some(key)).await? {
-        return if column::<String>(&existing, "format")? == format.as_str()
+        return if column::<bool>(&existing, "replicable")? == replicable
+            && column::<String>(&existing, "format")? == format.as_str()
             && column::<Vec<u8>>(&existing, "commitment")? == deck
         {
             Ok(())
@@ -57,20 +60,21 @@ async fn join(
         };
     }
     let admitted = db.execute_raw(statement(
-        "INSERT INTO central_identity.ranked_tickets(account_id,request_id,season_id,format,commitment,queue_elo)
+        "INSERT INTO central_identity.ranked_tickets(account_id,request_id,season_id,format,commitment,queue_elo,replicable)
          SELECT $1,$2,s.id,$3,$4,COALESCE((SELECT r.queue_elo FROM central_identity.ranked_ratings r
-          WHERE r.account_id=$1 AND r.format=$3 ORDER BY r.last_at DESC LIMIT 1),1500)
+          WHERE r.account_id=$1 AND r.format=$3 ORDER BY r.last_at DESC LIMIT 1),1500),$5
          FROM central_identity.ranked_seasons s WHERE s.starts_at<=pg_catalog.clock_timestamp()
           AND (s.ends_at IS NULL OR s.ends_at>pg_catalog.clock_timestamp())
           AND (SELECT count(*) FROM (SELECT 1 FROM central_identity.ranked_tickets
              WHERE account_id=$1 AND created_at>now()-interval '1 hour' LIMIT 24) recent)<24
          ON CONFLICT DO NOTHING",
-        vec![me.into(),key.into(),format.as_str().into(),deck.to_vec().into()]
+        vec![me.into(),key.into(),format.as_str().into(),deck.to_vec().into(),replicable.into()]
     )).await.map_err(unavailable)?;
     if admitted.rows_affected() == 0 {
         return match ticket(db, me, None).await? {
             Some(row)
-                if column::<Uuid>(&row, "request_id")? == key
+                if column::<bool>(&row, "replicable")? == replicable
+                    && column::<Uuid>(&row, "request_id")? == key
                     && column::<String>(&row, "format")? == format.as_str()
                     && column::<Vec<u8>>(&row, "commitment")? == deck =>
             {
@@ -87,6 +91,7 @@ pub(super) async fn handle(
     db: &DatabaseTransaction,
     me: Uuid,
     request: &api::Request,
+    replicable: bool,
 ) -> Result<api::QueueState, Error> {
     let key = match request {
         api::Request::Join { key, .. } | api::Request::Cancel { key } => {
@@ -98,9 +103,25 @@ pub(super) async fn handle(
         api::Request::Status => None,
         _ => return Err(Error::Rejected),
     };
+    if let api::Request::Join { key, format, deck } = request
+        && !replicable
+    {
+        let old = ticket(db, me, Some(uuid(*key)))
+            .await?
+            .ok_or(Error::UpdateRequired)?;
+        if column::<bool>(&old, "replicable")?
+            || column::<String>(&old, "format")? != format.as_str()
+            || column::<Vec<u8>>(&old, "commitment")? != *deck
+        {
+            return Err(Error::UpdateRequired);
+        }
+        return render(db, me, &old).await;
+    }
     retire(db, me).await?;
     match request {
-        api::Request::Join { key, format, deck } => join(db, me, uuid(*key), *format, deck).await?,
+        api::Request::Join { key, format, deck } => {
+            join(db, me, uuid(*key), *format, deck, replicable).await?;
+        }
         api::Request::Cancel { key } => {
             db.execute_raw(statement(
                 "UPDATE central_identity.ranked_tickets SET state='closed'
@@ -112,13 +133,16 @@ pub(super) async fn handle(
             // A player can decline the selected host's terms before their own seat is
             // claimed. Start and claim serialize on this same match row. A delayed
             // cancellation for an older request cannot release a newer reservation.
-            db.execute_raw(statement(
+            if let Some(closed)=db.query_one_raw(statement(
                 "UPDATE central_identity.ranked_matches m SET state='void',finished_at=pg_catalog.clock_timestamp()
                  FROM central_identity.ranked_tickets t WHERE t.account_id=$1 AND t.request_id=$2
                  AND t.match_id=m.id AND t.state='assigned' AND m.state='reserved'
-                 AND ((m.account_a=$1 AND NOT m.claimed_a) OR (m.account_b=$1 AND NOT m.claimed_b))",
+                 AND ((m.account_a=$1 AND NOT m.claimed_a) OR (m.account_b=$1 AND NOT m.claimed_b)) RETURNING m.id",
                 vec![me.into(),uuid(*key).into()],
-            )).await.map_err(unavailable)?;
+            )).await.map_err(unavailable)? {
+                let id=column(&closed,"id")?;
+                if super::replication::protected(db,id).await? { super::replication::void(db,id).await?; }
+            }
         }
         _ => {}
     }

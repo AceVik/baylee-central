@@ -1,6 +1,10 @@
 //! Shared competitive ladder protocol. Only Central assigns matches and publishes scores.
 use serde::{Deserialize, Serialize};
 
+mod proof;
+pub mod replica;
+pub use proof::SeatProof;
+
 /// Wire representation of a UUID.
 pub type Id = [u8; 16];
 
@@ -318,7 +322,7 @@ pub struct HostAssignment {
     pub match_id: Id,
     /// Competitive format.
     pub format: Format,
-    /// Distinct authenticated accounts in seat order.
+    /// Distinct aliases for this host and match, in seat order.
     pub accounts: [Id; 2],
     /// Deck commitments in seat order.
     pub decks: [[u8; 32]; 2],
@@ -393,6 +397,11 @@ pub enum QueueState {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Authenticated, negotiated seat operations for independently verified play.
+    Replicate {
+        /// Session-owned operation.
+        request: replica::SeatRequest,
+    },
     /// Read the authenticated account's own standings, including zero-game placements.
     OwnProfile {
         /// Selected season. None selects the current season.
@@ -454,6 +463,11 @@ pub enum Request {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Private seat routing and durable input receipts.
+    Replica {
+        /// Contains only data available to this participant.
+        response: replica::SeatResponse,
+    },
     /// Private valuation of the selected deck.
     DeckPreview {
         /// The result of the owner's read-only comparison.
@@ -501,6 +515,11 @@ pub enum Response {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostRequest {
+    /// Fenced service operations from a verified compatible gateway.
+    Replicate {
+        /// Operation on this host's own assignment.
+        request: replica::HostRequest,
+    },
     /// Renew short-lived availability.
     Ready {
         /// Total ranked game slots, including occupied ones.
@@ -510,8 +529,10 @@ pub enum HostRequest {
     Claim {
         /// Central's match ID.
         match_id: Id,
-        /// Public account ID.
+        /// This match host's seat alias from the player's signed ranked admission.
         account: Id,
+        /// The scoped SID actually presented to this gateway, checked online.
+        proof: SeatProof,
         /// Commitment to the frozen playable deck.
         deck: [u8; 32],
     },
@@ -544,6 +565,11 @@ pub enum HostRequest {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostResponse {
+    /// Host-only journal or service acknowledgement.
+    Replica {
+        /// Only available on the service-authenticated exchange.
+        response: replica::HostResponse,
+    },
     /// Availability renewed.
     Ready,
     /// Authorized reservation.

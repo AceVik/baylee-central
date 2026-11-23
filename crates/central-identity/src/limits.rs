@@ -213,6 +213,7 @@ fn class(request: &Request) -> Class {
             | Request::TowerIdentity {}
             | Request::RenewSession
             | Request::GatewayToken { .. }
+            | Request::RankedToken { .. }
             | Request::GatewayRevocations { .. }
             | Request::TermsStatus
             | Request::AccountSummary
@@ -278,6 +279,7 @@ fn tells(request: &Request) -> Tells {
         | Request::ReadDocument
         | Request::WriteDocument { .. }
         | Request::GatewayToken { .. }
+        | Request::RankedToken { .. }
         | Request::RegisterInvalidate { .. }
         | Request::GatewayRevocations { .. }
         | Request::GatewayHeartbeat { .. }

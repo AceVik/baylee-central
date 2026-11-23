@@ -124,6 +124,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::WriteDocument { .. }
         | Request::ConfirmRestore { .. }
         | Request::GatewayToken { .. }
+        | Request::RankedToken { .. }
         | Request::Logout
         | Request::Terms
         | Request::GatewayTerms { .. }
@@ -322,6 +323,7 @@ impl IdentityService {
                 GatewayPurpose::Ranked => Purpose::Ranked,
             },
             ranked_match: grant.ranked_match,
+            ranked_generation: grant.ranked_generation,
             name: grant.display_name,
             tag: grant.tag,
             legacy_id: grant.legacy_id,
@@ -348,6 +350,7 @@ impl IdentityService {
         &self,
         gateway: &str,
         purpose: GatewayPurpose,
+        fence: Option<central_api::ranked::replica::Fence>,
         bearer: Option<&Token>,
     ) -> Result<Response, Error> {
         let session = bearer.ok_or(Error::Rejected)?;
@@ -356,8 +359,14 @@ impl IdentityService {
         let set: &[String] = if official { &self.official } else { &own };
         let grant = self
             .store
-            .gateway_grant(session, set, !official, purpose, random_id()?)
+            .gateway_grant_scoped(session, set, !official, purpose, random_id()?, fence)
             .await?;
+        if fence.is_some_and(|expected| {
+            grant.ranked_match != Some(expected.match_id)
+                || grant.ranked_generation.unwrap_or(0) != expected.generation
+        }) {
+            return Err(Error::Conflict);
+        }
         self.signed_grant(gateway, purpose, grant)
     }
 

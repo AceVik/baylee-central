@@ -63,7 +63,9 @@ pub enum Purpose {
     Admit,
     /// Administer this gateway; Central checked current membership at issue.
     Admin,
-    /// Use only the selected gateway's game seat for the signed match.
+    /// Use a pseudonymous seat at this host for the signed match. The former
+    /// identity-bearing ranked token has a distinct, unrecognized wire value.
+    #[serde(rename = "ranked_seat")]
     Ranked,
 }
 
@@ -128,9 +130,9 @@ pub struct GatewayClaims {
     pub iss: String,
     /// The gateway's origin.
     pub aud: String,
-    /// The account's UUID.
+    /// A match/host-scoped seat alias for ranked, the account UUID otherwise.
     pub sub: String,
-    /// The session as this gateway knows it; no other gateway sees this value.
+    /// The session as this gateway knows it; ranked and ordinary sessions are separate.
     pub sid: String,
     /// 32 lowercase hex digits, unique.
     pub jti: String,
@@ -145,6 +147,9 @@ pub struct GatewayClaims {
     /// Central's match ID. Required for a ranked seat and absent for every other purpose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ranked_match: Option<[u8; 16]>,
+    /// Leadership term of a mirrored ranked match. Single-host grants omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ranked_generation: Option<u64>,
     /// The account's display name, while it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -163,7 +168,7 @@ pub struct GatewayClaims {
 }
 
 impl GatewayClaims {
-    /// The account's 16 bytes.
+    /// The signed subject as 16 bytes. A ranked subject identifies one host's match seat.
     #[must_use]
     pub fn account(&self) -> Option<[u8; 16]> {
         let digits = self.sub.replace('-', "");
@@ -194,9 +199,22 @@ impl Claims for GatewayClaims {
             && valid_sid(&self.sid)
             && lower_hex(&self.jti, 32)
             && self.tag != Some(0)
+            && self
+                .ranked_generation
+                .is_none_or(|term| self.purpose == Purpose::Ranked && term > 0)
             && (self.legacy_deck_source.is_none() || self.legacy_id.is_some())
             && match (self.purpose, self.ranked_match) {
-                (Purpose::Ranked, Some(id)) => id[6] >> 4 == 7 && id[8] >> 6 == 2,
+                (Purpose::Ranked, Some(id)) => {
+                    id[6] >> 4 == 7
+                        && id[8] >> 6 == 2
+                        && self.sub.as_bytes()[14] == b'7'
+                        && matches!(self.sub.as_bytes()[19], b'8' | b'9' | b'a' | b'b')
+                        && self.name.is_none()
+                        && self.tag.is_none()
+                        && self.legacy_id.is_none()
+                        && self.legacy_deck_source.is_none()
+                        && self.terms.is_none()
+                }
                 (Purpose::Admit | Purpose::Admin, None) => true,
                 _ => false,
             }

@@ -208,7 +208,19 @@ impl IdentityService {
                 Ok(Response::GatewayAdmins { revision })
             }
             Request::GatewayToken { gateway, purpose } => {
-                self.gateway_token(&gateway, purpose, bearer).await
+                if purpose == central_api::wire::GatewayPurpose::Ranked {
+                    return Err(Error::UpdateRequired);
+                }
+                self.gateway_token(&gateway, purpose, None, bearer).await
+            }
+            Request::RankedToken { gateway, fence } => {
+                self.gateway_token(
+                    &gateway,
+                    central_api::wire::GatewayPurpose::Ranked,
+                    Some(fence),
+                    bearer,
+                )
+                .await
             }
             Request::RegisterInvalidate { path } => {
                 let (_, origins) = self.gateway_authority(bearer).await?;

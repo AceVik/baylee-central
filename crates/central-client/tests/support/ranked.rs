@@ -10,6 +10,8 @@ use central_api::{
 };
 use central_client::{Session, Transport, ranked};
 
+pub(crate) mod replica;
+
 pub(super) fn public(http: &Http, account: Id, name: &str, tag: u32) {
     let Response::Seasons { items, .. } =
         ranked::read(http, Request::Seasons { before: None }).unwrap()
