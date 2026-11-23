@@ -10,6 +10,22 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 
 mod recovery;
 
+/// The operator's retention sweep also clears abandoned receipts when no
+/// player has requested another appearance on the service.
+pub(in crate::accounts) async fn sweep(db: &DatabaseTransaction) -> Result<(), Error> {
+    db.execute_unprepared(
+        "DELETE FROM central_identity.advent_table_looks WHERE proof IN
+        (SELECT proof FROM central_identity.advent_table_looks WHERE expires_at<=statement_timestamp()
+         ORDER BY expires_at LIMIT 256 FOR UPDATE SKIP LOCKED);
+        DELETE FROM central_identity.advent_table_outfits WHERE (gateway_id,game,seat) IN
+        (SELECT gateway_id,game,seat FROM central_identity.advent_table_outfits WHERE expires_at<=statement_timestamp()
+         ORDER BY expires_at LIMIT 256 FOR UPDATE SKIP LOCKED)",
+    )
+    .await
+    .map_err(unavailable)?;
+    Ok(())
+}
+
 fn chair(game: api::Id, seat: u8) -> Result<(Uuid, i16), Error> {
     if !valid_id(game) || seat >= 8 {
         return Err(Error::Rejected);
@@ -77,7 +93,6 @@ async fn begin(
     let host: Uuid = col(&row, "id")?;
     let sid: Vec<u8> = col(&row, "sid")?;
     lock_table(db, host, game).await?;
-    recovery::prune(db).await?;
     let look = match look {
         Some(look) if look == api::Equipment::default() => {
             recovery::clear(db, me, host, game, seat).await?;
@@ -92,9 +107,9 @@ async fn begin(
     inventory::check_look(db, me, look).await?;
     db.execute_raw(statement(
         "DELETE FROM central_identity.advent_table_looks WHERE proof IN (
-        SELECT proof FROM central_identity.advent_table_looks WHERE expires_at<=clock_timestamp()
-        ORDER BY expires_at LIMIT 64 FOR UPDATE SKIP LOCKED)",
-        vec![],
+        SELECT proof FROM central_identity.advent_table_looks WHERE sid=$1 AND expires_at<=statement_timestamp()
+        ORDER BY expires_at LIMIT 32 FOR UPDATE SKIP LOCKED)",
+        vec![sid.clone().into()],
     ))
     .await
     .map_err(unavailable)?;
