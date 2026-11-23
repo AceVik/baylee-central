@@ -41,6 +41,16 @@ pub struct Identity {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Registered host operations for a participant's ordinary table cosmetics.
+    AdventHost {
+        /// Exact game and private table grant.
+        request: crate::advent::table::HostRequest,
+    },
+    /// Session-bound seasonal puzzles and private cosmetics.
+    Advent {
+        /// Operation for this native account.
+        request: crate::advent::Request,
+    },
     /// Issue short-lived identity access to the configured separate Tower authority.
     TowerToken {},
     /// Introspect only a Tower credential from the Authorization header.
@@ -749,6 +759,16 @@ pub enum MigrationState {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// Only the two approved surfaces on the specific casual table.
+    AdventHost {
+        /// Host-authenticated result.
+        response: crate::advent::table::HostResponse,
+    },
+    /// Private seasonal progress or entitlement.
+    Advent {
+        /// Response scoped to the authenticated native call.
+        response: crate::advent::Response,
+    },
     /// Scoped identity access; contains no ordinary Central session capability.
     TowerToken {
         /// Destination, opaque bearer and expiry.
