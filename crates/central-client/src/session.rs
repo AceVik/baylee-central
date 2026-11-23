@@ -221,27 +221,36 @@ impl Session {
         gateway: String,
         purpose: central_api::wire::GatewayPurpose,
     ) -> Result<(SignedToken, i64), Error> {
-        self.destination_token(transport,Request::GatewayToken {gateway,purpose})
+        self.destination_token(transport, &Request::GatewayToken { gateway, purpose })
     }
 
     /// Request a pseudonymous seat admission for the exact current generation.
     ///
     /// # Errors
     /// Refuses a replaced assignment, unaccepted operator or invalid endpoint.
-    pub fn ranked_gateway_token(&self,transport:&impl Transport,gateway:String,fence:central_api::ranked::replica::Fence)->Result<(SignedToken,i64),Error>{
-        central_api::gateway::validate_origin(&gateway,transport.endpoint().origin().starts_with("http://"))?;
-        self.destination_token(transport,Request::RankedToken {gateway,fence})
+    pub fn ranked_gateway_token(
+        &self,
+        transport: &impl Transport,
+        gateway: String,
+        fence: central_api::ranked::replica::Fence,
+    ) -> Result<(SignedToken, i64), Error> {
+        central_api::gateway::validate_origin(
+            &gateway,
+            transport.endpoint().origin().starts_with("http://"),
+        )?;
+        self.destination_token(transport, &Request::RankedToken { gateway, fence })
     }
 
-    fn destination_token(&self,transport:&impl Transport,request:Request)->Result<(SignedToken,i64),Error>{
+    fn destination_token(
+        &self,
+        transport: &impl Transport,
+        request: &Request,
+    ) -> Result<(SignedToken, i64), Error> {
         self.same_endpoint(transport)?;
         if !self.confirmed {
             return Err(Error::Rejected);
         }
-        match transport.exchange(
-            &request,
-            Some((&self.token).into()),
-        )? {
+        match transport.exchange(request, Some((&self.token).into()))? {
             Response::GatewayToken { token, expires_at } => Ok((token, expires_at)),
             _ => Err(Error::Rejected),
         }

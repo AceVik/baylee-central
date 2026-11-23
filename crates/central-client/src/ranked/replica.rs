@@ -7,16 +7,21 @@ pub(super) fn responds(
     owner: Option<api::Id>,
 ) -> bool {
     match (request, response) {
-        (SeatRequest::Relay {call,..}, SeatResponse::Relayed {reply}) => match (call,reply){
-            (api::replica::relay::Call::SocketTicket{..},api::replica::relay::Reply::Socket{ticket}) => ticket.is_capability(),
-            (api::replica::relay::Call::Admit{..}|api::replica::relay::Call::Play{..}|api::replica::relay::Call::Reclaim{..},api::replica::relay::Reply::Http{status,body}) => (200..=599).contains(status) && (*status==200 || body.is_none()),
-            _=>false,
+        (SeatRequest::Relay { call, .. }, SeatResponse::Relayed { reply }) => match (call, reply) {
+            (
+                api::replica::relay::Call::SocketTicket { .. },
+                api::replica::relay::Reply::Socket { ticket },
+            ) => ticket.is_capability(),
+            (
+                api::replica::relay::Call::Admit { .. }
+                | api::replica::relay::Call::Play { .. }
+                | api::replica::relay::Call::Reclaim { .. },
+                api::replica::relay::Reply::Http { status, body },
+            ) => (200..=599).contains(status) && (*status == 200 || body.is_none()),
+            _ => false,
         },
-        (SeatRequest::RelayRoute {..}, SeatResponse::RelayRoute{seat,..})=>*seat < 2,
+        (SeatRequest::RelayRoute { .. }, SeatResponse::RelayRoute { seat, .. }) => *seat < 2,
         (SeatRequest::Join { key, format, deck }, SeatResponse::Queue { state }) => match state {
-            api::QueueState::Waiting {
-                key: k, format: f, ..
-            } => k == key && f == format,
             api::QueueState::Assigned {
                 key: k,
                 assignment: a,
@@ -27,7 +32,10 @@ pub(super) fn responds(
                     && Some(a.account) == owner
                     && a.seat < 2
             }
-            api::QueueState::Finished {
+            api::QueueState::Waiting {
+                key: k, format: f, ..
+            }
+            | api::QueueState::Finished {
                 key: k, format: f, ..
             } => k == key && f == format,
             api::QueueState::Idle => false,
@@ -155,9 +163,11 @@ pub fn replica_host(
         return Err(Error::Rejected);
     };
     let valid = match (request, &response) {
-        (HostRequest::Work, HostResponse::Work { items, pending }) => items.len()+pending.len() <= usize::from(u8::MAX),
+        (HostRequest::Work, HostResponse::Work { items, pending }) => {
+            u8::try_from(items.len() + pending.len()).is_ok()
+        }
         (
-            HostRequest::Read { after, .. },
+            HostRequest::Read { after, .. } | HostRequest::Tail { after, .. },
             HostResponse::Page {
                 opening,
                 setup,
@@ -183,7 +193,6 @@ pub fn replica_host(
         (HostRequest::Inspect { match_id }, HostResponse::AwaitingConsent { fence, .. }) => {
             fence.match_id == match_id
         }
-        (HostRequest::Inspect { .. }, HostResponse::Single) => true,
         (
             HostRequest::Pulse { fence } | HostRequest::Promote { fence },
             HostResponse::Assignment { work },
@@ -199,7 +208,8 @@ pub fn replica_host(
             | HostRequest::Pulse { .. }
             | HostRequest::Promote { .. },
             HostResponse::Done,
-        ) => true,
+        )
+        | (HostRequest::Inspect { .. }, HostResponse::Single) => true,
         _ => false,
     };
     if valid {

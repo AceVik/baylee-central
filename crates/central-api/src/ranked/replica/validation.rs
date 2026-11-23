@@ -18,6 +18,7 @@ impl HostApproval {
     #[must_use]
     pub fn valid(&self, development: bool) -> bool {
         uuid(&self.host_id)
+            && i64::try_from(self.epoch).is_ok()
             && gateway::validate_origin(&self.origin, development).is_ok()
             && self
                 .terms
@@ -33,8 +34,8 @@ impl SeatRequest {
     /// Refuses invalid identifiers, origins, terms, bounds and generations.
     pub fn validate(&self, development: bool) -> Result<(), Error> {
         let valid = match self {
-            Self::Relay {fence,call} => fence.valid(true) && call.valid(),
-            Self::RelayRoute {fence} => fence.valid(true),
+            Self::Relay { fence, call } => fence.valid(true) && call.valid(),
+            Self::RelayRoute { fence } => fence.valid(true),
             Self::Join { key, .. } => uuid(key),
             Self::Status { match_id }
             | Self::Hosts { match_id }
@@ -74,7 +75,9 @@ impl HostRequest {
             Self::Setup {
                 fence, game, pools, ..
             } => fence.valid(false) && uuid(game) && pools.iter().all(|p| valid_pool(p)),
-            Self::Read { fence, after } => fence.valid(false) && *after <= MAX_POSITION,
+            Self::Read { fence, after } | Self::Tail { fence, after } => {
+                fence.valid(false) && *after <= MAX_POSITION
+            }
             Self::Attest {
                 fence,
                 head,

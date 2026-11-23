@@ -8,6 +8,22 @@ mod bytes;
 pub mod clock;
 pub mod relay;
 mod validation;
+
+// Service-only wire shapes carry deterministic seeds, private deck
+// commitments and replay evidence, including inside generic responses.
+macro_rules! private_debug {
+    ($($kind:ty),+ $(,)?) => {$(
+        impl std::fmt::Debug for $kind {
+            fn fmt(&self, f:&mut std::fmt::Formatter<'_>)->std::fmt::Result {
+                f.write_str(concat!(stringify!($kind),"([REDACTED])"))
+            }
+        }
+    )+};
+}
+private_debug!(Evidence, Work, Entry, HostRequest, HostResponse);
+
+#[cfg(test)]
+mod tests;
 pub use bytes::{CommandBytes, SetupBytes};
 
 /// SHA-256 commitment.
@@ -148,7 +164,7 @@ pub enum Phase {
 }
 
 /// Private executor evidence. Never published to players or spectators.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Evidence {
     /// SHA-256 digest of deterministic private execution.
@@ -202,6 +218,8 @@ pub enum ConsentState {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostApproval {
+    /// Operator verification epoch in force when this consent was displayed.
+    pub epoch: u64,
     /// Central's stable identity for this verified operator.
     pub host_id: Id,
     /// Exact canonical destination.
@@ -226,7 +244,7 @@ pub struct HostConsentOffer {
 
 /// Assigned private work for one verified host. The peer and player
 /// responses never receive the host's service credential.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Work {
     /// Immutable Central-selected RNG seed for the independent executors.
@@ -252,7 +270,7 @@ pub struct Work {
 }
 
 /// A single ordered host-only journal input.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Entry {
     /// Position including this input.
@@ -274,14 +292,14 @@ pub enum SeatRequest {
     /// Forward a narrowly typed seat operation through Central's network boundary.
     Relay {
         /// Exact current authority.
-        fence:Fence,
+        fence: Fence,
         /// Fixed host operation without any caller-selected destination.
-        call:relay::Call,
+        call: relay::Call,
     },
     /// Reauthorize the current player's assigned host, game and seat for the relay.
     RelayRoute {
         /// Must match the current assignment and consent.
-        fence:Fence,
+        fence: Fence,
     },
     /// Decline a newly assigned operator before any private disclosure to it.
     DeclineHost {
@@ -334,7 +352,7 @@ pub enum SeatRequest {
         fence: Fence,
         #[doc = "Certified parent position."]
         expected: Head,
-        #[doc = "Stable UUIDv7 reused only for this intent."]
+        #[doc = "Stable `UUIDv7` reused only for this intent."]
         command_id: Id,
         #[doc = "Private encoded seat command."]
         body: CommandBytes,
@@ -348,16 +366,16 @@ pub enum SeatResponse {
     /// Bounded opaque result of this player's own relay operation.
     Relayed {
         /// Seat-scoped admission or one-time Central socket ticket.
-        reply:relay::Reply,
+        reply: relay::Reply,
     },
     /// Current authenticated seat routing for the application relay.
     RelayRoute {
         /// Verified primary's canonical origin.
-        origin:String,
+        origin: String,
         /// Bound engine game once the opening is registered.
-        game:Option<Id>,
+        game: Option<Id>,
         /// Zero-based seat index.
-        seat:u8,
+        seat: u8,
     },
     /// Current independently verified operators and the caller's choices.
     Hosts {
@@ -393,9 +411,16 @@ pub enum SeatResponse {
 }
 
 /// Independently verified host operations.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostRequest {
+    /// Poll the ordered suffix and certifications without retransmitting the private opening.
+    Tail {
+        /// Current assigned authority.
+        fence: Fence,
+        /// Exclusive journal position, including zero for initial certification.
+        after: u64,
+    },
     /// Report which player sockets the current leader observes attached.
     Presence {
         #[doc = "Current generation."]
@@ -469,13 +494,13 @@ pub enum HostRequest {
 #[serde(deny_unknown_fields)]
 pub struct PendingWork {
     /// Current assignment generation without either player's identity.
-    pub fence:Fence,
+    pub fence: Fence,
     /// Intended hosting function.
-    pub role:Role,
+    pub role: Role,
 }
 
 /// Private host-only result. Journal bytes and opening cannot be represented in a seat response.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostResponse {
     /// Authorized single-host primary, outside the replicated protocol.

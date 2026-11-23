@@ -66,7 +66,7 @@ impl<'de, const LIMIT: usize> Deserialize<'de> for PrivateBytes<LIMIT> {
                     _ => Err(E::custom("invalid ranked payload encoding")),
                 };
                 let mut bytes = Zeroizing::new(Vec::with_capacity(len / 2));
-                for pair in text.as_bytes().chunks_exact(2) {
+                for pair in text.as_bytes().as_chunks::<2>().0 {
                     bytes.push(nibble(pair[0])? << 4 | nibble(pair[1])?);
                 }
                 Ok(PrivateBytes(bytes))
