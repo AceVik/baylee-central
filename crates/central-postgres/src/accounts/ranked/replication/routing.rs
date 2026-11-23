@@ -145,7 +145,11 @@ pub(super) async fn inspect(
     assignment(db, &row, host, role).await
 }
 
-async fn role_live(db: &DatabaseTransaction, row: &QueryResult, role: Role) -> Result<(), Error> {
+async fn role_live(
+    db: &DatabaseTransaction,
+    row: &QueryResult,
+    role: Role,
+) -> Result<leases::Health, Error> {
     let state = super::phase(row)?;
     let live = leases::health(db, column(row, "id")?).await?;
     let current = match role {
@@ -156,7 +160,7 @@ async fn role_live(db: &DatabaseTransaction, row: &QueryResult, role: Role) -> R
         && !live.expired
         && matches!(state, Phase::Preparing | Phase::Playing | Phase::Paused)
     {
-        Ok(())
+        Ok(live)
     } else {
         Err(Error::Conflict)
     }
@@ -174,8 +178,18 @@ pub(super) async fn pulse(
         return Err(Error::Conflict);
     }
     let role = super::role(db, &row, host).await?;
-    role_live(db, &row, role).await?;
+    let live = role_live(db, &row, role).await?;
     leases::pulse(db, id, role).await?;
+    if role == Role::Primary && !live.standby {
+        // A replacement may register after promotion, while both seats wait for a quorum.
+        // Commit the new fence, then return only what its current operators may see.
+        leases::maintain(db, &row).await?;
+        let current = super::lock_match(db, id).await?;
+        if matches!(super::phase(&current)?, Phase::Void | Phase::Finished) {
+            return Ok(HostResponse::Done);
+        }
+        return assignment(db, &current, host, role).await;
+    }
     assignment(db, &row, host, role).await
 }
 

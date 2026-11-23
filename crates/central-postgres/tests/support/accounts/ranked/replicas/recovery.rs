@@ -118,7 +118,9 @@ async fn rotated(table: &Table<'_>, live: &Game<'_>, head: r::Head) -> r::Fence 
             .await
             .is_err()
     );
-    table.outsider.ready(table.store, 2, BUILD).await;
+    // No replacement exists at promotion. Neither seat polls after the third host arrives.
+    table.outsider.ready(table.store, 0, BUILD).await;
+    live.leader.ready(table.store, 0, BUILD).await;
     expire(table, fence.match_id, Deadline::Leader).await;
     assert!(
         live.leader
@@ -137,6 +139,25 @@ async fn rotated(table: &Table<'_>, live: &Game<'_>, head: r::Head) -> r::Fence 
         )
     );
     assert!(status.fence.generation > fence.generation);
+    table.outsider.ready(table.store, 2, BUILD).await;
+    let result = live
+        .witness
+        .host(
+            table.store,
+            r::HostRequest::Pulse {
+                fence: status.fence,
+            },
+        )
+        .await
+        .unwrap();
+    let r::HostResponse::AwaitingConsent {
+        fence: updated,
+        role: r::Role::Primary,
+    } = result
+    else {
+        panic!("a new verifier needs explicit approval from both seats");
+    };
+    assert!(updated.generation > status.fence.generation);
     assert!(
         table
             .seat(live.seats[0], r::SeatRequest::RelayRoute { fence })
@@ -149,7 +170,7 @@ async fn rotated(table: &Table<'_>, live: &Game<'_>, head: r::Head) -> r::Fence 
     live.leader.ready(table.store, 2, BUILD).await;
     stale(table, live, head).await;
     assert_eq!(table.receipt_count(fence.match_id).await, 0);
-    status.fence
+    updated
 }
 
 async fn grant_replacement(table: &Table<'_>, fence: r::Fence, replacement: &Node) {
