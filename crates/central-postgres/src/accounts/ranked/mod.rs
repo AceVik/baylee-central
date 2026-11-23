@@ -9,7 +9,9 @@ pub(super) mod boards;
 mod credentials;
 mod host;
 mod matchmaking;
+pub(super) mod privacy;
 mod queue;
+pub(super) mod replication;
 mod rules;
 mod scoring;
 
@@ -80,7 +82,16 @@ impl AccountStore {
             api::Request::Join { .. } | api::Request::Status | api::Request::Cancel { .. } => {
                 let me = actor(&db, session.ok_or(Error::Rejected)?, true).await?;
                 api::Response::Queue {
-                    state: queue::handle(&db, me, &request).await?,
+                    state: queue::handle(&db, me, &request, false).await?,
+                }
+            }
+            api::Request::Replicate { request } => {
+                let Some(session @ Session::Native(_)) = session else {
+                    return Err(Error::Rejected);
+                };
+                let me = actor(&db, session, true).await?;
+                api::Response::Replica {
+                    response: replication::seat(&db, me, request).await?,
                 }
             }
             api::Request::OwnProfile { .. } => {

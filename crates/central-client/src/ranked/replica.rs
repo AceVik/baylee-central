@@ -55,9 +55,11 @@ pub(super) fn responds(
             status.fence.match_id == *match_id
         }
         (
-            SeatRequest::Presence { fence, .. } | SeatRequest::DeclineHost { fence, .. },
+            SeatRequest::Presence { fence, .. }
+            | SeatRequest::Submit { fence, .. }
+            | SeatRequest::DeclineHost { fence, .. },
             SeatResponse::Status { status },
-        ) => status.fence == *fence,
+        ) => status.fence.match_id == fence.match_id && status.fence.generation >= fence.generation,
         (SeatRequest::Hosts { match_id }, SeatResponse::Hosts { fence, .. }) => {
             fence.match_id == *match_id
         }
@@ -197,9 +199,10 @@ pub fn replica_host(
             HostRequest::Pulse { fence } | HostRequest::Promote { fence },
             HostResponse::Assignment { work },
         ) => fence.match_id == work.fence.match_id && work.fence.generation >= fence.generation,
-        (HostRequest::Pulse { fence }, HostResponse::AwaitingConsent { fence: actual, .. }) => {
-            fence == *actual
-        }
+        (
+            HostRequest::Pulse { fence } | HostRequest::Promote { fence },
+            HostResponse::AwaitingConsent { fence: actual, .. },
+        ) => fence.match_id == actual.match_id && actual.generation >= fence.generation,
         (
             HostRequest::Presence { .. }
             | HostRequest::Ready { .. }
@@ -216,5 +219,91 @@ pub fn replica_host(
         Ok(response)
     } else {
         Err(Error::Rejected)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use api::replica::{CommandBytes, ConsentState, Fence, Head, SeatStatus};
+
+    #[test]
+    fn pending_submit_can_return_authority_status_but_never_acknowledges_another_command() {
+        let fence = Fence {
+            match_id: [1; 16],
+            generation: 3,
+        };
+        let expected = Head {
+            position: 7,
+            chain: [8; 32],
+        };
+        let r = SeatRequest::Submit {
+            fence,
+            expected,
+            command_id: [3; 16],
+            body: CommandBytes::new(vec![5]).unwrap(),
+        };
+        let reply = |fence| SeatResponse::Status {
+            status: SeatStatus {
+                fence,
+                phase: Phase::Paused,
+                host_id: [2; 16],
+                origin: "https://gate.example".into(),
+                game: Some([4; 16]),
+                consent: ConsentState::Ready,
+                head: expected,
+                clock: None,
+            },
+        };
+        for term in [3, 4] {
+            assert!(responds(
+                &r,
+                &reply(Fence {
+                    generation: term,
+                    ..fence
+                }),
+                Some([5; 16])
+            ));
+        }
+        assert!(!responds(
+            &r,
+            &reply(Fence {
+                generation: 2,
+                ..fence
+            }),
+            Some([5; 16])
+        ));
+        assert!(!responds(
+            &r,
+            &reply(Fence {
+                match_id: [9; 16],
+                ..fence
+            }),
+            Some([5; 16])
+        ));
+        assert!(responds(
+            &r,
+            &SeatResponse::Receipt {
+                command_id: [3; 16],
+                position: 8
+            },
+            Some([5; 16])
+        ));
+        assert!(!responds(
+            &r,
+            &SeatResponse::Receipt {
+                command_id: [9; 16],
+                position: 8
+            },
+            Some([5; 16])
+        ));
+        assert!(!responds(
+            &r,
+            &SeatResponse::Receipt {
+                command_id: [3; 16],
+                position: 9
+            },
+            Some([5; 16])
+        ));
     }
 }

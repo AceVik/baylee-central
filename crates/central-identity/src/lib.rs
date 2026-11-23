@@ -200,6 +200,7 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::ConfirmRestore { .. }
         | Request::LegacyStatus { .. }
         | Request::GatewayToken { .. }
+        | Request::RankedToken { .. }
         | Request::RegisterInvalidate { .. }
         | Request::GatewayRevocations { .. }
         | Request::GatewayTerms { .. }

@@ -220,6 +220,7 @@ async fn only_the_exact_first_line_asks_for_the_socket() {
     };
     let pause = Duration::from_millis(30);
     assert!(asked(vec![b"GET /v1/ws HTTP/1.1\r\nHost: x\r\n\r\n"], pause).await);
+    assert!(asked(vec![b"GET /v1/ranked/", b"socket HTTP/1.1\r\n"], pause).await);
     // the line in pieces, within the time a first line has
     assert!(asked(vec![b"GET /v1", b"/ws HT", b"TP/1.1\r\n"], pause).await);
     for line in [
@@ -229,6 +230,8 @@ async fn only_the_exact_first_line_asks_for_the_socket() {
         b"GET /v1/ws HTTP/1.0\r\n",
         b"get /v1/ws HTTP/1.1\r\n",
         b"GET /v1/native HTTP/1.1\r\n",
+        b"GET /v1/ranked/socket?x=1 HTTP/1.1\r\n",
+        b"GET /v1/ranked/socket/ HTTP/1.1\r\n",
     ] {
         assert!(!asked(vec![line], pause).await, "{line:?}");
     }

@@ -15,6 +15,7 @@ central-api = { path = "../central-api", version = "=0.1.0" }
 central-identity = { path = "../central-identity", version = "=0.1.0" }
 central-picture = { path = "../central-picture", version = "=0.1.0" }
 central-policy = { path = "../central-policy", version = "=0.1.0" }
+central-outbound = { path = "../central-outbound", version = "=0.1.0" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "=1.54.1", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync", "io-util"] }
 hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }
@@ -28,3 +29,9 @@ http-body-util = "=0.1.5"
 sha1 = { version = "=0.11.0", default-features = false }
 base64 = { version = "=0.22.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "=1.9.2", features = ["alloc"] }
+# The relay uses the TLS provider and trust roots already used by central-outbound.
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = { version = "=1.0.12", default-features = false }
+getrandom = "=0.4.3"
+httparse = "=1.10.1"
+serde = { version = "=1.0.229", features = ["derive"] }

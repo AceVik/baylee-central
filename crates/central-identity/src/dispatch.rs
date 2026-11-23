@@ -118,6 +118,7 @@ impl IdentityService {
             | Request::PublicFigures { .. }
             | Request::SetGatewayAdmins { .. }
             | Request::GatewayToken { .. }
+            | Request::RankedToken { .. }
             | Request::RegisterInvalidate { .. }
             | Request::GatewayRevocations { .. }
             | Request::GatewayStatus) => self.gateway_request(request, bearer).await,

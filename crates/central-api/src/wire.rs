@@ -368,9 +368,9 @@ pub enum Request {
     /// Obtain a pseudonymous seat credential bound to the exact verified match authority.
     RankedToken {
         /// Canonical origin selected by Central.
-        gateway:String,
+        gateway: String,
         /// Exact assignment approved by both participants.
-        fence:crate::ranked::replica::Fence,
+        fence: crate::ranked::replica::Fence,
     },
     /// Issue or refresh a token for one gateway. The same session, gateway and purpose keep
     /// their `sid`. Never forward a Central token. Answered with [`Response::GatewayToken`].

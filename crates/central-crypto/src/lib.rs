@@ -20,6 +20,8 @@ pub mod proof;
 pub mod vault;
 
 pub use context::Context;
+/// Longest validity of a gateway JWT or its matching ranked seat presentation.
+pub const GATEWAY_TOKEN_SECONDS: i64 = 3600;
 
 use std::fmt;
 

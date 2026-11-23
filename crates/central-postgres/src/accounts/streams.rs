@@ -18,9 +18,11 @@ pub const PUSH_ATTEMPTS: i16 = 5;
 pub struct GatewayGrant {
     /// Match binding for a game-only credential.
     pub ranked_match: Option<[u8; 16]>,
+    /// Leadership generation of a replicated match.
+    pub ranked_generation: Option<u64>,
     /// The session as this gateway knows it.
     pub sid: [u8; 16],
-    /// The account.
+    /// The match/host seat alias for ranked. Otherwise the account UUID.
     pub account: [u8; 16],
     /// The session's 12-hour cap, in Unix seconds. No token outlives it.
     pub cap: i64,
@@ -87,18 +89,33 @@ async fn assigned_match(
     account: Uuid,
     origin: &str,
     registered: bool,
-) -> Result<[u8; 16], Error> {
+) -> Result<(Uuid, Option<i64>, [u8; 16]), Error> {
+    // A standby reassignment may change only the replica row. Acquire the same
+    // parent lock as routing *before* taking the snapshot of roles and grants.
+    tx.query_one_raw(statement(
+        "SELECT m.id FROM central_identity.ranked_tickets t
+         JOIN central_identity.ranked_matches m ON m.id=t.match_id
+         WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN(m.account_a,m.account_b)
+         FOR SHARE OF m",
+        vec![account.into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?
+    .ok_or(Error::Rejected)?;
     let row = tx
         .query_one_raw(statement(
-            "SELECT m.id FROM central_identity.ranked_tickets t
+            "SELECT m.id,m.host_id,m.account_a,r.generation FROM central_identity.ranked_tickets t
          JOIN central_identity.ranked_matches m ON m.id=t.match_id
+         LEFT JOIN central_identity.ranked_replicas r ON r.match_id=m.id
          JOIN central_identity.gateways g ON g.id=m.host_id AND g.origin=m.origin
          JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id
          JOIN central_identity.ranked_hosts h ON h.host_id=g.id
          WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN (m.account_a,m.account_b)
            AND g.origin=$2 AND g.official<>$3 AND p.enabled AND p.ranked_verified
            AND p.ranked_epoch=m.ranked_epoch AND h.ranked_epoch=m.ranked_epoch
-           AND m.created_at>=h.continuity_since
+           AND ((r.match_id IS NULL AND m.created_at>=h.continuity_since) OR
+                (r.phase IN ('preparing','playing','paused') AND h.compatibility=r.compatibility
+                 AND r.primary_until>clock_timestamp() AND h.continuity_since<=r.primary_until-interval '45 seconds'))
            AND h.seen_at>clock_timestamp()-interval '5 minutes'
            AND m.state IN ('reserved','playing') AND m.lease_until>clock_timestamp()
          FOR SHARE OF m,p",
@@ -108,7 +125,15 @@ async fn assigned_match(
         .map_err(|_| Error::Unavailable)?
         .ok_or(Error::Rejected)?;
     let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
-    Ok(*id.as_bytes())
+    let generation = row
+        .try_get("", "generation")
+        .map_err(|_| Error::Unavailable)?;
+    let host: Uuid = row.try_get("", "host_id").map_err(|_| Error::Unavailable)?;
+    let first: Uuid = row
+        .try_get("", "account_a")
+        .map_err(|_| Error::Unavailable)?;
+    let aliases = super::ranked::privacy::aliases(tx, id, host).await?;
+    Ok((id, generation, aliases[usize::from(first != account)]))
 }
 
 /// Reuse the SID for a refresh. A new ranked game gets its own revocable session.
@@ -118,18 +143,20 @@ async fn held_sid(
     stream: &str,
     purpose: GatewayPurpose,
     ranked_match: Option<Uuid>,
+    generation: Option<i64>,
     fresh: [u8; 16],
 ) -> Result<[u8; 16], Error> {
     let found = tx
         .query_one_raw(statement(
             "SELECT sid FROM central_identity.gateway_sids
              WHERE session_digest = $1 AND stream = $2 AND purpose = $3
-             AND ranked_match IS NOT DISTINCT FROM $4",
+             AND ranked_match IS NOT DISTINCT FROM $4 AND ranked_generation IS NOT DISTINCT FROM $5",
             vec![
                 digest.to_vec().into(),
                 stream.into(),
                 purpose.as_str().into(),
                 ranked_match.into(),
+                generation.into(),
             ],
         ))
         .await
@@ -138,13 +165,12 @@ async fn held_sid(
         let sid: Vec<u8> = row.try_get("", "sid").map_err(|_| Error::Unavailable)?;
         return sid_bytes(&sid);
     }
-    if let Some(matched) = ranked_match {
+    if ranked_match.is_some() {
         // The session is locked. Removing its previous ranked SID also publishes the normal
         // revocation to the previous host, which can be on a different gateway.
         tx.execute_raw(statement(
-            "DELETE FROM central_identity.gateway_sids WHERE session_digest=$1 AND purpose='ranked'
-             AND ranked_match IS DISTINCT FROM $2",
-            vec![digest.to_vec().into(), matched.into()],
+            "DELETE FROM central_identity.gateway_sids WHERE session_digest=$1 AND purpose='ranked'",
+            vec![digest.to_vec().into()],
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
@@ -158,8 +184,8 @@ async fn held_sid(
     .map_err(|_| Error::Unavailable)?;
     let inserted = tx
         .execute_raw(statement(
-            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose, ranked_match)
-             SELECT $1, $2, $3, $4, $6 WHERE (SELECT count(*) FROM central_identity.gateway_sids
+            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose, ranked_match, ranked_generation)
+             SELECT $1, $2, $3, $4, $6, $7 WHERE (SELECT count(*) FROM central_identity.gateway_sids
                  WHERE session_digest = $2) < $5",
             vec![
                 fresh.to_vec().into(),
@@ -168,6 +194,7 @@ async fn held_sid(
                 purpose.as_str().into(),
                 MAX_SIDS_PER_SESSION.into(),
                 ranked_match.into(),
+                generation.into(),
             ],
         ))
         .await
@@ -199,6 +226,49 @@ async fn accepted_terms<S: AsRef<str> + Sync>(
         .transpose()
 }
 
+/// Lock a live session before its children, as ending the session does, so
+/// nothing can record a token for a session concurrently being ended.
+async fn issuing_session(
+    tx: &DatabaseTransaction,
+    digest: &[u8],
+) -> Result<sea_orm::QueryResult, Error> {
+    tx.query_one_raw(statement(
+        "SELECT a.id,a.display_name,a.tag,a.legacy_id,a.legacy_closed,a.legacy_deck_source,
+            floor(extract(epoch FROM COALESCE(s.proven_at,s.created_at)+interval '12 hours'))::bigint AS cap
+         FROM central_identity.sessions s JOIN central_identity.accounts a
+           ON a.id=s.account_id AND a.credential_revision=s.credential_revision
+         WHERE s.digest=$1 AND s.kind='native' AND s.expires_at>pg_catalog.clock_timestamp() AND a.restored
+         FOR UPDATE OF s",vec![digest.to_vec().into()]
+    )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)
+}
+
+/// Bind the online presentation to the same absolute expiry given to the signer.
+async fn presentation_deadline(
+    tx: &DatabaseTransaction,
+    sid: [u8; 16],
+    cap: i64,
+) -> Result<i64, Error> {
+    let deadline = tx
+        .query_one_raw(statement(
+            "UPDATE central_identity.gateway_sids SET ranked_proof_until=
+         pg_catalog.to_timestamp(least($2::bigint,
+            floor(extract(epoch FROM clock_timestamp()))::bigint+$3::bigint)::double precision)
+         WHERE sid=$1 AND purpose='ranked' RETURNING
+            floor(extract(epoch FROM ranked_proof_until))::bigint AS deadline",
+            vec![
+                sid.to_vec().into(),
+                cap.into(),
+                central_crypto::GATEWAY_TOKEN_SECONDS.into(),
+            ],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Unavailable)?;
+    deadline
+        .try_get("", "deadline")
+        .map_err(|_| Error::Unavailable)
+}
+
 impl AccountStore {
     /// Record a session at one gateway and read what its token says. `set` holds the origins
     /// the gateway answers for, canonical first; `registered` is false for the official
@@ -216,26 +286,32 @@ impl AccountStore {
         purpose: GatewayPurpose,
         fresh: [u8; 16],
     ) -> Result<GatewayGrant, Error> {
+        self.gateway_grant_scoped(session, set, registered, purpose, fresh, None)
+            .await
+    }
+
+    /// Issue admission for an explicitly selected ranked match and generation.
+    /// Ordinary purposes require no fence. A stale request cannot refresh a
+    /// newer seat, rotate its revocation stream, or extend its presentation.
+    ///
+    /// # Errors
+    /// The same refusals as `gateway_grant`, plus a stale or missing ranked scope.
+    pub async fn gateway_grant_scoped<S: AsRef<str> + Sync>(
+        &self,
+        session: &Token,
+        set: &[S],
+        registered: bool,
+        purpose: GatewayPurpose,
+        fresh: [u8; 16],
+        fence: Option<central_api::ranked::replica::Fence>,
+    ) -> Result<GatewayGrant, Error> {
+        if (purpose == GatewayPurpose::Ranked) != fence.is_some() {
+            return Err(Error::Rejected);
+        }
         let stream = set.first().ok_or(Error::Rejected)?.as_ref();
         let digest = session.digest().to_vec();
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        // Lock the session before its children, as ending it does, so that a token is never
-        // recorded for a session being ended, and the count below cannot be raced.
-        let row = tx
-            .query_one_raw(statement(
-                "SELECT a.id, a.display_name, a.tag, a.legacy_id, a.legacy_closed,a.legacy_deck_source,
-                 floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)
-                     + interval '12 hours'))::bigint AS cap
-                 FROM central_identity.sessions s JOIN central_identity.accounts a
-                 ON a.id = s.account_id AND a.credential_revision = s.credential_revision
-                 WHERE s.digest = $1 AND s.kind = 'native'
-                 AND s.expires_at > pg_catalog.clock_timestamp() AND a.restored
-                 FOR UPDATE OF s",
-                vec![digest.clone().into()],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?
-            .ok_or(Error::Rejected)?;
+        let row = issuing_session(&tx, &digest).await?;
         let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         let legacy_id: Option<String> = row
             .try_get("", "legacy_id")
@@ -243,13 +319,20 @@ impl AccountStore {
         let closed: bool = row
             .try_get("", "legacy_closed")
             .map_err(|_| Error::Unavailable)?;
-        let ranked_match = if purpose == GatewayPurpose::Ranked {
+        let (ranked_match, ranked_generation, subject) = if purpose == GatewayPurpose::Ranked {
             if legacy_id.is_some() && !closed {
                 return Err(Error::Rejected);
             }
-            Some(assigned_match(&tx, account, stream, registered).await?)
+            let (id, generation, alias) = assigned_match(&tx, account, stream, registered).await?;
+            if !fence.is_some_and(|f| {
+                f.match_id == id.into_bytes()
+                    && i64::try_from(f.generation).ok() == Some(generation.unwrap_or(0))
+            }) {
+                return Err(Error::Conflict);
+            }
+            (Some(id), generation, alias)
         } else {
-            None
+            (None, None, account.into_bytes())
         };
         if registered && ranked_match.is_none() {
             tx.query_one_raw(statement(
@@ -275,24 +358,33 @@ impl AccountStore {
             &digest,
             stream,
             purpose,
-            ranked_match.map(Uuid::from_bytes),
+            ranked_match,
+            ranked_generation,
             fresh,
         )
         .await?;
-        let terms = accepted_terms(&tx, account, set).await?;
-        let (display_name, tag) = super::profiles::columns(&row)?;
-        let cap = row.try_get("", "cap").map_err(|_| Error::Unavailable)?;
+        let (display_name, tag, terms) = if ranked_match.is_some() {
+            (None, None, None)
+        } else {
+            let (display_name, tag) = super::profiles::columns(&row)?;
+            (display_name, tag, accepted_terms(&tx, account, set).await?)
+        };
+        let mut cap: i64 = row.try_get("", "cap").map_err(|_| Error::Unavailable)?;
+        if ranked_match.is_some() {
+            cap = presentation_deadline(&tx, sid, cap).await?;
+        }
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(GatewayGrant {
-            ranked_match,
+            ranked_match: ranked_match.map(Uuid::into_bytes),
+            ranked_generation: ranked_generation.map(count).transpose()?,
             sid,
-            account: *account.as_bytes(),
+            account: subject,
             cap,
             display_name,
             tag,
             // Only the official gateway ever learns an old id.
-            legacy_id: legacy_id.filter(|_| !registered),
-            legacy_deck_source: if registered {
+            legacy_id: legacy_id.filter(|_| !registered && ranked_match.is_none()),
+            legacy_deck_source: if registered || ranked_match.is_some() {
                 None
             } else {
                 row.try_get::<Option<Vec<u8>>>("", "legacy_deck_source")

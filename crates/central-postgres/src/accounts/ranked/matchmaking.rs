@@ -51,24 +51,25 @@ async fn candidate(
     mine: Seat,
     season: Uuid,
     format: &str,
+    replicated: bool,
 ) -> Result<Option<(Uuid, Uuid)>, Error> {
     let rows = db
         .query_all_raw(statement(
             "WITH oldest AS (
-            SELECT account_id FROM central_identity.ranked_tickets WHERE season_id=$2 AND format=$3
+            SELECT account_id FROM central_identity.ranked_tickets WHERE season_id=$2 AND format=$3 AND replicable=$5
              AND state='waiting' AND expires_at>now() AND account_id<>$1
              ORDER BY created_at,account_id LIMIT 64
          ), lower AS (
-            SELECT account_id FROM central_identity.ranked_tickets WHERE season_id=$2 AND format=$3
+            SELECT account_id FROM central_identity.ranked_tickets WHERE season_id=$2 AND format=$3 AND replicable=$5
              AND state='waiting' AND expires_at>now() AND account_id<>$1 AND queue_elo<=$4
              ORDER BY queue_elo DESC LIMIT 16
          ), upper_pool AS (
-            SELECT account_id FROM central_identity.ranked_tickets WHERE season_id=$2 AND format=$3
+            SELECT account_id FROM central_identity.ranked_tickets WHERE season_id=$2 AND format=$3 AND replicable=$5
              AND state='waiting' AND expires_at>now() AND account_id<>$1 AND queue_elo>$4
              ORDER BY queue_elo LIMIT 16
          ), recent AS (
             SELECT count(*)<=6 AS sparse FROM (SELECT 1 FROM central_identity.ranked_tickets
-              WHERE season_id=$2 AND format=$3 AND created_at>now()-interval '2 minutes' LIMIT 7) a
+              WHERE season_id=$2 AND format=$3 AND replicable=$5 AND created_at>now()-interval '2 minutes' LIMIT 7) a
          )
          SELECT t.account_id,t.request_id,t.queue_elo,floor(extract(epoch FROM t.created_at))::bigint AS at,
           floor(extract(epoch FROM now()))::bigint AS clock,recent.sparse,
@@ -84,6 +85,7 @@ async fn candidate(
                 season.into(),
                 format.into(),
                 mine.elo.into(),
+                replicated.into(),
             ],
         ))
         .await
@@ -113,21 +115,22 @@ pub(super) async fn pair(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
     let season: Uuid = column(ticket, "season_id")?;
     let format: String = column(ticket, "format")?;
     let mine = seat(ticket)?;
-    let Some((other, other_key)) = candidate(db, mine, season, &format).await? else {
+    let replicated: bool = column(ticket, "replicable")?;
+    let Some((other, other_key)) = candidate(db, mine, season, &format, replicated).await? else {
         return Ok(());
     };
     let key: Uuid = column(ticket, "request_id")?;
     let rows = db.query_all_raw(statement(
         "SELECT account_id,commitment FROM central_identity.ranked_tickets WHERE
            ((account_id=$1 AND request_id=$2) OR (account_id=$3 AND request_id=$6)) AND season_id=$4 AND format=$5
-          AND state='waiting' AND expires_at>pg_catalog.clock_timestamp()
+          AND state='waiting' AND replicable=$7 AND expires_at>pg_catalog.clock_timestamp()
          ORDER BY account_id FOR UPDATE SKIP LOCKED",
-        vec![mine.id.into(),key.into(),other.into(),season.into(),format.clone().into(),other_key.into()]
+        vec![mine.id.into(),key.into(),other.into(),season.into(),format.clone().into(),other_key.into(),replicated.into()]
     )).await.map_err(unavailable)?;
     let [low, high] = rows.as_slice() else {
         return Ok(());
     };
-    let Some(host) = super::host::allocate(db).await? else {
+    let Some(allocation) = super::host::allocate(db, replicated).await? else {
         return Ok(());
     };
     let (mine_locked, other_locked) = if mine.id < other {
@@ -137,6 +140,7 @@ pub(super) async fn pair(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
     };
     let first: Vec<u8> = column(mine_locked, "commitment")?;
     let second: Vec<u8> = column(other_locked, "commitment")?;
+    let host = allocation.primary;
     let matched = db.query_one_raw(statement(
         "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,commitment_a,commitment_b,host_id,ranked_epoch,origin)
          SELECT s.id,$2,$3,$4,$5,$6,$7,$8,$9 FROM central_identity.ranked_seasons s WHERE s.id=$1
@@ -146,6 +150,9 @@ pub(super) async fn pair(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
     )).await.map_err(unavailable)?;
     if let Some(row) = matched {
         let matched: Uuid = column(&row, "id")?;
+        if let Some((standby, compatibility)) = allocation.replica {
+            super::replication::routing::assign(db, matched, &standby, &compatibility).await?;
+        }
         let changed = db.execute_raw(statement(
             "UPDATE central_identity.ranked_tickets SET state='assigned',match_id=$1 WHERE account_id IN ($2,$3) AND state='waiting'",
             vec![matched.into(),mine.id.into(),other.into()]

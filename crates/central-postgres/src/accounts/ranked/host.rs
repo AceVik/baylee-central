@@ -10,57 +10,25 @@ pub(super) struct Host {
     pub(super) origin: String,
 }
 
-pub(super) async fn allocate(db: &DatabaseTransaction) -> Result<Option<Host>, Error> {
-    let row=db.query_one_raw(statement(
-        "SELECT h.host_id,g.origin FROM central_identity.ranked_hosts h
-         JOIN central_identity.gateways g ON g.id=h.host_id
-         JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.ranked_epoch=h.ranked_epoch
-         CROSS JOIN LATERAL (SELECT count(*) AS games FROM central_identity.ranked_matches m
-           WHERE m.host_id=h.host_id AND m.ranked_epoch=h.ranked_epoch AND m.created_at>=h.continuity_since
-            AND m.state IN ('reserved','playing') AND m.lease_until>pg_catalog.clock_timestamp()) load
-         WHERE p.enabled AND p.ranked_verified AND h.capacity>0 AND load.games<h.capacity
-          AND h.seen_at>pg_catalog.clock_timestamp()-interval '90 seconds'
-         ORDER BY load.games::double precision/h.capacity,load.games,h.seen_at DESC,h.host_id
-         LIMIT 1 FOR UPDATE OF h SKIP LOCKED",
-        vec![]
-    )).await.map_err(unavailable)?;
-    let Some(row) = row else { return Ok(None) };
-    let id: Uuid = column(&row, "host_id")?;
-    // Re-read occupancy after locking the offer. A concurrent allocator may have
-    // committed a reservation between the first statement's snapshot and its row lock.
-    let row = db
-        .query_one_raw(statement(
-            "SELECT g.origin,p.ranked_epoch FROM central_identity.ranked_hosts h
-         JOIN central_identity.gateways g ON g.id=h.host_id
-         JOIN central_identity.gateway_approvals p ON p.gateway_id=h.host_id
-         WHERE h.host_id=$1 AND p.enabled AND p.ranked_verified AND p.ranked_epoch=h.ranked_epoch
-          AND h.seen_at>pg_catalog.clock_timestamp()-interval '90 seconds' AND h.capacity>(
-            SELECT count(*) FROM central_identity.ranked_matches m WHERE m.host_id=h.host_id
-            AND m.ranked_epoch=h.ranked_epoch AND m.created_at>=h.continuity_since
-            AND m.state IN ('reserved','playing') AND m.lease_until>pg_catalog.clock_timestamp())
-         FOR SHARE OF p",
-            vec![id.into()],
-        ))
-        .await
-        .map_err(unavailable)?;
-    row.as_ref()
-        .map(|row| {
-            Ok(Host {
-                id,
-                origin: column(row, "origin")?,
-                epoch: column(row, "ranked_epoch")?,
-            })
-        })
-        .transpose()
+pub(super) async fn allocate(
+    db: &DatabaseTransaction,
+    replicated: bool,
+) -> Result<Option<super::replication::routing::Allocation>, Error> {
+    super::replication::routing::allocate(db, replicated).await
 }
 
 /// Check only the polling account's assigned match, including host revocation and liveness.
 pub(super) async fn expire(db: &DatabaseTransaction, account: Uuid) -> Result<(), Error> {
+    if let Some(row)=db.query_one_raw(statement("SELECT r.match_id FROM central_identity.ranked_tickets t
+       JOIN central_identity.ranked_replicas r ON r.match_id=t.match_id WHERE t.account_id=$1 AND t.state='assigned'",vec![account.into()])).await.map_err(unavailable)? {
+        return super::replication::routing::maintain(db,column(&row,"match_id")?).await;
+    }
     db.execute_raw(statement(
         "WITH dead AS (SELECT m.id FROM central_identity.ranked_matches m
          WHERE m.state IN ('reserved','playing') AND
            m.id=(SELECT t.match_id FROM central_identity.ranked_tickets t
               WHERE t.account_id=$1 AND t.state='assigned')
+           AND NOT EXISTS(SELECT 1 FROM central_identity.ranked_replicas r WHERE r.match_id=m.id)
            AND (m.lease_until<=pg_catalog.clock_timestamp() OR NOT EXISTS (
              SELECT 1 FROM central_identity.gateway_approvals p JOIN central_identity.ranked_hosts h
               ON h.host_id=p.gateway_id WHERE p.gateway_id=m.host_id AND p.enabled AND p.ranked_verified
@@ -73,24 +41,26 @@ pub(super) async fn expire(db: &DatabaseTransaction, account: Uuid) -> Result<()
     Ok(())
 }
 
-async fn ready(
+pub(super) async fn ready(
     db: &DatabaseTransaction,
     host: &Host,
     capacity: u8,
+    compatibility: Option<&[u8; 32]>,
 ) -> Result<api::HostResponse, Error> {
     if capacity > 64 {
         return Err(Error::Rejected);
     }
     db.execute_raw(statement(
-        "INSERT INTO central_identity.ranked_hosts AS h(host_id,ranked_epoch,capacity) VALUES ($1,$2,$3)
-         ON CONFLICT(host_id) DO UPDATE SET capacity=EXCLUDED.capacity,ranked_epoch=EXCLUDED.ranked_epoch,
-          continuity_since=CASE WHEN h.ranked_epoch<>EXCLUDED.ranked_epoch OR
+        "INSERT INTO central_identity.ranked_hosts AS h(host_id,ranked_epoch,capacity,compatibility) VALUES ($1,$2,$3,$4)
+         ON CONFLICT(host_id) DO UPDATE SET capacity=EXCLUDED.capacity,ranked_epoch=EXCLUDED.ranked_epoch,compatibility=EXCLUDED.compatibility,
+          continuity_since=CASE WHEN h.ranked_epoch<>EXCLUDED.ranked_epoch OR h.compatibility IS DISTINCT FROM EXCLUDED.compatibility OR
             h.seen_at<=pg_catalog.clock_timestamp()-interval '5 minutes' THEN EXCLUDED.seen_at ELSE h.continuity_since END,
           seen_at=EXCLUDED.seen_at",
-        vec![host.id.into(),host.epoch.into(),i16::from(capacity).into()]
+        vec![host.id.into(),host.epoch.into(),i16::from(capacity).into(),compatibility.map(|c|c.to_vec()).into()]
     )).await.map_err(unavailable)?;
     db.execute_raw(statement(
         "WITH stale AS (SELECT id FROM central_identity.ranked_matches WHERE state IN ('reserved','playing')
+          AND NOT EXISTS(SELECT 1 FROM central_identity.ranked_replicas r WHERE r.match_id=ranked_matches.id)
           AND lease_until<=now() ORDER BY lease_until LIMIT 64 FOR UPDATE SKIP LOCKED)
          UPDATE central_identity.ranked_matches m SET state='void',deck_a=NULL,deck_b=NULL,finished_at=pg_catalog.clock_timestamp()
           FROM stale WHERE m.id=stale.id",
@@ -106,6 +76,7 @@ async fn ready(
     ))
     .await
     .map_err(unavailable)?;
+    super::replication::sweep(db).await?;
     Ok(api::HostResponse::Ready)
 }
 
@@ -118,7 +89,7 @@ pub(super) fn outcome(value: i16) -> Result<api::Outcome, Error> {
     }
 }
 
-fn valid(id: api::Id) -> Result<Uuid, Error> {
+pub(super) fn valid(id: api::Id) -> Result<Uuid, Error> {
     if super::super::gateways::valid_id(id) {
         Ok(uuid(id))
     } else {
@@ -126,16 +97,13 @@ fn valid(id: api::Id) -> Result<Uuid, Error> {
     }
 }
 
-fn assignment(row: &QueryResult) -> Result<api::HostAssignment, Error> {
+fn assignment(row: &QueryResult, aliases: [api::Id; 2]) -> Result<api::HostAssignment, Error> {
     Ok(api::HostAssignment {
         match_id: column::<Uuid>(row, "id")?.into_bytes(),
         format: column::<String>(row, "format")?
             .parse()
             .map_err(unavailable)?,
-        accounts: [
-            column::<Uuid>(row, "account_a")?.into_bytes(),
-            column::<Uuid>(row, "account_b")?.into_bytes(),
-        ],
+        accounts: aliases,
         decks: [
             column::<Vec<u8>>(row, "commitment_a")?
                 .try_into()
@@ -148,21 +116,26 @@ fn assignment(row: &QueryResult) -> Result<api::HostAssignment, Error> {
     })
 }
 
-async fn claim(
+pub(super) async fn claim(
     db: &DatabaseTransaction,
     row: &QueryResult,
-    account: api::Id,
+    host: Uuid,
+    alias: api::Id,
+    proof: &api::SeatProof,
     deck: &[u8; 32],
 ) -> Result<api::HostResponse, Error> {
-    let assignment = assignment(row)?;
+    let aliases = super::privacy::aliases(db, column(row, "id")?, host).await?;
+    let assignment = assignment(row, aliases)?;
     let seat = assignment
         .accounts
         .iter()
-        .position(|&id| id == account)
+        .position(|&id| id == alias)
         .ok_or(Error::Rejected)?;
     if assignment.decks[seat] != *deck {
         return Err(Error::Rejected);
     }
+    let account: Uuid = column(row, if seat == 0 { "account_a" } else { "account_b" })?;
+    super::privacy::presented(db, uuid(assignment.match_id), host, account, proof).await?;
     if !matches!(
         column::<String>(row, "state")?.as_str(),
         "reserved" | "playing"
@@ -189,7 +162,7 @@ fn pool(entries: &[api::PoolEntry]) -> Result<String, Error> {
     String::from_utf8(central_api::encode(&entries)?).map_err(unavailable)
 }
 
-async fn start(
+pub(super) async fn start(
     db: &DatabaseTransaction,
     row: &QueryResult,
     game: api::Id,
@@ -238,7 +211,7 @@ async fn start(
     Ok(api::HostResponse::Done)
 }
 
-async fn finish(
+pub(super) async fn finish(
     db: &DatabaseTransaction,
     row: &QueryResult,
     game: api::Id,
@@ -278,7 +251,12 @@ pub(super) async fn handle(
     request: &api::HostRequest,
 ) -> Result<api::HostResponse, Error> {
     let id = match request {
-        api::HostRequest::Ready { capacity } => return ready(db, host, *capacity).await,
+        api::HostRequest::Replicate { request } => {
+            return Ok(api::HostResponse::Replica {
+                response: super::replication::handle(db, host, request).await?,
+            });
+        }
+        api::HostRequest::Ready { capacity } => return ready(db, host, *capacity, None).await,
         api::HostRequest::Claim { match_id, .. }
         | api::HostRequest::Start { match_id, .. }
         | api::HostRequest::Void { match_id }
@@ -286,7 +264,8 @@ pub(super) async fn handle(
     };
     let row = db
         .query_one_raw(statement(
-            "SELECT m.*, (m.lease_until>pg_catalog.clock_timestamp() AND EXISTS (
+            "SELECT m.*, EXISTS (SELECT 1 FROM central_identity.ranked_tickets t WHERE t.match_id=m.id AND t.replicable) AS consent_required,
+         (m.lease_until>pg_catalog.clock_timestamp() AND EXISTS (
          SELECT 1 FROM central_identity.ranked_hosts h WHERE h.host_id=m.host_id AND
          h.ranked_epoch=m.ranked_epoch AND m.created_at>=h.continuity_since
          AND h.seen_at>pg_catalog.clock_timestamp()-interval '5 minutes')) AS live
@@ -297,6 +276,9 @@ pub(super) async fn handle(
         .await
         .map_err(unavailable)?
         .ok_or(Error::Rejected)?;
+    if super::replication::protected(db, id).await? {
+        return super::replication::legacy(db, host, request, id).await;
+    }
     let state: String = column(&row, "state")?;
     if matches!(state.as_str(), "reserved" | "playing")
         && !column::<bool>(&row, "live")?
@@ -305,9 +287,27 @@ pub(super) async fn handle(
         return Err(Error::Conflict);
     }
     match request {
-        api::HostRequest::Claim { account, deck, .. } => claim(db, &row, *account, deck).await,
-        api::HostRequest::Start { game, pools, .. } => start(db, &row, *game, pools).await,
-        api::HostRequest::Finish { game, outcome, .. } => finish(db, &row, *game, *outcome).await,
+        api::HostRequest::Claim {
+            account,
+            proof,
+            deck,
+            ..
+        } => claim(db, &row, host.id, *account, proof, deck).await,
+        api::HostRequest::Start { game, pools, .. } => {
+            if state == "reserved" && !super::privacy::consented(db, id, host.id).await? {
+                return Err(Error::Rejected);
+            }
+            start(db, &row, *game, pools).await
+        }
+        api::HostRequest::Finish { game, outcome, .. } => {
+            if state == "playing"
+                && column::<bool>(&row, "consent_required")?
+                && !super::privacy::consented(db, id, host.id).await?
+            {
+                return Err(Error::Rejected);
+            }
+            finish(db, &row, *game, *outcome).await
+        }
         api::HostRequest::Void { .. } => {
             if state == "finished" {
                 return Err(Error::Conflict);
@@ -317,6 +317,6 @@ pub(super) async fn handle(
             }
             Ok(api::HostResponse::Done)
         }
-        api::HostRequest::Ready { .. } => Err(Error::Rejected),
+        api::HostRequest::Ready { .. } | api::HostRequest::Replicate { .. } => Err(Error::Rejected),
     }
 }

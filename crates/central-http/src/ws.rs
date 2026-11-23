@@ -48,6 +48,7 @@ use tokio::{
 
 /// The first line of a connection that may become a push socket, exactly.
 pub(crate) const REQUEST_LINE: &[u8] = b"GET /v1/ws HTTP/1.1\r\n";
+const GAME_LINE: &[u8] = b"GET /v1/ranked/socket HTTP/1.1\r\n";
 /// How long a new connection has to show its first line before it is taken
 /// for an ordinary one. A client sends its request's head at once.
 const FIRST_LINE: Duration = Duration::from_secs(1);
@@ -288,16 +289,17 @@ impl Upgrades {
 /// slow to come included, is an ordinary connection.
 pub(crate) async fn asks(stream: &TcpStream) -> bool {
     let deadline = Instant::now() + FIRST_LINE;
-    let mut seen = [0_u8; REQUEST_LINE.len()];
+    let mut seen = [0_u8; GAME_LINE.len()];
     loop {
         let Ok(Ok(read)) = tokio::time::timeout_at(deadline, stream.peek(&mut seen)).await else {
             return false;
         };
-        if read == 0 || !REQUEST_LINE.starts_with(&seen[..read]) {
-            return false;
-        }
-        if read == REQUEST_LINE.len() {
+        let received = &seen[..read];
+        if received.starts_with(REQUEST_LINE) || received.starts_with(GAME_LINE) {
             return true;
+        }
+        if read == 0 || !(REQUEST_LINE.starts_with(received) || GAME_LINE.starts_with(received)) {
+            return false;
         }
         // Peeking again at once would see the same bytes.
         if Instant::now() + Duration::from_millis(10) >= deadline {
@@ -314,17 +316,19 @@ fn invalid() -> Response {
 
 /// Why a handshake is refused.
 #[derive(Debug, PartialEq, Eq)]
-enum Refusal {
+pub(super) enum Refusal {
     /// Not one this socket takes: 400.
     Invalid,
     /// Another version than 13: 426, naming 13 (RFC 6455 § 4.4).
     Version,
+    Busy,
 }
 
 impl IntoResponse for Refusal {
     fn into_response(self) -> Response {
         match self {
             Self::Invalid => invalid(),
+            Self::Busy => failure(Error::Busy),
             Self::Version => (
                 StatusCode::UPGRADE_REQUIRED,
                 [(header::SEC_WEBSOCKET_VERSION, "13")],
@@ -385,7 +389,7 @@ fn handshake(headers: &HeaderMap) -> Result<HeaderValue, Refusal> {
 /// protocol's GUID. `None` unless the key is sixteen bytes in canonical Base64
 /// (the standard engine refuses padding that is not canonical and bits past
 /// the last byte, so what it decodes is what it would encode).
-fn accept(key: &str) -> Option<HeaderValue> {
+pub(super) fn accept(key: &str) -> Option<HeaderValue> {
     let engine = base64::engine::general_purpose::STANDARD;
     if engine.decode(key).ok()?.len() != 16 {
         return None;
@@ -402,23 +406,11 @@ fn accept(key: &str) -> Option<HeaderValue> {
 pub(crate) async fn dial(
     identity: &Arc<IdentityService>,
     from: Option<Client>,
-    mut request: Request,
+    request: Request,
 ) -> Response {
-    // Only a connection that asked in its first line can be upgraded.
-    let Some(upgrades) = request.extensions().get::<Upgrades>().cloned() else {
-        return invalid();
-    };
-    let accept = match handshake(request.headers()) {
-        Ok(accept) => accept,
+    let opening = match Opening::admit(&request, from) {
+        Ok(opening) => opening,
         Err(refusal) => return refusal.into_response(),
-    };
-    if let Some(client) = from
-        && !upgrades.dial(client)
-    {
-        return failure(Error::Busy);
-    }
-    let Some(place) = upgrades.place(from) else {
-        return failure(Error::Busy);
     };
     let Some(bearer) = single(request.headers(), header::AUTHORIZATION) else {
         return failure(Error::Rejected);
@@ -432,24 +424,58 @@ pub(crate) async fn dial(
         Ok(listener) => listener,
         Err(error) => return failure(error),
     };
-    let on_upgrade = hyper::upgrade::on(&mut request);
-    let job = serve(
-        Arc::clone(identity),
-        listener,
-        place,
-        on_upgrade,
-        upgrades.0.stop.clone(),
-    );
-    if upgrades.0.jobs.try_send(Box::pin(job)).is_err() {
-        return failure(Error::Busy);
+    opening.start(request, |place, upgraded, stop| {
+        serve(Arc::clone(identity), listener, place, upgraded, stop)
+    })
+}
+
+/// Both native WebSocket routes charge the same listener and address budgets.
+pub(super) struct Opening {
+    upgrades: Upgrades,
+    place: Seat,
+    accept: HeaderValue,
+}
+
+impl Opening {
+    pub(super) fn admit(request: &Request, from: Option<Client>) -> Result<Self, Refusal> {
+        let upgrades = request
+            .extensions()
+            .get::<Upgrades>()
+            .cloned()
+            .ok_or(Refusal::Invalid)?;
+        let accept = handshake(request.headers())?;
+        if from.is_some_and(|client| !upgrades.dial(client)) {
+            return Err(Refusal::Busy);
+        }
+        let place = upgrades.place(from).ok_or(Refusal::Busy)?;
+        Ok(Self {
+            upgrades,
+            place,
+            accept,
+        })
     }
-    let mut response = Response::new(Body::empty());
-    *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
-    let headers = response.headers_mut();
-    headers.insert(header::UPGRADE, HeaderValue::from_static("websocket"));
-    headers.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
-    headers.insert(header::SEC_WEBSOCKET_ACCEPT, accept);
-    response
+
+    pub(super) fn start<F>(
+        self,
+        mut request: Request,
+        serve: impl FnOnce(Seat, hyper::upgrade::OnUpgrade, watch::Receiver<bool>) -> F,
+    ) -> Response
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        let upgraded = hyper::upgrade::on(&mut request);
+        let job = serve(self.place, upgraded, self.upgrades.0.stop.clone());
+        if self.upgrades.0.jobs.try_send(Box::pin(job)).is_err() {
+            return failure(Error::Busy);
+        }
+        let mut response = Response::new(Body::empty());
+        *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
+        let headers = response.headers_mut();
+        headers.insert(header::UPGRADE, HeaderValue::from_static("websocket"));
+        headers.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
+        headers.insert(header::SEC_WEBSOCKET_ACCEPT, self.accept);
+        response
+    }
 }
 
 /// Every non-upgrade answer on a connection that asked for the socket ends

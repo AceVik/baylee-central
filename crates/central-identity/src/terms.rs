@@ -85,7 +85,11 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
                 | central_api::notifications::NotificationRequest::Set { enabled: true, .. }
         }
         | Request::Social { .. }
-            | Request::Ranked { request: central_api::ranked::Request::Join { .. } }
+            | Request::Ranked { request: central_api::ranked::Request::Join { .. } | central_api::ranked::Request::Replicate {
+                request: central_api::ranked::replica::SeatRequest::Join { .. }
+                    | central_api::ranked::replica::SeatRequest::ApproveHosts { .. }
+                    | central_api::ranked::replica::SeatRequest::Submit { .. }
+            } }
             | Request::SetPresence { .. }
             | Request::Challenges {
                 request: central_api::challenges::Request::Begin { .. }
@@ -105,6 +109,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::RegisterGateway { .. }
             | Request::SetGatewayAdmins { .. }
             | Request::GatewayToken { .. }
+            | Request::RankedToken { .. }
             | Request::TowerToken {}
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }

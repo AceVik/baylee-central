@@ -1,7 +1,9 @@
 //! Shared competitive ladder protocol. Only Central assigns matches and publishes scores.
 use serde::{Deserialize, Serialize};
 
+mod proof;
 pub mod replica;
+pub use proof::SeatProof;
 
 /// Wire representation of a UUID.
 pub type Id = [u8; 16];
@@ -489,7 +491,7 @@ pub enum Response {
     Profile {
         /// Resolved season.
         season: Season,
-        /// This match host's seat alias from the player's signed ranked admission.
+        /// Public account ID.
         account: Id,
         /// Public display name if set.
         name: Option<String>,
@@ -527,8 +529,10 @@ pub enum HostRequest {
     Claim {
         /// Central's match ID.
         match_id: Id,
-        /// Public account ID.
+        /// This match host's seat alias from the player's signed ranked admission.
         account: Id,
+        /// The scoped SID actually presented to this gateway, checked online.
+        proof: SeatProof,
         /// Commitment to the frozen playable deck.
         deck: [u8; 32],
     },

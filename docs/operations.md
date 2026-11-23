@@ -134,6 +134,33 @@ central.baylee.app {
 }
 ```
 
+### Ranked game relay
+
+The account listener serves `GET /v1/ranked/socket` over HTTP/1.1 Upgrade. The
+site-wide Caddy rule above covers it. With a route allowlist, add this exact
+path to the account listener's WebSocket rules. Preserve Host and Upgrade,
+disable access and body logging, and allow long-lived bidirectional streams.
+The native client sends its single-use relay credential in the first masked
+binary frame. Admission shares the push listener's per-address socket and dial
+limits. At most 64 game relays can run at once. Each uses one additional
+outbound file descriptor compared with a push socket.
+
+Central creates a fresh connection to the currently authorized game host.
+Production requires public DNS answers, a trusted TLS certificate for the
+registered gateway name, and an HTTP/1.1 WebSocket endpoint. Every resolved
+address must be public. Central connects to the addresses it checked and
+verifies the registered hostname during TLS. Only explicitly selected numeric
+loopback development origins can use plaintext. The upstream handshake sends
+the game identifier, a gateway-issued single-use ticket, and game protocol
+version 69. Exclude this route's query string and request credentials from
+gateway and proxy logs. The gateway receives Central's network address.
+
+Central checks the grant before connecting, after the host accepts, and every
+three seconds thereafter. A failed or timed-out check closes both streams.
+After reassignment or disconnect the native client requests a fresh ticket.
+Allow 64 KiB per client message and 16 MiB per gateway projection, including
+fragmented messages. The relay closes a connection after twelve hours.
+
 ### The push socket
 
 `GET /v1/ws` on the account listener is a WebSocket for signed-in Baylee
@@ -714,6 +741,14 @@ through the host's normal credential store. Existing scoped tokens keep their
 previous permissions. Withdrawing ranked hosting under Administration invalidates
 outstanding assignments. To rotate a compromised named credential, revoke it
 and withdraw ranked hosting before issuing a replacement.
+
+### Replicated ranked operations
+
+Roll out the Central migrations and runtime grants, then deploy compatible gateway and engine builds under at least two independently registered gateway owners. Both gateways must hold current ranked verification and advertise available capacity with the same compatibility digest. Two installations registered to one owner cannot form an independent pair. The native client displays the assigned operators and asks both players to approve private disclosure. Upgrading only one operator permits single-host play when the initial allocator finds no independent compatible pair.
+
+During an outage, keep the remaining gateway online and advertise capacity on a compatible verified replacement. Each role holds a 45-second lease. An expired primary can be replaced by a standby that has certified the last committed position. A new generation fences prior host messages and revokes the old game admission. A newly assigned operator waits for both players' approval of that origin and the current terms before receiving the journal. During recovery the affected players see the paused table. The five-minute recovery window bounds the wait for an independent verifier. A disagreement is quarantined. Its recovery deadline releases the table without Elo. Host verification can be withdrawn through the same administrator control at any time.
+
+For triage, read the match identifier, generation, phase, certified position and number of receipts through restricted operational access. A settled 1v1 match has two seat receipts. A technical void has zero. Use these metadata in incident reports. Private openings, deck pools, journal bodies, credentials and host evidence belong only on the restricted authority or approved executors. Successful games permit a two-minute post-finish replay window. A bounded maintenance pass then erases the authority's private replay bodies and opening. Voids become eligible for cleanup immediately. See [replication assurance](ranked-replication-assurance.md).
 
 ### An origin's host may not end in a dot (12.11.2026)
 

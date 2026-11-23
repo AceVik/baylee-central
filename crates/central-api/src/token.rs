@@ -81,20 +81,24 @@ impl Token {
     /// # Errors
     /// Rejects any other length, case or character.
     pub fn from_hex(text: &str) -> Result<Self, Error> {
-        if text.len() != 64
-            || !text
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        {
-            return Err(Error::Rejected);
-        }
-        let mut bytes = Zeroizing::new([0; 32]);
-        for (index, byte) in bytes.iter_mut().enumerate() {
-            *byte = u8::from_str_radix(&text[index * 2..index * 2 + 2], 16)
-                .map_err(|_| Error::Rejected)?;
-        }
-        Ok(Self(*bytes))
+        Ok(Self(*lower_hex(text)?))
     }
+}
+
+pub(crate) fn lower_hex<const N: usize>(text: &str) -> Result<Zeroizing<[u8; N]>, Error> {
+    if text.len() != N * 2
+        || !text
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(Error::Rejected);
+    }
+    let mut bytes = Zeroizing::new([0; N]);
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte =
+            u8::from_str_radix(&text[index * 2..index * 2 + 2], 16).map_err(|_| Error::Rejected)?;
+    }
+    Ok(bytes)
 }
 
 /// A signed token as it travels: a compact JWS. To a client it is an opaque string, which it

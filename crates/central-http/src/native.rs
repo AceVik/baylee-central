@@ -16,7 +16,7 @@ use axum::{
 };
 use central_api::{
     Error, PROTOCOL_HEADER, PROTOCOL_VERSION, Token, UPDATE_REQUIRED_BODY, UPDATE_REQUIRED_STATUS,
-    reports::Part,
+    ranked, reports::Part, wire,
 };
 use central_identity::{IdentityService, KofiAnswer, Place, Presented};
 use std::{
@@ -26,6 +26,7 @@ use std::{
 
 #[derive(Clone)]
 struct Native {
+    relay: crate::relay::Relay,
     identity: Arc<IdentityService>,
     /// The report parts being uploaded, and each gateway's unfinished ones
     /// (`uploads.rs`).
@@ -55,10 +56,12 @@ pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
         // handshake, no protocol header, and the socket's events are its own
         // fixed vocabulary.
         .route("/v1/ws", get(socket))
+        .route("/v1/ranked/socket", get(ranked_socket))
         // Ko-fi's webhook (`docs/operations.md` §"Donations"): Ko-fi speaks no
         // protocol of ours, so it stands below the protocol's layer too.
         .route(KOFI_PATH, post(kofi))
         .with_state(Native {
+            relay: crate::relay::Relay::new(!deployed),
             identity,
             uploads: Uploads::default(),
             budgets: Arc::default(),
@@ -129,6 +132,11 @@ async fn jwks(State(native): State<Native>) -> Response {
 async fn socket(State(native): State<Native>, request: Request) -> Response {
     let from = native.origin(request.extensions());
     super::ws::dial(&native.identity, from, request).await
+}
+
+async fn ranked_socket(State(native): State<Native>, request: Request) -> Response {
+    let from = native.origin(request.extensions());
+    super::ranked_socket::dial(native.relay, native.identity, from, request)
 }
 
 /// Where Ko-fi delivers: the one route that takes a platform's word for a
@@ -302,10 +310,44 @@ async fn process(
             return Err(Error::Busy);
         }
     }
-    let response = native
-        .identity
-        .handle_from(request, presented.as_ref(), from.map(Place::from))
-        .await?;
+    let place = from.map(Place::from);
+    let response = match request {
+        wire::Request::Ranked {
+            request:
+                ranked::Request::Replicate {
+                    request: ranked::replica::SeatRequest::Relay { fence, call },
+                },
+        } => {
+            let authorization = headers
+                .get(header::AUTHORIZATION)
+                .and_then(|header| header.to_str().ok())
+                .ok_or(Error::Rejected)?;
+            native
+                .relay
+                .forward(
+                    &native.identity,
+                    presented.as_ref(),
+                    authorization,
+                    place,
+                    fence,
+                    call,
+                )
+                .await?
+        }
+        wire::Request::RankedToken { .. }
+        | wire::Request::Ranked {
+            request:
+                ranked::Request::Replicate {
+                    request: ranked::replica::SeatRequest::RelayRoute { .. },
+                },
+        } => return Err(Error::Rejected),
+        request => {
+            native
+                .identity
+                .handle_from(request, presented.as_ref(), place)
+                .await?
+        }
+    };
     central_api::encode(&response)
 }
 
