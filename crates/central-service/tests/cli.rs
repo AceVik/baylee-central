@@ -102,6 +102,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--legacy-import-stdin", "PRIVATE_ARG_CANARY"],
         &["--legacy-deadline-stdin", "--dev"],
         &["--import-reports-stdin", "PRIVATE_ARG_CANARY"],
+        &["--advent-import-stdin", "PRIVATE_ARG_CANARY"],
         &["--generate-secrets", "PRIVATE_ARG_CANARY"],
         &["--generate-token-key", "PRIVATE_ARG_CANARY"],
         &["--check-accounts-stdin", "PRIVATE_ARG_CANARY"],
@@ -113,7 +114,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
         assert_eq!(
             stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --generate-secrets | --generate-token-key"
+            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --generate-secrets | --generate-token-key"
         );
     }
 }
@@ -136,6 +137,10 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         (
             "--sweep-stdin",
             "central: sweep rejected configuration or failed",
+        ),
+        (
+            "--advent-import-stdin",
+            "Advent import refused. Verify the private package, worker and staging role.",
         ),
     ] {
         let output = run_invalid(&[mode], None);
