@@ -14,19 +14,7 @@ use central_api::{
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
 const PAGE: usize = 40;
-const LEAGUES: [League; 11] = [
-    League::Paper,
-    League::Wood,
-    League::Iron,
-    League::Bronze,
-    League::Silver,
-    League::Gold,
-    League::Platinum,
-    League::Diamond,
-    League::Master,
-    League::Grandmaster,
-    League::Champion,
-];
+const LEAGUES: [League; 11] = League::PLACED;
 const SEASONS: &str =
     "SELECT s.id,COALESCE(s.name,to_char(s.starts_at AT TIME ZONE 'UTC','YYYY-MM-DD')) AS name,
     floor(extract(epoch FROM s.starts_at))::bigint AS starts,

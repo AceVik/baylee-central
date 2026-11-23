@@ -36,8 +36,8 @@ async fn register(f: &Fixture<'_>, owner: &Player, origin: &str) -> Gateway {
 async fn ranked(
     f: &Fixture<'_>,
     home: &Gateway,
-    sleeve: &api::Reward,
-    mat: &api::Reward,
+    sleeve: &api::collection::Item,
+    mat: &api::collection::Item,
 ) -> api::Id {
     let row=f.db.query_one_raw(Statement::from_sql_and_values(DbBackend::Postgres,
         "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,commitment_a,commitment_b,host_id,ranked_epoch,origin)
@@ -250,7 +250,10 @@ pub(super) async fn run(
 ) {
     let home = register(f, &f.alice, HOME).await;
     let other = register(f, &f.bob, OTHER).await;
-    let game = ranked(f, &home, &sleeve, &mat).await;
+    let game = ranked(f, &home, &sleeve.clone().into(), &mat.clone().into()).await;
+    let rank_mat = super::ranked_collection::run(f).await;
+    ranked(f, &home, &sleeve.clone().into(), &rank_mat).await;
+    super::ranked_collection::remove_catalog(f).await;
     casual(f, game, &home, &other, &mat).await;
     retention::run(f, &home, &f.alice, &mat).await;
     resume::run(f, game, &home, &other, &sleeve, &mat, keys).await;

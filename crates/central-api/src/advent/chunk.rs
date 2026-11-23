@@ -23,6 +23,7 @@ mod tests {
         let decimals = crate::encode(&bytes).unwrap().len();
         let page = AssetPage {
             asset: AssetMeta {
+                mat_framing: None,
                 tier: Finish::Standard,
                 mime: Mime::Webp,
                 digest: [0; 32],

@@ -193,7 +193,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        44
+        46
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -315,8 +315,10 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
                  DROP COLUMN ranked_proof_until, DROP COLUMN ranked_match;
              DROP TRIGGER retire_advent_looks ON central_identity.ranked_matches;
              DROP FUNCTION central_identity.retire_advent_looks();
-             DROP TABLE central_identity.advent_table_outfits, central_identity.advent_table_looks, central_identity.advent_ranked_looks, central_identity.advent_entitlements,
-                        central_identity.advent_solutions, central_identity.advent_doors, central_identity.advent_campaigns, central_identity.advent_art;
+             DROP VIEW central_identity.cosmetic_collection;
+             DROP TABLE central_identity.ranked_cosmetic_steps,central_identity.ranked_cosmetic_unlocks,central_identity.ranked_cosmetic_catalog,central_identity.cosmetic_equip_rights,
+                        central_identity.advent_table_outfits, central_identity.advent_table_looks, central_identity.advent_ranked_looks, central_identity.advent_entitlements,
+                        central_identity.advent_solutions, central_identity.advent_doors, central_identity.advent_campaigns, central_identity.playmat_framing, central_identity.advent_art;
              DROP TABLE central_identity.ranked_clocks, central_identity.ranked_commands,
                         central_identity.ranked_host_permissions, central_identity.ranked_host_aliases,
                         central_identity.ranked_witnesses, central_identity.ranked_replicas;
@@ -335,6 +337,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
              ALTER TABLE central_identity.gateway_sids DROP CONSTRAINT gateway_sids_purpose_check,
                  ADD CONSTRAINT gateway_sids_purpose_check CHECK (purpose IN ('admit','admin'));
              DROP FUNCTION central_identity.ranked_earned_badge();
+             DROP FUNCTION central_identity.earn_ranked_cosmetics();
              ALTER TABLE central_identity.gateway_tokens DROP CONSTRAINT gateway_token_scope,
                  DROP COLUMN ranked, ADD CONSTRAINT gateway_token_scope CHECK (sso OR listing);
              DROP TRIGGER ranked_approval_changed ON central_identity.gateway_approvals;
@@ -352,7 +355,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        44
+        46
     );
     assert_eq!(
         scalar(

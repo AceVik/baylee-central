@@ -1,6 +1,9 @@
 //! Private, account-bound Advent doors and durable cosmetic inventory.
 use serde::{Deserialize, Serialize};
 mod chunk;
+pub mod collection;
+pub mod framing;
+mod framing_legacy;
 pub mod puzzle;
 pub mod table;
 
@@ -76,6 +79,9 @@ pub enum Mime {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AssetMeta {
+    /// Optional per-image framing for a playmat. Legacy peers receive this field omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mat_framing: Option<framing::MatFraming>,
     /// Released surface finish.
     pub tier: Finish,
     /// Digest verified after assembling all chunks.
@@ -243,6 +249,11 @@ pub enum Request {
         #[doc = "Optional exclusive previous item."]
         after: Option<Id>,
     },
+    /// Page every owned sleeve and playmat, including ranked awards.
+    Collection {
+        #[doc = "Optional exclusive previous item."]
+        after: Option<Id>,
+    },
     /// Fetch a private bounded chunk, or validate an already cached file.
     Asset {
         #[doc = "Entitlement or confirmed live participant."]
@@ -262,7 +273,7 @@ pub enum Response {
     /// Private projection of the two displayed looks in seat order.
     TableLooks {
         #[doc = "Per-seat visible slots."]
-        seats: [SeatLooks; 2],
+        seats: Box<[SeatLooks; 2]>,
     },
     /// Authenticated ordinary table appearance.
     Table {
@@ -319,6 +330,13 @@ pub enum Response {
         #[doc = "Exclusive cursor when more remain."]
         next: Option<Id>,
     },
+    /// Mixed-source collection page, returned only to an explicit collection request.
+    Collection {
+        #[doc = "The authenticated account's items."]
+        items: Vec<collection::Item>,
+        #[doc = "Exclusive cursor when more remain."]
+        next: Option<Id>,
+    },
     /// A bounded, authorized portion of private content.
     Asset {
         #[doc = "Private transfer."]
@@ -347,7 +365,11 @@ impl AssetMeta {
     /// # Errors
     /// Rejects an empty, oversized or out-of-range declaration.
     pub fn validate(&self) -> Result<(), crate::Error> {
-        if (1..=MAX_ART_BYTES).contains(&self.size)
+        if self
+            .mat_framing
+            .as_ref()
+            .is_none_or(|f| f.validate().is_ok())
+            && (1..=MAX_ART_BYTES).contains(&self.size)
             && (1..=4096).contains(&self.width)
             && (1..=4096).contains(&self.height)
         {

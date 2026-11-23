@@ -52,6 +52,7 @@ fn session() -> Session {
 fn verify_content_and_conditional_cache_scope() {
     // Published SHA-256 known-answer test vector for three synthetic octets.
     let meta = api::AssetMeta {
+        mat_framing: None,
         tier: api::Finish::Standard,
         mime: api::Mime::Webp,
         size: 3,
@@ -102,6 +103,7 @@ fn verify_content_and_conditional_cache_scope() {
 fn independent_page_jobs_cannot_switch_art_or_skip_a_range() {
     let scope = api::AssetScope::Owned { item: [7; 16] };
     let meta = api::AssetMeta {
+        mat_framing: None,
         size: api::PAGE_BYTES + 1,
         width: 1,
         height: 1,

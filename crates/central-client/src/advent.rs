@@ -48,6 +48,17 @@ fn answers(req: &api::Request, out: &api::Response) -> bool {
         (api::Request::Inventory { .. }, api::Response::Inventory { items, .. }) => {
             items.len() <= 32 && items.iter().all(|r| r.asset.validate().is_ok())
         }
+        (api::Request::Collection { after }, api::Response::Collection { items, next }) => {
+            items.len() <= 32
+                && items.iter().all(|item| item.asset.validate().is_ok())
+                && items.windows(2).all(|pair| pair[0].id < pair[1].id)
+                && after
+                    .zip(items.first())
+                    .is_none_or(|(a, first)| a < first.id)
+                && next.is_none_or(|n| {
+                    items.len() == 32 && items.last().is_some_and(|last| last.id == n)
+                })
+        }
         (api::Request::TableLooks { .. }, api::Response::TableLooks { seats }) => seats
             .iter()
             .flat_map(|s| [s.sleeve, s.playmat])

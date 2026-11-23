@@ -95,5 +95,7 @@ pub(super) async fn visible(
             target.playmat = Some(art::metadata(db, uuid(s)).await?);
         }
     }
-    Ok(api::Response::TableLooks { seats })
+    Ok(api::Response::TableLooks {
+        seats: Box::new(seats),
+    })
 }

@@ -60,6 +60,9 @@ impl AccountStore {
             }
             api::Request::Claim { year, door } => inventory::claim(&db, me, year, door).await?,
             api::Request::Inventory { after } => inventory::list(&db, me, after.map(uuid)).await?,
+            api::Request::Collection { after } => {
+                inventory::collection(&db, me, after.map(uuid)).await?
+            }
             api::Request::Asset {
                 scope,
                 offset,
