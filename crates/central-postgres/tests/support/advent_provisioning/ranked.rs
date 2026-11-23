@@ -85,7 +85,8 @@ pub(super) async fn run(owner: &DatabaseConnection, db: &DatabaseConnection) {
     assert_eq!(
         super::super::scalar(
             owner,
-            "SELECT count(*) AS value FROM central_identity.advent_art WHERE source='ranked'"
+            "SELECT count(*) AS value FROM central_identity.advent_art
+             WHERE source='ranked' AND title_en='Fixture art' AND get_byte(content,0)=231"
         )
         .await,
         56
