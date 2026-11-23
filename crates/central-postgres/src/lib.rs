@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)]
 
 mod accounts;
+/// Trusted private seasonal campaign provisioning.
+pub mod advent_import;
 mod connection;
 mod legacy;
 mod pending;

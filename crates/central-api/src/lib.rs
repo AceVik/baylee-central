@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admin;
+pub mod advent;
 pub mod challenges;
 pub mod chat;
 pub mod email;
@@ -18,6 +19,7 @@ pub mod object;
 pub mod owner;
 pub mod picture;
 pub mod presence;
+mod private_bytes;
 pub mod profile;
 pub mod ranked;
 pub mod register;

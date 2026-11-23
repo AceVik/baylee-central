@@ -16,6 +16,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 pub(super) mod admin;
+pub(super) mod advent;
 pub(super) mod browser;
 pub(super) mod challenges;
 pub(super) mod deletion;

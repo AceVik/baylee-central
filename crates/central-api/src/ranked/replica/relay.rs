@@ -1,7 +1,8 @@
 //! Fixed authenticated seat operations forwarded through Central. The
 //! selected host never receives a player's network address or Central session.
-use super::{Id, SetupBytes, bytes::PrivateBytes};
+use super::{Id, SetupBytes};
 use crate::Error;
+use crate::private_bytes::PrivateBytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use zeroize::Zeroizing;

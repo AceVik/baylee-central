@@ -15,6 +15,7 @@ pub(super) struct Secrets {
     pub(super) migrator: String,
     pub(super) runtime: String,
     pub(super) legacy: String,
+    pub(super) advent_importer: String,
 }
 
 impl Secrets {
@@ -24,6 +25,7 @@ impl Secrets {
             migrator: random::hex(32)?,
             runtime: random::hex(32)?,
             legacy: random::hex(32)?,
+            advent_importer: random::hex(32)?,
         })
     }
 }
@@ -46,6 +48,8 @@ CREATE ROLE central_inherited LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROL
 GRANT central_migrator TO central_inherited;
 CREATE ROLE central_legacy LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
   NOREPLICATION NOBYPASSRLS PASSWORD '{legacy}';
+CREATE ROLE central_advent_importer LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+  NOREPLICATION NOBYPASSRLS PASSWORD '{advent_importer}';
 CREATE DATABASE central_test OWNER central_migrator;
 CREATE DATABASE central_native_test OWNER central_migrator;
 \\connect central_native_test
@@ -58,6 +62,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
             migrator = secrets.migrator,
             runtime = secrets.runtime,
             legacy = secrets.legacy,
+            advent_importer = secrets.advent_importer,
         );
         let failure = "Fixture role bootstrap failed (diagnostics withheld)";
         let output = process::feed(

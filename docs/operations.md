@@ -1,5 +1,7 @@
 # Deployed operation
 
+The offline campaign operator procedure is in [private Advent provisioning](advent-provisioning.md).
+
 This runbook covers the deployed launcher and its database connector. It is an
 operator procedure, not a release approval: the gates in [status](status.md)
 still apply. Registration, sign-in, a password change and a reset with an
