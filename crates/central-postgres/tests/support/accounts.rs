@@ -12,6 +12,7 @@ use central_postgres::{AccountStore, Credential};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
 mod admin;
+mod advent;
 mod challenges;
 mod chat;
 mod deletion;
@@ -154,6 +155,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     sessions(&store, &alice, &bob).await;
     expiry_and_revision(&store, operator, &keys, first).await;
     ranked::run(&store, operator, &keys).await;
+    advent::run(&store, operator, &keys).await;
     gateways::run(&store, operator, &keys).await;
     single_session::run(&store, &keys).await;
     revocation_race::run(&store, operator, &keys).await;

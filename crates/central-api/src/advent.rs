@@ -1,5 +1,6 @@
 //! Private, account-bound Advent doors and durable cosmetic inventory.
 use serde::{Deserialize, Serialize};
+mod chunk;
 pub mod puzzle;
 pub mod table;
 
@@ -104,7 +105,7 @@ pub struct Reward {
     pub year: u16,
     /// Originating numbered door.
     pub door: u8,
-    /// First claim on Central's clock, Unix seconds.
+    /// First grant on Central's clock, Unix seconds.
     pub earned_at: i64,
 }
 /// The only calendar facts a player can see before opening a door.
@@ -166,6 +167,7 @@ pub struct AssetPage {
     /// Byte position in the immutable file.
     pub offset: u32,
     /// At most one bounded chunk.
+    #[serde(with = "chunk")]
     pub bytes: Vec<u8>,
 }
 impl std::fmt::Debug for AssetPage {
@@ -180,6 +182,8 @@ impl std::fmt::Debug for AssetPage {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    /// Discover the active or closest upcoming campaign using Central time.
+    CurrentCalendar {},
     /// Resolve only cosmetics visible to this ranked participant.
     TableLooks {
         #[doc = "Active ranked match."]
@@ -253,6 +257,8 @@ pub enum Request {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    /// No active or upcoming campaign has been provisioned.
+    NoCalendar {},
     /// Private projection of the two displayed looks in seat order.
     TableLooks {
         #[doc = "Per-seat visible slots."]

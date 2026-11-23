@@ -271,6 +271,7 @@ fn run(http: &Http, bridge: &Token, runtime: &Runtime, operator: &DatabaseConnec
     closed_then_admitted(http, &first, bridge, identity);
     support::gateways::run(http, &first, runtime, operator);
     support::ranked::replica::run(http, &first, bridge, runtime, operator);
+    support::advent::run(http, &first, bridge, runtime, operator);
     support::gateways::official(
         http,
         &first,

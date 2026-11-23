@@ -21,6 +21,7 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 mod admin;
+mod advent;
 mod challenge;
 mod challenges;
 pub use challenge::{Agent, Seen};
@@ -177,11 +178,11 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::PairCancel { .. }
         | Request::Picture { .. } => true,
         Request::AcceptTerms { subject, .. } => matches!(subject, TermsSubject::Central),
-        Request::TowerToken {}
+        Request::Advent { .. } | Request::TowerToken {}
         | Request::TowerIdentity {}
         | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
-        | Request::RankedHost { .. }
+        | Request::RankedHost { .. } | Request::AdventHost { .. }
         | Request::CreateObject
         | Request::ReadObject { .. }
         | Request::ListObjects { .. }

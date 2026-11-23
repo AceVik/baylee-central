@@ -1,5 +1,7 @@
 # Security assurance and review record
 
+[Advent release, entitlement and presentation checks](advent-assurance.md)
+
 Security > QA > performance > maintainability. Owner requested multiple review
 passes and a deliberately high standard on 2026-10-19.
 

@@ -1,18 +1,28 @@
-//! Bounded opaque payloads for the private, verified replay transport.
+//! Bounded opaque private payloads on the native transport.
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{fmt, marker::PhantomData};
 use zeroize::Zeroizing;
-
-/// Private opening, encoded within Central's existing global wire limit.
-pub type SetupBytes = PrivateBytes<{ 192 * 1024 }>;
-/// One private input, including any format framing.
-pub type CommandBytes = PrivateBytes<{ 32 * 1024 }>;
 
 /// A bounded body encoded as canonical lowercase hex on the JSON transport.
 #[derive(Clone, PartialEq, Eq)]
 pub struct PrivateBytes<const LIMIT: usize>(Zeroizing<Vec<u8>>);
 
 impl<const LIMIT: usize> PrivateBytes<LIMIT> {
+    pub(crate) fn serialize_slice<S: Serializer>(
+        slice: &[u8],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if slice.is_empty() || slice.len() > LIMIT {
+            return Err(serde::ser::Error::custom("invalid private payload length"));
+        }
+        let text = Zeroizing::new(crate::picture::hex(slice));
+        serializer.serialize_str(&text)
+    }
+
+    pub(crate) fn into_vec(mut self) -> Vec<u8> {
+        std::mem::take(&mut *self.0)
+    }
+
     /// Construct a non-empty, size-checked payload.
     ///
     /// # Errors
@@ -40,8 +50,7 @@ impl<const LIMIT: usize> fmt::Debug for PrivateBytes<LIMIT> {
 
 impl<const LIMIT: usize> Serialize for PrivateBytes<LIMIT> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let text = Zeroizing::new(crate::picture::hex(self.as_slice()));
-        serializer.serialize_str(&text)
+        Self::serialize_slice(self.as_slice(), serializer)
     }
 }
 
@@ -52,18 +61,18 @@ impl<'de, const LIMIT: usize> Deserialize<'de> for PrivateBytes<LIMIT> {
             type Value = PrivateBytes<N>;
 
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str("a bounded ranked payload")
+                f.write_str("a bounded private payload")
             }
 
             fn visit_str<E: de::Error>(self, text: &str) -> Result<Self::Value, E> {
                 let len = text.len();
                 if len == 0 || !len.is_multiple_of(2) || len / 2 > N {
-                    return Err(E::custom("invalid ranked payload length"));
+                    return Err(E::custom("invalid private payload length"));
                 }
                 let nibble = |byte| match byte {
                     b'0'..=b'9' => Ok(byte - b'0'),
                     b'a'..=b'f' => Ok(byte - b'a' + 10),
-                    _ => Err(E::custom("invalid ranked payload encoding")),
+                    _ => Err(E::custom("invalid private payload encoding")),
                 };
                 let mut bytes = Zeroizing::new(Vec::with_capacity(len / 2));
                 for pair in text.as_bytes().as_chunks::<2>().0 {

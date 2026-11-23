@@ -8,7 +8,7 @@ use central_api::{
 fn answers(req: &api::Request, out: &api::Response) -> bool {
     match (req, out) {
         (
-            api::Request::Calendar { year: a },
+            api::Request::Calendar { .. } | api::Request::CurrentCalendar {},
             api::Response::Calendar {
                 year: b,
                 starts_at,
@@ -18,7 +18,7 @@ fn answers(req: &api::Request, out: &api::Response) -> bool {
                 ..
             },
         ) => {
-            a == b
+            !matches!(req,api::Request::Calendar{year} if year!=b)
                 && starts_at < closes_at
                 && doors.len() == usize::from(api::DOORS)
                 && doors
@@ -38,7 +38,8 @@ fn answers(req: &api::Request, out: &api::Response) -> bool {
         (api::Request::Hint { number: n, .. }, api::Response::Hint { number: m, text }) => {
             n == m && text.en.len() <= 512 && text.de.len() <= 512
         }
-        (api::Request::Submit { .. }, api::Response::Submission { .. })
+        (api::Request::CurrentCalendar {}, api::Response::NoCalendar {})
+        | (api::Request::Submit { .. }, api::Response::Submission { .. })
         | (api::Request::Table { .. }, api::Response::Table { .. })
         | (api::Request::Present { .. }, api::Response::Presented) => true,
         (api::Request::Claim { year, door }, api::Response::Reward { reward }) => {
@@ -139,3 +140,6 @@ impl Session {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

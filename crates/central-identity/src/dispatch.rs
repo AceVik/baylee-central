@@ -67,6 +67,8 @@ impl IdentityService {
                 self.tower_award_export(after, bearer, surface).await
             }
             Request::Challenges { request } => self.challenges(request, bearer, surface).await,
+            Request::Advent { request } => self.advent(request, bearer, surface).await,
+            Request::AdventHost { request } => self.advent_host(request, bearer).await,
             Request::Ranked { request } => self.ranked(request, bearer, surface).await,
             Request::RankedHost { request } => self.ranked_host(request, bearer).await,
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,

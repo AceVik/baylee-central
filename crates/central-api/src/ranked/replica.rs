@@ -4,7 +4,6 @@ use super::{Format, Id, Outcome, PoolEntry, QueueState};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
-mod bytes;
 pub mod clock;
 pub mod relay;
 mod validation;
@@ -24,7 +23,10 @@ private_debug!(Evidence, Work, Entry, HostRequest, HostResponse);
 
 #[cfg(test)]
 mod tests;
-pub use bytes::{CommandBytes, SetupBytes};
+/// Private opening, encoded within Central's global wire limit.
+pub type SetupBytes = crate::private_bytes::PrivateBytes<{ 192 * 1024 }>;
+/// One private ordered input including any format framing.
+pub type CommandBytes = crate::private_bytes::PrivateBytes<{ 32 * 1024 }>;
 
 /// SHA-256 commitment.
 pub type Digest = [u8; 32];

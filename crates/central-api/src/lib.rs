@@ -19,6 +19,7 @@ pub mod object;
 pub mod owner;
 pub mod picture;
 pub mod presence;
+mod private_bytes;
 pub mod profile;
 pub mod ranked;
 pub mod register;
