@@ -12,6 +12,7 @@ use central_crypto::{
 };
 use zeroize::Zeroizing;
 
+pub mod advent;
 pub mod challenges;
 pub mod chat;
 mod deletion;
