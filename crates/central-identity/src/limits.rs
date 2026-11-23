@@ -258,13 +258,15 @@ fn tells(request: &Request) -> Tells {
         {
             Tells::Proves
         }
-        Request::TowerToken {}
+        Request::Advent { .. }
+        | Request::TowerToken {}
         | Request::TowerIdentity {}
         | Request::TowerAward { .. }
         | Request::TowerProgress {}
         | Request::TowerAwardExport { .. }
         | Request::ChallengeHost { .. }
         | Request::RankedHost { .. }
+        | Request::AdventHost { .. }
         | Request::SessionStatus
         | Request::RenewSession
         | Request::AccountSummary

@@ -11,6 +11,7 @@ use sea_orm::{
 };
 
 mod admin;
+mod advent;
 mod challenges;
 mod deletion;
 mod donations;

@@ -111,6 +111,10 @@ fn run_suite(
         .env("CENTRAL_TEST_PORT", port.to_string())
         .env("CENTRAL_TEST_MIGRATOR_PASSWORD", &secrets.migrator)
         .env("CENTRAL_TEST_RUNTIME_PASSWORD", &secrets.runtime)
+        .env(
+            "CENTRAL_TEST_ADVENT_IMPORT_PASSWORD",
+            &secrets.advent_importer,
+        )
         .env("CENTRAL_TEST_LEGACY_PASSWORD", &secrets.legacy)
         .env("CENTRAL_TEST_CA_PEM", tls.join("ca.pem"))
         .env("CENTRAL_TEST_WRONG_CA_PEM", tls.join("wrong.pem"));

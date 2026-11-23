@@ -232,9 +232,16 @@ impl AccountStore {
         &self,
         credential: &Token,
     ) -> Result<([u8; 16], String), Error> {
+        Self::authenticate_gateway_on(&self.db, credential).await
+    }
+
+    pub(super) async fn authenticate_gateway_on(
+        db: &impl ConnectionTrait,
+        credential: &Token,
+    ) -> Result<([u8; 16], String), Error> {
         // Two lookups by a unique digest each; a 256-bit random token cannot
         // be both a credential and a token, so at most one row answers.
-        let row=self.db.query_one_raw(statement(
+        let row=db.query_one_raw(statement(
             &format!("SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
              ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official
              UNION ALL

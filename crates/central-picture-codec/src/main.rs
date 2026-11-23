@@ -20,6 +20,8 @@
 //! stills), for the operator, and exits 0 when it has one.
 #![forbid(unsafe_code)]
 
+mod advent;
+
 use central_picture_codec::{Encoder, Ffmpeg, Found, Refusal, convert_with};
 use std::io::Write;
 use std::process::ExitCode;
@@ -96,6 +98,12 @@ fn options() -> Option<Options> {
 
 fn main() -> ExitCode {
     let started = Instant::now();
+    if std::env::args_os()
+        .skip(1)
+        .eq([std::ffi::OsString::from("--inspect-advent-webp")])
+    {
+        return advent::run();
+    }
     let Some(options) = options() else {
         eprintln!("usage: central-picture-worker [--ffmpeg PATH | --no-ffmpeg] [--probe]");
         return ExitCode::FAILURE;

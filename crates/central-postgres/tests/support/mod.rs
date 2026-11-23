@@ -4,6 +4,7 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 use std::time::Duration;
 
 mod accounts;
+pub(super) mod advent_provisioning;
 mod migration;
 mod tls;
 mod upgrade;

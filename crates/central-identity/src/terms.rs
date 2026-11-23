@@ -85,6 +85,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
                 | central_api::notifications::NotificationRequest::Set { enabled: true, .. }
         }
         | Request::Social { .. }
+            | Request::Advent { .. }
             | Request::Ranked { request: central_api::ranked::Request::Join { .. } | central_api::ranked::Request::Replicate {
                 request: central_api::ranked::replica::SeatRequest::Join { .. }
                     | central_api::ranked::replica::SeatRequest::ApproveHosts { .. }

@@ -145,9 +145,21 @@ async fn migrations_ids_roles_rollback_and_locking() {
     );
 
     support::accounts(&operator).await;
+    support::advent_provisioning::run(&operator).await;
     support::tls().await;
     store.close().await.unwrap();
     runtime.close().await.unwrap();
+    operator.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires the isolated PostgreSQL staging fixture"]
+async fn advent_staging_login_rolls_back_and_retries() {
+    let operator = connect_dev(config("central_migrator", "CENTRAL_TEST_MIGRATOR_PASSWORD"))
+        .await
+        .unwrap();
+    central_migration::apply(&operator).await.unwrap();
+    support::advent_provisioning::run(&operator).await;
     operator.close().await.unwrap();
 }
 
@@ -181,7 +193,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        41
+        43
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -301,6 +313,10 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
         .execute_unprepared(
             "ALTER TABLE central_identity.gateway_sids DROP COLUMN ranked_generation,
                  DROP COLUMN ranked_proof_until, DROP COLUMN ranked_match;
+             DROP TRIGGER retire_advent_looks ON central_identity.ranked_matches;
+             DROP FUNCTION central_identity.retire_advent_looks();
+             DROP TABLE central_identity.advent_table_looks, central_identity.advent_ranked_looks, central_identity.advent_entitlements,
+                        central_identity.advent_solutions, central_identity.advent_doors, central_identity.advent_campaigns, central_identity.advent_art;
              DROP TABLE central_identity.ranked_clocks, central_identity.ranked_commands,
                         central_identity.ranked_host_permissions, central_identity.ranked_host_aliases,
                         central_identity.ranked_witnesses, central_identity.ranked_replicas;
@@ -336,7 +352,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        41
+        43
     );
     assert_eq!(
         scalar(
