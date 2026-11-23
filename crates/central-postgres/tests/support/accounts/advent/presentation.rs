@@ -5,6 +5,7 @@ use central_postgres::RankedHostCredential::Registered;
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod resume;
+mod retention;
 
 const HOME: &str = "https://advent-table.example";
 const OTHER: &str = "https://advent-other.example";
@@ -251,5 +252,6 @@ pub(super) async fn run(
     let other = register(f, &f.bob, OTHER).await;
     let game = ranked(f, &home, &sleeve, &mat).await;
     casual(f, game, &home, &other, &mat).await;
+    retention::run(f, &home, &f.alice, &mat).await;
     resume::run(f, game, &home, &other, &sleeve, &mat, keys).await;
 }

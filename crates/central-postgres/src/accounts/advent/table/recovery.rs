@@ -3,13 +3,6 @@
 use super::{DatabaseTransaction, Error, Proof, Uuid, api, col, statement, unavailable};
 use sea_orm::ConnectionTrait;
 
-pub(super) async fn prune(db: &DatabaseTransaction) -> Result<(), Error> {
-    db.execute_raw(statement("DELETE FROM central_identity.advent_table_outfits WHERE
-        (gateway_id,game,seat) IN (SELECT gateway_id,game,seat FROM central_identity.advent_table_outfits
-        WHERE expires_at<=clock_timestamp() ORDER BY expires_at LIMIT 64)",vec![])).await.map_err(unavailable)?;
-    Ok(())
-}
-
 pub(super) async fn clear(
     db: &DatabaseTransaction,
     owner: Uuid,
