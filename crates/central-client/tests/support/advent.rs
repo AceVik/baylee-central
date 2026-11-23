@@ -37,6 +37,14 @@ fn closed(http: &Http, owner: &Session) {
         panic!("private calendar")
     };
     assert!(hero.is_none() && doors.iter().all(|d| d.state == api::DoorState::Locked));
+    assert!(matches!(
+        owner.advent(http, Q::CurrentCalendar {}).unwrap(),
+        A::Calendar {
+            year: YEAR,
+            hero: None,
+            ..
+        }
+    ));
     assert!(
         owner
             .advent(
@@ -164,6 +172,14 @@ fn range_reads(http: &Http, owner: &Session, outsider: &Session, reward: &api::R
     );
 }
 
+fn current(http: &Http, owner: &Session) -> Option<u16> {
+    match owner.advent(http, Q::CurrentCalendar {}).unwrap() {
+        A::NoCalendar {} => None,
+        A::Calendar { year, .. } => Some(year),
+        _ => panic!("default calendar response"),
+    }
+}
+
 pub(crate) fn run(
     http: &Http,
     owner: &Session,
@@ -171,6 +187,7 @@ pub(crate) fn run(
     runtime: &Runtime,
     db: &DatabaseConnection,
 ) {
+    let preceding = current(http, owner);
     runtime.block_on(material::provision(db, YEAR));
     runtime.block_on(material::elapsed(db, YEAR, -1800));
     closed(http, owner);
@@ -184,6 +201,7 @@ pub(crate) fn run(
     no_static_image(http, &reward);
     range_reads(http, owner, &outsider, &reward);
     runtime.block_on(material::elapsed(db, YEAR, 37 * 86_400));
+    assert_eq!(current(http, owner), preceding);
     assert!(
         matches!(owner.advent(http,Q::Inventory{after:None}).unwrap(),A::Inventory{items,..}if items==[reward.clone()])
     );

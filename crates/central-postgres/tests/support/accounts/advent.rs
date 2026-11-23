@@ -12,6 +12,7 @@ const YEAR: u16 = 2105;
 const DAY: i32 = 86_400;
 
 struct Player {
+    identity: central_api::wire::Identity,
     account: Uuid,
     session: Token,
 }
@@ -30,6 +31,7 @@ async fn player(store: &AccountStore, keys: &ServerKeys, name: &str) -> Player {
     store.close_legacy(name, identity).await.unwrap();
     Player {
         account: Uuid::from_bytes(identity.account),
+        identity,
         session,
     }
 }
@@ -105,7 +107,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     ));
     material::provision(db, YEAR).await;
     let (sleeve, mat) = calendar::run(&fixture).await;
-    presentation::run(&fixture, sleeve, mat).await;
+    presentation::run(&fixture, sleeve, mat, keys).await;
     for player in [fixture.alice, fixture.bob, fixture.observer] {
         db.execute_raw(Statement::from_sql_and_values(
             DbBackend::Postgres,

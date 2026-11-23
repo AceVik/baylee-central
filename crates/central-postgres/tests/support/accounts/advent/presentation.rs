@@ -4,6 +4,8 @@ use central_api::{gateway::GatewayMetadata, ranked::SeatProof, wire::GatewayPurp
 use central_postgres::RankedHostCredential::Registered;
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
+mod resume;
+
 const HOME: &str = "https://advent-table.example";
 const OTHER: &str = "https://advent-other.example";
 
@@ -68,6 +70,19 @@ async fn ranked(
             .await
             .is_err()
     );
+    assert!(f.call(&f.bob, show.clone()).await.is_err());
+    let pool = String::from_utf8(
+        central_api::encode(&[central_api::ranked::PoolEntry {
+            card: [7; 32],
+            copies: 60,
+        }])
+        .unwrap(),
+    )
+    .unwrap();
+    f.db.execute_raw(Statement::from_sql_and_values(DbBackend::Postgres,
+        "UPDATE central_identity.ranked_matches SET state='playing',game_id=uuidv7(),claimed_a=true,claimed_b=true,
+         start_fingerprint=sha256('synthetic start'::bytea),deck_a=$2::jsonb,deck_b=$2::jsonb WHERE id=$1",
+        [id.into(),pool.into()])).await.unwrap();
     assert!(
         matches!(f.call(&f.bob,show.clone()).await.unwrap(),A::TableLooks{seats} if seats[0].sleeve==Some(sleeve.asset)
         && seats[0].playmat==Some(mat.asset) && seats[1]==api::SeatLooks::default())
@@ -87,7 +102,7 @@ async fn ranked(
     }
     assert!(f.call(&f.observer, asset(0)).await.is_err());
     f.db.execute_raw(Statement::from_sql_and_values(DbBackend::Postgres,
-        "UPDATE central_identity.ranked_matches SET state='void',finished_at=clock_timestamp() WHERE id=$1",[id.into()])).await.unwrap();
+        "UPDATE central_identity.ranked_matches SET state='void',finished_at=clock_timestamp(),deck_a=NULL,deck_b=NULL WHERE id=$1",[id.into()])).await.unwrap();
     assert!(f.call(&f.bob, asset(0)).await.is_err());
     assert!(f.call(&f.alice, show).await.is_err());
     assert!(matches!(
@@ -226,9 +241,15 @@ async fn casual(
     assert!(access(&home.credential, cached()).await.is_err());
     assert!(access(&home.credential, valid).await.is_err());
 }
-pub(super) async fn run(f: &Fixture<'_>, sleeve: api::Reward, mat: api::Reward) {
+pub(super) async fn run(
+    f: &Fixture<'_>,
+    sleeve: api::Reward,
+    mat: api::Reward,
+    keys: &super::ServerKeys,
+) {
     let home = register(f, &f.alice, HOME).await;
     let other = register(f, &f.bob, OTHER).await;
     let game = ranked(f, &home, &sleeve, &mat).await;
     casual(f, game, &home, &other, &mat).await;
+    resume::run(f, game, &home, &other, &sleeve, &mat, keys).await;
 }

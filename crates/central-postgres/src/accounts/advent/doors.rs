@@ -35,7 +35,7 @@ pub(super) async fn calendar(
         FROM central_identity.advent_campaigns c WHERE c.year=$1",vec![year_num(year)?.into()])).await.map_err(unavailable)?.ok_or(Error::Rejected)?;
     let rows=db.query_all_raw(statement("SELECT d.door,s.account_id IS NOT NULL AS solved,e.account_id IS NOT NULL AS claimed
         FROM central_identity.advent_doors d LEFT JOIN central_identity.advent_solutions s ON s.year=d.year AND s.door=d.door AND s.account_id=$2
-        LEFT JOIN central_identity.advent_entitlements e ON e.account_id=s.account_id AND e.year=s.year AND e.door=s.door
+        LEFT JOIN central_identity.advent_entitlements e ON e.account_id=s.account_id AND e.art_id=d.art_id
         WHERE d.year=$1 ORDER BY d.door",vec![year_num(year)?.into(),me.into()])).await.map_err(unavailable)?;
     if rows.len() != usize::from(api::DOORS) {
         return Err(Error::Unavailable);

@@ -10,6 +10,9 @@ const REWARDS: &str =
     FROM central_identity.advent_entitlements e JOIN central_identity.advent_art a ON a.id=e.art_id
     WHERE e.account_id=$1";
 
+const SOLVED_ITEM:&str="EXISTS (SELECT 1 FROM central_identity.advent_solutions s JOIN central_identity.advent_doors d USING(year,door)
+    WHERE s.account_id=e.account_id AND s.year=$2 AND s.door=$3 AND d.art_id=e.art_id)";
+
 fn reward(row: &QueryResult) -> Result<api::Reward, Error> {
     let kind = match col::<String>(row, "kind")?.as_str() {
         "sleeve" => api::Kind::Sleeve,
@@ -49,7 +52,7 @@ pub(super) async fn grant(
         .await
         .map_err(unavailable)?;
     if inserted.rows_affected()==0 && db.query_one_raw(statement(
-        "SELECT 1 FROM central_identity.advent_entitlements WHERE account_id=$1 AND year=$2 AND door=$3",vars()
+        &format!("SELECT 1 FROM central_identity.advent_entitlements e WHERE e.account_id=$1 AND {SOLVED_ITEM}"),vars()
     )).await.map_err(unavailable)?.is_none(){return Err(Error::Rejected)}
     Ok(())
 }
@@ -62,18 +65,19 @@ pub(super) async fn claim(
 ) -> Result<api::Response, Error> {
     // An earlier solved row remains collectible even after its campaign closes.
     grant(db, me, year, door).await?;
-    let year = i16::try_from(year).map_err(|_| Error::Rejected)?;
+    let claim_year = i16::try_from(year).map_err(|_| Error::Rejected)?;
     let row = db
         .query_one_raw(statement(
-            &format!("{REWARDS} AND e.year=$2 AND e.door=$3"),
-            vec![me.into(), year.into(), i16::from(door).into()],
+            &format!("{REWARDS} AND {SOLVED_ITEM}"),
+            vec![me.into(), claim_year.into(), i16::from(door).into()],
         ))
         .await
         .map_err(unavailable)?
         .ok_or(Error::Rejected)?;
-    Ok(api::Response::Reward {
-        reward: reward(&row)?,
-    })
+    let mut reward = reward(&row)?;
+    reward.year = year;
+    reward.door = door;
+    Ok(api::Response::Reward { reward })
 }
 pub(super) async fn list(
     db: &DatabaseTransaction,

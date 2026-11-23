@@ -101,9 +101,9 @@ pub struct Reward {
     pub title: Text,
     /// Image metadata and transfer commitment.
     pub asset: AssetMeta,
-    /// Originating campaign.
+    /// Campaign shown by the claimed door, or first acquisition in inventory.
     pub year: u16,
-    /// Originating numbered door.
+    /// Claimed door, or first acquisition in inventory.
     pub door: u8,
     /// First grant on Central's clock, Unix seconds.
     pub earned_at: i64,

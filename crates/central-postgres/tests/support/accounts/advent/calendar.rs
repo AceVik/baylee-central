@@ -268,5 +268,37 @@ pub(super) async fn run(f: &Fixture<'_>) -> (api::Reward, api::Reward) {
     assert_eq!(f.inventory(&f.alice).await.len(), 2);
     assert_eq!(f.inventory(&f.bob).await.len(), 1);
     assert_eq!(f.claim(&f.alice, 1).await, sleeve);
+    reused_art(f, &sleeve).await;
     (sleeve, mat)
+}
+
+async fn reused_art(f: &Fixture<'_>, first: &api::Reward) {
+    let year = YEAR + 1;
+    material::provision(f.db, year).await;
+    material::elapsed(f.db, year, 120).await;
+    assert!(
+        matches!(f.call(&f.alice,Q::CurrentCalendar{}).await.unwrap(),A::Calendar{year:chosen,..}if chosen==year)
+    );
+    let get = Q::Claim { year, door: 1 };
+    assert!(f.call(&f.alice, get.clone()).await.is_err());
+    assert!(matches!(
+        f.call(
+            &f.alice,
+            Q::Submit {
+                year,
+                door: 1,
+                line: material::line(2)
+            }
+        )
+        .await
+        .unwrap(),
+        A::Submission { won: true }
+    ));
+    assert!(
+        matches!(f.call(&f.alice,get).await.unwrap(),A::Reward{reward}if reward.id==first.id && reward.earned_at==first.earned_at)
+    );
+    assert!(
+        matches!(f.call(&f.alice,Q::Calendar{year}).await.unwrap(),A::Calendar{doors,..} if doors[0].state==DoorState::Claimed)
+    );
+    assert_eq!(f.inventory(&f.alice).await.len(), 2);
 }

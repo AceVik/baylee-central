@@ -89,6 +89,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('advent_entitlements',ARRAY['SELECT'],NULL),
              ('advent_ranked_looks',ARRAY['SELECT','INSERT','DELETE'],NULL),
              ('advent_table_looks',ARRAY['SELECT','DELETE'],ARRAY['confirmed','expires_at']),
+             ('advent_table_outfits',ARRAY['SELECT','DELETE'],NULL),
              ('ranked_seasons', ARRAY['SELECT'], NULL),
              ('ranked_clocks', ARRAY['SELECT','INSERT','DELETE'], ARRAY['checkpoint']),
              ('ranked_hosts', ARRAY['SELECT'], ARRAY['ranked_epoch','capacity','seen_at','continuity_since','compatibility']),
@@ -103,6 +104,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place'])),
              insert_columns(name,cols) AS (VALUES
                ('advent_table_looks', ARRAY['proof','account_id','gateway_id','sid','game','seat','sleeve','playmat']),
+               ('advent_table_outfits', ARRAY['account_id','gateway_id','game','seat','stream','sleeve','playmat']),
                ('ranked_host_aliases', ARRAY['match_id','host_id']),
                ('ranked_host_permissions', ARRAY['match_id','host_id','seat','epoch','origin','version','digest','allowed']),
                ('ranked_replicas', ARRAY['match_id','standby_id','standby_epoch','compatibility']),

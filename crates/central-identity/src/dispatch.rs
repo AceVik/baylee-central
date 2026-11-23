@@ -72,6 +72,22 @@ impl IdentityService {
             Request::Ranked { request } => self.ranked(request, bearer, surface).await,
             Request::RankedHost { request } => self.ranked_host(request, bearer).await,
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
+            other => {
+                self.account_dispatch(other, bearer, surface, seen, place)
+                    .await
+            }
+        }
+    }
+
+    async fn account_dispatch(
+        &self,
+        request: Request,
+        bearer: Option<&Token>,
+        surface: Surface,
+        seen: Seen,
+        place: Option<Place>,
+    ) -> Result<Response, Error> {
+        match request {
             Request::Notifications { request } => self.notifications(request, bearer).await,
             Request::Social { request } => self.social(request, bearer, surface).await,
             request @ (Request::Presence
@@ -157,6 +173,7 @@ impl IdentityService {
             request @ (Request::ReadDocument
             | Request::WriteDocument { .. }
             | Request::ConfirmRestore { .. }) => self.document_request(request, bearer).await,
+            _ => Err(Error::Rejected),
         }
     }
 

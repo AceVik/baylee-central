@@ -14,12 +14,7 @@ impl IdentityService {
         }
         let session = surface.session(bearer)?;
         let response = match request {
-            api::Request::Table { request: table }
-                if {
-                    let api::table::Request::Begin { origin, .. } = &table;
-                    self.is_official(origin)
-                } =>
-            {
+            api::Request::Table { request: table } if self.is_official(table.origin()) => {
                 self.store
                     .advent_official_table(session, table, &self.official)
                     .await?
