@@ -96,6 +96,23 @@ pub enum League {
     Champion,
 }
 
+impl League {
+    /// Stable ladder order for placed ranks and their public storage indexes.
+    pub const PLACED: [Self; 11] = [
+        Self::Paper,
+        Self::Wood,
+        Self::Iron,
+        Self::Bronze,
+        Self::Silver,
+        Self::Gold,
+        Self::Platinum,
+        Self::Diamond,
+        Self::Master,
+        Self::Grandmaster,
+        Self::Champion,
+    ];
+}
+
 /// Engine-confirmed result in assignment seat order.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]

@@ -1,6 +1,7 @@
 //! Private, account-bound Advent doors and durable cosmetic inventory.
 use serde::{Deserialize, Serialize};
 mod chunk;
+pub mod collection;
 pub mod framing;
 mod framing_legacy;
 pub mod puzzle;
@@ -248,6 +249,11 @@ pub enum Request {
         #[doc = "Optional exclusive previous item."]
         after: Option<Id>,
     },
+    /// Page every owned sleeve and playmat, including ranked awards.
+    Collection {
+        #[doc = "Optional exclusive previous item."]
+        after: Option<Id>,
+    },
     /// Fetch a private bounded chunk, or validate an already cached file.
     Asset {
         #[doc = "Entitlement or confirmed live participant."]
@@ -321,6 +327,13 @@ pub enum Response {
     Inventory {
         #[doc = "Owned items."]
         items: Vec<Reward>,
+        #[doc = "Exclusive cursor when more remain."]
+        next: Option<Id>,
+    },
+    /// Mixed-source collection page, returned only to an explicit collection request.
+    Collection {
+        #[doc = "The authenticated account's items."]
+        items: Vec<collection::Item>,
         #[doc = "Exclusive cursor when more remain."]
         next: Option<Id>,
     },

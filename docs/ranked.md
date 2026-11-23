@@ -1,5 +1,29 @@
 # Global ranked play
 
+## Permanent division cosmetics
+
+Completing ten placement games in a format starts the player's cosmetic collection.
+Each reached player division earns a sleeve and a playmat for the whole account.
+A jump from Gold IV to Gold II includes Gold III. Wood, Iron, Bronze and Silver
+each have three divisions. Gold, Platinum and Diamond each have four. Paper,
+Master, Grandmaster and Champion each have one set, for 28 sets in total.
+Champion requires publication on the player track of the global Top 100.
+
+Central derives ownership from its confirmed player badge ledger across
+Standard, Highlander and Commander. The first acquisition persists through
+demotion, another format and future seasons. The migration recognizes existing
+players' highest recorded achievement and uses the migration time for older
+acquisitions whose original timestamp was never recorded. Newly imported
+assets become available immediately to qualifying accounts.
+
+The native `Collection` request returns account-owned items with a ranked or
+calendar source. Calendar-only clients keep their original `Inventory` and
+`Claim` operations. Both sources use the same private media and per-deck
+selection paths. Central checks ownership, the equipment slot and current seat
+authorization before delivering the privately provisioned image.
+
+## Play
+
 The native client enters Standard, Baylee Highlander or two-player Commander through its signed Central session. Each format has a player ladder and a deck ladder. The home gateway stays selected throughout a match. Personal contacts, private chat and the deck vault retain their Central account scope.
 
 ## Who can do what

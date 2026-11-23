@@ -44,6 +44,11 @@ impl Response {
                     item.asset.mat_framing = None;
                 }
             }
+            Self::Collection { items, .. } => {
+                for item in items {
+                    item.asset.mat_framing = None;
+                }
+            }
             Self::Asset { page } => page.asset.mat_framing = None,
             Self::Cached { asset } => asset.mat_framing = None,
             Self::Puzzle { .. }

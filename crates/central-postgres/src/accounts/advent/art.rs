@@ -88,7 +88,7 @@ pub(super) async fn get(
         }
         api::AssetScope::Owned { item } => {
             let id = uuid(item);
-            inventory::owned(db, me, id, None).await?;
+            inventory::owned(db, me, id).await?;
             id
         }
         api::AssetScope::Equipped {

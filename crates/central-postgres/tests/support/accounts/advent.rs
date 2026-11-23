@@ -7,6 +7,7 @@ mod calendar;
 #[path = "../advent_material.rs"]
 mod material;
 mod presentation;
+mod ranked_collection;
 
 const YEAR: u16 = 2105;
 const DAY: i32 = 86_400;

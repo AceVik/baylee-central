@@ -3,6 +3,9 @@
 //! Client/policy/crypto libraries do not depend on this server-side crate.
 #![forbid(unsafe_code)]
 
+/// Connected database handle shared by the restricted operator import paths.
+pub use sea_orm::DatabaseConnection;
+
 mod accounts;
 /// Trusted private seasonal campaign provisioning.
 pub mod advent_import;

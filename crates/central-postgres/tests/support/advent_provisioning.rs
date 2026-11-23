@@ -12,6 +12,8 @@ use central_postgres::{
 };
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
+mod ranked;
+
 const YEAR: u16 = 2194;
 
 fn text(value: &str) -> Text {
@@ -156,6 +158,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
             .is_err()
     );
     assert_eq!(super::scalar(operator,"SELECT count(*) AS value FROM central_identity.advent_doors WHERE year=2194 AND hint1_en='Fixture hint'").await,24);
+    ranked::run(operator, &db).await;
     db.close().await.unwrap();
     // Leave the fixture usable for another independent run or a schema clone.
     operator.execute_unprepared("BEGIN;

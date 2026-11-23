@@ -16,6 +16,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(test)]
 mod tests;
+pub(crate) mod ranked;
 
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
 #[serde(deny_unknown_fields)]
@@ -171,10 +172,11 @@ fn artwork(
     })
 }
 
-async fn import() -> Result<(), ()> {
+/// Both offline imports use the same confined file reader, decoder and restricted connection.
+fn settings() -> Result<(Connection, PathBuf, PathBuf), ()> {
     let input = super::production::read_settings()?;
     let Settings {
-        mut database,
+        database,
         pack_root,
     } = serde_json::from_slice(&input).map_err(|_| ())?;
     if !pack_root.is_absolute() || !pack_root.symlink_metadata().map_err(|_| ())?.is_dir() {
@@ -187,15 +189,11 @@ async fn import() -> Result<(), ()> {
             "central-picture-worker{}",
             std::env::consts::EXE_SUFFIX
         ));
-    let mut pack: Pack =
-        serde_json::from_slice(&read(&root, Path::new("campaign.json"), 64 * 1024)?)
-            .map_err(|_| ())?;
-    pack.doors.sort_by_key(|door| door.door);
-    if !pack.doors.iter().map(|d| d.door).eq(1..=DOORS) {
-        return Err(());
-    }
-    let hero = artwork(&root, &worker, pack.hero, None, "standard".into())?;
-    let db = match &mut database {
+    Ok((database,root,worker))
+}
+
+async fn connect(mut database: Connection) -> Result<central_postgres::DatabaseConnection, ()> {
+    match &mut database {
         Connection::Tls(config) => connect_server(config.server()?).await,
         Connection::LoopbackFixture(config) => {
             connect_dev(
@@ -210,7 +208,20 @@ async fn import() -> Result<(), ()> {
             .await
         }
     }
-    .map_err(|_| ())?;
+    .map_err(|_| ())
+}
+
+async fn import() -> Result<(), ()> {
+    let (database, root, worker) = settings()?;
+    let mut pack: Pack =
+        serde_json::from_slice(&read(&root, Path::new("campaign.json"), 64 * 1024)?)
+            .map_err(|_| ())?;
+    pack.doors.sort_by_key(|door| door.door);
+    if !pack.doors.iter().map(|d| d.door).eq(1..=DOORS) {
+        return Err(());
+    }
+    let hero = artwork(&root, &worker, pack.hero, None, "standard".into())?;
+    let db = connect(database).await?;
     let mut publication = Import::begin(&db, pack.year, hero).await.map_err(|_| ())?;
     for door in pack.doors {
         let Challenge { puzzle, hints } = serde_json::from_slice(&verified(

@@ -7,6 +7,9 @@ use sea_orm::{
 };
 use sha2::{Digest, Sha256};
 
+mod ranked;
+pub use ranked::RankedCatalog;
+
 /// A private still WebP validated by the isolated picture worker.
 pub struct Art {
     /// Optional per-image composition for a playmat.
@@ -40,7 +43,13 @@ fn text_ok(text: &Text, limit: usize) -> bool {
         .all(|s| !s.trim().is_empty() && s.len() <= limit && !s.chars().any(char::is_control))
 }
 
-async fn store_art(tx: &DatabaseTransaction, art: Art) -> Result<Uuid, StoreError> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Source {
+    Advent,
+    Ranked,
+}
+
+async fn store_art(tx: &DatabaseTransaction, art: Art, source: Source) -> Result<Uuid, StoreError> {
     let [width, height] = art.dimensions;
     if ![width, height]
         .into_iter()
@@ -72,15 +81,18 @@ async fn store_art(tx: &DatabaseTransaction, art: Art) -> Result<Uuid, StoreErro
         size.into(),
         width.into(),
         height.into(),
+        match source { Source::Advent => "advent", Source::Ranked => "ranked" }.into(),
     ];
     let mut values = keys.clone();
     values.push(art.bytes.into());
-    tx.execute_raw(sql("INSERT INTO central_identity.advent_art(digest,kind,tier,title_de,title_en,size,width,height,mime,content)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'image/webp',$9) ON CONFLICT(digest) DO NOTHING",values)).await.map_err(|_| StoreError::Unavailable)?;
+    let inserted = tx.execute_raw(sql("INSERT INTO central_identity.advent_art(digest,kind,tier,title_de,title_en,size,width,height,source,mime,content)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'image/webp',$10) ON CONFLICT(digest) DO NOTHING",values)).await.map_err(|_| StoreError::Unavailable)?.rows_affected();
     let id: Uuid = tx.query_one_raw(sql("SELECT id FROM central_identity.advent_art WHERE digest=$1 AND kind=$2 AND tier=$3 AND title_de=$4
-        AND title_en=$5 AND size=$6 AND width=$7 AND height=$8 AND mime='image/webp'",keys)).await
+        AND title_en=$5 AND size=$6 AND width=$7 AND height=$8 AND source=$9 AND mime='image/webp'",keys)).await
         .map_err(|_|StoreError::Unavailable)?.ok_or(StoreError::InvalidConfig)?.try_get("","id").map_err(|_|StoreError::Unavailable)?;
-    if let Some(framing) = art.mat_framing {
+    if source == Source::Ranked && inserted == 0 {
+        ranked::check_framing(tx, id, art.mat_framing.as_ref()).await?;
+    } else if let Some(framing) = art.mat_framing {
         store_framing(tx, id, &framing).await?;
     }
     Ok(id)
@@ -116,7 +128,7 @@ async fn check_role(tx: &DatabaseTransaction) -> Result<(), StoreError> {
              WHERE n.nspname='central_identity' AND c.relkind IN ('r','p') AND (
                has_table_privilege(current_user,c.oid,'DELETE,TRUNCATE,TRIGGER,MAINTAIN')
                OR has_any_column_privilege(current_user,c.oid,'UPDATE')
-               OR (c.relname NOT IN ('advent_art','advent_campaigns','advent_doors','playmat_framing')
+               OR (c.relname NOT IN ('advent_art','advent_campaigns','advent_doors','playmat_framing','ranked_cosmetic_catalog')
                  AND has_any_column_privilege(current_user,c.oid,'SELECT,INSERT,REFERENCES'))))",
         vec![])).await.map_err(|_|StoreError::UnsafeRole)?;
     ok.map(|_| ()).ok_or(StoreError::UnsafeRole)
@@ -141,7 +153,7 @@ impl Import {
         ))
         .await
         .map_err(|_| StoreError::Unavailable)?;
-        let id = store_art(&tx, hero).await?;
+        let id = store_art(&tx, hero, Source::Advent).await?;
         let values = vec![year.into(), id.into()];
         tx.execute_raw(sql(
             "INSERT INTO central_identity.advent_campaigns(year,hero_id,starts_at,closes_at)
@@ -200,7 +212,7 @@ impl Import {
             return Err(StoreError::InvalidConfig);
         }
         let json = String::from_utf8(encoded).map_err(|_| StoreError::InvalidConfig)?;
-        let art_id = store_art(&self.tx, art).await?;
+        let art_id = store_art(&self.tx, art, Source::Advent).await?;
         let [one, two] = hints;
         let values = vec![
             self.year.into(),

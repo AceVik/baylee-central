@@ -160,6 +160,9 @@ GRANT SELECT, DELETE, UPDATE (next_page) ON central_identity.legacy_deck_transfe
 GRANT SELECT ON central_identity.playmat_framing,central_identity.advent_art,central_identity.advent_campaigns,central_identity.advent_doors TO central_runtime;
 GRANT SELECT, INSERT (account_id,year,door) ON central_identity.advent_solutions TO central_runtime;
 GRANT SELECT, INSERT (account_id,year,door,art_id) ON central_identity.advent_entitlements TO central_runtime;
+GRANT SELECT ON central_identity.cosmetic_collection, central_identity.ranked_cosmetic_catalog,
+  central_identity.ranked_cosmetic_unlocks TO central_runtime;
+GRANT SELECT, INSERT(account_id,art_id,advent_id,league,division) ON central_identity.cosmetic_equip_rights TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.advent_ranked_looks TO central_runtime;
 GRANT SELECT, DELETE, INSERT (proof,account_id,gateway_id,sid,game,seat,sleeve,playmat),
       UPDATE (confirmed,expires_at) ON central_identity.advent_table_looks TO central_runtime;
