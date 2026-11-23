@@ -2,6 +2,9 @@
 use super::{Error, Request, Response, Session, Token, Transport};
 use central_api::ranked as api;
 
+mod replica;
+pub use replica::replica_host;
+
 /// Read a public board, season or profile.
 ///
 /// # Errors
@@ -38,6 +41,9 @@ fn responds(request: &api::Request, reply: &api::Response, owner: Option<api::Id
     use api::Request as Q;
     use api::Response as A;
     match (request, reply) {
+        (Q::Replicate { request }, A::Replica { response }) => {
+            owner.is_some() && replica::responds(request, response, owner)
+        }
         (
             Q::OwnProfile { season },
             A::Profile {
