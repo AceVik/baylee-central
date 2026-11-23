@@ -263,7 +263,37 @@ async fn refusal(table: &Table<'_>) {
     );
 }
 
+async fn no_certified_standby(table: &Table<'_>) {
+    let assignment = table.start_pair(160).await;
+    let matched = assignment.match_id;
+    let fence = table.status(matched).await.fence;
+    let witness = if assignment.host_id == table.first.id {
+        &table.second
+    } else {
+        &table.first
+    };
+    for (_, player) in table.seats {
+        privacy::approve_all(table.store, player, matched).await;
+    }
+    expire(table, matched, Deadline::Leader).await;
+    let paused = table.status(matched).await;
+    assert_eq!(
+        (paused.phase, paused.host_id, paused.fence),
+        (r::Phase::Paused, assignment.host_id, fence)
+    );
+    assert!(
+        witness
+            .host(table.store, r::HostRequest::Promote { fence })
+            .await
+            .is_err()
+    );
+    expire(table, matched, Deadline::Recovery).await;
+    assert_eq!(table.status(matched).await.phase, r::Phase::Void);
+    assert_eq!(table.receipt_count(matched).await, 0);
+}
+
 pub(super) async fn run(table: &Table<'_>) {
+    no_certified_standby(table).await;
     divergence(table).await;
     restore(table).await;
     refusal(table).await;

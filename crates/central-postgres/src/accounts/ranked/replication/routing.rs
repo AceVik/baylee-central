@@ -114,7 +114,7 @@ pub(super) async fn work(db: &DatabaseTransaction, host: &Host) -> Result<HostRe
         match assignment(db, &row, host, role).await? {
             HostResponse::Assignment { work } => items.push(work),
             HostResponse::AwaitingConsent { fence, role } => {
-                pending.push(api::replica::PendingWork { fence, role })
+                pending.push(api::replica::PendingWork { fence, role });
             }
             _ => return Err(Error::Unavailable),
         }

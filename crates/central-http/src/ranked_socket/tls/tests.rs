@@ -48,21 +48,29 @@ async fn real_tls_transfers_binary_and_refuses_the_wrong_certificate_name() {
     );
     let mut roots = RootCertStore::empty();
     roots.add(cert).unwrap();
-    let client = Arc::new(
-        ClientConfig::builder_with_provider(provider)
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .with_root_certificates(roots)
-            .with_no_client_auth(),
-    );
-    for (name, success) in [("localhost", true), ("other.invalid", false)] {
+    let client = |roots| {
+        Arc::new(
+            ClientConfig::builder_with_provider(Arc::clone(&provider))
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_root_certificates(roots)
+                .with_no_client_auth(),
+        )
+    };
+    let trusted = client(roots);
+    let unrelated = client(RootCertStore::empty());
+    for (name, config, success) in [
+        ("localhost", &trusted, true),
+        ("other.invalid", &trusted, false),
+        ("localhost", &unrelated, false),
+    ] {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
-        let config = server.clone();
+        let server_config = server.clone();
         let peer = tokio::task::spawn_blocking(move || {
             let (s, _) = listener.accept().unwrap();
             s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-            let mut s = rustls::StreamOwned::new(ServerConnection::new(config).unwrap(), s);
+            let mut s = rustls::StreamOwned::new(ServerConnection::new(server_config).unwrap(), s);
             let mut msg = [0; 4];
             if s.read_exact(&mut msg).is_err() {
                 return false;
@@ -74,7 +82,7 @@ async fn real_tls_transfers_binary_and_refuses_the_wrong_certificate_name() {
         });
         let socket = TcpStream::connect(addr).await.unwrap();
         let tls =
-            ClientConnection::new(client.clone(), ServerName::try_from(name).unwrap()).unwrap();
+            ClientConnection::new(Arc::clone(config), ServerName::try_from(name).unwrap()).unwrap();
         let (mut plain, pipe) = tokio::io::duplex(1024);
         let driver = tokio::spawn(drive(socket, tls, pipe));
         plain.write_all(b"game").await.unwrap();

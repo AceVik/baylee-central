@@ -1,0 +1,2 @@
+# RFC 6455 section 1.3 publishes this exact Base64 spelling of "the sample nonce".
+7de6dd72eb79da87add4c55ae526debd60cf6b0e:crates/central-http/src/ranked_socket/upstream/tests.rs:generic-api-key:22

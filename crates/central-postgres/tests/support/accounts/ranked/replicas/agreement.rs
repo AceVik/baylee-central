@@ -64,7 +64,10 @@ pub(super) async fn run(table: &Table<'_>) {
     );
     assert!(table.seat(live.seats[1], submit).await.is_err());
     let bad = live.submit(super::super::id(115), &[0xff]);
-    assert!(table.seat(live.seats[0], bad).await.is_err());
+    let r::SeatResponse::Status { status } = table.seat(live.seats[0], bad).await.unwrap() else {
+        panic!("an in-flight input keeps its journal slot")
+    };
+    assert_eq!(status.head, live.opening);
     let head = live
         .opening
         .next(
