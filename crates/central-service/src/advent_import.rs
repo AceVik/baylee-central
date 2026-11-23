@@ -1,5 +1,5 @@
 //! Offline import of a private, operator-owned campaign. Diagnostics contain no private material.
-use central_api::advent::{DOORS, Kind, MAX_ART_BYTES, Text, puzzle::Puzzle};
+use central_api::advent::{DOORS, Kind, MAX_ART_BYTES, Text, framing::MatFraming, puzzle::Puzzle};
 use central_postgres::{
     DevConfig,
     advent_import::{Art, Import},
@@ -50,6 +50,8 @@ struct Pack {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Image {
+    #[serde(default)]
+    mat_framing: Option<MatFraming>,
     path: PathBuf,
     sha256: String,
     title: Text,
@@ -160,6 +162,7 @@ fn artwork(
     let bytes = verified(root, &image.path, &image.sha256, MAX_ART_BYTES as usize)?;
     let dimensions = inspect(worker, &bytes)?;
     Ok(Art {
+        mat_framing: image.mat_framing,
         kind,
         tier,
         title: image.title,

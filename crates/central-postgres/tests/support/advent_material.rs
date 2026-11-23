@@ -51,6 +51,27 @@ pub fn bytes(day: u8) -> Vec<u8> {
     }
 }
 
+pub fn mat_framing(day: u8) -> api::framing::MatFraming {
+    use api::framing::{Framing, MatFraming, MatVariant};
+    let duel = Framing {
+        focus: [1_500 + u16::from(day), 3_000],
+        safe: Some([750, 1_500, 9_000, 7_000]),
+    };
+    let variants = [MatVariant {
+        seats: 5,
+        allies: 3,
+        sides: 2,
+        framing: Framing {
+            focus: [8_400, 4_500],
+            safe: Some([7_000, 3_000, 9_500, 5_000]),
+        },
+    }];
+    MatFraming {
+        duel,
+        variants: variants.as_slice().try_into().unwrap(),
+    }
+}
+
 fn art(day: u8) -> Art {
     let kind = match day {
         0 => None,
@@ -65,6 +86,7 @@ fn art(day: u8) -> Art {
             en: format!("Synthetic reward {day}"),
         },
         dimensions: [32, 32],
+        mat_framing: (kind == Some(api::Kind::Playmat)).then(|| mat_framing(day)),
         bytes: bytes(day),
     }
 }

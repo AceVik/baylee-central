@@ -86,7 +86,7 @@ impl Http {
         body: &str,
         bearer: Option<Bearer<'_>>,
     ) -> Result<Response, Error> {
-        central_api::decode(&self.posted(body.as_bytes(), bearer, None)?)
+        central_api::decode(&self.posted(body.as_bytes(), bearer, None, true)?)
     }
 
     fn sent(
@@ -95,7 +95,7 @@ impl Http {
         bearer: Option<Bearer<'_>>,
         hop: Option<&str>,
     ) -> Result<Response, Error> {
-        let answer = self.posted(&central_api::encode(request)?, bearer, hop)?;
+        let answer = self.posted(&central_api::encode(request)?, bearer, hop, true)?;
         if matches!(request, Request::WriteDocument { .. })
             && self.lose_write_reply.swap(false, Ordering::AcqRel)
         {
@@ -121,6 +121,7 @@ impl Http {
         bytes: &[u8],
         bearer: Option<Bearer<'_>>,
         hop: Option<&str>,
+        mat_framing: bool,
     ) -> Result<Vec<u8>, Error> {
         pace();
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(3))
@@ -134,6 +135,14 @@ impl Http {
         write!(stream, "POST /v1/native HTTP/1.1\r\nHost: {}\r\n{PROTOCOL_HEADER}: {PROTOCOL_VERSION}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n", self.address, bytes.len()).unwrap();
         if let Some(token) = bearer {
             write!(stream, "Authorization: {}\r\n", token.header().as_str()).unwrap();
+        }
+        if mat_framing {
+            write!(
+                stream,
+                "{}: 1\r\n",
+                central_api::advent::framing::CAPABILITY_HEADER
+            )
+            .unwrap();
         }
         if let Some(hop) = hop {
             write!(stream, "X-Forwarded-For: {hop}\r\n").unwrap();

@@ -8,6 +8,7 @@ use central_api::{
 use central_client::{Session, Transport};
 use sea_orm::DatabaseConnection;
 use tokio::runtime::Runtime;
+mod framing;
 #[path = "../../../central-postgres/tests/support/advent_material.rs"]
 mod material;
 mod staging;
@@ -30,6 +31,9 @@ fn closed(http: &Http, owner: &Session) {
         "sleeve",
         "playmat",
         "tier",
+        "mat_framing",
+        "focus",
+        "variants",
     ] {
         assert!(!encoded.contains(internal));
     }
@@ -198,8 +202,11 @@ pub(crate) fn run(
         matches!(owner.advent(http,Q::Puzzle{year:YEAR,door:1}).unwrap(),A::Puzzle{puzzle,..}if puzzle==material::board(1))
     );
     let reward = won(http, owner);
+    assert!(reward.asset.mat_framing.is_none());
     no_static_image(http, &reward);
     range_reads(http, owner, &outsider, &reward);
+    runtime.block_on(material::elapsed(db, YEAR, 86_460));
+    framing::run(http, &outsider, owner);
     runtime.block_on(material::elapsed(db, YEAR, 37 * 86_400));
     assert_eq!(current(http, owner), preceding);
     assert!(

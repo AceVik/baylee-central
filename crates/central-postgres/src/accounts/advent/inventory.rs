@@ -5,9 +5,10 @@ use super::{
 use sea_orm::ConnectionTrait;
 
 const REWARDS: &str =
-    "SELECT a.id,a.kind,a.title_de,a.title_en,a.digest,a.size,a.mime,a.tier,a.width,a.height,
+    "SELECT a.id,a.kind,a.title_de,a.title_en,a.digest,a.size,a.mime,a.tier,a.width,a.height,f.framing::text AS mat_framing,
     e.year,e.door,floor(extract(epoch FROM e.earned_at))::bigint AS earned
     FROM central_identity.advent_entitlements e JOIN central_identity.advent_art a ON a.id=e.art_id
+    LEFT JOIN central_identity.playmat_framing f ON f.art_id=a.id
     WHERE e.account_id=$1";
 
 const SOLVED_ITEM:&str="EXISTS (SELECT 1 FROM central_identity.advent_solutions s JOIN central_identity.advent_doors d USING(year,door)

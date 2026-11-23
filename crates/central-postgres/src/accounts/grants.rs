@@ -83,6 +83,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('ranked_commands', ARRAY['SELECT','INSERT','DELETE'], ARRAY['evidence']),
              ('ranked_witnesses', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('advent_art',ARRAY['SELECT'],NULL),
+             ('playmat_framing',ARRAY['SELECT'],NULL),
              ('advent_campaigns',ARRAY['SELECT'],NULL),
              ('advent_doors',ARRAY['SELECT'],NULL),
              ('advent_solutions',ARRAY['SELECT'],NULL),

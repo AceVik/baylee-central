@@ -18,6 +18,11 @@ pub(super) fn meta(row: &QueryResult) -> Result<api::AssetMeta, Error> {
         _ => return Err(Error::Unavailable),
     };
     let m = api::AssetMeta {
+        mat_framing: col::<Option<String>>(row, "mat_framing")?
+            .as_deref()
+            .map(|json| central_api::decode(json.as_bytes()))
+            .transpose()
+            .map_err(unavailable)?,
         digest: col::<Vec<u8>>(row, "digest")?
             .try_into()
             .map_err(unavailable)?,
@@ -31,7 +36,8 @@ pub(super) fn meta(row: &QueryResult) -> Result<api::AssetMeta, Error> {
     Ok(m)
 }
 pub(super) async fn metadata(db: &DatabaseTransaction, id: Uuid) -> Result<api::AssetMeta, Error> {
-    let row=db.query_one_raw(statement("SELECT digest,size,mime,width,height,tier FROM central_identity.advent_art WHERE id=$1",vec![id.into()]))
+    let row=db.query_one_raw(statement("SELECT a.digest,a.size,a.mime,a.width,a.height,a.tier,f.framing::text AS mat_framing
+        FROM central_identity.advent_art a LEFT JOIN central_identity.playmat_framing f ON f.art_id=a.id WHERE a.id=$1",vec![id.into()]))
         .await.map_err(unavailable)?.ok_or(Error::Rejected)?;
     meta(&row)
 }

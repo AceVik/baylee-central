@@ -11,4 +11,6 @@ REVOKE SELECT, INSERT ON central_identity.advent_doors FROM central_advent_impor
 GRANT SELECT (year, door, puzzle, hint1_de, hint1_en, hint2_de, hint2_en, art_id),
       INSERT (year, door, puzzle, hint1_de, hint1_en, hint2_de, hint2_en, art_id)
     ON central_identity.advent_doors TO central_advent_importer;
+GRANT SELECT (art_id, framing), INSERT (art_id, framing)
+    ON central_identity.playmat_framing TO central_advent_importer;
 COMMIT;

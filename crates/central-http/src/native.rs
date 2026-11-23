@@ -311,7 +311,7 @@ async fn process(
         }
     }
     let place = from.map(Place::from);
-    let response = match request {
+    let mut response = match request {
         wire::Request::Ranked {
             request:
                 ranked::Request::Replicate {
@@ -348,6 +348,17 @@ async fn process(
                 .await?
         }
     };
+    let mut accepts = headers
+        .get_all(central_api::advent::framing::CAPABILITY_HEADER)
+        .iter();
+    if !matches!((accepts.next(), accepts.next()), (Some(value), None) if value.as_bytes() == b"1")
+    {
+        match &mut response {
+            wire::Response::Advent { response } => response.omit_framing(),
+            wire::Response::AdventHost { response } => response.omit_framing(),
+            _ => {}
+        }
+    }
     central_api::encode(&response)
 }
 

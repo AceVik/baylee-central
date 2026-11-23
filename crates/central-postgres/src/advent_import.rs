@@ -1,6 +1,6 @@
 //! Immutable operator provisioning. Dropping an incomplete import rolls back its art and doors.
 use crate::StoreError;
-use central_api::advent::{DOORS, Kind, MAX_ART_BYTES, Text, puzzle::Puzzle};
+use central_api::advent::{DOORS, Kind, MAX_ART_BYTES, Text, framing::MatFraming, puzzle::Puzzle};
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, Statement,
     TransactionTrait, Value, prelude::Uuid,
@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 /// A private still WebP validated by the isolated picture worker.
 pub struct Art {
+    /// Optional per-image composition for a playmat.
+    pub mat_framing: Option<MatFraming>,
     /// An earned slot, or None for the calendar illustration.
     pub kind: Option<Kind>,
     /// Visual treatment selected by the operator.
@@ -51,6 +53,12 @@ async fn store_art(tx: &DatabaseTransaction, art: Art) -> Result<Uuid, StoreErro
     {
         return Err(StoreError::InvalidConfig);
     }
+    if let Some(framing) = &art.mat_framing {
+        if art.kind != Some(Kind::Playmat) {
+            return Err(StoreError::InvalidConfig);
+        }
+        framing.validate().map_err(|_| StoreError::InvalidConfig)?;
+    }
     let size = i32::try_from(art.bytes.len()).map_err(|_| StoreError::InvalidConfig)?;
     let width = i32::try_from(width).map_err(|_| StoreError::InvalidConfig)?;
     let height = i32::try_from(height).map_err(|_| StoreError::InvalidConfig)?;
@@ -69,9 +77,32 @@ async fn store_art(tx: &DatabaseTransaction, art: Art) -> Result<Uuid, StoreErro
     values.push(art.bytes.into());
     tx.execute_raw(sql("INSERT INTO central_identity.advent_art(digest,kind,tier,title_de,title_en,size,width,height,mime,content)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,'image/webp',$9) ON CONFLICT(digest) DO NOTHING",values)).await.map_err(|_| StoreError::Unavailable)?;
-    tx.query_one_raw(sql("SELECT id FROM central_identity.advent_art WHERE digest=$1 AND kind=$2 AND tier=$3 AND title_de=$4
+    let id: Uuid = tx.query_one_raw(sql("SELECT id FROM central_identity.advent_art WHERE digest=$1 AND kind=$2 AND tier=$3 AND title_de=$4
         AND title_en=$5 AND size=$6 AND width=$7 AND height=$8 AND mime='image/webp'",keys)).await
-        .map_err(|_|StoreError::Unavailable)?.ok_or(StoreError::InvalidConfig)?.try_get("","id").map_err(|_|StoreError::Unavailable)
+        .map_err(|_|StoreError::Unavailable)?.ok_or(StoreError::InvalidConfig)?.try_get("","id").map_err(|_|StoreError::Unavailable)?;
+    if let Some(framing) = art.mat_framing {
+        store_framing(tx, id, &framing).await?;
+    }
+    Ok(id)
+}
+
+async fn store_framing(
+    tx: &DatabaseTransaction,
+    id: Uuid,
+    framing: &MatFraming,
+) -> Result<(), StoreError> {
+    let bytes = central_api::encode(framing).map_err(|_| StoreError::InvalidConfig)?;
+    let json = String::from_utf8(bytes).map_err(|_| StoreError::InvalidConfig)?;
+    let values = vec![id.into(), json.into()];
+    tx.execute_raw(sql(
+        "INSERT INTO central_identity.playmat_framing(art_id,framing)
+        VALUES($1,$2::text::jsonb) ON CONFLICT(art_id) DO NOTHING",
+        values.clone(),
+    ))
+    .await
+    .map_err(|_| StoreError::Unavailable)?;
+    tx.query_one_raw(sql("SELECT art_id FROM central_identity.playmat_framing WHERE art_id=$1 AND framing=$2::text::jsonb",values)).await.map_err(|_|StoreError::Unavailable)?.ok_or(StoreError::InvalidConfig)?;
+    Ok(())
 }
 
 async fn check_role(tx: &DatabaseTransaction) -> Result<(), StoreError> {
@@ -85,7 +116,7 @@ async fn check_role(tx: &DatabaseTransaction) -> Result<(), StoreError> {
              WHERE n.nspname='central_identity' AND c.relkind IN ('r','p') AND (
                has_table_privilege(current_user,c.oid,'DELETE,TRUNCATE,TRIGGER,MAINTAIN')
                OR has_any_column_privilege(current_user,c.oid,'UPDATE')
-               OR (c.relname NOT IN ('advent_art','advent_campaigns','advent_doors')
+               OR (c.relname NOT IN ('advent_art','advent_campaigns','advent_doors','playmat_framing')
                  AND has_any_column_privilege(current_user,c.oid,'SELECT,INSERT,REFERENCES'))))",
         vec![])).await.map_err(|_|StoreError::UnsafeRole)?;
     ok.map(|_| ()).ok_or(StoreError::UnsafeRole)
