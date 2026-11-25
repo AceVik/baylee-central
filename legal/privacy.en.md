@@ -1,5 +1,5 @@
-<!-- version: 2026-11-19 -->
-<!-- updated: 2026-11-19 -->
+<!-- version: 2026-11-25 -->
+<!-- updated: 2026-11-25 -->
 
 # Baylee Central privacy policy
 
@@ -32,7 +32,7 @@ data protection officer, as none is required.
 ## 3. What we process, why, and on what basis
 
 - **Username, account ID, creation time, display name and tag** – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. Your public player profile at `/{lang}/player/{Name}-{tag}` (display name, tag, profile picture, ranked standings and earned badges) is visible by default and can be turned off at any time in your Profile settings. *Art. 6(1)(b) GDPR (contract)*
-- **Optional personal profile details (first name, last name, date of birth)** – stored exclusively for you in your private profile settings and never shown publicly or to other players or gateways. Date of birth is validated for the minimum age of 16. These fields are included in your data export and deleted when your account is deleted. *Art. 6(1)(b) GDPR*
+- **Optional personal profile details (first name, last name, date of birth)** – stored exclusively for you in your private profile settings and never shown publicly or to other players or gateways. Date of birth is validated for the minimum age of 13. These fields are included in your data export and deleted when your account is deleted. *Art. 6(1)(b) GDPR*
 - **Roles (administrator)** – administering Baylee Central. *Art. 6(1)(b) GDPR*
 - **The time of your last sign-in with your password** (no address) – administering accounts and noticing misuse. *Art. 6(1)(f) GDPR (our interest in secure operation)*
 - **OPAQUE sign-in record, encrypted key container, credential state** – sign-in, protecting your encrypted data. *Art. 6(1)(b) GDPR*
@@ -220,7 +220,9 @@ you sign in there is your decision.
 You have the right of access (Art. 15), rectification (Art. 16), erasure
 (Art. 17), restriction (Art. 18) and data portability (Art. 20 GDPR). You can
 withdraw a consent (crash reports, notifications) at any time for the
-future; what happened until then remains lawful (Art. 7(3) GDPR). You can
+future; what happened until then remains lawful (Art. 7(3) GDPR). If you are
+under 16, a consent counts only with the agreement of your parents or other
+guardians (Art. 8 GDPR). You can
 exercise many of your rights yourself: deleting your account, exporting your
 data and changing details is in the settings; deleting asks for your
 password again, and a deleted account cannot be restored. Otherwise a message

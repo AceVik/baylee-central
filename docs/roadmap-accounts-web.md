@@ -179,7 +179,8 @@ M5's settings work can run beside them.
   concluded 28.10.2026.
 - Profile pictures: moderation and reporting, or picture choice from a fixed set
   first?
-- Minimum age and parental consent (GDPR Art. 8; 16 in Germany) at registration.
+- Minimum age 13 (owner, 25.11.2026), confirmed at registration; under 16 a
+  consent-based feature needs a parent's consent too (GDPR Art. 8; 16 in Germany).
 - Legal pages for `baylee.app` (deferred in Baylee #316) before public sign-up;
   drafts of Central's terms and privacy policy and of the gateway texts are
   for the owner (and ideally a lawyer) to review.

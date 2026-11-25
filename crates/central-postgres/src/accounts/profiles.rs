@@ -242,10 +242,10 @@ impl AccountStore {
     /// Update owner-only profile details and public profile visibility for the
     /// account behind `browser`. Optional personal names are trimmed and
     /// checked with `shown_char`; optional `birth_date` (`YYYY-MM-DD`) must be
-    /// valid and at least 16 years old relative to the database's `CURRENT_DATE`.
+    /// valid and at least 13 years old relative to the database's `CURRENT_DATE`.
     ///
     /// # Errors
-    /// `Rejected` for invalid names, malformed birth date, age under 16, or
+    /// `Rejected` for invalid names, malformed birth date, age under 13, or
     /// missing live browser session; storage failure.
     pub async fn set_profile_details(
         &self,
@@ -284,7 +284,7 @@ impl AccountStore {
                      birth_date = $4::date,
                      public_profile = $5
                  WHERE id = $1
-                 AND ($4::date IS NULL OR $4::date <= (CURRENT_DATE - INTERVAL '16 years')::date)
+                 AND ($4::date IS NULL OR $4::date <= (CURRENT_DATE - INTERVAL '13 years')::date)
                  RETURNING id",
                 vec![
                     account.into(),

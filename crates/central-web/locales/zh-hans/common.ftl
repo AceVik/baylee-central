@@ -25,4 +25,4 @@ date-picker-next-month = 下个月
 date-picker-prev-year = 上一年
 date-picker-next-year = 下一年
 date-picker-placeholder = 选择出生日期
-date-picker-age-error = 你必须年满 16 岁。
+date-picker-age-error = 你必须年满 13 岁。

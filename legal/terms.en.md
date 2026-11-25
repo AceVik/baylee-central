@@ -1,5 +1,5 @@
-<!-- version: 2026-11-19 -->
-<!-- updated: 2026-11-19 -->
+<!-- version: 2026-11-25 -->
+<!-- updated: 2026-11-25 -->
 
 # Terms of use for Baylee accounts
 
@@ -41,7 +41,7 @@ no entitlement to any particular availability.
    your account's settings if you want to. You can therefore use
    Baylee pseudonymously (section 19(2) TDDDG). Playing offline against the
    computer needs no account at all.
-2. **Age.** You must be at least 16. If you are not yet of age, you need the
+2. **Age.** You must be at least 13. If you are not yet of age, you need the
    consent of your parents or other guardians for an account.
 3. **Username and display name** must not infringe anyone's rights,
    impersonate anyone, or be insulting, discriminatory or offensive. We may
