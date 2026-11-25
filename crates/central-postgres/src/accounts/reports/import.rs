@@ -159,6 +159,10 @@ fn check(report: &ImportedReport) -> Result<(), &'static str> {
     ) {
         return Err("status");
     }
+    // the feedback service took none from a report token
+    if report.channel == Channel::Token {
+        return Err("channel");
+    }
     let intake = ReportIntake {
         gateway: report.gateway_says.clone(),
         channel: report.channel,

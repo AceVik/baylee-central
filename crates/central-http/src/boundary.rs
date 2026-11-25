@@ -8,7 +8,7 @@ use std::{
 
 use super::{
     browser::Peer,
-    in_flight::{Client, InFlight, forwarded},
+    in_flight::{Client, InFlight, Permit, forwarded},
 };
 use axum::{
     Router,
@@ -84,9 +84,41 @@ pub(crate) const UPLOAD_PACE: Pace = Pace {
     bytes: 16_384,
 };
 
-/// A report part's upload (`PUT /v1/reports/{id}/{part}`, `native.rs`).
+/// A report part's upload (`PUT /v1/reports/{id}/{part}`, `reports.rs`).
 fn upload(request: &Request) -> bool {
     request.method() == Method::PUT && request.uri().path().starts_with("/v1/reports/")
+}
+
+/// A report route's other request: its handler knows its credential to be
+/// good before it has the body read ([`Unread`]).
+fn deferred(request: &Request) -> bool {
+    let path = request.uri().path();
+    path == "/v1/reports" || path.starts_with("/v1/reports/")
+}
+
+/// The answer that refuses a body: its status and its fixed text.
+pub(crate) type Refusal = (StatusCode, &'static str);
+
+/// The boundary of a request whose body is still unread: what reads it, once
+/// its handler asks for it, within the bounds every other body is read in.
+#[derive(Clone)]
+pub(crate) struct Unread(Arc<Boundary>);
+
+impl Unread {
+    /// The whole body of a request with `parts`, at most `limit` bytes, as
+    /// [`admitted`] reads one; a large one's place is the caller's to hold
+    /// until the request ends.
+    ///
+    /// # Errors
+    /// The answer that refuses it.
+    pub(crate) async fn read(
+        &self,
+        parts: &Parts,
+        body: Body,
+        limit: usize,
+    ) -> Result<(Bytes, Option<Permit<'_>>), Refusal> {
+        whole(&self.0, parts, body, limit).await
+    }
 }
 
 /// The most of a request's body the boundary reads: Ko-fi's deliveries
@@ -154,6 +186,11 @@ async fn inspect(State(state): State<Arc<Boundary>>, request: Request, next: Nex
     ));
     request.extensions_mut().insert(from);
     if !upload(&request) {
+        if deferred(&request) {
+            let time = state.request_time;
+            request.extensions_mut().insert(Unread(state));
+            return timed(time, next.run(request)).await;
+        }
         let limit = limit(&state, &request);
         return timed(state.request_time, admitted(&state, request, next, limit)).await;
     }
@@ -229,7 +266,24 @@ fn origin(peer: Option<&Peer>, headers: &HeaderMap) -> Option<Client> {
     }
 }
 
-/// Read the whole body, at most `limit` bytes, before `next` runs.
+/// Read the whole body, at most `limit` bytes ([`whole`]), before `next`
+/// runs. A large one's place is held until its request ends, however it
+/// ends.
+async fn admitted(state: &Boundary, request: Request, next: Next, limit: usize) -> Response {
+    let (parts, body) = request.into_parts();
+    let (bytes, place) = match whole(state, &parts, body, limit).await {
+        Ok(read) => read,
+        Err(refusal) => return refusal.into_response(),
+    };
+    let response = next
+        .run(Request::from_parts(parts, Body::from(bytes)))
+        .await;
+    drop(place);
+    response
+}
+
+/// The whole body of a request with `parts`, at most `limit` bytes, and a
+/// large one's place; or the answer that refuses it.
 ///
 /// A body of at most [`LIGHT_BYTES`] that is there within the grace needs
 /// nothing more. One that is not, or a larger one, needs one of its
@@ -237,16 +291,20 @@ fn origin(peer: Option<&Peer>, headers: &HeaderMap) -> Option<Client> {
 /// refused as busy before another byte is waited for; so bodies that are
 /// withheld hold no more than their share of the listener's connections,
 /// each for the request's time at most. A late body gives its place back
-/// when it has arrived, a large one when its request ends, however it
-/// ends: the places bound the large bodies in memory too.
-async fn admitted(state: &Boundary, request: Request, next: Next, limit: usize) -> Response {
-    let (parts, body) = request.into_parts();
+/// when it has arrived, a large one when its request ends: the places
+/// bound the large bodies in memory too.
+async fn whole<'a>(
+    state: &'a Boundary,
+    parts: &Parts,
+    body: Body,
+    limit: usize,
+) -> Result<(Bytes, Option<Permit<'a>>), Refusal> {
     // Reject declared oversize before waiting for an attacker to send a body.
     // Streaming/chunked bodies are still bounded independently below.
     if oversize(&parts.headers, limit) {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
+        return Err((StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n"));
     }
-    let client = client(&parts);
+    let client = client(parts);
     let large = body
         .size_hint()
         .upper()
@@ -262,20 +320,14 @@ async fn admitted(state: &Boundary, request: Request, next: Next, limit: usize) 
         (read, None)
     } else {
         let Some(place) = state.heavy.admit(client, HEAVY) else {
-            return (StatusCode::TOO_MANY_REQUESTS, REJECTED).into_response();
+            return Err((StatusCode::TOO_MANY_REQUESTS, REJECTED));
         };
         (reading.await, Some(place))
     };
-    let bytes = match read {
-        Ok(bytes) => bytes,
-        Err(status) => return (status, "request rejected\n").into_response(),
-    };
-    let place = place.filter(|_| large);
-    let response = next
-        .run(Request::from_parts(parts, Body::from(bytes)))
-        .await;
-    drop(place);
-    response
+    match read {
+        Ok(bytes) => Ok((bytes, place.filter(|_| large))),
+        Err(status) => Err((status, "request rejected\n")),
+    }
 }
 
 /// Whether `headers` declare a body longer than `limit`, or a length that

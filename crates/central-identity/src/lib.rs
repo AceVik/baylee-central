@@ -55,7 +55,7 @@ mod push;
 mod ranked;
 pub use push::{GatewayDelivery, GatewayOutcome};
 mod reports;
-pub use reports::PartUpload;
+pub use reports::{Filing, ReportCall, ReportReply};
 mod reset;
 mod social;
 mod terms;

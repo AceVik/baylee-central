@@ -116,6 +116,31 @@ export const GATEWAYS = () => [
 ];
 export const GW = { garden: id(0x41), moon: id(0x42), mill: id(0x43), owls: id(0x44), sun: id(0x45), official: id(0x46), closed: id(0x47) };
 
+export type Right = "file" | "read" | "triage" | "purge";
+/** A report token as the administration lists it (docs/reports.md, "Report tokens"). */
+export type ReportToken = {
+  id: number[]; name: string; scopes: Right[]; created_by: number[]; created_by_name: string | null; created_by_tag: number | null;
+  suspended: boolean; created_at: number; expires_at: number; revoked_at: number | null; revoked_by: number[] | null;
+  revoked_by_name: string | null; revoked_by_tag: number | null; last_used_at: number | null;
+};
+
+export const reportTokenOf = (n: number, name: string, more: Partial<ReportToken> = {}): ReportToken => ({
+  id: id(0xc0 + n), name, scopes: ["file"], created_by: OWN, created_by_name: "Chef", created_by_tag: 0x0c4e, suspended: false, created_at: THEN,
+  expires_at: FAR, revoked_at: null, revoked_by: null, revoked_by_name: null, revoked_by_tag: null, last_used_at: null, ...more,
+});
+
+/** The report tokens, the live ones first. */
+export const REPORT_TOKENS = () => [
+  reportTokenOf(1, "Triage agent", { scopes: ["read", "triage"], last_used_at: THEN }),
+  reportTokenOf(2, "Nightly build", { scopes: ["file", "read"] }),
+  // its maker is no administrator any more
+  reportTokenOf(3, "Old helper", { scopes: ["read"], created_by: ID.erika, created_by_name: "Erika", created_by_tag: 0x1a2b, suspended: true }),
+  reportTokenOf(4, "Leaked", { revoked_at: THEN, revoked_by: ID.ada, revoked_by_name: "Ada", revoked_by_tag: 0x3c4d }),
+  reportTokenOf(5, "Last year", { scopes: ["file", "read", "triage", "purge"], created_by: id(77), created_by_name: null, created_by_tag: null, expires_at: THEN }),
+];
+/** The token the stand-in makes, and its text form. */
+export const SECRET = Array.from({ length: 32 }, (_, i) => (i * 7 + 160) % 256);
+
 export type Event = { id: number[]; at: number; actor: number[] | null; action: string; account: number[] | null; gateway: number[] | null; beta_key: null };
 
 export const eventOf = (n: number, action: string, actor: number[] | null, account: number[] | null, gateway: number[] | null = null): Event => ({
@@ -157,6 +182,7 @@ export type World = {
   accounts: Account[];
   gateways: Gateway[];
   events: Event[];
+  reportTokens: ReportToken[];
   /** None: this Central keeps no legacy store (Central refuses the read). */
   legacy: Legacy | null;
   /** The reports' facets under "new": the open statuses and the new crashes; none where Central refuses. */
@@ -176,7 +202,7 @@ export type World = {
 };
 
 export const world = (more: Partial<World> = {}): World => ({
-  accounts: ACCOUNTS(), gateways: GATEWAYS(), events: EVENTS(), legacy: LEGACY(),
+  accounts: ACCOUNTS(), gateways: GATEWAYS(), events: EVENTS(), reportTokens: REPORT_TOKENS(), legacy: LEGACY(),
   reports: { statuses: [["new", 4], ["triaged", 2], ["in_progress", 1], ["resolved", 9]], crashes: 2 },
   admin: true, stale: false, as: OWN, gone: false, next: null, failing: {}, ...more,
 });
@@ -184,6 +210,7 @@ export const world = (more: Partial<World> = {}): World => ({
 export type Asked = {
   action?: string; query?: string | null; before?: number[] | null; account?: number[] | null; admin?: boolean;
   tag?: number; gateway?: number[]; enabled?: boolean; verified?: boolean; token?: number[]; state?: string | null; filter?: unknown;
+  name?: string; scopes?: Right[]; days?: number;
 };
 export type Body = { operation?: string; request?: Asked; identity?: unknown } & Record<string, unknown>;
 
@@ -226,8 +253,8 @@ function overview(w: World) {
   };
 }
 
-/** A change, as Central's store makes or refuses it. */
-function change(w: World, asked: Asked, done: (other: boolean) => Promise<void>, refused: (status: number) => Promise<void>, abort: () => Promise<void>) {
+/** A change, as Central's store makes or refuses it; `answer` for the one that answers with what it made. */
+function change(w: World, asked: Asked, answer: Answer, done: (other: boolean) => Promise<void>, refused: (status: number) => Promise<void>, abort: () => Promise<void>) {
   const next = w.next;
   w.next = null;
   if (typeof next === "number") return refused(next);
@@ -276,6 +303,20 @@ function change(w: World, asked: Asked, done: (other: boolean) => Promise<void>,
         token.revoked_at = THEN;
         gateway.live_tokens = Math.max(0, gateway.live_tokens - 1);
       }
+      made = true;
+      break;
+    }
+    case "create_report_token": {
+      const issued = reportTokenOf(9, asked.name ?? "", { scopes: asked.scopes ?? [] });
+      w.reportTokens.unshift(issued);
+      if (next === "lost") return abort();
+      if (next === "other") return done(true);
+      return answer({ answer: "report_token_created", id: issued.id, token: SECRET, expires_at: FAR });
+    }
+    case "revoke_report_token": {
+      const token = w.reportTokens.find((t) => same(t.id, asked.token));
+      if (!token) return refused(401);
+      Object.assign(token, { revoked_at: THEN, revoked_by: w.as, revoked_by_name: "Chef", revoked_by_tag: 0x0c4e });
       made = true;
       break;
     }
@@ -343,12 +384,16 @@ function admin(w: World, asked: Asked, answer: Answer, done: (other: boolean) =>
     }
     case "registration":
       return answer({ answer: "registration", open: true, changed_at: null });
+    case "report_tokens":
+      return answer({ answer: "report_tokens", tokens: w.reportTokens });
     case "set_admin":
     case "set_tag":
     case "set_gateway_approval":
     case "set_ranked_verification":
     case "revoke_gateway_token":
-      return change(w, asked, done, refused, abort);
+    case "create_report_token":
+    case "revoke_report_token":
+      return change(w, asked, answer, done, refused, abort);
     default:
       return refused(401);
   }
@@ -430,7 +475,9 @@ export const asked = (seen: Body[], from = 0) => seen.slice(from).filter((body) 
 export const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
 /** The changes since `from`. */
 export const changes = (seen: Body[], from = 0) =>
-  asked(seen, from).filter((r) => ["set_admin", "set_tag", "set_gateway_approval", "set_ranked_verification", "revoke_gateway_token"].includes(r?.action ?? ""));
+  asked(seen, from).filter((r) =>
+    ["set_admin", "set_tag", "set_gateway_approval", "set_ranked_verification", "revoke_gateway_token", "create_report_token", "revoke_report_token"].includes(r?.action ?? ""),
+  );
 
 export const button = (scope: Page | Locator, name: string) => scope.getByRole("button", { name, exact: true });
 
@@ -451,5 +498,5 @@ export async function tabs(page: Page, from: Locator, stops: Locator[]) {
 }
 
 /** The administration's navigation, in its order. */
-export const NAV = ["Overview", "Accounts", "Gateways", "Audit log", "Legacy accounts", "Reported profile pictures", "Feedback", "Reset a login"];
+export const NAV = ["Overview", "Accounts", "Gateways", "Audit log", "Legacy accounts", "Reported profile pictures", "Feedback", "Feedback tokens", "Reset a login"];
 export const nav = (page: Page) => page.getByRole("navigation", { name: "Administration" });

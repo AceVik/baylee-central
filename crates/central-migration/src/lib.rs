@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 50] = migrations![
+const MIGRATIONS: [Migration; 51] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -86,6 +86,7 @@ const MIGRATIONS: [Migration; 50] = migrations![
     "m20261124_000049_group_profiles_and_admins",
     "m20261124_000050_card_catalog",
     "m20261124_000051_friend_invites",
+    "m20261125_000052_report_tokens",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -209,7 +210,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 50);
+        assert_eq!(MIGRATIONS.len(), 51);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -241,7 +242,7 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(50));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(51));
         assert_eq!(
             pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
             Some("m20261119_000033_presence")
@@ -265,9 +266,9 @@ mod tests {
     #[test]
     fn friend_invites_migration_enforces_hashing_uuidv7_and_revokes_public() {
         let m = MIGRATIONS
-            .last()
+            .iter()
+            .find(|m| m.name == "m20261124_000051_friend_invites")
             .expect("friend invites migration is present");
-        assert_eq!(m.name, "m20261124_000051_friend_invites");
         assert!(
             m.sql
                 .contains("CREATE TABLE central_identity.friend_invites")
@@ -280,5 +281,26 @@ mod tests {
             m.sql
                 .contains("REVOKE ALL ON TABLE central_identity.friend_invites FROM PUBLIC")
         );
+    }
+    /// A report token is stored by its digest alone, its rights' needs are
+    /// the table's, and what it files or writes says so.
+    #[test]
+    fn report_tokens_migration_keeps_digests_and_marks_what_a_token_did() {
+        let m = MIGRATIONS
+            .last()
+            .expect("report tokens migration is present");
+        assert_eq!(m.name, "m20261125_000052_report_tokens");
+        for said in [
+            "CREATE TABLE central_identity.report_tokens",
+            "digest bytea NOT NULL UNIQUE CHECK (octet_length(digest) = 32)",
+            "(read OR NOT triage) AND (triage OR NOT purge)",
+            "expires_at <= created_at + interval '366 days'",
+            "REVOKE ALL ON central_identity.report_tokens FROM PUBLIC",
+            "ADD COLUMN filed_by text NOT NULL DEFAULT 'gateway'",
+            "record_origin IS DISTINCT FROM 'gateway'",
+            "ADD COLUMN report_token_id uuid",
+        ] {
+            assert!(m.sql.contains(said), "{said}");
+        }
     }
 }

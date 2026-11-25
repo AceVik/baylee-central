@@ -42,6 +42,7 @@ impl IdentityService {
                     more: page.more,
                     accounts: page.accounts,
                     gateways: page.gateways,
+                    report_tokens: page.report_tokens,
                 }
             }
             AdminRequest::Overview => AdminAnswer::Overview {
@@ -59,8 +60,9 @@ impl IdentityService {
             request @ (AdminRequest::Registration | AdminRequest::SetRegistration { .. }) => {
                 return self.registration_admin(request, cookie).await;
             }
-            // Reports (`docs/reports.md`, `reports.rs`): the store checks the
-            // administrator, a purge's fresh sign-in, and writes the report's history.
+            // Reports and report tokens (`docs/reports.md`, `reports.rs`): the
+            // store checks the administrator, the fresh sign-in of a purge and of a
+            // token's making or revocation, and writes the history or the audit.
             request @ (AdminRequest::Reports { .. }
             | AdminRequest::ReportFacets { .. }
             | AdminRequest::Report { .. }
@@ -78,7 +80,10 @@ impl IdentityService {
             | AdminRequest::ReportViews
             | AdminRequest::SaveReportView { .. }
             | AdminRequest::DeleteReportView { .. }
-            | AdminRequest::SetReportsSeen { .. }) => {
+            | AdminRequest::SetReportsSeen { .. }
+            | AdminRequest::ReportTokens
+            | AdminRequest::CreateReportToken { .. }
+            | AdminRequest::RevokeReportToken { .. }) => {
                 return self.report_admin(request, cookie).await;
             }
             // Changes: the store checks the sign-in's age and writes the audit.

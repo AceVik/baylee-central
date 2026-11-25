@@ -43,6 +43,13 @@ pub(crate) const DIRECTORY: u32 = 60;
 /// that guessing it costs a guesser this budget too.
 pub(crate) const KOFI: u32 = 30;
 
+/// Refused report tokens an hour (`docs/reports.md` §"Report tokens"): past
+/// them the store is not asked about another from the address until the hour
+/// is over. A token is 256 random bits, so this bounds the asking, not the
+/// guessing; a script whose token was revoked meets it as well. A gateway's
+/// credential is neither counted nor refused by it.
+pub(crate) const REPORT_REFUSALS: u32 = 30;
+
 /// Each budget's addresses; one is forgotten once its window has passed.
 #[derive(Default)]
 pub(crate) struct Budgets {
@@ -53,6 +60,7 @@ pub(crate) struct Budgets {
     directory: Book,
     reset_mail: Book,
     kofi: Book,
+    report_refusals: Book,
 }
 
 impl Budgets {
@@ -75,6 +83,22 @@ impl Budgets {
             | Request::PublicFunding {} => self.directory.charge(client, now, DIRECTORY, MINUTE),
             _ => true,
         }
+    }
+
+    /// Whether the store may be asked about a report token from `client`:
+    /// its refusals in the hour are fewer than [`REPORT_REFUSALS`]. Requests
+    /// at once are asked before either is refused, so they may pass it by as
+    /// many as the listener serves at once.
+    pub(crate) fn may_present(&self, client: Client, now: Instant) -> bool {
+        !self
+            .report_refusals
+            .spent(client, now, REPORT_REFUSALS, HOUR)
+    }
+
+    /// Count a report token of `client` that was refused.
+    pub(crate) fn report_refused(&mut self, client: Client, now: Instant) {
+        self.report_refusals
+            .charge(client, now, REPORT_REFUSALS, HOUR);
     }
 
     /// Spend one of `client`'s deliveries to Ko-fi's webhook; `false` when none is
@@ -253,6 +277,34 @@ mod tests {
             );
         }
         assert!(budgets.charge_kofi(client(1), start + MINUTE));
+    }
+
+    /// An address's refused report tokens are the last the store is asked
+    /// about for the hour, and nothing else is spent by them.
+    #[test]
+    fn refused_report_tokens_are_counted_by_their_address() {
+        let start = Instant::now();
+        let mut budgets = Budgets::default();
+        for _ in 0..REPORT_REFUSALS {
+            assert!(budgets.may_present(client(1), start));
+            budgets.report_refused(client(1), start);
+        }
+        assert!(!budgets.may_present(client(1), start));
+        assert!(budgets.may_present(client(2), start));
+        let late = start + HOUR.saturating_sub(Duration::from_secs(1));
+        // refusals past the bound do not prolong it
+        budgets.report_refused(client(1), late);
+        assert!(!budgets.may_present(client(1), late));
+        assert!(budgets.may_present(client(1), start + HOUR));
+        for (request, limit, _) in requests() {
+            assert_eq!(
+                served(&mut budgets, &request, client(1), start, limit),
+                limit
+            );
+        }
+        // asking remembers nobody
+        assert!(budgets.may_present(client(3), start));
+        assert!(!budgets.report_refusals.spent(client(3), start, 1, HOUR));
     }
 
     fn served_of(

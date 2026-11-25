@@ -515,8 +515,11 @@ pub(super) struct Limits {
     /// place's share of them ([`PLACE_UNPROVEN_PER_MINUTE`]).
     unproven: Window,
     strangers: Places,
-    /// Reports each gateway filed in the current hour.
+    /// Reports each gateway or report token filed in the current hour.
     reports: BTreeMap<[u8; 16], (Instant, u32)>,
+    /// Each report token's other requests in its hour, and its downloads
+    /// among them.
+    report_tokens: BTreeMap<[u8; 16], (Instant, u32, u32)>,
     /// Signature checks of presented Central tokens.
     signatures: Window,
     /// Each place's share of them, by its block ([`PLACE_SIGNATURES_PER_SECOND`]).
@@ -852,6 +855,39 @@ impl Limits {
             return Err(Error::Busy);
         }
         *used += 1;
+        Ok(())
+    }
+
+    /// Spend `requests` of a report token's
+    /// [`central_api::report_tokens::REQUESTS_PER_HOUR`] an hour besides
+    /// filing, and `downloads` of its
+    /// [`central_api::report_tokens::DOWNLOADS_PER_HOUR`] with them. Nothing
+    /// is spent when they do not fit. The table holds tokens that
+    /// authenticated in the hour, of which few are live at once
+    /// ([`central_api::report_tokens::LIVE_TOKENS`]).
+    pub(super) fn report_token(
+        &mut self,
+        token: [u8; 16],
+        requests: u32,
+        downloads: u32,
+        now: Instant,
+    ) -> Result<(), Error> {
+        use central_api::report_tokens::{DOWNLOADS_PER_HOUR, REQUESTS_PER_HOUR};
+        let hour = Duration::from_secs(3_600);
+        self.report_tokens
+            .retain(|_, (start, ..)| now.duration_since(*start) < hour);
+        if !self.report_tokens.contains_key(&token) && self.report_tokens.len() >= 1024 {
+            return Err(Error::Busy);
+        }
+        let (_, asked, loaded) = self.report_tokens.entry(token).or_insert((now, 0, 0));
+        let (asking, loading) = (
+            asked.saturating_add(requests),
+            loaded.saturating_add(downloads),
+        );
+        if asking > REQUESTS_PER_HOUR || loading > DOWNLOADS_PER_HOUR {
+            return Err(Error::Busy);
+        }
+        (*asked, *loaded) = (asking, loading);
         Ok(())
     }
 
@@ -2018,6 +2054,42 @@ mod tests {
         limits
             .request(&figures, None, None, now + Duration::from_secs(1))
             .unwrap();
+    }
+
+    /// A report token has its hour's requests and, among them, its downloads;
+    /// another token's are its own, and filing is counted apart.
+    #[test]
+    fn a_report_token_has_its_requests_and_among_them_its_downloads() {
+        use central_api::report_tokens::{DOWNLOADS_PER_HOUR, REQUESTS_PER_HOUR};
+        let start = Instant::now();
+        let hour = Duration::from_secs(3_600);
+        let (one, two) = ([1; 16], [2; 16]);
+        let mut limits = Limits::default();
+        for _ in 0..DOWNLOADS_PER_HOUR {
+            limits.report_token(one, 1, 1, start).unwrap();
+        }
+        assert_eq!(limits.report_token(one, 1, 1, start), Err(Error::Busy));
+        // a refused download spent nothing: the other requests are whole,
+        // and a selection's twenty fit while they are there
+        for _ in DOWNLOADS_PER_HOUR..REQUESTS_PER_HOUR - 20 {
+            limits.report_token(one, 1, 0, start).unwrap();
+        }
+        limits.report_token(one, 1, 0, start).unwrap();
+        assert_eq!(limits.report_token(one, 20, 0, start), Err(Error::Busy));
+        limits.report_token(one, 19, 0, start).unwrap();
+        let late = start + hour.saturating_sub(Duration::from_secs(1));
+        assert_eq!(limits.report_token(one, 1, 0, late), Err(Error::Busy));
+        assert_eq!(
+            limits.report_token(one, u32::MAX, 0, late),
+            Err(Error::Busy)
+        );
+        limits.report_token(two, 1, 1, late).unwrap();
+        // what it files is counted apart from what it asks
+        limits.report(one, late).unwrap();
+        limits.report_token(one, 1, 1, start + hour).unwrap();
+        // nothing is kept of a token whose hour is over
+        limits.report_token(one, 1, 0, start + 3 * hour).unwrap();
+        assert_eq!(limits.report_tokens.len(), 1);
     }
 
     #[test]

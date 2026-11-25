@@ -1,13 +1,17 @@
 //! Central administration (`docs/administration.md`): what an administrator
 //! asks and is answered, on the browser listener only, with a browser session
 //! whose account holds the administrator role. No answer has a field that
-//! could carry a credential, a wrapper, a document or any other ciphertext.
+//! could carry a wrapper, a document or any other ciphertext, and two can
+//! carry a secret, each answered once to the change that made it and never
+//! again: a reset code and a new report token.
 use crate::Error;
+use crate::Token;
 use crate::gateway::{GatewayMetadata, GatewayState};
 use crate::owner::TokenInfo;
+use crate::report_tokens::{ReportScopes, ReportTokenInfo};
 use crate::reports::{
-    BulkAction, CrashGroup, DayCount, Neighbours, ReportAdmin, ReportChange, ReportDetail,
-    ReportFacets, ReportFilter, ReportSort, ReportSummary, SavedView,
+    BulkAction, CrashGroup, DayCount, NamedToken, Neighbours, ReportAdmin, ReportChange,
+    ReportDetail, ReportFacets, ReportFilter, ReportSort, ReportSummary, SavedView,
 };
 use crate::reset_code::ResetCode;
 use crate::wire::AccountSource;
@@ -234,6 +238,29 @@ pub enum AdminRequest {
         /// Opened, or not.
         seen: bool,
     },
+    /// The report tokens (`docs/reports.md` §"Report tokens"): the live
+    /// ones, and those revoked or expired in the last 30 days. Answered with
+    /// [`AdminAnswer::ReportTokens`].
+    ReportTokens,
+    /// Make a report token: a change that hands out a credential. At most
+    /// [`crate::report_tokens::LIVE_TOKENS`] live ones and
+    /// [`crate::report_tokens::TOKENS_PER_DAY`] new ones a day (`Busy`).
+    /// Answered with [`AdminAnswer::ReportTokenCreated`], the only answer
+    /// that carries the token.
+    CreateReportToken {
+        /// Its name ([`crate::owner::token_name`]).
+        name: String,
+        /// What it allows.
+        scopes: ReportScopes,
+        /// How many days it lives, 1 to [`crate::owner::MAX_TOKEN_DAYS`].
+        days: u16,
+    },
+    /// Revoke a report token at once: a change. `Done` again for one
+    /// revoked already.
+    RevokeReportToken {
+        /// The token's id.
+        token: [u8; 16],
+    },
     /// Whether registration is open (`docs/registration-abuse.md`).
     /// Answered with [`AdminAnswer::Registration`].
     Registration,
@@ -277,6 +304,8 @@ impl AdminRequest {
             | Self::SaveReportView { .. }
             | Self::DeleteReportView { .. }
             | Self::SetReportsSeen { .. }
+            | Self::CreateReportToken { .. }
+            | Self::RevokeReportToken { .. }
             | Self::SetRegistration { .. } => true,
             Self::Picture { request } => request.changes(),
             Self::Accounts { .. }
@@ -294,6 +323,7 @@ impl AdminRequest {
             | Self::ReportStats
             | Self::ReportAdmins
             | Self::ReportViews
+            | Self::ReportTokens
             | Self::Registration => false,
         }
     }
@@ -532,6 +562,18 @@ pub struct AuditEvent {
     pub beta_key: Option<[u8; 16]>,
 }
 
+/// The report token an audit event made or revoked, as it is called. Beside
+/// the events and not in them: the account export holds events too, and the
+/// released client reads those field by field (`export/released.rs`).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TokenEvent {
+    /// The event's id.
+    pub event: [u8; 16],
+    /// The token.
+    pub token: NamedToken,
+}
+
 /// The answer to an [`AdminRequest`] that reads; a change answers `Done`.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "answer", rename_all = "snake_case", deny_unknown_fields)]
@@ -565,6 +607,9 @@ pub enum AdminAnswer {
         accounts: Vec<NamedAccount>,
         /// The gateways the page names that still exist, each once.
         gateways: Vec<NamedGateway>,
+        /// The report tokens the page's events made or revoked.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        report_tokens: Vec<TokenEvent>,
     },
     /// A page of gateways.
     Gateways {
@@ -652,6 +697,22 @@ pub enum AdminAnswer {
         /// Oldest first.
         views: Vec<SavedView>,
     },
+    /// The report tokens.
+    ReportTokens {
+        /// At most [`crate::report_tokens::LISTED_TOKENS`], the live ones
+        /// first, each group newest first.
+        tokens: Vec<ReportTokenInfo>,
+    },
+    /// A report token, shown to the administrator once; Central keeps its
+    /// digest.
+    ReportTokenCreated {
+        /// The token's id.
+        id: [u8; 16],
+        /// The token: [`crate::report_tokens::token_text`] is the form to show.
+        token: Token,
+        /// When it stops working, in Unix seconds.
+        expires_at: i64,
+    },
     /// A page of picture reports.
     PictureReports {
         /// At most [`crate::picture::REPORT_PAGE`], newest first.
@@ -737,10 +798,17 @@ mod tests {
                 account: [0; 16],
                 tag: 7,
             },
+            AdminRequest::CreateReportToken {
+                name: "CI".into(),
+                scopes: ReportScopes::ONLY_POST,
+                days: 30,
+            },
+            AdminRequest::RevokeReportToken { token: [0; 16] },
         ] {
-            assert!(change.changes());
+            assert!(change.changes() && change.fresh());
         }
         for read in [
+            AdminRequest::ReportTokens,
             AdminRequest::Gateways {
                 state: Some(GatewayState::Pending),
                 before: None,
@@ -794,11 +862,14 @@ mod tests {
                 tag: Some(0x3fa2),
             }],
             gateways: Vec::new(),
+            report_tokens: Vec::new(),
         };
         let text = String::from_utf8(crate::encode(&answer).unwrap()).unwrap();
         assert!(text.starts_with(r#"{"answer":"audit","events":[{"id":[1,"#));
         assert!(text.contains(r#""accounts":[{"id":[2,"#));
         assert!(crate::decode::<AdminAnswer>(text.as_bytes()).is_ok());
+        // an event without a token reads as it did before there were any
+        assert!(!text.contains("report_token"));
         assert!(
             crate::decode::<AdminAnswer>(
                 text.replace(r#""beta_key":null"#, r#""beta_key":null,"note":"x""#)
@@ -831,5 +902,66 @@ mod tests {
         );
         let request = crate::decode::<AdminRequest>(br#"{"action":"overview"}"#).unwrap();
         assert!(matches!(request, AdminRequest::Overview) && !request.changes());
+    }
+    /// A report token's requests, and the one answer that carries a token.
+    #[test]
+    fn a_report_token_is_asked_for_by_its_rights_and_shown_once() {
+        let request: AdminRequest = crate::decode(
+            br#"{"action":"create_report_token","name":"CI","scopes":["read","triage"],"days":90}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            request,
+            AdminRequest::CreateReportToken { days: 90, scopes, .. } if scopes == ReportScopes::READ_AND_EDIT
+        ));
+        for bad in [
+            br#"{"action":"create_report_token","name":"CI","scopes":["admin"],"days":90}"#.as_slice(),
+            br#"{"action":"create_report_token","name":"CI","scopes":["read"]}"#,
+            br#"{"action":"create_report_token","name":"CI","scopes":["read"],"days":90,"digest":"x"}"#,
+            br#"{"action":"revoke_report_token"}"#,
+        ] {
+            assert!(crate::decode::<AdminRequest>(bad).is_err());
+        }
+        let token = Token::generate().unwrap();
+        let hex = token.hex();
+        let list = AdminAnswer::ReportTokens {
+            tokens: vec![ReportTokenInfo {
+                id: [1; 16],
+                name: "CI".into(),
+                scopes: ReportScopes::ONLY_POST,
+                created_by: [2; 16],
+                created_by_name: Some("Synthetic".into()),
+                created_by_tag: Some(0x3fa2),
+                suspended: false,
+                created_at: 1_800_000_000,
+                expires_at: 1_800_086_400,
+                revoked_at: None,
+                revoked_by: None,
+                revoked_by_name: None,
+                revoked_by_tag: None,
+                last_used_at: None,
+            }],
+        };
+        let text = String::from_utf8(crate::encode(&list).unwrap()).unwrap();
+        assert!(text.starts_with(r#"{"answer":"report_tokens","tokens":[{"id":[1,"#));
+        assert!(!text.contains("digest") && !text.contains(hex.as_str()));
+        assert!(
+            crate::decode::<AdminAnswer>(
+                text.replace(r#""name":"CI""#, r#""name":"CI","token":"x""#)
+                    .as_bytes()
+            )
+            .is_err()
+        );
+        let created = AdminAnswer::ReportTokenCreated {
+            id: [1; 16],
+            token,
+            expires_at: 1_800_086_400,
+        };
+        let text = crate::encode(&created).unwrap();
+        let AdminAnswer::ReportTokenCreated { token, .. } = crate::decode(&text).unwrap() else {
+            panic!("another answer");
+        };
+        assert_eq!(token.hex().as_str(), hex.as_str());
+        assert!(!format!("{token:?}").contains(hex.as_str()));
     }
 }

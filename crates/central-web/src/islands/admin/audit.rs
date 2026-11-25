@@ -43,6 +43,7 @@ impl Audit {
                     more,
                     accounts,
                     gateways,
+                    report_tokens,
                 }) => {
                     let found: Vec<Event> = events.into_iter().map(Event::from).collect();
                     let next = found.first().map(|event| id_hex(&event.id));
@@ -58,6 +59,11 @@ impl Audit {
                             names
                                 .gateways
                                 .insert(gateway.id, (gateway.name, gateway.origin));
+                        }
+                        for found in report_tokens {
+                            names
+                                .tokens
+                                .insert(found.event, (found.token.id, found.token.name));
                         }
                     });
                     if before.is_some() {

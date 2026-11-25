@@ -384,8 +384,13 @@ three years at the latest"). The operator's daily sweep does the same.
 The reporter stays the gateway's pseudonym or the device's HMAC; Central
 holds no key to either and never joins a reporter to an account. A
 reported chat message is not filed here: it is the gateway's moderation.
-The `client` object and the record are read only by an administrator, one
-report at a time, and never logged.
+The `client` object and the record are read only by an administrator or,
+since 25.11.2026, by the holder of a report token that may read
+([below](#report-tokens-25112026)), one report at a time, and never logged.
+Who may hold such a token is the administrators' to decide: the
+administration's own tools, and a hosted AI agent only once its provider
+is a processor under contract and named in the privacy policy
+(§"Decided by the owner" there).
 
 ### The website's section
 
@@ -496,3 +501,289 @@ Baylee's `baylee-feedback export-reports` writes them as JSON Lines (its
 - **The checks are the intake's own** (`ReportIntake::validate`), the
   status open, the labels Central's, the issue within its range.
 
+## Report tokens (25.11.2026)
+
+The owner asked for tokens that administrators hand out for the report API,
+with levels: some only post, some only read, some read and edit (delete,
+move and so on), some everything. A report token is an administrator's
+credential for a script, a build machine or an agent. It is no gateway, no
+account and no administrator, and it signs nobody in.
+
+### Pass 1: design
+
+**Assets.** Report words, `client` objects (with a screenshot) and records;
+the triage and its history; the store's room; the bounds that keep one
+caller from filling it; the tokens themselves.
+
+**Callers considered.** A stranger without a token; a holder of a revoked or
+expired token; a holder who tries more than the token allows; a holder who
+presents a gateway's credential, a session or a cookie instead, or a report
+token where one of those belongs; an administrator whose role was removed
+after making a token; a stolen browser cookie; a buggy script that repeats
+itself; a page in a browser.
+
+**Invariants.**
+
+1. A report token does exactly what its rights say, on the report routes and
+   nowhere else. No right implies a sign-in, an administration request, a
+   gateway's operation or another table.
+2. Whether a token is live and holds the right is asked by the query that
+   authenticates it, every time, and again in the transaction that changes
+   anything. Nothing is cached. Once a revocation is answered, nothing the
+   token began commits any more.
+3. A token never outlives its maker's role. The authenticating query also
+   asks that the account that made it is an administrator now, so removing
+   an administrator (or deleting the account) stops every token they know.
+4. An unknown token, a revoked one, an expired one and one without the right
+   are refused alike.
+5. A report names the token it came from, authenticated and never claimed,
+   and never looks like a gateway's: not in a list, a filter, a facet or the
+   history. A token cannot file a record as a gateway's own, nor name one.
+6. A change says which token made it, and no reader can take it for an
+   administrator's.
+7. What is secret is shown once, in the answer to its creation. Central
+   keeps the SHA-256 digest and never writes token or digest to a log, an
+   audit event or another answer.
+8. Nothing of a body is read before its credential is known to be good.
+9. The bounds that hold for a gateway hold for each token.
+
+### Pass 2: the rights, the routes and the schema
+
+**A token** is a [`Token`](../crates/central-api/src/token.rs) like a
+gateway's: 32 random bytes, stored as their digest in `report_tokens`,
+shown once as `brt_` and 64 lowercase hex digits. It has a name (the rules
+of a gateway token's), its rights, a lifetime of 1 to 366 days, its maker,
+its revocation and who revoked it, and when it was last used, to the minute.
+
+| right | what it allows | needs |
+| --- | --- | --- |
+| `file` | file a report and its parts | – |
+| `read` | search, facets, crash groups, statistics, one report with its notes and history, its parts | – |
+| `triage` | status, priority, labels, issue, assignee and duplicate, one or a selection; into the trash and out of it; notes, and the removal of the token's own; the list of administrators an assignee is chosen from | `read` |
+| `purge` | delete for good, from the trash only | `triage` |
+
+The website offers four presets, "only post" (`file`), "only read" (`read`),
+"read and edit" (`read`, `triage`) and "everything", and any other
+combination whose needs are met. The table's CHECKs hold the same rules.
+
+**Making and revoking one** is an administrator's change on the browser
+listener (`ReportTokens`, `CreateReportToken`, `RevokeReportToken`): a
+password sign-in less than 30 minutes old, at most 32 live tokens and 32 new
+ones a day, and an event in the administration's audit
+(`report_token.created`, `report_token.revoked`) that names the token by its
+id.
+
+**The routes** stand beside `/v1/native` on the native listener, under the
+same boundary: the protocol header, the exact `Host`, no `Origin` and no
+`Sec-Fetch-Site`, so no browser page reaches them.
+
+| request | right | answer |
+| --- | --- | --- |
+| `POST /v1/reports` | `file` | `201 {"report_id"}` |
+| `PUT /v1/reports/{id}/client`, `…/record` | `file` | `204` |
+| `POST /v1/reports/search` | `read` | a page and the total |
+| `POST /v1/reports/facets` | `read` | counts per dimension |
+| `POST /v1/reports/crashes` | `read` | crash groups |
+| `GET /v1/reports/stats` | `read` | reports per day and kind, 30 days |
+| `GET /v1/reports/{id}` | `read` | one report, its notes and history |
+| `GET /v1/reports/{id}/client`, `…/record` | `read` | the gzip as stored |
+| `GET /v1/reports/admins` | `triage` | who a report may be assigned to |
+| `PATCH /v1/reports/{id}` | `triage` | the report as changed |
+| `POST /v1/reports/{id}/trash`, `…/restore` | `triage` | `204` |
+| `POST /v1/reports/{id}/notes` | `triage` | the report |
+| `DELETE /v1/reports/{id}/notes/{note}` | `triage` | the report |
+| `POST /v1/reports/bulk` | `triage` | how many changed |
+| `DELETE /v1/reports/{id}` | `purge` | `204` |
+| `POST /v1/reports/purge` | `purge` | how many went |
+
+- **The right follows from the route alone**, so it is known before the body
+  is. A selection's purge has a route of its own for that reason.
+- **The bearer says what it is.** `Authorization: Bearer brt_<64 hex>` is a
+  report token and is looked for in `report_tokens` only; `Bearer <64 hex>`
+  stays a gateway's or the bridge's and is never looked for there. The
+  first two routes take both, the others a report token alone. Every other
+  route refuses a `brt_` bearer, which is no credential there.
+- **A filter travels in a body**, not in the address: a search may hold
+  words of a report or a reporter's pseudonym, and an address ends up in
+  shells' histories and proxies' logs.
+- **The contract is its own** (`central_api::report_api`): ids are 32
+  lowercase hex digits, unknown fields are refused, and the administration's
+  wire types, which change with the website, are not it.
+- **What is refused.** Before the credential is known to be good: `401` for
+  everything, the same for every cause; past it, `400` for a request the
+  rules refuse, `409` for a revision that moved on, `429` past a budget and
+  `503` when the store is away.
+- **Budgets.** Every request spends the listener's public budget and its
+  address's share, as a gateway's does. Thirty refused report tokens an hour
+  from one address are the last the store is asked about; the address's
+  gateways are not counted or refused by it. A token files 120 reports an
+  hour, its reports take 2 GiB in the store and it holds two uploads at
+  once, as a gateway does; it makes 600 other requests an hour, 120 of them
+  downloads, and one download at a time of two in all.
+
+**The store** asks the same functions for both callers, an administrator's
+session or a token with its rights (`ReportCaller`). A token marks nothing
+as seen, keeps no saved lists and cannot filter by what it opened.
+
+**Schema: migration 000052.** `report_tokens`; `reports.filed_by`
+(`gateway`, or `token`, whose id then stands in `gateway_id` and whose name
+in `gateway_label`, as it was); `report_audit.token_name` and
+`report_notes.token_name`, set exactly when the acting id is a token's, with
+the token's name as it was; `audit_events.report_token_id`. The previous
+binary runs unchanged over all of it: it shows a token's report like a
+gateway's of that name, and a token's note or change by an id it does not
+know.
+
+### Pass 3: as built
+
+What the building decided beyond pass 2, and what the adversarial pass found
+in it.
+
+- **The boundary leaves these bodies unread.** It read every other route's
+  body before the handler ran; for `/v1/reports` and below it now hands the
+  body on, and the handler has it read by the boundary's own means once the
+  credential is known to be good (`boundary.rs`, `Unread`): the same grace,
+  the same places for late bodies, at most 64 KiB, within the request's five
+  seconds. A gateway's `POST /v1/reports` is read this way too, so one with a
+  wrong credential is refused earlier than before, and metadata over 64 KiB
+  is `413` where it was `401`.
+- **A change holds the token's row** (`FOR SHARE`) until it commits. A
+  revocation therefore waits for a change that is being written, and a
+  change that comes while a revocation is being written waits and is refused
+  by it: once a revocation is answered, nothing the token began commits. One
+  that would wait longer than the store's five seconds fails and is sent
+  again; a token's changes come one at a time and its hour is bounded, so it
+  can hold its row against a revocation for seconds and not for an hour. A
+  filing and a part's upload, whose bodies come after the credential, ask for
+  the token again in the transaction that stores them.
+- **The maker's role** is asked by the authenticating query, as designed, and
+  in a change once more after the token's row is locked, in a statement of
+  its own: a statement that waited for the row looks at that row again and
+  at no other. The removal of an administrator locks the tokens they made
+  first, so it waits for what they are changing, and nothing of theirs is
+  stored after it. A token whose maker is no administrator is shown as
+  paused; with the role its maker's tokens work again. Revoking is final.
+  (An operator's own SQL on the roles takes no such lock: a change that has
+  begun still ends.)
+- **What can be told apart.** Only the credential's own refusal is counted
+  against an address; a request the rules refuse is not. The part's and the
+  report's checks are asked after the credential, apart from it. A token
+  revoked while its request is being answered is refused by the transaction
+  that answers, which is `400`; its next request is `401`.
+- **A token speaks for no gateway.** What a gateway says of itself (its name,
+  its address, its build) is empty in a token's report, by the type and by
+  the table, and the report's page calls the row it came from "Token" and
+  not "Gateway". A CSV has the token's name and id in two columns of their
+  own, after the old ones, and no gateway.
+- **The audit's event** carries the token's id in a column of its own
+  (`audit_events.report_token_id`), and a page of the audit names the token
+  beside its events, not in them: `AuditEvent` is also in the account export,
+  which the released Baylee client reads field by field
+  (`central-api`, `export/released.rs`). A field there would have kept every
+  administrator's client from reading its own name after sign-in.
+- **The store's four connections.** A search reads every report's words, so
+  a few of them at once could hold every connection and keep everyone's
+  sign-in waiting. Report tokens have two calls in the store at once, one of
+  each token (`central-http`, `slots.rs`); one more is `429` at once. A
+  script sends one request after the other. The slot is taken when the body
+  is there and kept until the store is done, whoever still waits: a request
+  that is dropped leaves its statement running, and its connection taken,
+  for up to the store's five seconds.
+- **Downloads** hold their part in memory until it is sent: two at once, one
+  of each token, in slots of their own. The slot is held while the part is
+  sent and not only while it is read from the store.
+- **A selection costs what it writes.** A change of two hundred reports
+  writes as many rows and histories; it spends a request of the token's hour
+  for every ten reports in it. A report that becomes a duplicate hands its
+  own duplicates on, which the request does not pay for and which could be
+  asked for again and again: a token's request hands on 50 in all and is
+  `400` past it, before anything is written. Whoever has more of them moves
+  them by a selection first.
+- **A report stays readable.** One report's page is answered on the wire's
+  1 MiB. Nothing bounded a report's notes together, nor the history it is
+  shown with, and a script can write both faster than a person. A report's
+  notes are now 192 KiB together, each weighed with 256 bytes besides its
+  text, whoever writes them (`429` past it), and the newest 200 lines of its
+  history are shown, with a line saying there are older ones. A facet lists
+  the 200 most used labels. A token's answers have a bound of their own
+  (8 MiB), which a page of two hundred reports at their largest fits.
+- **A token's note** holds what a report's own words may hold: no control
+  characters and none of the invisible ones that change how text reads.
+- **Its name in words.** A report, a note and a line of the history keep the
+  token's name as it was beside its id, as a report keeps its gateway's. Two
+  tokens may have one name: the page shows the end of the id beside it, and
+  *Feedback tokens* the whole.
+
+Tests. `central-api`: the rights and their needs, the presets, the text form
+and the header's two kinds and nothing else, redaction, the contract's
+bounds, every answer's fields by name, and that answers without a token read
+as before. `central-identity`: the hour's requests and downloads, what a
+selection costs, the right each call needs. `central-http`, against a
+stand-in behind the real boundary: each route's right, that no body is read
+for a credential that is not good (a body that counts its polls), one answer
+for every such refusal, a gateway's credential never asked about where a
+token is, `400` and `401`, the refusals' budget by address and that a
+gateway's are not in it, one call and one download at a time, the call's slot
+kept until the store is done when its caller goes away and not taken by a
+body on its way, the body's bounds, the protocol and a page's `Origin`, and
+that no answer holds a credential. PostgreSQL
+(`tests/support/accounts/reports/tokens.rs`): every set of rights a token
+can hold against every act, eighteen of them; a token revoked, over or
+without its maker; a revocation between the credential and the storing, and
+one while a change runs; the end of the maker's role while a change runs, and
+a change while that is being written; who may make and revoke; the audit; the
+bounds on tokens, notes, history, labels and what a request hands on; the
+filters, facets and history that tell a token
+from a gateway of the same name; the store's bound; the checks of the table
+and the runtime's exact grants both ways. Over real HTTP with PostgreSQL
+(`central-client`, `tests/support/report_tokens.rs`): the whole way from the
+administrator's browser session to filing, reading, triage and purge, the
+refusals, and a token on the routes that are not its own.
+
+**A review by a second agent** read the branch at `468c561b` without the
+implementer's notes, and found nothing high, two of middle weight and seven
+small ones. The two: a caller who hung up gave the slot back while the store
+worked on, so that hanging up again and again held more than two of its
+connections; and a report that became a duplicate wrote a line for each of
+its own duplicates, unpaid and as often as asked. The small ones: a note of
+one letter cost more than it was weighed as; a body on its way held a slot;
+the end of the maker's role did not wait for a change; a token's report
+could name a gateway; the labels' facet had no bound; an administration tab
+opened before the deployment cannot read what a token filed; tokens of one
+name could not be told apart. All of them are changed or, the tab, said in
+[operations](operations.md), as the points above describe. It was the same
+model as the implementer, so it is no independent audit.
+
+**What was not done.** It has not run on the server. The memory of a download
+and the time of a search over a full store are by reading the code and were
+not measured. The browser specs were written and not run on the machine it
+was built on (no npm packages there); CI runs them. These passes are the
+implementing agent's and are not an audit.
+
+### Decided by the owner
+
+Asked on 25.11.2026, the owner settled the four questions the first build
+left open:
+
+- **Hosted AI agents may read reports.** The owner alone manages feedback.
+  By the owner's decision of 25.11.2026, report tokens that may read may
+  also go to hosted AI agents (such as Claude by Anthropic or Codex by
+  OpenAI) that triage reports for the owner. The provider then receives
+  players' words, screenshots and records and is a processor (Art. 28
+  GDPR), in the USA. Before the first read token goes to such an agent,
+  the provider's commercial terms with their data processing agreement
+  must apply (consumer plans have none, and may train on inputs), and the
+  privacy policy must name the provider as a recipient and the transfer
+  (version 2026-11-26, drafted in a pull request of its own). Until then
+  read tokens go only to the administration's own machines.
+- **A purge by a token** needs no password, since a token has none: the
+  preset "everything" may delete for good, from the trash only, and each
+  report it deletes leaves a line naming the token in `report_audit`. Leave
+  `purge` out where it is not needed.
+- **Sixteen GiB for all reports** stays the bound for everyone together,
+  beside each token's own budget. Eight tokens at their two GiB fill it, and
+  then every gateway's reports are refused too. The four uploads at once are
+  shared the same way: two tokens that use their two each leave a gateway
+  none for that long. Tokens that file are an administrator's to hand out.
+- **The translations** besides English and German do not hold the change
+  back; a speaker reads them later.

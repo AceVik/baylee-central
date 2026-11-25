@@ -31,6 +31,7 @@ pub(super) mod password;
 pub(super) mod push;
 pub(super) mod ranked;
 pub(super) mod registration;
+pub(super) mod report_tokens;
 pub(super) mod reports;
 pub(super) mod reset;
 pub(super) mod strangers;

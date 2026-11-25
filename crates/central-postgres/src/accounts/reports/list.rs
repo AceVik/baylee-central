@@ -2,21 +2,25 @@
 //! the month's numbers and a report's neighbours. A filter becomes fixed SQL
 //! with numbered values (`Where`); no text of a filter is ever SQL.
 use super::super::{AccountStore, Error, Token, statement};
-use super::sweep;
+use super::{Actor, ReportCaller, sweep};
+use central_api::report_tokens::ReportScope;
 use central_api::reports::{
-    Channel, Count, CrashGroup, DayCount, EXCERPT, FACET_REPORTERS, MAX_CRASH_GROUPS, MAX_PAGE,
-    Neighbours, Priority, RecordOrigin, ReportFacets, ReportFilter, ReportKind, ReportSort,
-    ReportStatus, ReportSummary, STATS_DAYS,
+    Channel, Count, CrashGroup, DayCount, EXCERPT, FACET_LABELS, FACET_REPORTERS, MAX_CRASH_GROUPS,
+    MAX_PAGE, NamedToken, Neighbours, Priority, RecordOrigin, ReportFacets, ReportFilter,
+    ReportKind, ReportSort, ReportStatus, ReportSummary, STATS_DAYS,
 };
 use sea_orm::{
     ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, Value, prelude::Uuid,
 };
 
-/// The columns of a [`ReportSummary`] from `reports r`; `$1` is the reading administrator.
+/// The columns of a [`ReportSummary`] from `reports r`; `$1` is the reading
+/// administrator (a report token opens nothing, so its id finds no marks).
 pub(super) const SUMMARY_COLUMNS: &str = "r.id,
     floor(extract(epoch FROM r.created_at))::bigint AS created_at,
     floor(extract(epoch FROM r.updated_at))::bigint AS updated_at,
-    r.gateway_label, r.gateway_says, r.gateway_version, r.channel, r.reporter, r.kind, r.status,
+    r.gateway_label, r.gateway_says, r.gateway_version, r.reporter, r.kind, r.status,
+    CASE WHEN r.filed_by = 'token' THEN 'token' ELSE r.channel END AS channel,
+    CASE WHEN r.filed_by = 'token' THEN r.gateway_id END AS token_id,
     left(r.text, 300) AS excerpt, r.build_version, r.crash_message,
     r.record_bytes, r.record_complete, r.record_origin, r.issue_number, r.assignee, r.priority,
     pg_catalog.array_to_string(r.labels, ',') AS labels, r.duplicate_of, r.signature, r.revision,
@@ -62,6 +66,7 @@ pub(super) fn summary(row: &QueryResult) -> Result<ReportSummary, Error> {
         created_at: get(row, "created_at")?,
         updated_at: get(row, "updated_at")?,
         gateway: get(row, "gateway_label")?,
+        token: optional_id(row, "token_id")?,
         gateway_says: get(row, "gateway_says")?,
         gateway_version: get(row, "gateway_version")?,
         channel: Channel::from_stored(&get::<String>(row, "channel")?)?,
@@ -96,13 +101,16 @@ pub(super) fn summary(row: &QueryResult) -> Result<ReportSummary, Error> {
 /// but `skip`'s dimension, the most frequent first.
 async fn facet(
     tx: &DatabaseTransaction,
-    admin: Uuid,
+    reader: Uuid,
     filter: &ReportFilter,
     column: &str,
     skip: Dimension,
     limit: Option<usize>,
 ) -> Result<Vec<QueryResult>, Error> {
-    let at = Where::new(admin).filter(filter, Some(skip));
+    let mut at = Where::new(reader).filter(filter, Some(skip));
+    if skip == Dimension::Gateway {
+        at.when("r.filed_by = 'gateway'".into());
+    }
     let limit = limit.map_or_else(String::new, |n| format!(" LIMIT {n}"));
     let sql = format!(
         "SELECT {column} AS value, count(*)::bigint AS n FROM central_identity.reports r {}
@@ -112,6 +120,37 @@ async fn facet(
     tx.query_all_raw(statement(&sql, at.into_values()))
         .await
         .map_err(|_| Error::Unavailable)
+}
+
+/// The report tokens' facet: each by its id, with the name its newest report
+/// names, the most frequent first.
+async fn tokens(
+    tx: &DatabaseTransaction,
+    reader: Uuid,
+    filter: &ReportFilter,
+) -> Result<Vec<Count<NamedToken>>, Error> {
+    let at = Where::new(reader).filter(filter, Some(Dimension::Token));
+    let sql = format!(
+        "SELECT r.gateway_id AS value, (array_agg(r.gateway_label ORDER BY r.id DESC))[1] AS name,
+             count(*)::bigint AS n
+         FROM central_identity.reports r {} AND r.filed_by = 'token'
+         GROUP BY 1 ORDER BY 3 DESC, 1 LIMIT {FACET_REPORTERS}",
+        at.clause()
+    );
+    tx.query_all_raw(statement(&sql, at.into_values()))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .iter()
+        .map(|row| {
+            Ok(Count {
+                value: NamedToken {
+                    id: id(row, "value")?,
+                    name: get(row, "name")?,
+                },
+                count: n(row)?,
+            })
+        })
+        .collect()
 }
 
 /// A facet of words, each read by `read`.
@@ -138,21 +177,22 @@ enum Dimension {
     Assignee,
     Label,
     Gateway,
+    Token,
     Channel,
     Reporter,
 }
 
-/// Conditions over `reports r` and their values; `$1` is always the reading administrator.
+/// Conditions over `reports r` and their values; `$1` is always who reads.
 pub(super) struct Where {
     conditions: Vec<String>,
     values: Vec<Value>,
 }
 
 impl Where {
-    pub(super) fn new(admin: Uuid) -> Self {
+    pub(super) fn new(reader: Uuid) -> Self {
         Self {
             conditions: Vec::new(),
-            values: vec![admin.into()],
+            values: vec![reader.into()],
         }
     }
 
@@ -217,15 +257,28 @@ impl Where {
                 if none { " OR r.priority IS NULL" } else { "" }
             ));
         }
-        if keep(Dimension::Channel)
-            && let Some(channel) = filter.channel
-        {
-            self.equals("r.channel", channel.as_str());
+        if keep(Dimension::Channel) {
+            match filter.channel {
+                None => {}
+                Some(Channel::Token) => self.when("r.filed_by = 'token'".into()),
+                Some(channel) => {
+                    self.when("r.filed_by = 'gateway'".into());
+                    self.equals("r.channel", channel.as_str());
+                }
+            }
         }
         if keep(Dimension::Gateway)
             && let Some(gateway) = &filter.gateway
         {
+            // a report token of that name is no gateway
+            self.when("r.filed_by = 'gateway'".into());
             self.equals("r.gateway_label", gateway.clone());
+        }
+        if keep(Dimension::Token)
+            && let Some(token) = filter.token
+        {
+            self.when("r.filed_by = 'token'".into());
+            self.equals("r.gateway_id", Uuid::from_bytes(token));
         }
         if keep(Dimension::Assignee) {
             if filter.unassigned {
@@ -324,23 +377,24 @@ pub(super) fn order(sort: ReportSort, descending: bool) -> String {
     format!("ORDER BY {key} {direction}, r.id {direction}")
 }
 
-/// The administrator behind `browser`, and the sweep before anything is read, in `tx`.
-async fn reader(tx: &sea_orm::DatabaseTransaction, browser: &Token) -> Result<Uuid, Error> {
-    let (admin, _) = AccountStore::administrator(tx, browser).await?;
+/// Who reads, and the sweep before anything is read, in `tx`.
+async fn reader(tx: &DatabaseTransaction, caller: ReportCaller<'_>) -> Result<Uuid, Error> {
+    let reader = Actor::check(tx, caller, ReportScope::Read).await?;
     sweep(tx).await?;
-    Ok(admin)
+    Ok(reader.id)
 }
 
 impl AccountStore {
-    /// A page of reports for the administrator behind `browser`, after the
-    /// sweep, and how many the filter matches.
+    /// A page of reports for `caller`, after the sweep, and how many the
+    /// filter matches.
     ///
     /// # Errors
-    /// `Rejected` without an administrator's live browser session or for a
-    /// filter or page out of bounds; storage failure.
+    /// `Rejected` without an administrator's live browser session or a
+    /// report token that may read, or for a filter or page out of bounds;
+    /// storage failure.
     pub async fn reports(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         filter: &ReportFilter,
         sort: ReportSort,
         descending: bool,
@@ -352,7 +406,7 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = reader(&tx, browser).await?;
+        let admin = reader(&tx, caller).await?;
         let mut at = Where::new(admin).filter(filter, None);
         let (l, o) = (at.value(i64::from(limit)), at.value(i64::from(offset)));
         let sql = format!(
@@ -376,12 +430,12 @@ impl AccountStore {
     /// As [`Self::reports`].
     pub async fn report_facets(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         filter: &ReportFilter,
     ) -> Result<ReportFacets, Error> {
         filter.validate()?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = reader(&tx, browser).await?;
+        let admin = reader(&tx, caller).await?;
         let facet = |column, skip, limit| facet(&tx, admin, filter, column, skip, limit);
         let words = |s: &str| Ok(s.to_owned());
         let statuses = counted(
@@ -393,7 +447,12 @@ impl AccountStore {
             ReportKind::from_stored,
         )?;
         let channels = counted(
-            &facet("r.channel", Dimension::Channel, None).await?,
+            &facet(
+                "CASE WHEN r.filed_by = 'token' THEN 'token' ELSE r.channel END",
+                Dimension::Channel,
+                None,
+            )
+            .await?,
             Channel::from_stored,
         )?;
         let priorities = facet("r.priority", Dimension::Priority, None)
@@ -418,13 +477,19 @@ impl AccountStore {
             })
             .collect::<Result<_, Error>>()?;
         let labels = counted(
-            &facet("pg_catalog.unnest(r.labels)", Dimension::Label, None).await?,
+            &facet(
+                "pg_catalog.unnest(r.labels)",
+                Dimension::Label,
+                Some(FACET_LABELS),
+            )
+            .await?,
             words,
         )?;
         let gateways = counted(
             &facet("r.gateway_label", Dimension::Gateway, None).await?,
             words,
         )?;
+        let tokens = tokens(&tx, admin, filter).await?;
         let reporters = counted(
             &facet("r.reporter", Dimension::Reporter, Some(FACET_REPORTERS)).await?,
             words,
@@ -438,6 +503,7 @@ impl AccountStore {
             assignees,
             labels,
             gateways,
+            tokens,
             channels,
             reporters,
             total,
@@ -450,12 +516,12 @@ impl AccountStore {
     /// As [`Self::reports`].
     pub async fn crash_groups(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         filter: &ReportFilter,
     ) -> Result<Vec<CrashGroup>, Error> {
         filter.validate()?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = reader(&tx, browser).await?;
+        let admin = reader(&tx, caller).await?;
         let at = Where::new(admin).filter(filter, None);
         let rows = tx
             .query_all_raw(statement(
@@ -497,10 +563,11 @@ impl AccountStore {
     /// Reports per UTC day and kind over [`STATS_DAYS`] days, out of the trash: counts only.
     ///
     /// # Errors
-    /// `Rejected` without an administrator's live browser session; storage failure.
-    pub async fn report_stats(&self, browser: &Token) -> Result<Vec<DayCount>, Error> {
+    /// `Rejected` without an administrator's live browser session or a
+    /// report token that may read; storage failure.
+    pub async fn report_stats(&self, caller: ReportCaller<'_>) -> Result<Vec<DayCount>, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        reader(&tx, browser).await?;
+        reader(&tx, caller).await?;
         let rows = tx
             .query_all_raw(statement(
                 &format!(
@@ -528,7 +595,8 @@ impl AccountStore {
         Ok(days)
     }
 
-    /// `report`'s place in the list the filter and order make.
+    /// `report`'s place in the list the filter and order make, for the
+    /// administrator behind `browser`.
     ///
     /// # Errors
     /// As [`Self::reports`].
@@ -542,7 +610,7 @@ impl AccountStore {
     ) -> Result<Neighbours, Error> {
         filter.validate()?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = reader(&tx, browser).await?;
+        let admin = reader(&tx, ReportCaller::Admin(browser)).await?;
         let mut at = Where::new(admin).filter(filter, None);
         let wanted = at.value(Uuid::from_bytes(report));
         let order = order(sort, descending);

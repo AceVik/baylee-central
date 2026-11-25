@@ -546,3 +546,33 @@ The privacy policy and the terms (still version 2026-11-19, unpublished) and
 the website's privacy page say what friends see. Open: the owner's look at the
 changed paragraph; the migration's production run through its own gate; the
 Baylee client, which has yet to report and choose.
+
+## Report tokens, 25 November 2026
+
+By the owner's order of the same day, administrators hand out tokens for the
+report API with levels ([reports](reports.md) §"Report tokens"):
+
+- `central-api`: `report_tokens` (the rights `file`, `read`, `triage`,
+  `purge` and their needs, the text form `brt_…`, the header's two kinds) and
+  `report_api`, the contract scripts read, apart from the administration's
+  types; `Channel::Token`;
+- `central-postgres`: migration 000052 (`report_tokens`, `reports.filed_by`,
+  the token's name on a note and a line of the history,
+  `audit_events.report_token_id`); one actor type for administrators and
+  tokens; a report's notes bounded together, its history shown by its newest
+  200 lines;
+- `central-identity`: the token's hour, its calls and what a selection costs;
+  `ReportTokens`, `CreateReportToken` and `RevokeReportToken`;
+- `central-http`: the report routes, their credential before their body, one
+  call and one download at a time, refused tokens counted by their address;
+- `central-web`: the page *Feedback tokens* in eleven languages, and a token
+  named as one in the list, the filters, the facts, the notes, the history
+  and the audit.
+
+The owner settled the questions the first build left open the same day
+([reports](reports.md) §"Decided by the owner"). Open: the privacy
+policy's version 2026-11-26, which names a hosted AI agent's provider as a
+processor before a read token goes to one, drafted and waiting for the
+owner; the nine languages besides English and German for a speaker to
+read, which does not hold the change back; the migration's production run
+through its own gate.

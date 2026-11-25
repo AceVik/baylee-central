@@ -344,6 +344,7 @@ function facets(w: World, f: Filter) {
     assignees: counts(under("assignee"), (r) => [r.summary.assignee]),
     labels: counts(under("label"), (r) => r.summary.labels),
     gateways: counts(under("gateway"), (r) => (r.summary.channel === "gateway" ? [r.summary.gateway] : [])),
+    tokens: [],
     channels: counts(under("channel"), (r) => [r.summary.channel]),
     reporters: counts(w.reports.filter((r) => matches(r, f)), (r) => [r.summary.reporter]),
     total: w.reports.filter((r) => matches(r, f)).length,

@@ -5,7 +5,9 @@
 //! at a time.
 use super::{AccountStore, DatabaseConnection, Error, Uuid, fresh_id, gzip, intake, sql};
 use central_api::reports::{Part, ReportIntake, ReportKind};
-use central_postgres::{ALL_STORED, Filer, GATEWAY_STORED, OFFICIAL_STORED, REPORT_BYTES};
+use central_postgres::{
+    ALL_STORED, Filer, FilerKind, GATEWAY_STORED, OFFICIAL_STORED, REPORT_BYTES,
+};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, TransactionTrait};
 
 /// The parts at their largest: 2 MiB of `client`, 64 MiB of record.
@@ -18,9 +20,13 @@ const LARGEST: u64 = REPORT_BYTES + CLIENT + RECORD;
 /// gateway, and the store weighs a filer's reports by its id.
 async fn gateway(operator: &DatabaseConnection, official: bool) -> Filer {
     Filer {
-        gateway: *fresh_id(operator).await.as_bytes(),
+        id: *fresh_id(operator).await.as_bytes(),
         label: "Weighed".into(),
-        official,
+        kind: if official {
+            FilerKind::Official
+        } else {
+            FilerKind::Gateway
+        },
     }
 }
 
@@ -71,11 +77,11 @@ async fn age(operator: &DatabaseConnection, gateway: [u8; 16]) {
 }
 
 async fn theirs(store: &AccountStore, filer: &Filer) -> u64 {
-    store.report_levels(filer.gateway).await.unwrap().0
+    store.report_levels(filer.id).await.unwrap().0
 }
 
 async fn everyone(store: &AccountStore, filer: &Filer) -> u64 {
-    store.report_levels(filer.gateway).await.unwrap().1
+    store.report_levels(filer.id).await.unwrap().1
 }
 
 pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection) {
@@ -110,10 +116,16 @@ async fn runbook(store: &AccountStore, operator: &DatabaseConnection, filer: &Fi
             .map(|line| line.try_get::<i64>("", "bytes").unwrap())
             .and_then(|bytes| u64::try_from(bytes).ok())
     };
-    let (theirs, everyone) = store.report_levels(filer.gateway).await.unwrap();
+    let (theirs, everyone) = store.report_levels(filer.id).await.unwrap();
     assert!(theirs > 0 && everyone > theirs);
-    assert_eq!(counted(Some(Uuid::from_bytes(filer.gateway))), Some(theirs));
+    assert_eq!(counted(Some(Uuid::from_bytes(filer.id))), Some(theirs));
     assert_eq!(counted(None), Some(everyone));
+    // a line says who filed, and the line for all names nobody
+    for line in &lines {
+        let id = line.try_get::<Option<Uuid>>("", "gateway_id").unwrap();
+        let filed_by = line.try_get::<Option<String>>("", "filed_by").unwrap();
+        assert_eq!(filed_by.as_deref(), id.map(|_| "gateway"));
+    }
 }
 
 /// A registered gateway's bound, to the byte; another gateway is not
@@ -122,7 +134,7 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection) -> File
     let one = gateway(operator, false).await;
     let before = everyone(store, &one).await;
     assert_eq!(theirs(store, &one).await, 0);
-    pile(operator, one.gateway, 31).await;
+    pile(operator, one.id, 31).await;
     assert_eq!(theirs(store, &one).await, 31 * LARGEST);
     assert_eq!(everyone(store, &one).await, before + 31 * LARGEST);
     // exactly a report without parts is left of its 2 GiB
@@ -152,7 +164,7 @@ async fn registered(store: &AccountStore, operator: &DatabaseConnection) -> File
 /// be stored; what is stored counts however old; a report's going frees
 /// its room.
 async fn stored_and_awaited(store: &AccountStore, operator: &DatabaseConnection, one: &Filer) {
-    age(operator, one.gateway).await;
+    age(operator, one.id).await;
     assert_eq!(theirs(store, one).await, 32 * REPORT_BYTES);
     store
         .file_report(one, &announcing(CLIENT, RECORD))
@@ -173,7 +185,7 @@ async fn stored_and_awaited(store: &AccountStore, operator: &DatabaseConnection,
         .await
         .unwrap();
     assert_eq!(theirs(store, &sender).await, REPORT_BYTES + 4_000 + 20_000);
-    age(operator, sender.gateway).await;
+    age(operator, sender.id).await;
     assert_eq!(
         theirs(store, &sender).await,
         REPORT_BYTES + 20_000,
@@ -193,7 +205,7 @@ async fn official(store: &AccountStore, operator: &DatabaseConnection) {
     let official = gateway(operator, true).await;
     let fit = OFFICIAL_STORED / LARGEST;
     assert!(fit > 4 * 30);
-    pile(operator, official.gateway, fit - 1).await;
+    pile(operator, official.id, fit - 1).await;
     store
         .file_report(&official, &announcing(CLIENT, RECORD))
         .await
@@ -213,7 +225,7 @@ async fn official(store: &AccountStore, operator: &DatabaseConnection) {
 async fn all(store: &AccountStore, operator: &DatabaseConnection, one: &Filer) {
     let room = ALL_STORED - everyone(store, one).await;
     let crowd = gateway(operator, false).await;
-    pile(operator, crowd.gateway, room / LARGEST - 1).await;
+    pile(operator, crowd.id, room / LARGEST - 1).await;
     let late = gateway(operator, false).await;
     store
         .file_report(&late, &announcing(CLIENT, RECORD))
@@ -233,7 +245,7 @@ async fn all(store: &AccountStore, operator: &DatabaseConnection, one: &Filer) {
     sql(
         operator,
         "DELETE FROM central_identity.reports WHERE gateway_id = $1",
-        vec![Uuid::from_bytes(crowd.gateway).into()],
+        vec![Uuid::from_bytes(crowd.id).into()],
     )
     .await;
     store
@@ -261,7 +273,7 @@ async fn one_at_a_time(store: &AccountStore, operator: &DatabaseConnection) {
     held.rollback().await.unwrap();
     assert_eq!(theirs(store, &racer).await, 0);
     // room for exactly one report without parts, asked for four times at once
-    pile(operator, racer.gateway, 31).await;
+    pile(operator, racer.id, 31).await;
     let report = announcing(0, 0);
     let filed = tokio::join!(
         store.file_report(&racer, &report),

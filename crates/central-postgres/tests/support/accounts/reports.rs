@@ -12,13 +12,14 @@ use central_api::reports::{
 };
 use central_api::wire::Identity;
 use central_postgres::{
-    ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal, Session,
-    appoint_admin,
+    FilerKind, ImportedHistory, ImportedNote, ImportedReport, ReportCaller::Admin, ReportImport,
+    ReportImportRefusal, Session, appoint_admin,
 };
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 use sha2::{Digest, Sha256};
 
 mod level;
+mod tokens;
 
 const ORIGIN: &str = "https://reports.invalid";
 
@@ -143,7 +144,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     )
     .await;
     let filer = store.report_filer(&token).await.unwrap();
-    assert_eq!((filer.gateway, filer.official), (gateway, false));
+    assert_eq!((filer.id, filer.kind), (gateway, FilerKind::Gateway));
     assert_eq!(
         store.report_filer(&Token::generate().unwrap()).await.err(),
         Some(Error::Rejected)
@@ -179,6 +180,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     marking(store, &cookie, &other, admin, first).await;
     importing(store, operator, &cookie, admin, owner).await;
     sweeping(store, operator, &cookie, first).await;
+    tokens::run(store, operator, keys).await;
     level::run(store, operator).await;
 }
 
@@ -209,7 +211,7 @@ async fn filing(
         "direct only through the bridge"
     );
     let official = store.official_filer().await.unwrap();
-    assert!(official.official);
+    assert_eq!(official.kind, FilerKind::Official);
     store.file_report(&official, &direct).await.unwrap();
     // the announced length, then the bytes: wrong length, wrong hash, not gzip
     assert_eq!(
@@ -298,14 +300,14 @@ async fn listing(
 ) {
     assert_eq!(
         store
-            .reports(stranger, &all(), ReportSort::Received, true, 0, 50)
+            .reports(Admin(stranger), &all(), ReportSort::Received, true, 0, 50)
             .await
             .err(),
         Some(Error::Rejected),
         "no administrator"
     );
     let (page, total) = store
-        .reports(cookie, &all(), ReportSort::Received, true, 0, 50)
+        .reports(Admin(cookie), &all(), ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert!(total >= 4 && u64::try_from(page.len()).unwrap() == total.min(50));
@@ -316,7 +318,7 @@ async fn listing(
     };
     let (hits, _) = store
         .reports(
-            cookie,
+            Admin(cookie),
             &found("STACK WENT"),
             ReportSort::Received,
             true,
@@ -328,7 +330,7 @@ async fn listing(
     assert_eq!(hits.iter().map(|r| r.id).collect::<Vec<_>>(), [first]);
     let (hits, _) = store
         .reports(
-            cookie,
+            Admin(cookie),
             &found("out of range"),
             ReportSort::Received,
             true,
@@ -347,13 +349,13 @@ async fn listing(
         ..all()
     };
     let (hits, _) = store
-        .reports(cookie, &crashes, ReportSort::Received, true, 0, 50)
+        .reports(Admin(cookie), &crashes, ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert!(hits.iter().all(|r| r.kind == ReportKind::Crash) && hits.iter().any(|r| r.id == crash));
     assert_eq!(
         store
-            .reports(cookie, &all(), ReportSort::Received, true, 0, 201)
+            .reports(Admin(cookie), &all(), ReportSort::Received, true, 0, 201)
             .await
             .err(),
         Some(Error::Rejected)
@@ -369,7 +371,7 @@ async fn reading(
     first: [u8; 16],
     crash: [u8; 16],
 ) {
-    let detail = store.report_detail(cookie, first).await.unwrap();
+    let detail = store.report_detail(Admin(cookie), first).await.unwrap();
     assert_eq!(detail.text, "The stack went wrong");
     assert!(
         detail.client.as_ref().is_some_and(|c| c.received)
@@ -377,7 +379,7 @@ async fn reading(
     );
     assert_eq!(detail.audit[0].action, "report.filed");
     let (bytes, origin) = store
-        .report_part(cookie, first, Part::Record)
+        .report_part(Admin(cookie), first, Part::Record)
         .await
         .unwrap();
     assert_eq!(
@@ -385,10 +387,13 @@ async fn reading(
         (gzip(5, 20_000), Some(RecordOrigin::Gateway))
     );
     assert_eq!(
-        store.report_part(stranger, first, Part::Record).await.err(),
+        store
+            .report_part(Admin(stranger), first, Part::Record)
+            .await
+            .err(),
         Some(Error::Rejected)
     );
-    let groups = store.crash_groups(cookie, &all()).await.unwrap();
+    let groups = store.crash_groups(Admin(cookie), &all()).await.unwrap();
     assert!(
         groups
             .iter()
@@ -398,12 +403,12 @@ async fn reading(
         kinds: vec![ReportKind::Crash],
         ..all()
     };
-    let facets = store.report_facets(cookie, &crashes).await.unwrap();
+    let facets = store.report_facets(Admin(cookie), &crashes).await.unwrap();
     assert!(facets.kinds.len() > 1, "its own dimension is not filtered");
     assert!(facets.statuses.iter().all(|c| c.value == ReportStatus::New));
     assert!(
         store
-            .report_stats(cookie)
+            .report_stats(Admin(cookie))
             .await
             .unwrap()
             .iter()
@@ -431,7 +436,7 @@ async fn triage(
     };
     let triaged = change(|c| c.status = Some(ReportStatus::Triaged));
     let now = store
-        .set_report(cookie, first, &triaged, Some(0))
+        .set_report(Admin(cookie), first, &triaged, Some(0))
         .await
         .unwrap();
     assert_eq!(
@@ -440,7 +445,7 @@ async fn triage(
     );
     assert_eq!(
         store
-            .set_report(cookie, first, &triaged, Some(0))
+            .set_report(Admin(cookie), first, &triaged, Some(0))
             .await
             .err(),
         Some(Error::Conflict),
@@ -448,7 +453,7 @@ async fn triage(
     );
     assert_eq!(
         store
-            .set_report(cookie, first, &triaged, Some(1))
+            .set_report(Admin(cookie), first, &triaged, Some(1))
             .await
             .unwrap()
             .summary
@@ -461,7 +466,10 @@ async fn triage(
         ..ReportChange::default()
     };
     assert_eq!(
-        store.set_report(cookie, first, &assign, None).await.err(),
+        store
+            .set_report(Admin(cookie), first, &assign, None)
+            .await
+            .err(),
         Some(Error::Rejected),
         "only an administrator"
     );
@@ -470,7 +478,7 @@ async fn triage(
     assign.priority = Some(Some(Priority::High));
     assign.issue = Some(Some(311));
     let now = store
-        .set_report(cookie, first, &assign, None)
+        .set_report(Admin(cookie), first, &assign, None)
         .await
         .unwrap();
     assert_eq!(now.summary.labels, ["lands", "ui"]);
@@ -488,26 +496,26 @@ async fn duplicates(store: &AccountStore, cookie: &Token, [first, second, crash]
         ..ReportChange::default()
     };
     let now = store
-        .set_report(cookie, second, &dup(first), None)
+        .set_report(Admin(cookie), second, &dup(first), None)
         .await
         .unwrap();
     assert_eq!(now.summary.status, ReportStatus::Duplicate);
     assert!(now.summary.done_at.is_some());
     assert_eq!(
         store
-            .set_report(cookie, crash, &dup(second), None)
+            .set_report(Admin(cookie), crash, &dup(second), None)
             .await
             .err(),
         Some(Error::Rejected),
         "the original is no duplicate"
     );
     store
-        .set_report(cookie, first, &dup(crash), None)
+        .set_report(Admin(cookie), first, &dup(crash), None)
         .await
         .unwrap();
     assert_eq!(
         store
-            .report_detail(cookie, second)
+            .report_detail(Admin(cookie), second)
             .await
             .unwrap()
             .summary
@@ -517,7 +525,7 @@ async fn duplicates(store: &AccountStore, cookie: &Token, [first, second, crash]
     );
     let undone = store
         .set_report(
-            cookie,
+            Admin(cookie),
             first,
             &ReportChange {
                 duplicate_of: Some(None),
@@ -543,16 +551,22 @@ async fn notes(
 ) {
     // notes: added, removed only by their author
     let noted = store
-        .add_report_note(cookie, first, "Looks like the stack")
+        .add_report_note(Admin(cookie), first, "Looks like the stack")
         .await
         .unwrap();
     let note = noted.notes[0].id;
     assert_eq!(noted.notes[0].author, admin.account);
     assert_eq!(
-        store.remove_report_note(other, first, note).await.err(),
+        store
+            .remove_report_note(Admin(other), first, note)
+            .await
+            .err(),
         Some(Error::Rejected)
     );
-    let left = store.remove_report_note(cookie, first, note).await.unwrap();
+    let left = store
+        .remove_report_note(Admin(cookie), first, note)
+        .await
+        .unwrap();
     assert_eq!(left.notes.len(), 0);
 }
 
@@ -571,14 +585,18 @@ async fn binning(
     };
     assert_eq!(
         store
-            .reports_bulk(cookie, &[first, crash], &BulkAction::Change { change: add })
+            .reports_bulk(
+                Admin(cookie),
+                &[first, crash],
+                &BulkAction::Change { change: add }
+            )
             .await
             .unwrap(),
         2
     );
     assert_eq!(
         store
-            .reports_bulk(cookie, &[crash], &BulkAction::Trash)
+            .reports_bulk(Admin(cookie), &[crash], &BulkAction::Trash)
             .await
             .unwrap(),
         1
@@ -588,13 +606,13 @@ async fn binning(
         ..all()
     };
     let (bin, _) = store
-        .reports(cookie, &trash, ReportSort::Received, true, 0, 50)
+        .reports(Admin(cookie), &trash, ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert_eq!(bin.iter().map(|r| r.id).collect::<Vec<_>>(), [crash]);
     assert_eq!(
         store
-            .bin_report(cookie, first, &BulkAction::Purge)
+            .bin_report(Admin(cookie), first, &BulkAction::Purge)
             .await
             .err(),
         Some(Error::Rejected),
@@ -608,30 +626,34 @@ async fn binning(
     .await;
     assert_eq!(
         store
-            .bin_report(cookie, crash, &BulkAction::Purge)
+            .bin_report(Admin(cookie), crash, &BulkAction::Purge)
             .await
             .err(),
         Some(Error::Rejected),
         "a stale sign-in"
     );
     store
-        .bin_report(cookie, crash, &BulkAction::Restore)
+        .bin_report(Admin(cookie), crash, &BulkAction::Restore)
         .await
         .unwrap();
     store
-        .bin_report(other, crash, &BulkAction::Trash)
+        .bin_report(Admin(other), crash, &BulkAction::Trash)
         .await
         .unwrap();
     store
-        .bin_report(other, crash, &BulkAction::Purge)
+        .bin_report(Admin(other), crash, &BulkAction::Purge)
         .await
         .unwrap();
     assert_eq!(
-        store.report_detail(cookie, crash).await.err(),
+        store.report_detail(Admin(cookie), crash).await.err(),
         Some(Error::Rejected)
     );
     // its duplicate keeps no original: opened again
-    let freed = store.report_detail(cookie, second).await.unwrap().summary;
+    let freed = store
+        .report_detail(Admin(cookie), second)
+        .await
+        .unwrap()
+        .summary;
     assert_eq!(
         (freed.status, freed.duplicate_of, freed.done_at),
         (ReportStatus::Triaged, None, None)
@@ -679,18 +701,18 @@ async fn marking(
         ..all()
     };
     let (mine, _) = store
-        .reports(cookie, &unseen, ReportSort::Received, true, 0, 50)
+        .reports(Admin(cookie), &unseen, ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert!(!mine.iter().any(|r| r.id == first));
     let (theirs, _) = store
-        .reports(other, &unseen, ReportSort::Received, true, 0, 50)
+        .reports(Admin(other), &unseen, ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert!(theirs.iter().any(|r| r.id == first));
     assert!(
         store
-            .report_admins(cookie)
+            .report_admins(Admin(cookie))
             .await
             .unwrap()
             .iter()
@@ -710,7 +732,7 @@ async fn sweeping(
         ..ReportChange::default()
     };
     store
-        .set_report(cookie, done, &resolved, None)
+        .set_report(Admin(cookie), done, &resolved, None)
         .await
         .unwrap();
     sql(
@@ -720,11 +742,11 @@ async fn sweeping(
     )
     .await;
     store
-        .reports(cookie, &all(), ReportSort::Received, true, 0, 50)
+        .reports(Admin(cookie), &all(), ReportSort::Received, true, 0, 50)
         .await
         .unwrap();
     assert_eq!(
-        store.report_detail(cookie, done).await.err(),
+        store.report_detail(Admin(cookie), done).await.err(),
         Some(Error::Rejected)
     );
     assert_eq!(
@@ -832,14 +854,20 @@ async fn importing(
         assert_eq!(import.finish(count, &sha).await.err(), Some(refusal));
     }
     assert_eq!(
-        store.report_detail(cookie, *id.as_bytes()).await.err(),
+        store
+            .report_detail(Admin(cookie), *id.as_bytes())
+            .await
+            .err(),
         Some(Error::Rejected),
         "a refused copy stored nothing"
     );
     let mut import = ReportImport::begin(operator, admin.account).await.unwrap();
     import.add(line, &report).await.unwrap();
     assert_eq!(import.finish(1, &digest).await.unwrap(), (1, 0));
-    let detail = store.report_detail(cookie, *id.as_bytes()).await.unwrap();
+    let detail = store
+        .report_detail(Admin(cookie), *id.as_bytes())
+        .await
+        .unwrap();
     assert_eq!(
         (
             detail.summary.status,
@@ -868,7 +896,7 @@ async fn importing(
     );
     assert_eq!(
         store
-            .report_part(cookie, *id.as_bytes(), Part::Record)
+            .report_part(Admin(cookie), *id.as_bytes(), Part::Record)
             .await
             .unwrap(),
         (gzip(2, 900), Some(RecordOrigin::Client))

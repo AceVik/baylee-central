@@ -399,6 +399,23 @@
   margin-block-start: var(--space-3);
 }
 
+/* ---- Feedback tokens -------------------------------------------------------- */
+
+.rt-making {
+  margin-block-end: var(--space-4);
+}
+
+.rt-making .admin-chips legend {
+  margin-block-end: var(--space-2);
+  padding: 0;
+  color: var(--ink);
+  font: 700 1rem var(--sans);
+}
+
+.admin-gw .meta {
+  overflow-wrap: anywhere;
+}
+
 /* ---- A change: its confirmation in the card of what it changes ------------ */
 
 .admin-confirm {

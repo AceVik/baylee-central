@@ -16,15 +16,15 @@ mod legacy;
 mod pending;
 pub use accounts::{
     ALL_STORED, AUDIT_YEARS, AccountStore, Action, Appointed, Approval, AuditPage,
-    CHAT_SENDER_SHARE, Claim, Concerns, Credential, EMAIL_FRESH_MINUTES, Email, Filer,
+    CHAT_SENDER_SHARE, Claim, Concerns, Credential, EMAIL_FRESH_MINUTES, Email, Filer, FilerKind,
     GATEWAY_STORED, GatewayGrant, GatewayPush, GatewayPushResult, ISSUED_RESET_HOURS,
     ImportedHistory, ImportedNote, ImportedReport, Issued, LIVE_CHECK, LegacyMove,
     MAIL_CODE_MINUTES, MAIL_CODE_TRIES, MAILED_RESET_HOURS, MAX_GATEWAY_VERSIONS, MAX_POLLS,
     MAX_SIDS_PER_SESSION, MailedReset, OFFICIAL_STORED, OPEN_IN_ALL, OPEN_PER_ACCOUNT,
     PUSH_ATTEMPTS, PushJob, PushResult, REPORT_BYTES, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY,
     REVOCATION_PAGE, RankedHostCredential, RecoveryBackupPrep, Redeemed, RefreshOutcome,
-    ReportImport, ReportImportRefusal, RevocationPage, Session, Status, Summary, Swept, TAG_DRAWS,
-    TagDraw, Told, appoint_admin, provision_tower_award_issuer, sweep,
+    ReportCaller, ReportImport, ReportImportRefusal, ReportToken, RevocationPage, Session, Status,
+    Summary, Swept, TAG_DRAWS, TagDraw, Told, appoint_admin, provision_tower_award_issuer, sweep,
 };
 /// Donations (`docs/operations.md` §"Donations", migration 000032).
 pub mod donations {

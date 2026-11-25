@@ -1,22 +1,21 @@
 use super::{
     addresses::Budgets,
-    boundary::{Origin, Pace, REJECTED, UPLOAD_PACE, paced, timed_out},
+    boundary::{Origin, REJECTED},
     in_flight::Client,
     unplaced::Unplaced,
-    uploads::Uploads,
 };
 use axum::{
     Router,
-    body::{Body, Bytes},
-    extract::{Path, Request, State},
+    body::Bytes,
+    extract::{Request, State},
     http::{Extensions, HeaderMap, HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{get, post, put},
+    routing::{get, post},
 };
 use central_api::{
-    Error, PROTOCOL_HEADER, PROTOCOL_VERSION, Token, UPDATE_REQUIRED_BODY, UPDATE_REQUIRED_STATUS,
-    ranked, reports::Part, wire,
+    Error, PROTOCOL_HEADER, PROTOCOL_VERSION, UPDATE_REQUIRED_BODY, UPDATE_REQUIRED_STATUS, ranked,
+    wire,
 };
 use central_identity::{IdentityService, KofiAnswer, Place, Presented};
 use std::{
@@ -28,9 +27,6 @@ use std::{
 struct Native {
     relay: crate::relay::Relay,
     identity: Arc<IdentityService>,
-    /// The report parts being uploaded, and each gateway's unfinished ones
-    /// (`uploads.rs`).
-    uploads: Uploads,
     /// What each client address may ask in its window (`addresses.rs`).
     budgets: Arc<Mutex<Budgets>>,
     /// On the deployed listener, the requests that came without the
@@ -43,12 +39,18 @@ struct Native {
 /// public name's proxy: there a request without the proxy's address is
 /// counted and reported, never refused (`unplaced.rs`).
 pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
+    let budgets: Arc<Mutex<Budgets>> = Arc::default();
+    let unplaced: Option<Arc<Unplaced>> = deployed.then(Arc::default);
+    // Reports (`docs/reports.md`, `reports.rs`): a gateway's, and what a
+    // report token files, reads and triages.
+    let reports = super::reports::router(
+        Arc::clone(&identity),
+        Arc::clone(&budgets),
+        unplaced.clone(),
+    );
     Router::new()
         .route("/v1/native", post(call))
-        // A gateway's reports (`docs/reports.md`): the metadata, then each
-        // announced part as raw gzip.
-        .route("/v1/reports", post(file))
-        .route("/v1/reports/{report}/{part}", put(file_part))
+        .merge(reports)
         // Above this line every route speaks the protocol; the key set below is public.
         .layer(middleware::from_fn(protocol))
         .route("/.well-known/jwks.json", get(jwks))
@@ -63,23 +65,27 @@ pub(crate) fn router(identity: Arc<IdentityService>, deployed: bool) -> Router {
         .with_state(Native {
             relay: crate::relay::Relay::new(!deployed),
             identity,
-            uploads: Uploads::default(),
-            budgets: Arc::default(),
-            unplaced: deployed.then(Arc::default),
+            budgets,
+            unplaced,
         })
 }
 
+/// The client address the boundary attached, if it knows one; `unplaced` is
+/// told where it should have. It shares out budgets and grants nothing
+/// (`boundary.rs`).
+pub(crate) fn origin(extensions: &Extensions, unplaced: Option<&Unplaced>) -> Option<Client> {
+    let from = extensions.get::<Origin>().and_then(|origin| origin.0);
+    if from.is_none()
+        && let Some(unplaced) = unplaced
+    {
+        unplaced.note();
+    }
+    from
+}
+
 impl Native {
-    /// The client address the boundary attached, if it knows one. It
-    /// shares out budgets and grants nothing (`boundary.rs`).
     fn origin(&self, extensions: &Extensions) -> Option<Client> {
-        let from = extensions.get::<Origin>().and_then(|origin| origin.0);
-        if from.is_none()
-            && let Some(unplaced) = &self.unplaced
-        {
-            unplaced.note();
-        }
-        from
+        origin(extensions, self.unplaced.as_deref())
     }
 }
 
@@ -101,9 +107,9 @@ pub(crate) fn update_required() -> Response {
 
 /// Refuse any other protocol before the request is decoded: before its credential, its budget
 /// or the database. The boundary has read a small body by then, within its own bounds
-/// (`boundary.rs`); a report part's body is not read at all. An old client hears this at its
+/// (`boundary.rs`); a report route's body is not read at all. An old client hears this at its
 /// first request, not as a failure to decode the answer to a sign-in that has already happened.
-async fn protocol(request: Request, next: Next) -> Response {
+pub(crate) async fn protocol(request: Request, next: Next) -> Response {
     let mut values = request.headers().get_all(PROTOCOL_HEADER).iter();
     if values.next().map(HeaderValue::as_bytes) == Some(PROTOCOL_VERSION.as_bytes())
         && values.next().is_none()
@@ -192,50 +198,9 @@ pub(crate) fn failure(error: Error) -> Response {
     (status, REJECTED).into_response()
 }
 
-/// Why a report part's upload stopped.
-enum Stopped {
-    /// The service or a check refused it.
-    Failed(Error),
-    /// Its body did not keep [`UPLOAD_PACE`] (408).
-    Stalled,
-}
-
-impl From<Error> for Stopped {
-    fn from(error: Error) -> Self {
-        Self::Failed(error)
-    }
-}
-
-impl IntoResponse for Stopped {
-    fn into_response(self) -> Response {
-        match self {
-            Self::Failed(error) => failure(error),
-            Self::Stalled => timed_out(),
-        }
-    }
-}
-
-/// Whether an upload that held a slot and ended with `answer` is held
-/// against its gateway (`uploads.rs`): one whose part was not stored
-/// because of what was sent or not sent. A part stored meanwhile by the
-/// gateway's other upload (`Conflict`, which a gateway takes as sent) and
-/// a store that failed are nobody's unfinished upload.
-fn unfinished(answer: &Result<(), Stopped>) -> bool {
-    !matches!(
-        answer,
-        Ok(()) | Err(Stopped::Failed(Error::Conflict | Error::Unavailable))
-    )
-}
-
-/// A part's body, at most `length` bytes, as long as it keeps `pace`.
-async fn part_body(body: Body, length: usize, pace: Pace) -> Result<Bytes, Stopped> {
-    paced(body, length, pace)
-        .await
-        .map_err(|status| match status {
-            StatusCode::REQUEST_TIMEOUT => Stopped::Stalled,
-            _ => Stopped::Failed(Error::Rejected),
-        })
-}
+/// What a report token whose credential is known to be good is told of a
+/// request the rules refuse (`reports.rs`): a fixed text like the other.
+pub(crate) const REPORT_ROUTE_REJECTED: &str = "report request rejected\n";
 
 async fn call(
     State(native): State<Native>,
@@ -250,7 +215,7 @@ async fn call(
 }
 
 /// Exactly one `Content-Type`, this one, and at most one `Authorization`.
-fn single_headers(headers: &HeaderMap, content_type: &str) -> Result<(), Error> {
+pub(crate) fn single_headers(headers: &HeaderMap, content_type: &str) -> Result<(), Error> {
     if headers.get_all(header::CONTENT_TYPE).iter().count() != 1
         || headers
             .get(header::CONTENT_TYPE)
@@ -261,15 +226,6 @@ fn single_headers(headers: &HeaderMap, content_type: &str) -> Result<(), Error> 
         return Err(Error::Rejected);
     }
     Ok(())
-}
-
-/// A gateway's credential, on the routes that take nothing else.
-fn credential(headers: &HeaderMap, content_type: &str) -> Result<Option<Token>, Error> {
-    single_headers(headers, content_type)?;
-    headers
-        .get(header::AUTHORIZATION)
-        .map(|h| Token::from_bearer(h.to_str().map_err(|_| Error::Rejected)?))
-        .transpose()
 }
 
 /// A credential or a signed session, on the route that takes both. A signed session's check
@@ -362,167 +318,11 @@ async fn process(
     central_api::encode(&response)
 }
 
-/// `POST /v1/reports`: `201 {"report_id": "<32 hex>"}`.
-async fn file(
-    State(native): State<Native>,
-    extensions: Extensions,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    let filed = async {
-        let token = credential(&headers, "application/json")?;
-        let place = native.origin(&extensions).map(Place::from);
-        native
-            .identity
-            .file_report(token.as_ref(), &body, place)
-            .await
-    };
-    match filed.await {
-        Ok(id) => (
-            StatusCode::CREATED,
-            [(header::CONTENT_TYPE, "application/json")],
-            format!(r#"{{"report_id":"{}"}}"#, central_api::reports::hex(&id)),
-        )
-            .into_response(),
-        Err(error) => failure(error),
-    }
-}
-
-/// `PUT /v1/reports/{report}/{client|record}`: the gzip as the raw body;
-/// `204`. The credential and the announcement come first, then the
-/// declared length must be the announced one, then a slot (`uploads.rs`:
-/// a few in all, two for one gateway, none for a gateway that left too
-/// many uploads unfinished in the hour), and only then is the body read,
-/// exactly that long and at [`UPLOAD_PACE`]: a body that is withheld gives
-/// its slot back at the pace's first empty window, not at the upload's
-/// whole time. An upload that is dropped while it holds a slot (its
-/// connection went away, its whole time was over) gives the slot back
-/// too, and is counted unfinished like one that stalled.
-async fn file_part(
-    State(native): State<Native>,
-    Path((report, part)): Path<(String, String)>,
-    request: Request,
-) -> Response {
-    let filed = async {
-        let (head, body) = request.into_parts();
-        let token = credential(&head.headers, "application/gzip")?;
-        let (Some(report), Ok(part)) = (super::browser::hex_id(&report), Part::from_stored(&part))
-        else {
-            return Err(Stopped::Failed(Error::Rejected));
-        };
-        let place = native.origin(&head.extensions).map(Place::from);
-        let upload = native
-            .identity
-            .report_upload(token.as_ref(), report, part, place)
-            .await?;
-        let declared = head
-            .headers
-            .get(header::CONTENT_LENGTH)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.parse::<u64>().ok());
-        if declared != Some(u64::from(upload.bytes)) {
-            return Err(Stopped::Failed(Error::Rejected));
-        }
-        let length = usize::try_from(upload.bytes).map_err(|_| Error::Rejected)?;
-        let slot = native.uploads.begin(upload.gateway(), Instant::now())?;
-        let stored = match part_body(body, length, UPLOAD_PACE).await {
-            Ok(gzip) => native
-                .identity
-                .file_report_part(&upload, &gzip)
-                .await
-                .map_err(Stopped::Failed),
-            Err(stopped) => Err(stopped),
-        };
-        slot.ended(!unfinished(&stored), Instant::now());
-        stored
-    };
-    match filed.await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(stopped) => stopped.into_response(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::to_bytes;
-    use std::time::Duration;
+    use axum::body::{Body, to_bytes};
     use tower::ServiceExt;
-
-    /// A body announced and never sent.
-    struct Withheld;
-
-    impl hyper::body::Body for Withheld {
-        type Data = Bytes;
-        type Error = std::io::Error;
-
-        fn poll_frame(
-            self: std::pin::Pin<&mut Self>,
-            _: &mut std::task::Context<'_>,
-        ) -> std::task::Poll<Option<Result<hyper::body::Frame<Bytes>, Self::Error>>> {
-            std::task::Poll::Pending
-        }
-    }
-
-    async fn said(response: Response) -> (StatusCode, String) {
-        let status = response.status();
-        let text = to_bytes(response.into_body(), 1024).await.unwrap();
-        (status, String::from_utf8(text.to_vec()).unwrap())
-    }
-
-    #[tokio::test]
-    async fn a_part_s_body_that_is_withheld_times_out_at_its_pace_and_others_are_refused() {
-        let pace = Pace {
-            window: Duration::from_millis(40),
-            bytes: 1_000,
-        };
-        // withheld: 408 at the first window, long before an upload's minute
-        let started = std::time::Instant::now();
-        let Err(stopped) = part_body(Body::new(Withheld), 2_000, pace).await else {
-            panic!("a withheld body was read");
-        };
-        assert!(started.elapsed() < Duration::from_secs(2));
-        assert_eq!(
-            said(stopped.into_response()).await,
-            (StatusCode::REQUEST_TIMEOUT, "request timed out\n".into())
-        );
-        // longer than announced: the fixed refusal, as before
-        let Err(stopped) = part_body(Body::from(vec![0x1f; 2_001]), 2_000, pace).await else {
-            panic!("a body past its announced length was read");
-        };
-        assert_eq!(
-            said(stopped.into_response()).await,
-            (StatusCode::UNAUTHORIZED, REJECTED.into())
-        );
-        // exactly as announced
-        let whole = part_body(Body::from(vec![0x1f; 2_000]), 2_000, pace).await;
-        assert!(whole.is_ok_and(|bytes| bytes.len() == 2_000));
-        // the pace asked of a real upload: 16 KiB in every five seconds
-        assert_eq!(
-            (UPLOAD_PACE.window, UPLOAD_PACE.bytes),
-            (Duration::from_secs(5), 16_384)
-        );
-    }
-
-    #[test]
-    fn an_upload_is_unfinished_unless_its_part_is_stored_or_the_store_failed() {
-        // stored, stored meanwhile by the other upload, the store down
-        for answer in [
-            Ok(()),
-            Err(Stopped::Failed(Error::Conflict)),
-            Err(Stopped::Failed(Error::Unavailable)),
-        ] {
-            assert!(!unfinished(&answer));
-        }
-        // too slow, bytes other than announced or a connection that broke
-        for answer in [
-            Err(Stopped::Stalled),
-            Err(Stopped::Failed(Error::Rejected)),
-            Err(Stopped::Failed(Error::Busy)),
-        ] {
-            assert!(unfinished(&answer));
-        }
-    }
 
     /// The refusal in front of a route that must not be reached.
     fn guarded() -> Router {
@@ -589,18 +389,6 @@ mod tests {
         let body = to_bytes(response.into_body(), 64).await.unwrap();
         assert_eq!(&body[..], UPDATE_REQUIRED_BODY.as_bytes());
     }
-
-    #[test]
-    fn a_session_is_never_taken_where_only_a_credential_is() {
-        let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-        headers.insert(header::AUTHORIZATION, "Bearer a.b.c".parse().unwrap());
-        assert!(matches!(
-            credential(&headers, "application/json"),
-            Err(Error::Rejected)
-        ));
-    }
-
     #[test]
     fn a_request_names_its_one_type_and_at_most_one_bearer() {
         let of = |types: &[&str], bearers: &[&str]| {
@@ -611,14 +399,12 @@ mod tests {
             for value in bearers {
                 headers.append(header::AUTHORIZATION, value.parse().unwrap());
             }
-            credential(&headers, "application/json")
+            single_headers(&headers, "application/json")
         };
         let json = ["application/json"];
-        let hex = "0123456789abcdef".repeat(4);
-        let bearer = format!("Bearer {hex}");
-        assert!(of(&json, &[]).unwrap().is_none());
-        let found = of(&json, &[&bearer]).unwrap().unwrap();
-        assert_eq!(found.hex().as_str(), hex);
+        assert!(of(&json, &[]).is_ok());
+        assert!(of(&json, &["Bearer x"]).is_ok());
+        assert!(of(&json, &["Bearer x", "Bearer x"]).is_err());
         for types in [
             &[][..],
             &["application/json", "application/json"],
@@ -629,30 +415,7 @@ mod tests {
             &["application/json, text/plain"],
             &[""],
         ] {
-            assert!(of(types, &[&bearer]).is_err(), "{types:?}");
+            assert!(of(types, &[]).is_err(), "{types:?}");
         }
-        for bearers in [
-            &[bearer.as_str(), bearer.as_str()][..],
-            &[""],
-            &["Bearer "],
-            &[hex.as_str()],
-            &[&bearer.replace("Bearer", "bearer")],
-            &[&bearer.replace("Bearer", "Basic")],
-            &[&bearer.replace("Bearer ", "Bearer  ")],
-            &[&bearer.to_uppercase()],
-            &[&bearer[..bearer.len() - 1]],
-            &[&format!("{bearer}0")],
-            &[&format!("{bearer},{bearer}")],
-        ] {
-            assert!(of(&json, bearers).is_err(), "{bearers:?}");
-        }
-        // Octets that are no text are a refusal, not a request without a bearer.
-        let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, json[0].parse().unwrap());
-        headers.insert(
-            header::AUTHORIZATION,
-            axum::http::HeaderValue::from_bytes(b"Bearer \xff").unwrap(),
-        );
-        assert!(credential(&headers, "application/json").is_err());
     }
 }

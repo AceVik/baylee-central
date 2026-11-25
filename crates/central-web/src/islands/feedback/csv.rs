@@ -1,5 +1,6 @@
 //! Reports as CSV, made in the browser from what Central answered (the old
-//! administration's `csv.ts`, column for column). A cell a spreadsheet
+//! administration's `csv.ts`, column for column, and after its columns the
+//! report token's). A cell a spreadsheet
 //! would read as a formula (it starts with `=`, `+`, `-`, `@`, a tab or a
 //! carriage return) gets an apostrophe in front, so a report's words never
 //! run as one.
@@ -12,7 +13,7 @@ use super::text::{hex, iso};
 pub const EXPORT_MAX: u64 = 5_000;
 
 /// The header line's columns.
-pub const COLUMNS: [&str; 17] = [
+pub const COLUMNS: [&str; 19] = [
     "id",
     "received",
     "changed",
@@ -30,6 +31,8 @@ pub const COLUMNS: [&str; 17] = [
     "issue",
     "notes",
     "excerpt",
+    "token",
+    "token_id",
 ];
 
 /// `raw` as one CSV field: a formula's first character defused, quoted
@@ -66,16 +69,14 @@ pub fn to_csv(reports: &[ReportSummary], name: &dyn Fn([u8; 16]) -> String) -> S
                 .unwrap_or_default(),
             r.assignee.map(name).unwrap_or_default(),
             r.labels.join(" "),
-            if r.channel == Channel::Direct {
-                String::new()
-            } else {
+            // a direct report came through no gateway of its own, and a
+            // report token's through none: its name is no gateway's
+            if r.channel == Channel::Gateway {
                 r.gateway.clone()
+            } else {
+                String::new()
             },
-            match r.channel {
-                Channel::Gateway => "gateway",
-                Channel::Direct => "direct",
-            }
-            .to_owned(),
+            r.channel.as_str().to_owned(),
             r.reporter.clone(),
             r.build.clone().unwrap_or_default(),
             r.crash.clone().unwrap_or_default(),
@@ -83,6 +84,8 @@ pub fn to_csv(reports: &[ReportSummary], name: &dyn Fn([u8; 16]) -> String) -> S
             r.issue.map(|i| i.to_string()).unwrap_or_default(),
             r.notes.to_string(),
             r.excerpt.clone(),
+            r.token.map(|_| r.gateway.clone()).unwrap_or_default(),
+            r.token.map(|id| hex(&id)).unwrap_or_default(),
         ];
         lines.push(cells.iter().map(|c| field(c)).collect::<Vec<_>>().join(","));
     }
@@ -113,6 +116,7 @@ pub(super) mod tests {
             created_at: 1_794_000_000,
             updated_at: 1_794_000_060,
             gateway: "Synthetic gateway".into(),
+            token: None,
             gateway_says: None,
             gateway_version: None,
             channel: Channel::Gateway,
@@ -168,7 +172,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn the_export_has_the_old_columns() {
+    fn the_export_has_the_old_columns_and_the_token_s() {
         let mut hostile = summary(2);
         hostile.excerpt = "=cmd|' /C calc'!A0".into();
         hostile.labels = vec!["ui".into(), "crash-loop".into()];
@@ -177,7 +181,14 @@ pub(super) mod tests {
         hostile.channel = Channel::Direct;
         hostile.issue = Some(311);
         hostile.record_bytes = Some(4_000);
-        let csv = to_csv(&[summary(1), hostile], &|id| format!("admin{}", id[0]));
+        // a token named as a gateway is, and as a formula
+        let mut token = summary(3);
+        token.channel = Channel::Token;
+        token.gateway = "=Synthetic gateway".into();
+        token.token = Some([0xc1; 16]);
+        let csv = to_csv(&[summary(1), hostile, token], &|id| {
+            format!("admin{}", id[0])
+        });
         let lines: Vec<&str> = csv.split("\r\n").collect();
         assert_eq!(lines[0], COLUMNS.join(","));
         assert!(lines[1].starts_with(&format!(
@@ -185,12 +196,18 @@ pub(super) mod tests {
             hex(&summary(1).id)
         )));
         assert!(
-            lines[1].ends_with(",Synthetic gateway,gateway,5bdc,0.1.1-beta.9b,,,,0,It went wrong")
+            lines[1]
+                .ends_with(",Synthetic gateway,gateway,5bdc,0.1.1-beta.9b,,,,0,It went wrong,,")
         );
         assert!(lines[2].contains(",bug,new,high,admin3,ui crash-loop,,direct,5bdc,"));
-        assert!(lines[2].ends_with(",4000,311,0,\"'=cmd|' /C calc'!A0\""));
-        assert_eq!(lines.len(), 4, "a line end after the last row");
-        assert_eq!(lines[3], "");
+        assert!(lines[2].ends_with(",4000,311,0,\"'=cmd|' /C calc'!A0\",,"));
+        assert!(lines[3].contains(",bug,new,,,,,token,5bdc,"));
+        let its_id = "c1".repeat(16);
+        assert!(lines[3].ends_with(&format!(
+            ",0,It went wrong,\"'=Synthetic gateway\",{its_id}"
+        )));
+        assert_eq!(lines.len(), 5, "a line end after the last row");
+        assert_eq!(lines[4], "");
         assert_eq!(file_name("2026-11-12"), "baylee-reports-2026-11-12.csv");
     }
 }

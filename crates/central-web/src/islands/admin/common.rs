@@ -97,6 +97,7 @@ pub fn nav(lang: Lang, section: Section) -> impl IntoView {
                 {link(Section::AdminLegacy, words::admin_legacy(lang))}
                 {link(Section::AdminPictures, words::admin_pictures_title(lang))}
                 {link(Section::Feedback, words::admin_feedback(lang))}
+                {link(Section::FeedbackTokens, words::rt_title(lang))}
                 {link(Section::Admin, words::admin_reset_title(lang))}
             </ul>
         </nav>
@@ -222,6 +223,9 @@ pub struct Names {
     pub accounts: HashMap<[u8; 16], String>,
     /// A gateway's name and origin.
     pub gateways: HashMap<[u8; 16], (String, String)>,
+    /// The report token an event made or revoked, by the event: its id and
+    /// its name.
+    pub tokens: HashMap<[u8; 16], ([u8; 16], String)>,
 }
 
 /// The words for an audited action Central names; `None` for one this page
@@ -237,6 +241,8 @@ pub fn action_text(lang: Lang, action: &str) -> Option<&'static str> {
         "gateway.ranked_revoked" => words::admin_gw_ranked_revoked(lang),
         "gateway.disabled" => words::admin_audit_gateway_disabled(lang),
         "gateway.token_revoked" => words::admin_audit_token_revoked(lang),
+        "report_token.created" => words::admin_audit_rt_created(lang),
+        "report_token.revoked" => words::admin_audit_rt_revoked(lang),
         "registration.closed" => words::admin_audit_registration_closed(lang),
         "registration.opened" => words::admin_audit_registration_opened(lang),
         _ => return None,
@@ -279,12 +285,15 @@ fn event_rows(lang: Lang, events: &[Event], names: &Names) -> impl IntoView + us
             let account = event.account.map(|id| account_cell(lang, id, names));
             let between = (event.account.is_some() && event.gateway.is_some()).then_some(" · ");
             let gateway = event.gateway.map(|id| gateway_cell(id, names));
+            let token = names.tokens.get(&event.id).map(|(id, name)| {
+                view! { <span title=id_hex(id)><bdi translate="no">{name.clone()}</bdi>" "<code translate="no">{id_end(id)}</code></span> }
+            });
             view! {
                 <tr>
                     <td class="num">{super::super::account::when(lang, event.at)}</td>
                     <th scope="row" tabindex="-1" id=format!("admin-event-{}", id_hex(&event.id))>{what}</th>
                     <td>{by}</td>
-                    <td>{account}{between}{gateway}</td>
+                    <td>{account}{between}{gateway}{token}</td>
                 </tr>
             }
         })
@@ -336,6 +345,8 @@ pub enum Change {
     Ranked { gateway: [u8; 16], verified: bool },
     /// Revoke a gateway's token.
     Revoke { gateway: [u8; 16], token: [u8; 16] },
+    /// Revoke a report token.
+    RevokeReport { token: [u8; 16] },
 }
 
 impl Change {
@@ -351,6 +362,7 @@ impl Change {
                 AdminRequest::SetRankedVerification { gateway, verified }
             }
             Change::Revoke { token, .. } => AdminRequest::RevokeGatewayToken { token },
+            Change::RevokeReport { token } => AdminRequest::RevokeReportToken { token },
         }
     }
 
@@ -363,6 +375,7 @@ impl Change {
             Change::Approval { gateway, .. }
             | Change::Ranked { gateway, .. }
             | Change::Revoke { gateway, .. } => AdminRequest::Gateway { gateway },
+            Change::RevokeReport { .. } => AdminRequest::ReportTokens,
         }
     }
 
@@ -373,6 +386,7 @@ impl Change {
             Change::Approval { .. } | Change::Ranked { .. } | Change::Revoke { .. } => {
                 Came::GatewayGone
             }
+            Change::RevokeReport { .. } => Came::TokenGone,
         }
     }
 
@@ -389,6 +403,7 @@ impl Change {
                 verified: false, ..
             } => words::admin_gw_ranked_revoked(lang),
             Change::Revoke { .. } => words::tokens_revoked_now(lang),
+            Change::RevokeReport { .. } => words::rt_revoked_done(lang),
         }
     }
 }
@@ -414,6 +429,8 @@ pub enum Came {
     AccountGone,
     /// The gateway is gone (its tokens with it).
     GatewayGone,
+    /// The report token is gone.
+    TokenGone,
     /// Another account holds the tag, or the account's chat keeps its own.
     Taken,
     /// No answer came back: it may have been made.
@@ -494,6 +511,7 @@ pub fn came_text(lang: Lang, came: Came) -> Option<&'static str> {
         Came::Stale => Some(words::admin_refused_stale(lang)),
         Came::AccountGone => Some(words::admin_refused_gone(lang)),
         Came::GatewayGone => Some(words::admin_refused_gateway(lang)),
+        Came::TokenGone => Some(words::rt_missing(lang)),
         Came::Taken => Some(words::admin_tag_taken(lang)),
         Came::Other(problem) => Some(problem_text(lang, problem)),
     }
@@ -514,14 +532,36 @@ async fn summary() -> Result<(bool, [u8; 16], i64), Came> {
     }
 }
 
+/// Whether a change of the account `own` may be sent now, by
+/// `AccountSummary`; `proven` where the password was proven just now.
+///
+/// # Errors
+/// What stands before it.
+pub async fn may_send(own: [u8; 16], proven: bool) -> Result<(), Came> {
+    let (admin, account, signed_in) = summary().await?;
+    match before(admin, account, own, signed_in, now(), proven) {
+        Some(came) => Err(came),
+        None => Ok(()),
+    }
+}
+
+/// What Central's refusal of a change that names nothing means, by what it
+/// says afterwards: the session, the role, or the sign-in's age, for which
+/// the password is asked once.
+pub async fn refused(own: [u8; 16], proven: bool) -> Came {
+    match summary().await {
+        Err(came) => came,
+        Ok((_, account, _)) if account != own => Came::Switched,
+        Ok((false, ..)) => Came::Role,
+        Ok(_) if proven => Came::Stale,
+        Ok(_) => Came::Password,
+    }
+}
+
 /// Sends `change`, once, after `AccountSummary` said it may be; `proven`
 /// where the password was proven just now.
 async fn send(change: Change, own: [u8; 16], proven: bool) -> Came {
-    let (admin, account, signed_in) = match summary().await {
-        Ok(found) => found,
-        Err(came) => return came,
-    };
-    if let Some(came) = before(admin, account, own, signed_in, now(), proven) {
+    if let Err(came) = may_send(own, proven).await {
         return came;
     }
     let failure = match call(&Request::Admin {
@@ -558,22 +598,33 @@ async fn send(change: Change, own: [u8; 16], proven: bool) -> Came {
     explain(change, admin, exists, proven)
 }
 
-/// Proves the password once more in a Worker ended at once, checks that the
-/// session is still `own`'s, and sends `change`.
-async fn send_after(change: Change, own: [u8; 16], worker: &str, password: String) -> Came {
+/// Proves the password once more in a Worker ended at once, and checks that
+/// the session is still `own`'s.
+///
+/// # Errors
+/// Why it was not proven.
+pub async fn prove(own: [u8; 16], worker: &str, password: String) -> Result<(), Came> {
     let Some(crypto) = Crypto::start(worker) else {
-        return Came::Other(Problem::Failed);
+        return Err(Came::Other(Problem::Failed));
     };
     let signed = sign_in_again(&crypto, &password).await;
     crypto.close();
     drop(password);
     match signed {
-        Ok((identity, _)) if identity.account != own => Came::Switched,
-        Ok(_) => send(change, own, true).await,
-        Err(Trouble::Current) => Came::WrongPassword,
-        Err(Trouble::SignedOut) => Came::SignedOut,
-        Err(Trouble::Unsure) => Came::Other(Problem::Failed),
-        Err(Trouble::Other(problem)) => Came::Other(problem),
+        Ok((identity, _)) if identity.account != own => Err(Came::Switched),
+        Ok(_) => Ok(()),
+        Err(Trouble::Current) => Err(Came::WrongPassword),
+        Err(Trouble::SignedOut) => Err(Came::SignedOut),
+        Err(Trouble::Unsure) => Err(Came::Other(Problem::Failed)),
+        Err(Trouble::Other(problem)) => Err(Came::Other(problem)),
+    }
+}
+
+/// Proves the password once more and sends `change`.
+async fn send_after(change: Change, own: [u8; 16], worker: &str, password: String) -> Came {
+    match prove(own, worker, password).await {
+        Ok(()) => send(change, own, true).await,
+        Err(came) => came,
     }
 }
 
@@ -880,7 +931,7 @@ mod tests {
         Failure::Network,
     ];
 
-    fn changes() -> [Change; 8] {
+    fn changes() -> [Change; 9] {
         [
             Change::Role {
                 account: OTHER,
@@ -914,6 +965,7 @@ mod tests {
                 gateway: OTHER,
                 verified: false,
             },
+            Change::RevokeReport { token: [4; 16] },
         ]
     }
 
@@ -979,6 +1031,7 @@ mod tests {
         for change in changes() {
             let gone = match change {
                 Change::Role { .. } | Change::Tag { .. } => Came::AccountGone,
+                Change::RevokeReport { .. } => Came::TokenGone,
                 _ => Came::GatewayGone,
             };
             for proven in [false, true] {
@@ -1020,6 +1073,7 @@ mod tests {
             Came::Stale,
             Came::AccountGone,
             Came::GatewayGone,
+            Came::TokenGone,
             Came::Taken,
         ];
         for lang in Lang::ALL {
@@ -1059,6 +1113,7 @@ mod tests {
             revoke,
             verify,
             withdraw,
+            revoke_report,
         ] = changes();
         assert!(text(verify.request()).contains(r#""action":"set_ranked_verification""#));
         assert!(text(withdraw.request()).ends_with(r#""verified":false}}"#));
@@ -1092,6 +1147,14 @@ mod tests {
                 id(3)
             )
         );
+        assert_eq!(
+            text(revoke_report.request()),
+            format!(
+                r#"{{"operation":"admin","request":{{"action":"revoke_report_token","token":{}}}}}"#,
+                id(4)
+            )
+        );
+        assert!(text(revoke_report.target()).contains(r#""action":"report_tokens""#));
         assert!(text(tag.target()).contains(r#""action":"account""#));
         assert!(text(revoke.target()).contains(r#""action":"gateway""#));
     }
@@ -1109,6 +1172,8 @@ mod tests {
             "gateway.token_revoked",
             "gateway.ranked_verified",
             "gateway.ranked_revoked",
+            "report_token.created",
+            "report_token.revoked",
             "registration.closed",
             "registration.opened",
         ];

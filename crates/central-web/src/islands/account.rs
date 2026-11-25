@@ -1704,6 +1704,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
         | Section::AdminLegacy
         | Section::AdminPictures
         | Section::Feedback
+        | Section::FeedbackTokens
         | Section::Report => ().into_any(),
     })
 }

@@ -13,7 +13,8 @@ use std::sync::Arc;
 use central_api::admin::AdminRequest;
 use central_api::reports::{
     Channel, MAX_CLIENT_GZIP, MAX_LABELS, MAX_NOTE, MAX_RECORD_GZIP, Neighbours, Priority,
-    RecordOrigin, ReportChange, ReportDetail, ReportKind, ReportStatus, TRASH_DAYS, valid_label,
+    RecordOrigin, ReportChange, ReportDetail, ReportKind, ReportStatus, ReportSummary, TRASH_DAYS,
+    valid_label,
 };
 use leptos::prelude::*;
 use serde_json::{Map, Value};
@@ -668,24 +669,38 @@ fn sent_view(r: &Rep) -> impl IntoView + use<> {
     section("fb-sent", words::fb_client_sent(lang), body)
 }
 
+/// Where a report came from: what its row is called, and what it says. A
+/// report token is no gateway, and its row does not say it was.
+fn came_from(lang: Lang, s: &ReportSummary) -> (&'static str, AnyView) {
+    if let Some(token) = s.token {
+        let name = s.gateway.clone();
+        return (
+            words::fb_token(lang),
+            view! { <bdi translate="no">{name}</bdi>" "{token_id(&token)} }.into_any(),
+        );
+    }
+    let gateway = if s.channel == Channel::Direct {
+        view! { {words::fb_channel_direct(lang)} }.into_any()
+    } else {
+        let says = s
+            .gateway_says
+            .clone()
+            .filter(|says| *says != s.gateway)
+            .map(|says| {
+                view! { <span class="meta">{format!(" · {} ", words::fb_calls_itself(lang))}<bdi translate="no">{says}</bdi></span> }
+            });
+        view! { <bdi translate="no">{s.gateway.clone()}</bdi>{says} }.into_any()
+    };
+    (words::fb_gateway(lang), gateway)
+}
+
 fn facts_view(r: &Rep) -> impl IntoView + use<> {
     let r = *r;
     let lang = r.c.lang;
     let body = move || {
         r.with(|d| {
             let s = &d.summary;
-            let gateway = if s.channel == Channel::Direct {
-                view! { {words::fb_channel_direct(lang)} }.into_any()
-            } else {
-                let says = s
-                    .gateway_says
-                    .clone()
-                    .filter(|says| *says != s.gateway)
-                    .map(|says| {
-                        view! { <span class="meta">{format!(" · {} ", words::fb_calls_itself(lang))}<bdi translate="no">{says}</bdi></span> }
-                    });
-                view! { <bdi translate="no">{s.gateway.clone()}</bdi>{says} }.into_any()
-            };
+            let (from, gateway) = came_from(lang, s);
             // the address the gateway gave, as text: never a link
             let url = d
                 .gateway_url
@@ -743,7 +758,7 @@ fn facts_view(r: &Rep) -> impl IntoView + use<> {
                 <dl class="facts">
                     <dt>{words::fb_received(lang)}</dt><dd>{when(lang, s.created_at)}</dd>
                     <dt>{words::fb_changed(lang)}</dt><dd>{when(lang, s.updated_at)}</dd>
-                    <dt>{words::fb_gateway(lang)}</dt><dd>{gateway}{url}</dd>
+                    <dt>{from}</dt><dd>{gateway}{url}</dd>
                     {gateway_build}
                     <dt>{words::fb_client_build(lang)}</dt><dd>{build}{commit}</dd>
                     <dt>{words::fb_reporter(lang)}</dt>
@@ -765,6 +780,23 @@ fn facts_view(r: &Rep) -> impl IntoView + use<> {
     section("fb-facts", words::fb_facts(lang), body)
 }
 
+/// The end of a report token's id, by which two of one name are told apart.
+fn token_id(id: &[u8; 16]) -> impl IntoView + use<> {
+    view! { <code class="fb-code" translate="no" title=hex(id)>{format!("…{}", short_id(id))}</code> }
+}
+
+/// Who wrote or changed something: a report token by its name then and its
+/// id, else what `name` calls them.
+fn actor(lang: Lang, token: Option<&str>, id: Option<[u8; 16]>, name: String) -> AnyView {
+    match (token, id) {
+        (Some(token), Some(id)) => {
+            let text = words::fb_by_token(lang, token);
+            view! { <bdi translate="no">{text}</bdi>" "{token_id(&id)} }.into_any()
+        }
+        _ => view! { <bdi translate="no">{name}</bdi> }.into_any(),
+    }
+}
+
 fn history_view(r: &Rep) -> impl IntoView + use<> {
     let r = *r;
     let lang = r.c.lang;
@@ -779,9 +811,11 @@ fn history_view(r: &Rep) -> impl IntoView + use<> {
                 .audit
                 .iter()
                 .map(|row| {
-                    let who = row
-                        .actor
-                        .map_or_else(|| words::fb_h_central(lang).to_owned(), |a| c.name(Some(a)));
+                    let name_of = row.actor.map_or_else(
+                        || words::fb_h_central(lang).to_owned(),
+                        |admin| c.name(Some(admin)),
+                    );
+                    let who = actor(lang, row.token.as_deref(), row.actor, name_of);
                     let what = action_text(lang, &row.action).map_or_else(
                         || view! { <code>{row.action.clone()}</code> }.into_any(),
                         |w| view! { {w} }.into_any(),
@@ -791,12 +825,15 @@ fn history_view(r: &Rep) -> impl IntoView + use<> {
                     view! {
                         <li>
                             <span class="meta">{when(lang, row.at)}</span>" "
-                            <bdi translate="no">{who}</bdi>": "{what}{detail}
+                            {who}": "{what}{detail}
                         </li>
                     }
                 })
                 .collect_view();
-            view! { <ol class="fb-history">{rows}</ol> }.into_any()
+            let older = d
+                .older
+                .then(|| view! { <p class="meta">{words::fb_history_older(lang)}</p> });
+            view! { {older}<ol class="fb-history">{rows}</ol> }.into_any()
         })
     };
     section("fb-history", words::fb_history(lang), body)
@@ -1259,7 +1296,9 @@ fn notes_view(r: &Rep) -> impl IntoView + use<> {
                 .notes
                 .iter()
                 .map(|n| {
-                    let mine = n.author == me;
+                    let mine = n.token.is_none() && n.author == me;
+                    let name = r.c.who(n.author);
+                    let who = actor(lang, n.token.as_deref(), Some(n.author), name);
                     let at = when(lang, n.at);
                     let note = n.id;
                     let remove = mine.then(|| {
@@ -1276,7 +1315,7 @@ fn notes_view(r: &Rep) -> impl IntoView + use<> {
                     view! {
                         <li class="fb-note">
                             <p class="fb-note-head meta">
-                                <bdi translate="no">{r.c.who(n.author)}</bdi>" · "{at.clone()}
+                                {who}" · "{at.clone()}
                                 {remove}
                             </p>
                             <p class="fb-note-text" dir="auto">{n.text.clone()}</p>

@@ -35,6 +35,7 @@ mod ranked;
 pub use ranked::RankedHostCredential;
 mod recovery;
 mod registration;
+mod report_tokens;
 mod reports;
 mod reset;
 mod sessions;
@@ -62,9 +63,10 @@ pub use pictures::{
 };
 pub use profiles::{TAG_DRAWS, TagDraw};
 pub use recovery::Summary;
+pub use report_tokens::ReportToken;
 pub use reports::{
-    ALL_STORED, Filer, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport,
-    OFFICIAL_STORED, REPORT_BYTES, ReportImport, ReportImportRefusal,
+    ALL_STORED, Filer, FilerKind, GATEWAY_STORED, ImportedHistory, ImportedNote, ImportedReport,
+    OFFICIAL_STORED, REPORT_BYTES, ReportCaller, ReportImport, ReportImportRefusal,
 };
 pub use reset::{
     ISSUED_RESET_HOURS, MAILED_RESET_HOURS, MailedReset, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY,

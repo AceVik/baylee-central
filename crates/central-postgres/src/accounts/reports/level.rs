@@ -5,7 +5,8 @@
 //! parts, and the hour's count is in the service's memory. So the store
 //! itself weighs every filing: against what its gateway's reports take,
 //! and against what everyone's take. Past a bound the filing is `Busy`;
-//! the report is not filed, so no part of it can follow.
+//! the report is not filed, so no part of it can follow. A report token is
+//! weighed as a registered gateway is, by its own id.
 //!
 //! No count is kept beside the reports. A level is asked of the reports
 //! themselves in the filing's transaction, so it cannot drift, a restart
@@ -24,7 +25,7 @@
 //! sends again. The operator's one-time copy (`import.rs`) is not weighed
 //! and is counted afterwards like any report.
 use super::super::{Error, statement, uuid};
-use super::Filer;
+use super::{Filer, FilerKind};
 use central_api::reports::{MAX_INTAKE_BYTES, PART_SECONDS, ReportIntake};
 use sea_orm::ConnectionTrait;
 
@@ -37,7 +38,7 @@ const _: () = assert!(MAX_INTAKE_BYTES == 65_536);
 /// and 64 MiB of record.
 const LARGEST: u64 = REPORT_BYTES + 2 * 1024 * 1024 + 64 * 1024 * 1024;
 
-/// What a registered gateway's reports may take: 2 GiB. That is 31 reports
+/// What a registered gateway's or a report token's reports may take: 2 GiB. That is 31 reports
 /// with both parts at their largest, about 2,000 with a megabyte of parts
 /// each, or 32,768 without parts; a gateway that announces all it may
 /// reaches it in a quarter of an hour and files nothing more until an
@@ -125,7 +126,7 @@ pub(super) async fn admit(
     if !alone {
         return Err(Error::Busy);
     }
-    let (theirs, everyone) = levels(db, filer.gateway).await?;
+    let (theirs, everyone) = levels(db, filer.id).await?;
     let new = REPORT_BYTES
         + report
             .client
@@ -135,10 +136,9 @@ pub(super) async fn admit(
             .record
             .as_ref()
             .map_or(0, |part| u64::from(part.bytes));
-    let bound = if filer.official {
-        OFFICIAL_STORED
-    } else {
-        GATEWAY_STORED
+    let bound = match filer.kind {
+        FilerKind::Official => OFFICIAL_STORED,
+        FilerKind::Gateway | FilerKind::Token => GATEWAY_STORED,
     };
     if theirs.saturating_add(new) > bound || everyone.saturating_add(new) > ALL_STORED {
         return Err(Error::Busy);
