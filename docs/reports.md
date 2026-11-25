@@ -387,8 +387,8 @@ reported chat message is not filed here: it is the gateway's moderation.
 The `client` object and the record are read only by an administrator or,
 since 25.11.2026, by the holder of a report token that may read
 ([below](#report-tokens-25112026)), one report at a time, and never logged.
-Who may hold such a token is the administrators' to decide, and what the
-privacy notice says of it the owner's (§"Open for the owner" there).
+Who may hold such a token is the administrators' to decide; such tokens
+serve the administration's own tools only (§"Decided by the owner" there).
 
 ### The website's section
 
@@ -758,18 +758,24 @@ not measured. The browser specs were written and not run on the machine it
 was built on (no npm packages there); CI runs them. These passes are the
 implementing agent's and are not an audit.
 
-### Open for the owner
+### Decided by the owner
 
-- **The privacy notice** says who reads a report. A report token that may
-  read lets a script or an agent read players' words, the screenshot and the
-  record, and whoever runs it may be another company. `legal/` is unchanged;
-  before the first such token is handed to anything outside Central's own
-  administration, the notice and, for a processor, the contract are the
-  owner's to decide.
-- **A purge by a token** needs no password, since a token has none. The
-  preset "everything" includes it; leave it out where it is not needed.
-- **Sixteen GiB for all reports** stays the bound for everyone together.
-  Eight tokens at their two GiB fill it, and then every gateway's reports
-  are refused too. The four uploads at once are shared the same way: two
-  tokens that use their two each leave a gateway none for that long. Tokens
-  that file are an administrator's to hand out.
+Asked on 25.11.2026, the owner settled the four questions the first build
+left open:
+
+- **The privacy notice stays as it is.** The owner alone manages feedback,
+  and reports never leave Baylee's own systems: a report token that may read
+  goes to the administration's own scripts and agents, not to another
+  company, so there is no processor and no contract. `legal/` is unchanged.
+  Handing such a token to anyone outside is a new question for the owner.
+- **A purge by a token** needs no password, since a token has none: the
+  preset "everything" may delete for good, from the trash only, and each
+  report it deletes leaves a line naming the token in `report_audit`. Leave
+  `purge` out where it is not needed.
+- **Sixteen GiB for all reports** stays the bound for everyone together,
+  beside each token's own budget. Eight tokens at their two GiB fill it, and
+  then every gateway's reports are refused too. The four uploads at once are
+  shared the same way: two tokens that use their two each leave a gateway
+  none for that long. Tokens that file are an administrator's to hand out.
+- **The translations** besides English and German do not hold the change
+  back; a speaker reads them later.

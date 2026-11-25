@@ -569,7 +569,7 @@ report API with levels ([reports](reports.md) §"Report tokens"):
   named as one in the list, the filters, the facts, the notes, the history
   and the audit.
 
-Open: the privacy notice before a token that reads is handed to anyone
-outside Central's administration; the nine languages besides English and
-German for a speaker to read; the migration's production run through its own
-gate.
+The owner settled the questions the first build left open the same day
+([reports](reports.md) §"Decided by the owner"). Open: the nine languages
+besides English and German for a speaker to read, which does not hold the
+change back; the migration's production run through its own gate.

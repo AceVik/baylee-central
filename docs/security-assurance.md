@@ -8787,5 +8787,6 @@ on the pull request.
 What was not done: nothing ran on the server; the migration has not run on production, which has its
 own gate; the memory of downloads and the time of a search over a full store are by reading the code;
 the translations besides English and German are by a cheaper agent, as the owner set for `.ftl`
-files, and were not read by a speaker; the privacy notice is unchanged and the owner's to decide.
-These passes are by the implementing agent and are not an independent audit.
+files, and were not read by a speaker (the owner, 25.11.2026: they do not hold the change back); the
+privacy notice is unchanged, by the owner's decision of the same day (reports.md §"Decided by the
+owner"). These passes are by the implementing agent and are not an independent audit.
