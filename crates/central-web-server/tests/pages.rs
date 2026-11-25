@@ -1141,10 +1141,15 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("An e-mail address is optional. An account needs none."));
     assert!(english.contains("you need no e-mail address"));
-    assert!(english.contains("As of 19 November 2026"));
+    assert!(english.contains("As of 25 November 2026"));
+    // The minimum age (owner, 25.11.2026), and a consent under 16 (Art. 8).
+    assert!(english.contains("You may create an account from the age of 13."));
+    assert!(english.contains("If you are under 16, a consent counts only with"));
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
     assert!(german.contains("Eine E-Mail-Adresse ist freiwillig. Ein Account braucht keine."));
     assert!(german.contains("eine E-Mail-Adresse brauchst du nicht"));
+    assert!(german.contains("Einen Account darfst du ab 13 Jahren anlegen."));
+    assert!(german.contains("Bist du jünger als 16, gilt eine Einwilligung nur mit"));
 }
 
 /// The privacy notice says who sees that an account is online (its friends,
@@ -1179,7 +1184,7 @@ async fn the_privacy_notice_says_who_sees_an_account_online() {
             "Deine Wahl (online, abwesend, offline) speichert Central mit deinem Account"
         )
     );
-    assert!(german.contains("Stand: 19. November 2026"));
+    assert!(german.contains("Stand: 25. November 2026"));
 }
 
 /// Central's figures (the accounts, and what a gateway says is happening

@@ -1,5 +1,5 @@
-<!-- version: 2026-11-19 -->
-<!-- updated: 2026-11-19 -->
+<!-- version: 2026-11-25 -->
+<!-- updated: 2026-11-25 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -33,7 +33,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
 - **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. Über `/{lang}/player/{Name}-{Tag}` ist dein öffentliches Spielerprofil (Anzeigename, Tag, Profilbild, Ranked-Platzierungen und verdiente Abzeichen) standardmäßig sichtbar; im Profil kannst du das jederzeit abschalten. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
-- **Freiwillige persönliche Angaben im Profil (Vorname, Nachname, Geburtsdatum)** – nur für dich selbst in deinen Profileinstellungen gespeichert und einsehbar (niemals öffentlich, nie für andere Spieler oder Gateways sichtbar). Wir prüfen beim Geburtsdatum lediglich das Mindestalter von 16 Jahren. Die Angaben werden mit deinem Export bereitgestellt und mit deinem Konto gelöscht. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Freiwillige persönliche Angaben im Profil (Vorname, Nachname, Geburtsdatum)** – nur für dich selbst in deinen Profileinstellungen gespeichert und einsehbar (niemals öffentlich, nie für andere Spieler oder Gateways sichtbar). Wir prüfen beim Geburtsdatum lediglich das Mindestalter von 13 Jahren. Die Angaben werden mit deinem Export bereitgestellt und mit deinem Konto gelöscht. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Rollen (Administrator)** – Verwaltung von Baylee Central. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Zeitpunkt deiner letzten Anmeldung mit Passwort** (keine Adresse) – Konten verwalten und Missbrauch bemerken. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem sicheren Betrieb)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
@@ -239,7 +239,8 @@ Du hast das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung
 (Art. 17), Einschränkung (Art. 18) und Datenübertragbarkeit (Art. 20 DSGVO).
 Eine Einwilligung (Absturzberichte, Benachrichtigungen) kannst du jederzeit
 für die Zukunft widerrufen; was bis dahin geschah, bleibt rechtmäßig
-(Art. 7 Abs. 3 DSGVO). Viele deiner Rechte kannst du selbst ausüben: Konto
+(Art. 7 Abs. 3 DSGVO). Bist du jünger als 16, gilt eine Einwilligung nur mit
+Zustimmung deiner Eltern oder anderer Sorgeberechtigter (Art. 8 DSGVO). Viele deiner Rechte kannst du selbst ausüben: Konto
 löschen, Daten exportieren und Angaben ändern geht in den Einstellungen; das
 Löschen fragt dein Passwort erneut ab, und ein gelöschtes Konto lässt sich
 nicht wiederherstellen. Sonst genügt eine Nachricht an die Kontaktdaten im

@@ -494,11 +494,11 @@ test("the sign-in and the registration keep what was typed before the islands ra
   const register = page.locator("#auth-register");
   await register.getByLabel("Sign-in name").fill("early_erika");
   await register.getByLabel("Display name").fill("Erika");
-  await register.getByLabel("I am 16 or older.").check();
+  await register.getByLabel("I am 13 or older.").check();
   release();
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await expect(register.getByLabel("Sign-in name")).toHaveValue("early_erika");
-  await expect(register.getByLabel("I am 16 or older.")).toBeChecked();
+  await expect(register.getByLabel("I am 13 or older.")).toBeChecked();
   // the island knows them too: only the missing password is named
   await register.getByRole("button", { name: "Create account" }).click();
   await expect(register.locator(".error[role=alert]")).not.toContainText(/name/i);

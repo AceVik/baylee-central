@@ -25,4 +25,4 @@ date-picker-next-month = 다음 달
 date-picker-prev-year = 이전 연도
 date-picker-next-year = 다음 연도
 date-picker-placeholder = 생년월일 선택
-date-picker-age-error = 만 16세 이상이어야 해요.
+date-picker-age-error = 만 13세 이상이어야 해요.

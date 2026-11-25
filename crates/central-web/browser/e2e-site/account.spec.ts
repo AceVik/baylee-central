@@ -103,7 +103,7 @@ test("registration refuses a robot's haste and its hidden field, and says when i
     await register.getByLabel("Repeat password").fill("violet lantern harbour");
   };
   await fill();
-  await register.getByLabel("I am 16 or older.").check();
+  await register.getByLabel("I am 13 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   const refused = "The registration was not accepted. Try again.";
   // faster than a person: not sent
@@ -140,7 +140,7 @@ async function fillRegistration(page: Page) {
   await register.getByLabel("Display name").fill("Erika");
   await register.getByLabel("Password", { exact: true }).fill("violet lantern harbour");
   await register.getByLabel("Repeat password").fill("violet lantern harbour");
-  await register.getByLabel("I am 16 or older.").check();
+  await register.getByLabel("I am 13 or older.").check();
   await page.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   await page.waitForTimeout(3_000);
 }

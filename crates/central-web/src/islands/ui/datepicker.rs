@@ -13,7 +13,7 @@ use super::super::{focus, time};
 
 const MIN_YEAR: i32 = 1900;
 const MAX_YEAR: i32 = 2100;
-const MIN_AGE_YEARS: u64 = 16;
+const MIN_AGE_YEARS: u64 = 13;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ViewMode {

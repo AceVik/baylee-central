@@ -729,7 +729,7 @@ field for form robots, and a form sent within three seconds is not sent):
 - username, with the name rules shown
 - display name, with its rules shown (since 23.10.2026)
 - password, twice, with a strength hint and no composition rules
-- confirmation of the minimum age of 16 (Central's terms §2)
+- confirmation of the minimum age of 13 (Central's terms §2; owner, 25.11.2026)
 - acceptance of Central's terms and privacy notice, linked and shown in the
   page's language
 

@@ -25,4 +25,4 @@ date-picker-next-month = 翌月
 date-picker-prev-year = 前年
 date-picker-next-year = 翌年
 date-picker-placeholder = 生年月日を選択
-date-picker-age-error = 16歳以上である必要があります。
+date-picker-age-error = 13歳以上である必要があります。

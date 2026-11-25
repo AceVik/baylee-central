@@ -225,7 +225,7 @@ async function register(page: Page, scope: Locator = page.locator("#auth-registe
   await scope.getByLabel("Display name").fill("Erika");
   await scope.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await scope.getByLabel("Repeat password").fill(PASSWORD);
-  await scope.getByLabel("I am 16 or older.").check();
+  await scope.getByLabel("I am 13 or older.").check();
   await scope.getByRole("checkbox", { name: /I accept the terms of use/ }).check();
   await page.waitForTimeout(3_000);
   await scope.getByRole("button", { name: "Create account" }).click();
