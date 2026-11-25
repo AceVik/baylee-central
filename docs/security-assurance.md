@@ -8700,7 +8700,7 @@ rebuilt with `cargo xtask wasm` on x86-64 Linux; the browser test suites take `@
 1.65.1, `@axe-core/playwright` 4.14.1, `@types/node` 24.19.4 and `oxlint` 1.95.0.
 
 Adversarial pass, what was run on the final tree: the policy check, `crypto-scope`, `chrono-scope`,
-`cargo audit --deny warnings` (0.22.2 in CI) and `cargo deny check`, the browser suites' `npm run
+`cargo audit --deny warnings` and `cargo deny check` (0.23.0 and 0.22.1, the versions CI now pins), the browser suites' `npm run
 check` and `npm audit`, and `cargo xtask gate` (format, policy with its compiler probe, clippy
 `-D warnings`, every test, the doc tests, the release build). `postgres`, `smoke` and `wasm --check`
 run in CI on the pull request. What was not done: no source audit of the moved packages, and no run
