@@ -61,7 +61,9 @@ impl Audit {
                                 .insert(gateway.id, (gateway.name, gateway.origin));
                         }
                         for found in report_tokens {
-                            names.tokens.insert(found.event, found.token.name);
+                            names
+                                .tokens
+                                .insert(found.event, (found.token.id, found.token.name));
                         }
                     });
                     if before.is_some() {

@@ -41,10 +41,14 @@ pub const MAX_PAGE: u32 = 200;
 pub const MAX_QUERY: usize = 200;
 /// A note, in characters.
 pub const MAX_NOTE: usize = 4_000;
-/// A report's notes together, in bytes: what one report's page can still be
-/// answered with on the wire beside its text and history, and 48 notes of
-/// the longest in plain letters.
+/// A report's notes together, in bytes, each weighed with [`NOTE_BYTES`]:
+/// what one report's page can still be answered with on the wire beside its
+/// text and history. 46 notes of the longest in plain letters, and no more
+/// than 765 of one letter.
 pub const MAX_NOTES_BYTES: usize = 192 * 1024;
+/// What a note weighs besides its text: its ids, its time, who wrote it and
+/// what the wire writes around them.
+pub const NOTE_BYTES: usize = 256;
 /// The newest lines of a report's history that are shown with it.
 pub const HISTORY: usize = 200;
 /// Labels on one report, and one label's length.
@@ -59,10 +63,17 @@ pub const MAX_VIEW_NAME: usize = 64;
 pub const MAX_VIEW_QUERY: usize = 2_048;
 /// Reports changed in one request.
 pub const MAX_BULK: usize = 200;
+/// Duplicates the reports of one report token's request hand on to another
+/// original, all together. Each is written and gets a line of history, for
+/// which the request does not pay; a token that has more of them moves them
+/// itself, by a selection, first.
+pub const MAX_HANDED_ON: usize = 50;
 /// Reports marked opened in one request.
 pub const MAX_SEEN: usize = 500;
 /// The busiest reporters a facet lists.
 pub const FACET_REPORTERS: usize = 50;
+/// The most used labels a facet lists.
+pub const FACET_LABELS: usize = 200;
 /// Crash groups a list shows.
 pub const MAX_CRASH_GROUPS: usize = 100;
 /// Days in the trash before the sweep purges a report.
@@ -199,7 +210,8 @@ pub struct Crash {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReportIntake {
-    /// What the gateway says of itself.
+    /// What the gateway says of itself; a report token is none and says
+    /// nothing here.
     pub gateway: GatewaySays,
     /// How it came; `direct` only from the official gateway, `token` from a
     /// report token and from nothing else.
@@ -297,14 +309,16 @@ impl ReportIntake {
                     }
         });
         // a direct report carries no game of a gateway's, a crash names its
-        // place only for a crash, and a token has no record a gateway kept
+        // place only for a crash, and a token speaks for no gateway: it has
+        // nothing to say of itself as one, and no record a gateway kept
         let consistent = (self.channel != Channel::Direct || self.game_id.is_none())
             && (self.crash.is_none() || self.kind == ReportKind::Crash)
             && (self.channel != Channel::Token
-                || self
-                    .record
-                    .as_ref()
-                    .is_none_or(|r| r.origin == RecordOrigin::Client));
+                || self.gateway == GatewaySays::default()
+                    && self
+                        .record
+                        .as_ref()
+                        .is_none_or(|r| r.origin == RecordOrigin::Client));
         if reporter
             && text
             && game
@@ -738,7 +752,7 @@ pub struct ReportFacets {
     pub priorities: Vec<Count<Option<Priority>>>,
     /// By assignee.
     pub assignees: Vec<Count<Option<[u8; 16]>>>,
-    /// By label.
+    /// By label, the most used, at most [`FACET_LABELS`].
     pub labels: Vec<Count<String>>,
     /// By gateway.
     pub gateways: Vec<Count<String>>,
@@ -921,8 +935,8 @@ mod tests {
         assert!(serde_json::from_value::<ReportIntake>(text).is_err());
     }
 
-    /// A token's report says so, may name a game, and never claims a record
-    /// a gateway kept.
+    /// A token's report says so, may name a game, and claims neither a
+    /// gateway's name, address or build nor a record a gateway kept.
     #[test]
     fn a_token_s_report_is_no_gateway_s() {
         let mut report = intake();
@@ -935,6 +949,17 @@ mod tests {
         let record = report.record.as_mut().unwrap();
         record.origin = RecordOrigin::Client;
         record.bytes = MAX_CLIENT_RECORD_GZIP;
+        let claims: [fn(&mut GatewaySays); 3] = [
+            |says| says.name = Some("Synthetic".into()),
+            |says| says.url = Some("https://gateway.invalid".into()),
+            |says| says.version = Some("0.1.1-beta.9b".into()),
+        ];
+        for claim in claims {
+            report.gateway = GatewaySays::default();
+            claim(&mut report.gateway);
+            assert_eq!(report.validate(), Err(Error::Rejected), "{report:?}");
+        }
+        report.gateway = GatewaySays::default();
         report.validate().unwrap();
         report.record.as_mut().unwrap().bytes += 1;
         assert_eq!(report.validate(), Err(Error::Rejected));

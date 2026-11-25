@@ -27,7 +27,9 @@ use axum::{
     Router,
     body::{Body, Bytes},
     extract::{Path, Request, State},
-    http::{Extensions, HeaderMap, HeaderName, HeaderValue, StatusCode, header, request::Parts},
+    http::{
+        Extensions, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header, request::Parts,
+    },
     response::{IntoResponse, Response},
     routing::{get, patch, post, put},
 };
@@ -347,15 +349,14 @@ impl<R: Reports> Desk<R> {
         said
     }
 
-    /// A report token's request, its credential known to be good for `right`
-    /// and one of its calls at once: the token, its id and the slot, held
-    /// until the store has answered.
+    /// A report token's request, its credential known to be good for `right`:
+    /// the token and its id.
     async fn begin(
         &self,
         head: &Parts,
         right: ReportScope,
         download: bool,
-    ) -> Result<(Token, [u8; 16], Slot), Error> {
+    ) -> Result<(Token, [u8; 16]), Error> {
         let ReportBearer::Report(token) = bearer(&head.headers)? else {
             return Err(Error::Rejected);
         };
@@ -364,8 +365,22 @@ impl<R: Reports> Desk<R> {
         let place = from.map(Place::from);
         let said = self.reports.access(&token, right, download, place).await;
         let id = self.heard(said, true, from)?;
+        Ok((token, id))
+    }
+
+    /// Ask the store what a whole request asks of it, in one of the token's
+    /// calls at once. The slot is taken here and not before: a body that is
+    /// still on its way holds its address's place and no slot.
+    async fn called(
+        &self,
+        (token, id): (Token, [u8; 16]),
+        call: ReportCall,
+    ) -> Result<ReportReply, Stopped> {
         let slot = self.calls.take(id)?;
-        Ok((token, id, slot))
+        let reports = Arc::clone(&self.reports);
+        let work = async move { reports.call(id, &token, call).await };
+        let (reply, _slot) = to_the_end(slot, work).await?;
+        Ok(reply)
     }
 
     /// A report token's request without a body.
@@ -382,11 +397,8 @@ impl<R: Reports> Desk<R> {
             let call = call.ok_or(Stopped::Request(Error::Rejected))?;
             Ok((begun, call))
         };
-        let ((token, id, _slot), call) = kept(begun.await, body).await?.0;
-        self.reports
-            .call(id, &token, call)
-            .await
-            .map_err(Stopped::Request)
+        let (begun, call) = kept(begun.await, body).await?.0;
+        self.called(begun, call).await
     }
 
     /// A report token's request with a JSON body, read once its credential
@@ -406,18 +418,31 @@ impl<R: Reports> Desk<R> {
             }
             Ok((begun, unread(&head)?))
         };
-        let (((token, id, _slot), unread), body) = kept(begun.await, body).await?;
+        let ((begun, unread), body) = kept(begun.await, body).await?;
         let (bytes, _place) = unread
             .read(&head, body, report_api::MAX_BODY_BYTES)
             .await
             .map_err(Stopped::Body)?;
         let body = central_api::decode(&bytes).map_err(Stopped::Request)?;
         let call = call(body).ok_or(Stopped::Request(Error::Rejected))?;
-        self.reports
-            .call(id, &token, call)
-            .await
-            .map_err(Stopped::Request)
+        self.called(begun, call).await
     }
+}
+
+/// Do `work`, which asks the store, to its end and keep what it `holds` until
+/// then, whoever still waits for it: what it answered, and what it held. A
+/// request whose connection goes away is dropped, and what the store works
+/// on for it is not: it keeps its connection until it is done or its time is
+/// over. A slot given back before that would let a sender who hangs up hold
+/// more of the store's connections than there are slots.
+async fn to_the_end<T: Send + 'static, H: Send + 'static>(
+    holds: H,
+    work: impl Future<Output = Result<T, Error>> + Send + 'static,
+) -> Result<(T, H), Stopped> {
+    tokio::spawn(async move { work.await.map(|done| (done, holds)) })
+        .await
+        .unwrap_or(Err(Error::Unavailable))
+        .map_err(Stopped::Request)
 }
 
 /// What a request may go on with, and its body still unread; a refused
@@ -652,7 +677,8 @@ impl hyper::body::Body for Sending {
 
 /// `GET /v1/reports/{report}/{client|record}`: the gzip as stored, its
 /// record's writer beside it. One of the token's downloads of its hour, and
-/// the one it has at once.
+/// the one it has at once. `HEAD` is no route: it would read a whole part to
+/// send none of it.
 async fn download<R: Reports>(
     State(desk): Counter<R>,
     Path((report, part)): Path<(String, String)>,
@@ -661,6 +687,9 @@ async fn download<R: Reports>(
     let Ok(part) = Part::from_stored(&part) else {
         return nowhere();
     };
+    if request.method() == Method::HEAD {
+        return StatusCode::METHOD_NOT_ALLOWED.into_response();
+    }
     let (head, body) = request.into_parts();
     let sent = async {
         let begun = async {
@@ -669,13 +698,11 @@ async fn download<R: Reports>(
             let report = hex_id(&report).ok_or(Stopped::Request(Error::Rejected))?;
             Ok((begun, report))
         };
-        let ((token, id, _slot), report) = kept(begun.await, body).await?.0;
-        let slot = desk.downloads.take(id)?;
-        let (gzip, origin) = desk
-            .reports
-            .download(&token, report, part)
-            .await
-            .map_err(Stopped::Request)?;
+        let ((token, id), report) = kept(begun.await, body).await?.0;
+        let slots = (desk.calls.take(id)?, desk.downloads.take(id)?);
+        let reports = Arc::clone(&desk.reports);
+        let work = async move { reports.download(&token, report, part).await };
+        let ((gzip, origin), (_call, slot)) = to_the_end(slots, work).await?;
         Ok::<_, Stopped>((gzip, origin, slot))
     };
     match sent.await {

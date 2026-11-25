@@ -9,9 +9,9 @@ use super::list::{SUMMARY_COLUMNS, split, summary};
 use super::{Actor, ReportCaller, history, release, sweep};
 use central_api::report_tokens::ReportScope;
 use central_api::reports::{
-    BulkAction, HISTORY, MAX_BULK, MAX_NOTE, MAX_NOTES_BYTES, MAX_SEEN, MAX_VIEWS, PartState,
-    ReportAdmin, ReportAuditRow, ReportChange, ReportDetail, ReportNote, ReportStatus, SavedView,
-    valid_view,
+    BulkAction, HISTORY, MAX_BULK, MAX_HANDED_ON, MAX_NOTE, MAX_NOTES_BYTES, MAX_SEEN, MAX_VIEWS,
+    NOTE_BYTES, PartState, ReportAdmin, ReportAuditRow, ReportChange, ReportDetail, ReportNote,
+    ReportStatus, SavedView, valid_view,
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, prelude::Uuid};
 
@@ -189,14 +189,64 @@ fn lines(was: &Triage, next: &Decided) -> Vec<(&'static str, String)> {
     lines
 }
 
+/// Hand `report`'s duplicates on to `original`, of which it became one, each
+/// with its line of history. `handed` counts those of the whole request: a
+/// report token hands on at most [`MAX_HANDED_ON`], which is asked before
+/// anything is written. `report`'s row is locked, and a row with a duplicate
+/// is locked by whoever adds one, so none comes in between.
+async fn hand_on(
+    tx: &DatabaseTransaction,
+    actor: &Actor,
+    report: Uuid,
+    original: Uuid,
+    handed: &mut usize,
+) -> Result<(), Error> {
+    if actor.token_name.is_some() {
+        let more = tx
+            .query_all_raw(statement(
+                "SELECT 1 AS one FROM central_identity.reports WHERE duplicate_of = $1 LIMIT $2",
+                vec![report.into(), limit(MAX_HANDED_ON + 1)],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .len();
+        *handed += more;
+        if *handed > MAX_HANDED_ON {
+            return Err(Error::Rejected);
+        }
+    }
+    let moved = tx
+        .query_all_raw(statement(
+            "UPDATE central_identity.reports SET duplicate_of = $2, revision = revision + 1,
+                 updated_at = pg_catalog.clock_timestamp()
+             WHERE duplicate_of = $1 RETURNING id",
+            vec![report.into(), original.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+    for row in &moved {
+        history(
+            tx,
+            get(row, "id")?,
+            Some(actor),
+            "duplicate",
+            &original.to_string(),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 /// Apply `change` to `report` by `actor` in `tx`: the rules, the row and its
-/// history. Returns whether anything changed.
+/// history; `handed` is the whole request's ([`hand_on`]). Returns whether
+/// anything changed.
 async fn apply(
     tx: &DatabaseTransaction,
     actor: &Actor,
     report: Uuid,
     change: &ReportChange,
     expected: Option<u32>,
+    handed: &mut usize,
 ) -> Result<bool, Error> {
     let was = locked(tx, report).await?;
     if expected.is_some_and(|e| i64::from(e) != i64::from(was.revision)) {
@@ -228,25 +278,7 @@ async fn apply(
     .map_err(|_| Error::Unavailable)?;
     // a report that became a duplicate hands its own duplicates on to its original
     if let Some(original) = next.duplicate_of {
-        let moved = tx
-            .query_all_raw(statement(
-                "UPDATE central_identity.reports SET duplicate_of = $2, revision = revision + 1,
-                     updated_at = pg_catalog.clock_timestamp()
-                 WHERE duplicate_of = $1 RETURNING id",
-                vec![report.into(), original.into()],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        for row in &moved {
-            history(
-                tx,
-                get(row, "id")?,
-                Some(actor),
-                "duplicate",
-                &original.to_string(),
-            )
-            .await?;
-        }
+        hand_on(tx, actor, report, original, handed).await?;
     }
     for (action, detail) in lines {
         history(tx, report, Some(actor), action, &detail).await?;
@@ -416,7 +448,8 @@ impl AccountStore {
     /// # Errors
     /// `Rejected` for a change out of bounds or against the rules (a second
     /// duplicate level, an assignee who is no administrator, a duplicate
-    /// without its original), an unknown report, or neither an
+    /// without its original, a report token handing on more than
+    /// [`MAX_HANDED_ON`] duplicates), an unknown report, or neither an
     /// administrator nor a report token that may triage; `Conflict` on
     /// another revision; storage failure.
     pub async fn set_report(
@@ -429,7 +462,7 @@ impl AccountStore {
         change.validate(false)?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let actor = Actor::check(&tx, caller, ReportScope::Triage).await?;
-        apply(&tx, &actor, uuid(report), change, expected).await?;
+        apply(&tx, &actor, uuid(report), change, expected, &mut 0).await?;
         let detail = Self::detail(&tx, &actor, uuid(report)).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(detail)
@@ -460,10 +493,12 @@ impl AccountStore {
         ids.dedup();
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let actor = Actor::check(&tx, caller, right(how)).await?;
-        let mut changed = 0_u32;
+        let (mut changed, mut handed) = (0_u32, 0);
         for report in ids {
             let did = match how {
-                BulkAction::Change { change } => apply(&tx, &actor, report, change, None).await?,
+                BulkAction::Change { change } => {
+                    apply(&tx, &actor, report, change, None, &mut handed).await?
+                }
                 bin_action => bin(&tx, &actor, report, bin_action).await?,
             };
             changed += u32::from(did);
@@ -498,8 +533,8 @@ impl AccountStore {
     /// # Errors
     /// `Rejected` for an empty or overlong note, an unknown report, or
     /// neither an administrator nor a report token that may triage; `Busy`
-    /// when the report's notes would be more than [`MAX_NOTES_BYTES`];
-    /// storage failure.
+    /// when the report's notes, each with its [`NOTE_BYTES`], would be more
+    /// than [`MAX_NOTES_BYTES`]; storage failure.
     pub async fn add_report_note(
         &self,
         caller: ReportCaller<'_>,
@@ -515,8 +550,10 @@ impl AccountStore {
         // The report's row is locked, so its notes are weighed one at a time.
         let held: i64 = tx
             .query_one_raw(statement(
-                "SELECT COALESCE(sum(octet_length(text)), 0)::bigint AS bytes
-                 FROM central_identity.report_notes WHERE report_id = $1",
+                &format!(
+                    "SELECT COALESCE(sum(octet_length(text) + {NOTE_BYTES}), 0)::bigint AS bytes
+                     FROM central_identity.report_notes WHERE report_id = $1"
+                ),
                 vec![uuid(report).into()],
             ))
             .await
@@ -524,7 +561,7 @@ impl AccountStore {
             .ok_or(Error::Unavailable)
             .and_then(|row| get(&row, "bytes"))?;
         let held = usize::try_from(held).map_err(|_| Error::Unavailable)?;
-        if held.saturating_add(text.len()) > MAX_NOTES_BYTES {
+        if held.saturating_add(text.len() + NOTE_BYTES) > MAX_NOTES_BYTES {
             return Err(Error::Busy);
         }
         tx.execute_raw(statement(

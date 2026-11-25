@@ -1091,7 +1091,7 @@ refused as ever (`Origin`, `Sec-Fetch-Site`).
 
 | request | right | body | answer |
 | --- | --- | --- | --- |
-| `POST /v1/reports` | `file` | the metadata, `"channel":"token"` | `201 {"report_id"}` |
+| `POST /v1/reports` | `file` | the metadata, `"channel":"token"`, `"gateway":{}` | `201 {"report_id"}` |
 | `PUT /v1/reports/{id}/client`, `…/record` | `file` | gzip, `application/gzip`, `Content-Length` | `204` |
 | `POST /v1/reports/search` | `read` | `{"filter":{…},"sort","descending","offset","limit"}`, all optional | `{"reports":[…],"total"}` |
 | `POST /v1/reports/facets`, `…/crashes` | `read` | `{"filter":{…}}` | counts, crash groups |
@@ -1107,15 +1107,17 @@ refused as ever (`Origin`, `Sec-Fetch-Site`).
 | `DELETE /v1/reports/{id}` | `purge` | none | `204`, from the trash only |
 | `POST /v1/reports/purge` | `purge` | `{"reports":[ids]}` | `{"changed"}`, from the trash only, all or none |
 
-Ids are 32 lowercase hex digits. The filter's parts are `statuses`, `kinds`,
+A `HEAD` of a part is `405`. Ids are 32 lowercase hex digits. The filter's
+parts are `statuses`, `kinds`,
 `priorities` (`null` is none), `q`, `from`, `to`, `has_record`, `channel`,
 `gateway`, `token`, `assignee`, `unassigned`, `label`, `reporter`,
 `signature`, `duplicate_of` and `trash`; `central_api::report_api` is the
-contract. A record a token files has `"origin":"client"`, at most 4 MiB.
+contract. A record a token files has `"origin":"client"`, at most 4 MiB, and
+its `gateway` stays empty: a token speaks for none.
 
 | status | means |
 | --- | --- |
-| `400` | the token is good, the request is not (an id, a body, a rule; a report that is not there) |
+| `400` | the token is good, the request is not (an id, a body, a rule; a report that is not there); or the token was revoked while this was answered |
 | `401` | the token is not good here: unknown, revoked, expired, its maker no administrator, or without the right; a gateway's refusals as ever |
 | `409` | the report moved past `expected_revision`, or the part is stored already |
 | `413` | a body over 64 KiB |
@@ -1128,22 +1130,31 @@ contract. A record a token files has `"origin":"client"`, at most 4 MiB.
 | live tokens, new ones a day | 32, 32 | `central-api`, `report_tokens` |
 | requests of one token an hour besides filing, a selection one for every ten reports | 600 | `REQUESTS_PER_HOUR` |
 | of them, downloads | 120 | `DOWNLOADS_PER_HOUR` |
+| duplicates one request hands on to another original | 50 | `central-api`, `MAX_HANDED_ON` |
 | calls at once, all tokens and one | 2, 1 | `central-http`, `slots.rs` |
 | downloads at once, all tokens and one | 2, 1 | `slots.rs` |
 | refused tokens an hour from one address | 30 | `addresses.rs`, `REPORT_REFUSALS` |
 | reports an hour, uploads at once, stored bytes of one token | as a registered gateway's | above |
-| a report's notes together | 192 KiB | `central-api`, `MAX_NOTES_BYTES` |
+| a report's notes together, each with 256 bytes besides its text | 192 KiB | `central-api`, `MAX_NOTES_BYTES`, `NOTE_BYTES` |
 
-All but the stored bytes and the notes are in the service's memory: a restart
-forgets them.
+All but the stored bytes, the duplicates and the notes are in the service's
+memory: a restart forgets them. The four uploads at once and the 16 GiB of
+all reports are tokens' and gateways' together. A request whose sender hangs
+up keeps its call's slot until the store is done with it, five seconds at
+most.
 
 **A lost or leaked token** is revoked on the page, at once. Without an
-administrator who can sign in, as `central_migrator`:
+administrator who can sign in, as `central_migrator`, by its id, since two
+tokens may have one name (the page, a report's history and
+`audit_events.report_token_id` name it):
 
 ```sql
+SELECT id, name, created_by, created_at, last_used_at
+FROM central_identity.report_tokens
+WHERE revoked_at IS NULL AND expires_at > pg_catalog.clock_timestamp();
 UPDATE central_identity.report_tokens
 SET revoked_at = pg_catalog.clock_timestamp()
-WHERE name = 'its name' AND revoked_at IS NULL;
+WHERE id = 'its id' AND revoked_at IS NULL;
 ```
 
 **Removing an administrator** stops every token they made
@@ -1159,6 +1170,11 @@ created_at, expires_at), UPDATE (revoked_at, revoked_by, last_used_at)` on
 over all of it; it shows a token's report like a gateway's of that name, and
 it knows no report token, so their requests are refused by it. No secret
 and no setting is new.
+
+An administration page that was opened before the deployment stays at its old
+build. It reads no answer that a token's report, note or change is in, nor
+an audit page with a token's event, and says the request failed: reload it. Tell the administrators before the first
+token is handed out.
 
 **Memory.** Two downloads at once of the largest part (64 MiB) can hold
 about 384 MiB for a moment, by reading the code and not measured, beside

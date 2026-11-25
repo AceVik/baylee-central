@@ -223,8 +223,9 @@ pub struct Names {
     pub accounts: HashMap<[u8; 16], String>,
     /// A gateway's name and origin.
     pub gateways: HashMap<[u8; 16], (String, String)>,
-    /// The name of the report token an event made or revoked, by the event.
-    pub tokens: HashMap<[u8; 16], String>,
+    /// The report token an event made or revoked, by the event: its id and
+    /// its name.
+    pub tokens: HashMap<[u8; 16], ([u8; 16], String)>,
 }
 
 /// The words for an audited action Central names; `None` for one this page
@@ -284,11 +285,9 @@ fn event_rows(lang: Lang, events: &[Event], names: &Names) -> impl IntoView + us
             let account = event.account.map(|id| account_cell(lang, id, names));
             let between = (event.account.is_some() && event.gateway.is_some()).then_some(" · ");
             let gateway = event.gateway.map(|id| gateway_cell(id, names));
-            let token = names
-                .tokens
-                .get(&event.id)
-                .cloned()
-                .map(|name| view! { <bdi translate="no">{name}</bdi> });
+            let token = names.tokens.get(&event.id).map(|(id, name)| {
+                view! { <span title=id_hex(id)><bdi translate="no">{name.clone()}</bdi>" "<code translate="no">{id_end(id)}</code></span> }
+            });
             view! {
                 <tr>
                     <td class="num">{super::super::account::when(lang, event.at)}</td>

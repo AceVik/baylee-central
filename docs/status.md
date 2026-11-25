@@ -546,3 +546,30 @@ The privacy policy and the terms (still version 2026-11-19, unpublished) and
 the website's privacy page say what friends see. Open: the owner's look at the
 changed paragraph; the migration's production run through its own gate; the
 Baylee client, which has yet to report and choose.
+
+## Report tokens, 25 November 2026
+
+By the owner's order of the same day, administrators hand out tokens for the
+report API with levels ([reports](reports.md) §"Report tokens"):
+
+- `central-api`: `report_tokens` (the rights `file`, `read`, `triage`,
+  `purge` and their needs, the text form `brt_…`, the header's two kinds) and
+  `report_api`, the contract scripts read, apart from the administration's
+  types; `Channel::Token`;
+- `central-postgres`: migration 000052 (`report_tokens`, `reports.filed_by`,
+  the token's name on a note and a line of the history,
+  `audit_events.report_token_id`); one actor type for administrators and
+  tokens; a report's notes bounded together, its history shown by its newest
+  200 lines;
+- `central-identity`: the token's hour, its calls and what a selection costs;
+  `ReportTokens`, `CreateReportToken` and `RevokeReportToken`;
+- `central-http`: the report routes, their credential before their body, one
+  call and one download at a time, refused tokens counted by their address;
+- `central-web`: the page *Feedback tokens* in eleven languages, and a token
+  named as one in the list, the filters, the facts, the notes, the history
+  and the audit.
+
+Open: the privacy notice before a token that reads is handed to anyone
+outside Central's administration; the nine languages besides English and
+German for a speaker to read; the migration's production run through its own
+gate.

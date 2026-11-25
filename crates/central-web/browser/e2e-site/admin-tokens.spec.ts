@@ -28,18 +28,20 @@ test("the tokens: what each may do, who made it, and where it stands", async ({ 
   expect(asked(seen)).toEqual([{ action: "report_tokens" }]);
   await expect(cards(page).locator(".pill")).toHaveText(["Active", "Active", "Paused", "Revoked", "Expired"]);
   const agent = card(page, "Triage agent");
-  await expect(agent.locator("dt")).toHaveText(["Its rights", "Created by", "Created", "Expires", "Last used"]);
-  await expect(facts(agent).nth(0)).toHaveText("Read and edit");
-  await expect(facts(agent).nth(1)).toHaveText("Chef#0c4e");
-  await expect(facts(agent).nth(4)).not.toHaveText("Never");
+  await expect(agent.locator("dt")).toHaveText(["Id", "Its rights", "Created by", "Created", "Expires", "Last used"]);
+  // whole, so that the operator can revoke by it
+  await expect(facts(agent).nth(0).locator("code")).toHaveText(hex(id(0xc1)));
+  await expect(facts(agent).nth(1)).toHaveText("Read and edit");
+  await expect(facts(agent).nth(2)).toHaveText("Chef#0c4e");
+  await expect(facts(agent).nth(5)).not.toHaveText("Never");
   // rights no preset holds are named one by one
-  await expect(facts(card(page, "Nightly build")).nth(0)).toHaveText("File reports · Read reports and download their parts");
-  await expect(facts(card(page, "Nightly build")).nth(4)).toHaveText("Never");
+  await expect(facts(card(page, "Nightly build")).nth(1)).toHaveText("File reports · Read reports and download their parts");
+  await expect(facts(card(page, "Nightly build")).nth(5)).toHaveText("Never");
   await expect(card(page, "Old helper")).toContainText("Its maker is not an administrator any more, so it does nothing.");
-  await expect(facts(card(page, "Old helper")).nth(1).locator("a")).toHaveAttribute("href", `/en/account/admin/users/${hex(ID.erika)}`);
+  await expect(facts(card(page, "Old helper")).nth(2).locator("a")).toHaveAttribute("href", `/en/account/admin/users/${hex(ID.erika)}`);
   await expect(card(page, "Leaked")).toContainText(/Revoked .+ by Ada#3c4d/);
   // a maker who is gone is named by its id's end
-  await expect(facts(card(page, "Last year")).nth(1)).toHaveText(`…${hex(id(77)).slice(24)}`);
+  await expect(facts(card(page, "Last year")).nth(2)).toHaveText(`…${hex(id(77)).slice(24)}`);
   // only what still works, or would again, is revoked
   await expect(page.getByRole("button", { name: "Revoke", exact: true })).toHaveCount(3);
   expect(changes(seen)).toEqual([]);

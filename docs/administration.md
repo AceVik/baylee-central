@@ -209,8 +209,10 @@ that could carry either.
 
 **Removing an administrator stops every token they made**, at once and
 without a revocation: the query that authenticates a token asks for its
-maker's role. Their tokens show as paused, and work again if they are
-appointed again; revoke them where that must not be.
+maker's role. The removal waits for what one of them is changing at that
+moment, and nothing of theirs is stored after it. Their tokens show as
+paused, and work again if they are appointed again; revoke them where that
+must not be.
 
 The runtime has `SELECT`, `INSERT` of a token's own columns and
 `UPDATE (revoked_at, revoked_by, last_used_at)` on `report_tokens`; it can

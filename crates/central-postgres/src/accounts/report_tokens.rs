@@ -43,9 +43,10 @@ pub struct ReportToken {
 pub(super) enum Hold {
     /// For the statement: a read's check, or the one before a body is read.
     Now,
-    /// Until the transaction ends: a change's. A revocation waits for it,
+    /// Until the transaction ends: a change's. A revocation and the end of
+    /// its maker's role wait for it (`set_admin` locks the maker's tokens),
     /// and one that committed before is seen here, so nothing a token began
-    /// commits once its revocation was answered.
+    /// commits once either was answered.
     ToTheEnd,
 }
 
@@ -71,6 +72,26 @@ fn authenticating(column: &'static str, right: ReportScope, hold: Hold) -> Strin
     )
 }
 
+/// The maker of `token` is an administrator still, asked once its row is
+/// locked and in a statement of its own. A statement that waited for the row
+/// looks at that row again and at nothing else: a role that went while it
+/// waited would be there for it.
+async fn made_by_an_administrator(
+    db: &impl ConnectionTrait,
+    token: ReportToken,
+) -> Result<ReportToken, Error> {
+    db.query_one_raw(statement(
+        &format!(
+            "SELECT 1 AS yes FROM central_identity.report_tokens t WHERE t.id = $1 AND {MAKER}"
+        ),
+        vec![uuid(token.id).into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?
+    .ok_or(Error::Rejected)?;
+    Ok(token)
+}
+
 /// The report token `token` authenticates as, in `db`, if it is live, its
 /// maker is an administrator and it holds `right`.
 ///
@@ -90,7 +111,11 @@ pub(super) async fn authenticated(
         .await
         .map_err(|_| Error::Unavailable)?
         .ok_or(Error::Rejected)?;
-    found(&row)
+    let token = found(&row)?;
+    match hold {
+        Hold::Now => Ok(token),
+        Hold::ToTheEnd => made_by_an_administrator(db, token).await,
+    }
 }
 
 /// As [`authenticated`], for a token that authenticated before in the same
@@ -113,7 +138,24 @@ pub(super) async fn still(
         .await
         .map_err(|_| Error::Unavailable)?
         .ok_or(Error::Rejected)?;
-    found(&row)
+    made_by_an_administrator(db, found(&row)?).await
+}
+
+/// Lock the live report tokens `maker` made, in `db`'s transaction, before
+/// their role ends: what they began is over first, and what begins after
+/// asks for the role again ([`made_by_an_administrator`]).
+///
+/// # Errors
+/// Storage failure.
+pub(super) async fn hold_back(db: &impl ConnectionTrait, maker: Uuid) -> Result<(), Error> {
+    db.query_all_raw(statement(
+        "SELECT id FROM central_identity.report_tokens WHERE created_by = $1 AND revoked_at IS NULL
+         ORDER BY id FOR UPDATE",
+        vec![maker.into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?;
+    Ok(())
 }
 
 fn scopes(row: &QueryResult) -> Result<ReportScopes, Error> {

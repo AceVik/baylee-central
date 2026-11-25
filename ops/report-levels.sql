@@ -14,7 +14,7 @@
 -- for all.
 SELECT w.gateway_id,
        max(w.gateway_label) AS name,
-       max(w.filed_by) AS filed_by,
+       CASE WHEN GROUPING(w.gateway_id) = 0 THEN max(w.filed_by) END AS filed_by,
        count(*)::bigint AS reports,
        sum(w.bytes)::bigint AS bytes,
        pg_catalog.pg_size_pretty(sum(w.bytes)) AS counted

@@ -120,6 +120,12 @@ async fn runbook(store: &AccountStore, operator: &DatabaseConnection, filer: &Fi
     assert!(theirs > 0 && everyone > theirs);
     assert_eq!(counted(Some(Uuid::from_bytes(filer.id))), Some(theirs));
     assert_eq!(counted(None), Some(everyone));
+    // a line says who filed, and the line for all names nobody
+    for line in &lines {
+        let id = line.try_get::<Option<Uuid>>("", "gateway_id").unwrap();
+        let filed_by = line.try_get::<Option<String>>("", "filed_by").unwrap();
+        assert_eq!(filed_by.as_deref(), id.map(|_| "gateway"));
+    }
 }
 
 /// A registered gateway's bound, to the byte; another gateway is not

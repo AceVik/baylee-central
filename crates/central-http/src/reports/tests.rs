@@ -756,6 +756,11 @@ async fn another_path_or_method_is_no_route() {
             format!("/v1/reports/{REPORT}"),
             StatusCode::METHOD_NOT_ALLOWED,
         ),
+        (
+            &Method::HEAD,
+            format!("/v1/reports/{REPORT}/record"),
+            StatusCode::METHOD_NOT_ALLOWED,
+        ),
     ] {
         assert_eq!(
             send(&app, bad(method, &path)).await.0,
@@ -896,8 +901,9 @@ async fn refused_tokens_are_counted_by_their_address_and_gateways_are_not() {
     }
 }
 
-/// A token's calls run one at a time, and a second is told so at once; the
-/// slot is free again when the first is answered or goes away.
+/// A token's calls run one at a time, and a second is told so at once. The
+/// slot is free again when the store is done with the first, and not when the
+/// one who asked goes away: what the store works on then goes on.
 #[tokio::test]
 async fn a_token_has_one_call_at_once() {
     let stand = Arc::new(Stand::default());
@@ -917,7 +923,7 @@ async fn a_token_has_one_call_at_once() {
     assert_eq!(send(&app, ask()).await.0, StatusCode::TOO_MANY_REQUESTS);
     stand.go.notify_one();
     assert_eq!(first.await.unwrap(), StatusCode::OK);
-    // one whose connection goes away gives it back too
+    // one whose connection goes away keeps it until the store is done
     let gone = tokio::spawn({
         let (app, sent) = (app.clone(), ask());
         async move { send(&app, sent).await.0 }
@@ -926,7 +932,44 @@ async fn a_token_has_one_call_at_once() {
     gone.abort();
     assert!(gone.await.is_err());
     stand.wait.store(false, Ordering::SeqCst);
-    assert_eq!(send(&app, ask()).await.0, StatusCode::OK);
+    for _ in 0..3 {
+        assert_eq!(send(&app, ask()).await.0, StatusCode::TOO_MANY_REQUESTS);
+    }
+    stand.go.notify_one();
+    let free = tokio::time::timeout(Duration::from_secs(2), async {
+        while send(&app, ask()).await.0 != StatusCode::OK {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    });
+    assert!(free.await.is_ok(), "the slot was never given back");
+}
+
+/// A body on its way holds no slot: the token's other calls are answered
+/// while one withholds its body.
+#[tokio::test]
+async fn a_body_on_its_way_holds_no_slot() {
+    let stand = Arc::new(Stand::default());
+    let app = app(&stand);
+    let withheld = tokio::spawn({
+        let app = app.clone();
+        let sent = request(&Method::POST, "/v1/reports/search", Some(&report_bearer()))
+            .header(header::CONTENT_TYPE, JSON)
+            .header(header::CONTENT_LENGTH, "8")
+            .body(Body::new(Watched::withheld(&stand)))
+            .unwrap();
+        async move { send(&app, sent).await.0 }
+    });
+    while stand.polls.load(Ordering::SeqCst) == 0 {
+        tokio::task::yield_now().await;
+    }
+    stand.polls.store(0, Ordering::SeqCst);
+    let sent = built(
+        request(&Method::GET, "/v1/reports/stats", Some(&report_bearer())),
+        None,
+    );
+    assert_eq!(send(&app, sent).await.0, StatusCode::OK);
+    withheld.abort();
+    assert!(withheld.await.is_err());
 }
 
 /// A download's slot is held until its part is sent, and is free again when

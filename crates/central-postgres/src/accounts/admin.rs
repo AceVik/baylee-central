@@ -983,8 +983,10 @@ impl AccountStore {
     /// first, and the acting role checked after the lock, so two
     /// administrators removing each other at once leave one. Nobody removes their own role,
     /// which keeps the last administrator; only an enrolled account is
-    /// appointed. The same state again changes nothing; a change writes its
-    /// audit event in the same transaction.
+    /// appointed. A removal waits for what the account's report tokens are
+    /// changing, and nothing of theirs is stored after it. The same state
+    /// again changes nothing; a change writes its audit event in the same
+    /// transaction.
     ///
     /// # Errors
     /// `Rejected` without an administrator's live browser session, for a
@@ -1014,6 +1016,7 @@ impl AccountStore {
             .rows_affected()
                 == 1
         } else {
+            super::report_tokens::hold_back(&tx, target).await?;
             tx.execute_raw(statement(
                 "DELETE FROM central_identity.account_roles WHERE account_id = $1 AND role = 'admin'",
                 vec![target.into()],

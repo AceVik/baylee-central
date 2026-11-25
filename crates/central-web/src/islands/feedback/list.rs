@@ -511,16 +511,17 @@ fn counted(lang: Lang, n: Option<u64>) -> impl IntoView + use<> {
 
 /// A report token's name as the facets know it, else the end of its id.
 fn token_name(l: &List, id: &[u8; 16]) -> String {
+    let end = format!("…{}", short_id(id));
     l.facets
         .with(|f| {
             f.as_ref().and_then(|f| {
                 f.tokens
                     .iter()
                     .find(|c| c.value.id == *id)
-                    .map(|c| c.value.name.clone())
+                    .map(|c| format!("{} {end}", c.value.name))
             })
         })
-        .unwrap_or_else(|| format!("…{}", short_id(id)))
+        .unwrap_or(end)
 }
 
 /// A pill's words.

@@ -38,12 +38,13 @@ REVOKE ALL ON central_identity.report_tokens FROM PUBLIC;
 -- Who filed a report: a gateway (or the bridge), as every report until now,
 -- or a report token. A token's id then stands in gateway_id and its name, as
 -- it was, in gateway_label, so that the store weighs its reports and its
--- parts find them as a gateway's do. A token is no gateway: it files no
--- record as one's own, and no direct report.
+-- parts find them as a gateway's do. A token is no gateway: it says nothing
+-- of itself as one, files no record as one's own, and no direct report.
 ALTER TABLE central_identity.reports
     ADD COLUMN filed_by text NOT NULL DEFAULT 'gateway' CHECK (filed_by IN ('gateway', 'token')),
     ADD CONSTRAINT report_by_token CHECK (
-        filed_by = 'gateway' OR (channel = 'gateway' AND record_origin IS DISTINCT FROM 'gateway'));
+        filed_by = 'gateway' OR (channel = 'gateway' AND record_origin IS DISTINCT FROM 'gateway'
+            AND pg_catalog.num_nonnulls(gateway_says, gateway_url, gateway_version) = 0));
 CREATE INDEX reports_by_token ON central_identity.reports(gateway_id) WHERE filed_by = 'token';
 
 -- Who wrote a note or changed a report: an administrator, or a report token,

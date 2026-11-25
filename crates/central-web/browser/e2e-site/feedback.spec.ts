@@ -233,7 +233,7 @@ test("a selection: one request for all of it, the trash with Undo, opened marks,
   expect(file.suggestedFilename()).toMatch(/^baylee-reports-\d{4}-\d\d-\d\d\.csv$/);
   const csv = await readFile((await file.path()) ?? "", "utf8");
   const lines = csv.split("\r\n");
-  expect(lines[0]).toBe("id,received,changed,kind,status,priority,assignee,labels,gateway,channel,reporter,build,crash,record_bytes,issue,notes,excerpt");
+  expect(lines[0]).toBe("id,received,changed,kind,status,priority,assignee,labels,gateway,channel,reporter,build,crash,record_bytes,issue,notes,excerpt,token,token_id");
   // a formula never runs: its first character is defused
   expect(csv).toContain(`"'=HYPERLINK(""https://x.invalid"",""click"")"`);
   expect(lines).toHaveLength(4);

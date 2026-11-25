@@ -536,7 +536,7 @@ itself; a page in a browser.
    are refused alike.
 5. A report names the token it came from, authenticated and never claimed,
    and never looks like a gateway's: not in a list, a filter, a facet or the
-   history. A token cannot file a record as a gateway's own.
+   history. A token cannot file a record as a gateway's own, nor name one.
 6. A change says which token made it, and no reader can take it for an
    administrator's.
 7. What is secret is shown once, in the answer to its creation. Central
@@ -651,12 +651,25 @@ in it.
   by it: once a revocation is answered, nothing the token began commits. A
   filing and a part's upload, whose bodies come after the credential, ask for
   the token again in the transaction that stores them.
-- **The maker's role** is asked by the authenticating query, as designed. A
-  token whose maker is no administrator is shown as paused; with the role
-  its maker's tokens work again. Revoking is final.
+- **The maker's role** is asked by the authenticating query, as designed, and
+  in a change once more after the token's row is locked, in a statement of
+  its own: a statement that waited for the row looks at that row again and
+  at no other. The removal of an administrator locks the tokens they made
+  first, so it waits for what they are changing, and nothing of theirs is
+  stored after it. A token whose maker is no administrator is shown as
+  paused; with the role its maker's tokens work again. Revoking is final.
+  (An operator's own SQL on the roles takes no such lock: a change that has
+  begun still ends.)
 - **What can be told apart.** Only the credential's own refusal is counted
   against an address; a request the rules refuse is not. The part's and the
-  report's checks are asked after the credential, apart from it.
+  report's checks are asked after the credential, apart from it. A token
+  revoked while its request is being answered is refused by the transaction
+  that answers, which is `400`; its next request is `401`.
+- **A token speaks for no gateway.** What a gateway says of itself (its name,
+  its address, its build) is empty in a token's report, by the type and by
+  the table, and the report's page calls the row it came from "Token" and
+  not "Gateway". A CSV has the token's name and id in two columns of their
+  own, after the old ones, and no gateway.
 - **The audit's event** carries the token's id in a column of its own
   (`audit_events.report_token_id`), and a page of the audit names the token
   beside its events, not in them: `AuditEvent` is also in the account export,
@@ -667,24 +680,34 @@ in it.
   a few of them at once could hold every connection and keep everyone's
   sign-in waiting. Report tokens have two calls in the store at once, one of
   each token (`central-http`, `slots.rs`); one more is `429` at once. A
-  script sends one request after the other.
+  script sends one request after the other. The slot is taken when the body
+  is there and kept until the store is done, whoever still waits: a request
+  that is dropped leaves its statement running, and its connection taken,
+  for up to the store's five seconds.
 - **Downloads** hold their part in memory until it is sent: two at once, one
   of each token, in slots of their own. The slot is held while the part is
   sent and not only while it is read from the store.
 - **A selection costs what it writes.** A change of two hundred reports
   writes as many rows and histories; it spends a request of the token's hour
-  for every ten reports in it.
+  for every ten reports in it. A report that becomes a duplicate hands its
+  own duplicates on, which the request does not pay for and which could be
+  asked for again and again: a token's request hands on 50 in all and is
+  `400` past it, before anything is written. Whoever has more of them moves
+  them by a selection first.
 - **A report stays readable.** One report's page is answered on the wire's
   1 MiB. Nothing bounded a report's notes together, nor the history it is
   shown with, and a script can write both faster than a person. A report's
-  notes are now 192 KiB together, whoever writes them (`429` past it), and
-  the newest 200 lines of its history are shown, with a line saying there
-  are older ones. A token's answers have a bound of their own (8 MiB), which
-  a page of two hundred reports at their largest fits.
+  notes are now 192 KiB together, each weighed with 256 bytes besides its
+  text, whoever writes them (`429` past it), and the newest 200 lines of its
+  history are shown, with a line saying there are older ones. A facet lists
+  the 200 most used labels. A token's answers have a bound of their own
+  (8 MiB), which a page of two hundred reports at their largest fits.
 - **A token's note** holds what a report's own words may hold: no control
   characters and none of the invisible ones that change how text reads.
 - **Its name in words.** A report, a note and a line of the history keep the
-  token's name as it was beside its id, as a report keeps its gateway's.
+  token's name as it was beside its id, as a report keeps its gateway's. Two
+  tokens may have one name: the page shows the end of the id beside it, and
+  *Feedback tokens* the whole.
 
 Tests. `central-api`: the rights and their needs, the presets, the text form
 and the header's two kinds and nothing else, redaction, the contract's
@@ -695,23 +718,41 @@ stand-in behind the real boundary: each route's right, that no body is read
 for a credential that is not good (a body that counts its polls), one answer
 for every such refusal, a gateway's credential never asked about where a
 token is, `400` and `401`, the refusals' budget by address and that a
-gateway's are not in it, one call and one download at a time and the slot
-given back when the caller goes away, the body's bounds, the protocol and a
-page's `Origin`, and that no answer holds a credential. PostgreSQL
+gateway's are not in it, one call and one download at a time, the call's slot
+kept until the store is done when its caller goes away and not taken by a
+body on its way, the body's bounds, the protocol and a page's `Origin`, and
+that no answer holds a credential. PostgreSQL
 (`tests/support/accounts/reports/tokens.rs`): every set of rights a token
 can hold against every act, eighteen of them; a token revoked, over or
 without its maker; a revocation between the credential and the storing, and
-one while a change runs; who may make and revoke; the audit; the bounds on
-tokens, notes and history; the filters, facets and history that tell a token
+one while a change runs; the end of the maker's role while a change runs, and
+a change while that is being written; who may make and revoke; the audit; the
+bounds on tokens, notes, history, labels and what a request hands on; the
+filters, facets and history that tell a token
 from a gateway of the same name; the store's bound; the checks of the table
 and the runtime's exact grants both ways. Over real HTTP with PostgreSQL
 (`central-client`, `tests/support/report_tokens.rs`): the whole way from the
 administrator's browser session to filing, reading, triage and purge, the
 refusals, and a token on the routes that are not its own.
 
-**What was not done.** No independent review has read it. It has not run on
-the server. The memory of a download and the time of a search over a full
-store are by reading the code and were not measured. These passes are the
+**A review by a second agent** read the branch at `468c561b` without the
+implementer's notes, and found nothing high, two of middle weight and seven
+small ones. The two: a caller who hung up gave the slot back while the store
+worked on, so that hanging up again and again held more than two of its
+connections; and a report that became a duplicate wrote a line for each of
+its own duplicates, unpaid and as often as asked. The small ones: a note of
+one letter cost more than it was weighed as; a body on its way held a slot;
+the end of the maker's role did not wait for a change; a token's report
+could name a gateway; the labels' facet had no bound; an administration tab
+opened before the deployment cannot read what a token filed; tokens of one
+name could not be told apart. All of them are changed or, the tab, said in
+[operations](operations.md), as the points above describe. It was the same
+model as the implementer, so it is no independent audit.
+
+**What was not done.** It has not run on the server. The memory of a download
+and the time of a search over a full store are by reading the code and were
+not measured. The browser specs were written and not run on the machine it
+was built on (no npm packages there); CI runs them. These passes are the
 implementing agent's and are not an audit.
 
 ### Open for the owner
@@ -726,4 +767,6 @@ implementing agent's and are not an audit.
   preset "everything" includes it; leave it out where it is not needed.
 - **Sixteen GiB for all reports** stays the bound for everyone together.
   Eight tokens at their two GiB fill it, and then every gateway's reports
-  are refused too. Tokens that file are an administrator's to hand out.
+  are refused too. The four uploads at once are shared the same way: two
+  tokens that use their two each leave a gateway none for that long. Tokens
+  that file are an administrator's to hand out.

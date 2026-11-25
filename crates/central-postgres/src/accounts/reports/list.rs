@@ -5,9 +5,9 @@ use super::super::{AccountStore, Error, Token, statement};
 use super::{Actor, ReportCaller, sweep};
 use central_api::report_tokens::ReportScope;
 use central_api::reports::{
-    Channel, Count, CrashGroup, DayCount, EXCERPT, FACET_REPORTERS, MAX_CRASH_GROUPS, MAX_PAGE,
-    NamedToken, Neighbours, Priority, RecordOrigin, ReportFacets, ReportFilter, ReportKind,
-    ReportSort, ReportStatus, ReportSummary, STATS_DAYS,
+    Channel, Count, CrashGroup, DayCount, EXCERPT, FACET_LABELS, FACET_REPORTERS, MAX_CRASH_GROUPS,
+    MAX_PAGE, NamedToken, Neighbours, Priority, RecordOrigin, ReportFacets, ReportFilter,
+    ReportKind, ReportSort, ReportStatus, ReportSummary, STATS_DAYS,
 };
 use sea_orm::{
     ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, Value, prelude::Uuid,
@@ -477,7 +477,12 @@ impl AccountStore {
             })
             .collect::<Result<_, Error>>()?;
         let labels = counted(
-            &facet("pg_catalog.unnest(r.labels)", Dimension::Label, None).await?,
+            &facet(
+                "pg_catalog.unnest(r.labels)",
+                Dimension::Label,
+                Some(FACET_LABELS),
+            )
+            .await?,
             words,
         )?;
         let gateways = counted(

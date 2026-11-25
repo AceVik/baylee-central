@@ -5,11 +5,12 @@
 //! preset or from its rights (`CreateReportToken`), and revokes one after
 //! its confirmation (`common::Flow`).
 //!
-//! A new token is shown once. It is held by the step that shows it, as a
-//! `Token`, which wipes its bytes when it goes, and goes when that step is
-//! left (by its button, by leaving the page, or by the page being put away
-//! into the browser's back-forward cache). It never goes into an address, a
-//! log, the console, storage or a field with a name.
+//! A new token is shown once. It is held by the step that shows it, which
+//! goes when it is left (by its button, by leaving the page, or by the page
+//! being put away into the browser's back-forward cache). The `Token` it is
+//! held as wipes its own bytes; the text it is shown and copied as is the
+//! page's, and is not wiped. It never goes into an address, a log, the
+//! console, storage or a field with a name.
 
 use std::sync::Arc;
 
@@ -574,6 +575,11 @@ fn card(p: &Page, token: &ReportTokenInfo, now: i64) -> impl IntoView + use<> {
                 <p class="pills"><span class=format!("pill {tone}")>{state}</span></p>
             </div>
             <dl class="facts">
+                <dt>{words::admin_id(lang)}</dt>
+                <dd class="admin-copyable">
+                    <code class="address" translate="no">{key.clone()}</code>
+                    {common::copy_button(lang, key, words::admin_id(lang))}
+                </dd>
                 <dt>{words::rt_rights(lang)}</dt>
                 <dd>{rights}</dd>
                 <dt>{words::rt_by(lang)}</dt>

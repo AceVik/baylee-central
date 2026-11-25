@@ -13,8 +13,9 @@ use central_api::report_tokens::{
     LIVE_TOKENS, ReportScope, ReportScopes, ReportTokenInfo, TOKENS_PER_DAY,
 };
 use central_api::reports::{
-    BulkAction, Channel, HISTORY, MAX_NOTE, MAX_NOTES_BYTES, Part, RecordOrigin, ReportChange,
-    ReportFilter, ReportIntake, ReportKind, ReportSort, ReportStatus,
+    BulkAction, Channel, FACET_LABELS, GatewaySays, HISTORY, MAX_HANDED_ON, MAX_NOTE,
+    MAX_NOTES_BYTES, NOTE_BYTES, Part, RecordOrigin, ReportChange, ReportFilter, ReportIntake,
+    ReportKind, ReportSort, ReportStatus,
 };
 use central_postgres::{FilerKind, GATEWAY_STORED, REPORT_BYTES, ReportCaller, appoint_admin};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, TransactionTrait};
@@ -61,6 +62,7 @@ fn every_scopes() -> Vec<ReportScopes> {
 /// A report as a token files it.
 fn filed(text: &str) -> ReportIntake {
     let mut report = intake(ReportKind::Bug, text, &gzip(3, 400), Some(&gzip(5, 900)));
+    report.gateway = GatewaySays::default();
     report.channel = Channel::Token;
     report.record.as_mut().unwrap().origin = RecordOrigin::Client;
     report
@@ -79,8 +81,10 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     filing(store, operator, &cookie).await;
     acting(store, &cookie, admin).await;
     bounded(store, operator, &cookie).await;
+    handed_on(store, operator, &cookie).await;
     ending(store, operator, &cookie, admin).await;
     in_flight(store, operator, &cookie).await;
+    demoted(store, operator, keys, &cookie, admin).await;
     used(store, operator, &cookie).await;
     full(store, operator, &cookie).await;
     sql(
@@ -574,7 +578,9 @@ async fn filing(store: &AccountStore, operator: &DatabaseConnection, cookie: &To
     direct.channel = Channel::Direct;
     let mut own = filed("A gateway's record");
     own.record.as_mut().unwrap().origin = RecordOrigin::Gateway;
-    for report in [&gateways, &direct, &own] {
+    let mut named = filed("By a gateway's name");
+    named.gateway.name = Some("Synthetic reports".into());
+    for report in [&gateways, &direct, &own, &named] {
         assert_eq!(
             store.file_report(&filer, report).await.err(),
             Some(Error::Rejected),
@@ -869,7 +875,8 @@ async fn noting(
         .unwrap();
 }
 
-/// A report's notes and its history are bounded, whoever writes them.
+/// A report's notes and its history are bounded, whoever writes them, and so
+/// are the labels a facet lists.
 async fn bounded(store: &AccountStore, operator: &DatabaseConnection, cookie: &Token) {
     let one = made(store, cookie, "Talkative", ReportScopes::EVERYTHING).await;
     let filer = store.report_token_filer(&one.token).await.unwrap();
@@ -878,7 +885,8 @@ async fn bounded(store: &AccountStore, operator: &DatabaseConnection, cookie: &T
         .await
         .unwrap();
     let note = "n".repeat(MAX_NOTE);
-    for _ in 0..MAX_NOTES_BYTES / MAX_NOTE {
+    let each = MAX_NOTE + NOTE_BYTES;
+    for _ in 0..MAX_NOTES_BYTES / each {
         store
             .add_report_note(one.by(), report, &note)
             .await
@@ -890,7 +898,7 @@ async fn bounded(store: &AccountStore, operator: &DatabaseConnection, cookie: &T
             Some(Error::Busy)
         );
     }
-    let rest = "n".repeat(MAX_NOTES_BYTES % MAX_NOTE);
+    let rest = "n".repeat(MAX_NOTES_BYTES % each - NOTE_BYTES);
     store
         .add_report_note(one.by(), report, &rest)
         .await
@@ -925,6 +933,111 @@ async fn bounded(store: &AccountStore, operator: &DatabaseConnection, cookie: &T
             .iter()
             .all(|row| row.action == "report.synthetic")
     );
+    sql(
+        operator,
+        "INSERT INTO central_identity.reports (gateway_id, gateway_label, filed_by, channel, reporter, kind, text, labels)
+         SELECT $1, 'Talkative', 'token', 'gateway', 'ab', 'other', 'labelled',
+             (SELECT array_agg('l' || (16 * n + k) ORDER BY k) FROM pg_catalog.generate_series(0, 15) k)
+         FROM pg_catalog.generate_series(0, $2::bigint) n",
+        vec![
+            Uuid::from_bytes(one.id).into(),
+            i64::try_from(FACET_LABELS / 16).unwrap().into(),
+        ],
+    )
+    .await;
+    let mine = ReportFilter {
+        token: Some(one.id),
+        ..all()
+    };
+    let facets = store.report_facets(one.by(), &mine).await.unwrap();
+    assert_eq!(facets.labels.len(), FACET_LABELS);
+    store.revoke_report_token(cookie, one.id).await.unwrap();
+}
+
+/// A token's request hands on a bounded number of duplicates, counted over a
+/// whole selection and before anything is written; an administrator's hands
+/// on all of them.
+async fn handed_on(store: &AccountStore, operator: &DatabaseConnection, cookie: &Token) {
+    let one = made(store, cookie, "Merger", ReportScopes::EVERYTHING).await;
+    let filer = store.report_token_filer(&one.token).await.unwrap();
+    let mut filed_one = Vec::new();
+    for text in ["The first", "The second", "The original"] {
+        filed_one.push(store.file_report(&filer, &filed(text)).await.unwrap());
+    }
+    let (first, second, original) = (filed_one[0], filed_one[1], filed_one[2]);
+    for (of, duplicates) in [(first, MAX_HANDED_ON), (second, 1)] {
+        sql(
+            operator,
+            "INSERT INTO central_identity.reports (gateway_id, gateway_label, filed_by, channel, reporter, kind, text,
+                 status, duplicate_of, done_at)
+             SELECT $1, 'Merger', 'token', 'gateway', 'ab', 'other', 'again', 'duplicate', $2,
+                 pg_catalog.clock_timestamp() FROM pg_catalog.generate_series(1, $3::bigint)",
+            vec![
+                Uuid::from_bytes(one.id).into(),
+                Uuid::from_bytes(of).into(),
+                i64::try_from(duplicates).unwrap().into(),
+            ],
+        )
+        .await;
+    }
+    let of = |original: [u8; 16]| {
+        count(
+            operator,
+            "SELECT count(*) AS n FROM central_identity.reports WHERE duplicate_of = $1",
+            vec![Uuid::from_bytes(original).into()],
+        )
+    };
+    let lines = || {
+        count(
+            operator,
+            "SELECT count(*) AS n FROM central_identity.report_audit
+             WHERE action = 'report.duplicate' AND token_name = 'Merger'",
+            vec![],
+        )
+    };
+    let most = i64::try_from(MAX_HANDED_ON).unwrap();
+    let onto = |original: [u8; 16]| ReportChange {
+        duplicate_of: Some(Some(original)),
+        ..ReportChange::default()
+    };
+    // one more than the most, over the selection: none of it
+    let how = BulkAction::Change {
+        change: onto(original),
+    };
+    assert_eq!(
+        store
+            .reports_bulk(one.by(), &[first, second], &how)
+            .await
+            .err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!(
+        (of(first).await, of(second).await, of(original).await),
+        (most, 1, 0)
+    );
+    assert_eq!(lines().await, 0);
+    // the most is handed on, each with its line beside the report's own
+    store
+        .set_report(one.by(), first, &onto(original), None)
+        .await
+        .unwrap();
+    assert_eq!((of(first).await, of(original).await), (0, most + 1));
+    assert_eq!(lines().await, most + 1);
+    // one more than the most, of one report
+    assert_eq!(
+        store
+            .set_report(one.by(), original, &onto(second), None)
+            .await
+            .err(),
+        Some(Error::Rejected)
+    );
+    assert_eq!((of(original).await, of(second).await), (most + 1, 1));
+    store
+        .set_report(Admin(cookie), original, &onto(second), None)
+        .await
+        .unwrap();
+    assert_eq!((of(original).await, of(second).await), (0, most + 3));
+    assert_eq!(lines().await, most + 1);
     store.revoke_report_token(cookie, one.id).await.unwrap();
 }
 
@@ -1082,6 +1195,103 @@ async fn in_flight(store: &AccountStore, operator: &DatabaseConnection, cookie: 
     assert_eq!(detail.summary.status, ReportStatus::Triaged);
 }
 
+/// The end of a maker's role waits for what the maker's tokens are changing,
+/// and a change that waited for that end is refused by it.
+async fn demoted(
+    store: &AccountStore,
+    operator: &DatabaseConnection,
+    keys: &ServerKeys,
+    cookie: &Token,
+    admin: Identity,
+) {
+    let maker = || vec![Uuid::from_bytes(admin.account).into()];
+    let (second, removing) = signed_in(store, keys, "rt-second").await;
+    appoint_admin(operator, "rt-second").await.unwrap();
+    let one = made(store, cookie, "Demoted", ReportScopes::EVERYTHING).await;
+    let filer = store.report_token_filer(&one.token).await.unwrap();
+    let report = store.file_report(&filer, &filed("Raced")).await.unwrap();
+    // a change is being written
+    let changing = operator.begin().await.unwrap();
+    changing
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT id FROM central_identity.report_tokens WHERE id = $1 FOR SHARE",
+            vec![Uuid::from_bytes(one.id).into()],
+        ))
+        .await
+        .unwrap();
+    let removal = store.set_admin(&removing, admin.account, false);
+    tokio::pin!(removal);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), &mut removal)
+            .await
+            .is_err(),
+        "a removal waits for a change being written"
+    );
+    changing.commit().await.unwrap();
+    removal.await.unwrap();
+    assert_eq!(
+        store
+            .report_token(&one.token, ReportScope::Read)
+            .await
+            .err(),
+        Some(Error::Rejected)
+    );
+    appoint_admin(operator, "rt-admin").await.unwrap();
+    // a removal is being written
+    for (commits, expected) in [(false, None), (true, Some(Error::Rejected))] {
+        let removing = operator.begin().await.unwrap();
+        for text in [
+            "SELECT id FROM central_identity.report_tokens WHERE created_by = $1 AND revoked_at IS NULL FOR UPDATE",
+            "DELETE FROM central_identity.account_roles WHERE account_id = $1",
+        ] {
+            removing
+                .execute_raw(Statement::from_sql_and_values(
+                    DbBackend::Postgres,
+                    text,
+                    maker(),
+                ))
+                .await
+                .unwrap();
+        }
+        let next = if commits {
+            ReportStatus::Resolved
+        } else {
+            ReportStatus::Triaged
+        };
+        let change = status(next);
+        let acting = store.set_report(one.by(), report, &change, None);
+        tokio::pin!(acting);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(300), &mut acting)
+                .await
+                .is_err(),
+            "a change waits for a removal being written"
+        );
+        if commits {
+            removing.commit().await.unwrap();
+        } else {
+            removing.rollback().await.unwrap();
+        }
+        assert_eq!(acting.await.err(), expected);
+    }
+    // nor is anything filed that was begun before
+    assert_eq!(
+        store.file_report(&filer, &filed("Too late")).await.err(),
+        Some(Error::Rejected)
+    );
+    appoint_admin(operator, "rt-admin").await.unwrap();
+    sql(
+        operator,
+        "DELETE FROM central_identity.account_roles WHERE account_id = $1",
+        vec![Uuid::from_bytes(second.account).into()],
+    )
+    .await;
+    let detail = store.report_detail(Admin(cookie), report).await.unwrap();
+    assert_eq!(detail.summary.status, ReportStatus::Triaged);
+    store.revoke_report_token(cookie, one.id).await.unwrap();
+}
+
 /// A use is noted, to the minute.
 async fn used(store: &AccountStore, operator: &DatabaseConnection, cookie: &Token) {
     let one = made(store, cookie, "Used", ReportScopes::ONLY_READ).await;
@@ -1231,16 +1441,33 @@ async fn table(operator: &DatabaseConnection) {
                  pg_catalog.sha256(''::bytea), true, '{origin}')"
         )
     };
+    let says = |column: &str| {
+        report("gateway", "client")
+            .replace("(gateway_id,", &format!("({column}, gateway_id,"))
+            .replace("VALUES (", "VALUES ('x', ")
+    };
     for refused in [
         report("gateway", "gateway"),
         report("direct", "client"),
         report("token", "client"),
+        says("gateway_says"),
+        says("gateway_url"),
+        says("gateway_version"),
     ] {
         assert!(
             operator.execute_unprepared(&refused).await.is_err(),
             "{refused}"
         );
     }
+    // what each of them is but for the one thing
+    operator
+        .execute_unprepared(&report("gateway", "client"))
+        .await
+        .unwrap();
+    operator
+        .execute_unprepared("DELETE FROM central_identity.reports WHERE filed_by = 'token'")
+        .await
+        .unwrap();
     assert!(
         operator
             .execute_unprepared(

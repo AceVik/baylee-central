@@ -1,7 +1,9 @@
 //! Central administration (`docs/administration.md`): what an administrator
 //! asks and is answered, on the browser listener only, with a browser session
 //! whose account holds the administrator role. No answer has a field that
-//! could carry a credential, a wrapper, a document or any other ciphertext.
+//! could carry a wrapper, a document or any other ciphertext, and two can
+//! carry a secret, each answered once to the change that made it and never
+//! again: a reset code and a new report token.
 use crate::Error;
 use crate::Token;
 use crate::gateway::{GatewayMetadata, GatewayState};
