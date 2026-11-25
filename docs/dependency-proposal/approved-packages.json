@@ -2,7 +2,7 @@
   "packages": [
     "adler2@2.0.1",
     "aead@0.6.1",
-    "ahash@0.8.12",
+    "ahash@0.8.14",
     "aho-corasick@1.1.5",
     "aliasable@0.1.3",
     "aligned-vec@0.6.4",
@@ -10,7 +10,7 @@
     "allocator-api2@0.2.21",
     "android_system_properties@0.1.6",
     "any_spawner@0.3.0",
-    "anyhow@1.0.104",
+    "anyhow@1.0.105",
     "arbitrary@1.5.0",
     "arg_enum_proc_macro@0.3.4",
     "argon2@0.5.3",
@@ -18,29 +18,29 @@
     "arrayref@0.3.9",
     "arrayvec@0.7.8",
     "arrow-arith@60.0.0",
-    "arrow-arith@60.1.0",
+    "arrow-arith@60.2.0",
     "arrow-array@60.0.0",
-    "arrow-array@60.1.0",
+    "arrow-array@60.2.0",
     "arrow-buffer@60.0.0",
-    "arrow-buffer@60.1.0",
+    "arrow-buffer@60.2.0",
     "arrow-cast@60.0.0",
-    "arrow-cast@60.1.0",
+    "arrow-cast@60.2.0",
     "arrow-cmp@60.0.0",
-    "arrow-cmp@60.1.0",
+    "arrow-cmp@60.2.0",
     "arrow-data@60.0.0",
-    "arrow-data@60.1.0",
+    "arrow-data@60.2.0",
     "arrow-ord@60.0.0",
-    "arrow-ord@60.1.0",
+    "arrow-ord@60.2.0",
     "arrow-row@60.0.0",
-    "arrow-row@60.1.0",
+    "arrow-row@60.2.0",
     "arrow-schema@60.0.0",
-    "arrow-schema@60.1.0",
+    "arrow-schema@60.2.0",
     "arrow-select@60.0.0",
-    "arrow-select@60.1.0",
+    "arrow-select@60.2.0",
     "arrow-string@60.0.0",
-    "arrow-string@60.1.0",
+    "arrow-string@60.2.0",
     "arrow@60.0.0",
-    "arrow@60.1.0",
+    "arrow@60.2.0",
     "as-slice@0.2.1",
     "assert_matches@1.5.0",
     "async-lock@3.5.0",
@@ -90,7 +90,7 @@
     "bytes@1.12.2",
     "camino@1.2.6",
     "cc@1.11.0",
-    "cc@1.11.2",
+    "cc@1.11.3",
     "cc@1.9.0",
     "cexpr@0.6.0",
     "cfg-if@1.0.5",
@@ -106,8 +106,8 @@
     "collection_literals@1.0.3",
     "config@0.15.27",
     "const-oid@0.9.6",
-    "const-random-macro@0.1.16",
-    "const-random@0.1.18",
+    "const-random-macro@0.1.18",
+    "const-random@0.1.20",
     "const-str@1.1.0",
     "const_format@0.2.37",
     "const_format_proc_macros@0.2.37",
@@ -119,7 +119,7 @@
     "cpufeatures@0.2.17",
     "cpufeatures@0.3.1",
     "crc-catalog@2.5.0",
-    "crc32fast@1.5.5",
+    "crc32fast@1.5.6",
     "crc@3.4.0",
     "crossbeam-deque@0.8.8",
     "crossbeam-epoch@0.9.21",
@@ -206,7 +206,7 @@
     "guardian@1.3.0",
     "half@2.7.1",
     "hashbrown@0.16.1",
-    "hashbrown@0.17.1",
+    "hashbrown@0.17.2",
     "hashlink@0.11.1",
     "heck@0.4.1",
     "heck@0.5.0",
@@ -225,7 +225,7 @@
     "hybrid-array@0.4.15",
     "hydration_context@0.4.0-rc1",
     "hyper-util@0.1.21",
-    "hyper@1.12.0",
+    "hyper@1.13.0",
     "iana-time-zone-haiku@0.1.2",
     "iana-time-zone@0.1.65",
     "icu_collections@2.3.0",
@@ -354,9 +354,9 @@
     "percent-encoding@2.3.2",
     "pgvector@0.4.2",
     "pico-args@0.5.0",
-    "pin-project-internal@1.1.13",
-    "pin-project-lite@0.2.17",
-    "pin-project@1.1.13",
+    "pin-project-internal@1.2.0",
+    "pin-project-lite@0.2.18",
+    "pin-project@1.2.0",
     "pkg-config@0.3.34",
     "pluralizer@0.5.0",
     "png@0.18.1",
@@ -450,7 +450,7 @@
     "server_fn_macro_default@0.9.0-rc1",
     "sha1@0.11.0",
     "sha2@0.10.9",
-    "sha2@0.11.1",
+    "sha2@0.11.2",
     "sharded-slab@0.1.7",
     "shlex@1.3.0",
     "shlex@2.0.1",
@@ -458,7 +458,7 @@
     "signature@2.2.0",
     "signature@3.0.0",
     "simd-adler32@0.3.10",
-    "simd_helpers@0.1.0",
+    "simd_helpers@0.1.1",
     "simplecss@0.2.2",
     "siphasher@1.0.4",
     "slab@0.4.12",
@@ -519,11 +519,11 @@
     "tokio@1.53.3",
     "tokio@1.54.1",
     "toml@1.2.0+spec-1.1.0",
-    "toml@1.2.1+spec-1.1.0",
+    "toml@1.2.3+spec-1.1.0",
     "toml_datetime@1.1.2+spec-1.1.0",
     "toml_datetime@1.1.3+spec-1.1.0",
     "toml_edit@0.25.17+spec-1.1.0",
-    "toml_parser@1.1.5+spec-1.1.0",
+    "toml_parser@1.1.7+spec-1.1.0",
     "toml_writer@1.2.0+spec-1.1.0",
     "tower-http@0.6.8",
     "tower-http@0.7.1",
@@ -564,7 +564,7 @@
     "vcpkg@0.2.15",
     "version_check@0.9.5",
     "voprf@0.5.0",
-    "walkdir@2.5.0",
+    "walkdir@2.5.1",
     "wasi@0.11.1+wasi-snapshot-preview1",
     "wasip2@1.0.4+wasi-0.2.12",
     "wasm-bindgen-futures@0.4.80",
@@ -616,11 +616,11 @@
     "yoke-derive@0.8.4",
     "yoke@0.8.3",
     "yoke@0.8.4",
-    "yuv@0.8.20",
+    "yuv@0.8.21",
     "zerocopy-derive@0.7.35",
-    "zerocopy-derive@0.8.63",
+    "zerocopy-derive@0.8.65",
     "zerocopy@0.7.35",
-    "zerocopy@0.8.63",
+    "zerocopy@0.8.65",
     "zerofrom-derive@0.1.8",
     "zerofrom@0.1.8",
     "zeroize@1.9.1",
@@ -631,7 +631,7 @@
     "zerovec-derive@0.11.7",
     "zerovec@0.11.8",
     "zerovec@0.11.9",
-    "zlib-rs@0.6.8",
+    "zlib-rs@0.6.9",
     "zmij@1.0.23",
     "zune-core@0.5.3",
     "zune-jpeg@0.5.15"
@@ -731,7 +731,7 @@
       "tokio-macros",
       "windows-sys"
     ],
-    "pin-project-lite@0.2.17": [],
+    "pin-project-lite@0.2.18": [],
     "serde_core@1.0.229": [
       "alloc",
       "default",
@@ -745,7 +745,7 @@
     ],
     "atomic-waker@1.1.2": [],
     "tower-layer@0.3.3": [],
-    "hyper@1.12.0": [
+    "hyper@1.13.0": [
       "default",
       "http1",
       "server"
@@ -1068,7 +1068,7 @@
       "zeroize_derive"
     ],
     "zeroize_derive@1.5.0": [],
-    "ahash@0.8.12": [
+    "ahash@0.8.14": [
       "compile-time-rng",
       "const-random",
       "getrandom",
@@ -1160,8 +1160,8 @@
       "winapi",
       "windows-link"
     ],
-    "const-random@0.1.18": [],
-    "const-random-macro@0.1.16": [],
+    "const-random@0.1.20": [],
+    "const-random-macro@0.1.18": [],
     "core-foundation-sys@0.8.7": [
       "default",
       "link"
@@ -1277,7 +1277,7 @@
       "inline-more",
       "raw-entry"
     ],
-    "hashbrown@0.17.1": [],
+    "hashbrown@0.17.2": [],
     "hashlink@0.11.1": [],
     "heck@0.4.1": [
       "default"
@@ -1679,7 +1679,7 @@
       "std"
     ],
     "sha1@0.11.0": [],
-    "sha2@0.11.1": [
+    "sha2@0.11.2": [
       "zeroize"
     ],
     "sharded-slab@0.1.7": [],
@@ -1839,7 +1839,7 @@
     "toml_edit@0.25.17+spec-1.1.0": [
       "parse"
     ],
-    "toml_parser@1.1.5+spec-1.1.0": [
+    "toml_parser@1.1.7+spec-1.1.0": [
       "alloc",
       "default",
       "std"
@@ -1948,12 +1948,12 @@
       "zerofrom"
     ],
     "yoke-derive@0.8.4": [],
-    "zerocopy@0.8.63": [
+    "zerocopy@0.8.65": [
       "derive",
       "simd",
       "zerocopy-derive"
     ],
-    "zerocopy-derive@0.8.63": [],
+    "zerocopy-derive@0.8.65": [],
     "zerofrom@0.1.8": [
       "derive"
     ],
@@ -2075,18 +2075,18 @@
     "argon2@0.6.0": [
       "zeroize"
     ],
-    "arrow-arith@60.1.0": [],
-    "arrow-array@60.1.0": [],
-    "arrow-buffer@60.1.0": [],
-    "arrow-cast@60.1.0": [],
-    "arrow-cmp@60.1.0": [],
-    "arrow-data@60.1.0": [],
-    "arrow-ord@60.1.0": [],
-    "arrow-row@60.1.0": [],
-    "arrow-schema@60.1.0": [],
-    "arrow-select@60.1.0": [],
-    "arrow-string@60.1.0": [],
-    "arrow@60.1.0": [],
+    "arrow-arith@60.2.0": [],
+    "arrow-array@60.2.0": [],
+    "arrow-buffer@60.2.0": [],
+    "arrow-cast@60.2.0": [],
+    "arrow-cmp@60.2.0": [],
+    "arrow-data@60.2.0": [],
+    "arrow-ord@60.2.0": [],
+    "arrow-row@60.2.0": [],
+    "arrow-schema@60.2.0": [],
+    "arrow-select@60.2.0": [],
+    "arrow-string@60.2.0": [],
+    "arrow@60.2.0": [],
     "blake2@0.11.0": [],
     "cc@1.11.0": [
       "parallel"
@@ -2197,7 +2197,7 @@
       "futures-executor",
       "wasm-bindgen"
     ],
-    "anyhow@1.0.104": [
+    "anyhow@1.0.105": [
       "default",
       "std"
     ],
@@ -2287,8 +2287,8 @@
     "or_poisoned@0.1.0": [],
     "paste@1.0.15": [],
     "pathdiff@0.2.3": [],
-    "pin-project@1.1.13": [],
-    "pin-project-internal@1.1.13": [],
+    "pin-project@1.2.0": [],
+    "pin-project-internal@1.2.0": [],
     "prettyplease@0.3.0": [],
     "proc-macro-utils@0.10.0": [
       "default",
@@ -2332,7 +2332,7 @@
     "typed-builder@0.23.2": [],
     "typed-builder-macro@0.23.2": [],
     "unicode-segmentation@1.13.3": [],
-    "walkdir@2.5.0": [],
+    "walkdir@2.5.1": [],
     "wasm-bindgen-futures@0.4.80": [
       "default",
       "std"
@@ -2653,7 +2653,7 @@
       "default",
       "std"
     ],
-    "crc32fast@1.5.5": [
+    "crc32fast@1.5.6": [
       "default",
       "std"
     ],
@@ -2851,7 +2851,7 @@
       "default",
       "std"
     ],
-    "simd_helpers@0.1.0": [],
+    "simd_helpers@0.1.1": [],
     "simplecss@0.2.2": [
       "default",
       "std"
@@ -2895,7 +2895,7 @@
       "std"
     ],
     "y4m@0.8.0": [],
-    "yuv@0.8.20": [
+    "yuv@0.8.21": [
       "avx",
       "default",
       "rdm",
@@ -2908,7 +2908,7 @@
       "zerocopy-derive"
     ],
     "zerocopy-derive@0.7.35": [],
-    "zlib-rs@0.6.8": [
+    "zlib-rs@0.6.9": [
       "rust-allocator",
       "std"
     ],
@@ -2925,7 +2925,7 @@
       "default",
       "std"
     ],
-    "cc@1.11.2": [
+    "cc@1.11.3": [
       "parallel"
     ],
     "errno@0.3.15": [
@@ -3121,7 +3121,7 @@
       "visit",
       "visit-mut"
     ],
-    "toml@1.2.1+spec-1.1.0": [
+    "toml@1.2.3+spec-1.1.0": [
       "parse",
       "std"
     ],
@@ -3300,6 +3300,36 @@
         "base64@0.22.1 as a direct dependency of central-http, default features off, with alloc"
       ],
       "implied": "sha1 0.11.0 enters the compiled graph; until then it was in the lock through sqlx-mysql only. Its own unsafe: x86 SHA-NI and AArch64 SHA2 intrinsics chosen at run time, inline assembly for LoongArch only, which no build here targets. cpufeatures 0.3.1 and digest 0.11.3 under it, and base64 0.22.1, were compiled already (through sha2 0.11.1, ece and sqlx-core). First-party unsafe stays forbidden. Not a third-party source audit."
+    },
+    {
+      "approved_on": "2026-11-25",
+      "reason": "owner 25.11.2026: \"grade bitte überall alle crates/packages up und führe major version migrations etc. aus, sammt audit, verbesserungsvorschlägen etc.\"",
+      "for": "the dependency upgrade of 25.11.2026 (docs/dependency-proposal/upgrade-2026-11-25.md): compatible updates of the lock file, sha2 0.11.2, hyper 1.13.0, and base64 0.23.1 in central-http",
+      "entries": [
+        "ahash@0.8.14",
+        "anyhow@1.0.105",
+        "arrow@60.2.0 with arrow-arith, arrow-array, arrow-buffer, arrow-cast, arrow-cmp, arrow-data, arrow-ord, arrow-row, arrow-schema, arrow-select and arrow-string at 60.2.0",
+        "cc@1.11.3",
+        "const-random@0.1.20",
+        "const-random-macro@0.1.18",
+        "crc32fast@1.5.6",
+        "hashbrown@0.17.2",
+        "hyper@1.13.0",
+        "pin-project@1.2.0",
+        "pin-project-internal@1.2.0",
+        "pin-project-lite@0.2.18",
+        "sha2@0.11.2",
+        "simd_helpers@0.1.1",
+        "toml@1.2.3+spec-1.1.0",
+        "toml_parser@1.1.7+spec-1.1.0",
+        "walkdir@2.5.1",
+        "yuv@0.8.21",
+        "zerocopy@0.8.65",
+        "zerocopy-derive@0.8.65",
+        "zlib-rs@0.6.9",
+        "base64@0.23.1 as a direct dependency of central-http in place of base64@0.22.1, default features off, with alloc"
+      ],
+      "implied": "Each entry replaces the same package at an older version; no package and no feature is new to the graph. base64 0.23.1 was compiled already through jsonwebtoken 12.0.0 and leptos 0.9.0-rc1, and base64 0.22.1 stays through ece and sqlx-core. First-party unsafe stays forbidden. Not a third-party source audit."
     }
   ]
 }

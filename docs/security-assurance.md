@@ -8674,3 +8674,36 @@ the blocker's letter and table until their own reading ends, as they already kep
 the URL standard admits hosts no DNS name has (a quote in a host), which the frame serializes safely
 and which a client never dials. The table remains the client's claim: Central cannot check that it
 exists or that the client sits at it.
+
+## The dependency upgrade of 25 November 2026
+
+The owner asked again for every crate and package to be upgraded, major versions included
+([the inventory](dependency-proposal/upgrade-2026-11-25.md)). A week after the last one, little had
+moved.
+
+Design pass. What the upgrade touches: the hash every crate uses (`sha2` 0.11.2), the listener's
+HTTP/1 parser and connection handling (`hyper` 1.13.0), the push socket's handshake (`base64` 0.23.1
+in `central-http`), and the browser's crypto module, which links `sha2` and `pin-project-lite`. What
+must not move stays where it was: OPAQUE's record and protocol (`opaque-ke` 4.0.1 with
+`opaque-sha2` 0.10.9, `rand` 0.8.8 and `getrandom` 0.2.17 under it; 5.0.0-pre.0 is a pre-release
+and not taken). Invariant for the graph: no package and no feature that is not already approved and
+compiled enters it.
+
+Implementation pass: the exact pins in the manifests by hand (`cargo upgrade` drops the `=` and
+moved `opaque-sha2` past OPAQUE's generation, so it was not used), then `cargo update` within them;
+`approved-packages.json` replaces the 32 older versions with the newer ones, keeps each package's
+approved features, and records the approval; `base64` 0.23.1 was compiled already through
+`jsonwebtoken` 12 and `leptos`, and its `Engine` API is the one `central-http` called, so no source
+changed; `central-crypto`'s manifest line moved its source fingerprint, which was renewed after the
+graph and source review recorded in `crypto-proposal/bigint-advisory.md`; the browser module was
+rebuilt with `cargo xtask wasm` on x86-64 Linux; the browser test suites take `@playwright/test`
+1.65.1, `@axe-core/playwright` 4.14.1, `@types/node` 24.19.4 and `oxlint` 1.95.0.
+
+Adversarial pass, what was run on the final tree: the policy check, `crypto-scope`, `chrono-scope`,
+`cargo audit --deny warnings` and `cargo deny check` (0.23.0 and 0.22.1, the versions CI now pins), the browser suites' `npm run
+check` and `npm audit`, and `cargo xtask gate` (format, policy with its compiler probe, clippy
+`-D warnings`, every test, the doc tests, the release build). `postgres`, `smoke` and `wasm --check`
+run in CI on the pull request. What was not done: no source audit of the moved packages, and no run
+on a Mac of what only builds there beyond the workspace's own tests.
+
+These passes are by the implementing agent and are not an independent audit.

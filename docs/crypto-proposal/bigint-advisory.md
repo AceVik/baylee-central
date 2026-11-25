@@ -346,3 +346,18 @@ The manifest, fixed Ristretto OPAQUE suite and its OPRF/TripleDH callers are ide
 ### Context identifier and replay cache tests, 25 November 2026
 
 Independent review compared the entire `central-crypto` crate against the previously pinned main revision (`fa10ed2a…`). Only two files changed, both test-only: `src/context.rs` adds a `#[cfg(test)]` module checking UUIDv7 version/variant boundaries, issuer/epoch bounds and single-bit AAD uniqueness, and `src/jwt/tests.rs` adds replay-cache expiry-boundary and zero-capacity/non-eviction tests. Production code, `Cargo.toml`, `Cargo.lock`, the fixed Ristretto255 OPAQUE suite and its OPRF/TripleDH callers are unchanged. Locked all-feature metadata still has `crypto-bigint 0.5.5` as a dependency of `elliptic-curve 0.13.8`, called only by `opaque-ke 4.0.1` and `voprf 0.5.0`. Existing graph and source-mutation checks continue to apply. The independently computed whole-crate SHA-256 is `82d4fdc9bba676d52515dd77ccb1eb875520939886c0e7cb63258e34158a9289`. [RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2026-0387.html)
+
+### `sha2` 0.11.2 in the manifest, 25 November 2026
+
+The dependency upgrade the owner asked for on 25.11.2026
+(docs/dependency-proposal/upgrade-2026-11-25.md) changes one line of the reviewed crate: its
+manifest's `sha2` pin, 0.11.1 → 0.11.2, the hash the vaults and chat use. No source file, feature
+or other dependency of the crate changed; `opaque-sha2` 0.10.9 and `rand` 0.8.8 stay pinned to
+OPAQUE's generation, so the Ristretto255 OPAQUE suite and its OPRF/TripleDH callers resolve exactly
+as before. The graph guard, which runs before the source check, passes unchanged: locked
+all-feature metadata still has `crypto-bigint 0.5.5` as a dependency of `elliptic-curve 0.13.8`,
+called only by `opaque-ke 4.0.1` and `voprf 0.5.0`. The whole-crate SHA-256 was computed by a
+separate implementation of the same algorithm, which reproduces the previous pin
+(`82d4fdc9…`) on the tree before this change, and is
+`31c963b62ac4de941163a139d59478822448ae3a0b00f8241f1fd77704323506`. This is the implementing
+agent's review, not an independent audit. [RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2026-0387.html)
