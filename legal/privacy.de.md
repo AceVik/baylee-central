@@ -1,5 +1,5 @@
-<!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- version: 2026-11-26 -->
+<!-- updated: 2026-11-26 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -156,6 +156,15 @@ Zustellung verhindern.
   angeforderten Rücksetzcodes und die Hinweise über mailbox.org (Heinlein
   Hosting GmbH, Berlin) als Auftragsverarbeiter, der die Adresse und die
   E-Mail erhält.
+- **KI-Assistenten für Fehlerberichte:** Fehler- und Absturzberichte werten
+  wir teils mit KI-Assistenten aus, die ein Anbieter für uns betreibt
+  (Anthropic PBC und OpenAI, L.L.C., beide USA). Sie erhalten dafür den
+  Bericht mit den Anhängen, die du mitgeschickt hast (etwa deinen Text, das
+  Bildschirmfoto, die Spielaufzeichnung, die technischen Angaben und das
+  Pseudonym, unter dem du meldest), nie dein Passwort oder deine
+  verschlüsselten Daten. Sie handeln als Auftragsverarbeiter (Art. 28
+  DSGVO) nur nach unserer Weisung und verwenden die Berichte nicht zum
+  Training ihrer Modelle.
 - **Unsere Administratoren** sehen zur Verwaltung der Konten deinen
   Benutzernamen, Anzeigenamen und Tag, woher dein Konto stammt, wann es
   erstellt wurde und wann du dich zuletzt angemeldet hast, ob es einen
@@ -174,12 +183,15 @@ Zustellung verhindern.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
 Eine Übermittlung in Länder außerhalb des Europäischen Wirtschaftsraums
-findet nur statt, wenn du Benachrichtigungen aktivierst: Dann überbringt
-sie der Push-Anbieter deines Browsers (Google, Mozilla oder Apple, USA).
-Grundlage ist der Angemessenheitsbeschluss der EU-Kommission zum
-EU-US-Datenschutzrahmen (Data Privacy Framework), soweit der Anbieter danach
-zertifiziert ist. Gateways anderer Betreiber können in jedem Land stehen; ob
-du dich dort anmeldest, entscheidest du.
+findet nur in zwei Fällen statt: Wenn du Benachrichtigungen aktivierst,
+überbringt sie der Push-Anbieter deines Browsers (Google, Mozilla oder
+Apple, USA). Und Fehler- und Absturzberichte, die wir mit KI-Assistenten
+auswerten, erhalten deren Anbieter (Anthropic und OpenAI, USA; Abschnitt 6).
+Grundlage ist in beiden Fällen der Angemessenheitsbeschluss der
+EU-Kommission zum EU-US-Datenschutzrahmen (Data Privacy Framework), soweit
+der Anbieter danach zertifiziert ist, sonst die Standardvertragsklauseln
+der EU-Kommission. Gateways anderer Betreiber können in jedem Land stehen;
+ob du dich dort anmeldest, entscheidest du.
 
 ## 7. Wie lange wir Daten speichern
 

@@ -1,5 +1,5 @@
-<!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- version: 2026-11-26 -->
+<!-- updated: 2026-11-26 -->
 
 # Baylee Central privacy policy
 
@@ -144,6 +144,13 @@ only after you choose to enable notifications; OS/browser settings can block del
   our server sends its confirmation code, the reset codes asked for and the
   notices through mailbox.org (Heinlein Hosting GmbH, Berlin, Germany),
   acting as a processor, which receives the address and the mail.
+- **AI assistants for bug reports:** we triage some bug and crash reports
+  with AI assistants that a provider runs for us (Anthropic PBC and OpenAI,
+  L.L.C., both USA). For that they receive the report with the attachments
+  you sent along (such as your text, the screenshot, the game record, the
+  technical details and the pseudonym you report under), never your
+  password or your encrypted data. They act as processors (Art. 28 GDPR) on
+  our instructions only and do not use the reports to train their models.
 - **Our administrators** see, for administering accounts, your username,
   display name and tag, where your account came from, when it was created and
   last signed in, whether it has a recovery code, and the gateways you own;
@@ -160,12 +167,15 @@ only after you choose to enable notifications; OS/browser settings can block del
   your entry on a leaderboard you enable.
 - **Authorities** receive data only where we are legally obliged.
 
-Data is transferred to countries outside the European Economic Area only if
-you enable notifications: your browser's push provider (Google, Mozilla or
-Apple, USA) then carries them, on the basis of the European Commission's
-adequacy decision on the EU-US Data Privacy Framework, as far as the provider
-is certified under it. Gateways run by others can be in any country; whether
-you sign in there is your decision.
+Data is transferred to countries outside the European Economic Area in two
+cases only: if you enable notifications, your browser's push provider
+(Google, Mozilla or Apple, USA) carries them; and the bug and crash reports
+we triage with AI assistants reach their providers (Anthropic and OpenAI,
+USA; section 6). In both cases the basis is the European Commission's
+adequacy decision on the EU-US Data Privacy Framework, as far as the
+provider is certified under it, and otherwise the European Commission's
+standard contractual clauses. Gateways run by others can be in any country;
+whether you sign in there is your decision.
 
 ## 7. How long we keep data
 

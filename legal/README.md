@@ -1,7 +1,8 @@
 # Legal texts of Baylee Central
 
-**Status: the terms and the privacy policy are at version 2026-11-25** (the
-minimum age, below; before it 2026-11-19). The
+**Status: the terms are at version 2026-11-25** (the minimum age, below;
+before it 2026-11-19), **the privacy policy at 2026-11-26** (AI assistants
+for bug reports, a draft that waits for the owner, at the end). The
 privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
 reviewed by the owner on 19.11.2026; the status his later decision of the same
 day added changed that paragraph and point again, and he approved the German
@@ -152,3 +153,23 @@ age box, the date picker's warning and the profile's birth-date check
 privacy page says the same in its eleven languages, the nine beside German
 and English machine translations. Written by the implementing agent; the
 owner's review of these sentences is still to come.
+
+**Version 2026-11-26 of the privacy policy: AI assistants for bug reports
+(a draft).** On 25.11.2026 the owner decided that hosted AI agents may read
+reports with a report token ([reports](../docs/reports.md) §"Decided by the
+owner"). That makes the privacy policy's version 2026-11-26: § 6 names the
+AI providers (Anthropic and OpenAI) as processors, and the paragraph on
+transfers outside the EEA names them beside the push providers. The terms
+stay at 2026-11-25, so nobody is asked to accept anything again; a new
+privacy policy is shown, not accepted. The website's privacy page
+(`privacy-recipients`, eleven languages, the nine beside German and English
+machine translations) says the same. Drafted by the implementing agent; it
+waits for the owner to confirm the providers and that their commercial
+terms with a data processing agreement apply, since only then does the
+sentence that they do not train on the reports hold. Not checked either,
+and the owner's to confirm before publishing: which company of each
+provider contracts with a customer in the EEA, and where it sits; whether
+each is certified under the Data Privacy Framework; how long each keeps
+what it receives (§ 7 names no such time); and whether the standard
+contractual clauses the transfer paragraph now names as the fallback can
+hold for the browsers' push providers, with whom Baylee has no contract.
