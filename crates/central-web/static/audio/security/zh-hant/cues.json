@@ -1,0 +1,137 @@
+{
+  "available": true,
+  "lang": "zh-hant",
+  "modelId": "eleven_v4",
+  "parts": {
+    "chat": {
+      "duration": 76.88,
+      "src": "/static/audio/security/zh-hant/chat.opus",
+      "steps": [
+        {
+          "end": 24.0,
+          "start": 11.36,
+          "step": 1
+        },
+        {
+          "end": 41.68,
+          "start": 24.0,
+          "step": 2
+        },
+        {
+          "end": 54.24,
+          "start": 41.68,
+          "step": 3
+        },
+        {
+          "end": 66.16,
+          "start": 54.24,
+          "step": 4
+        },
+        {
+          "end": 76.88,
+          "start": 66.16,
+          "step": 5
+        }
+      ]
+    },
+    "intro": {
+      "duration": 29.2,
+      "src": "/static/audio/security/zh-hant/intro.opus",
+      "steps": []
+    },
+    "memory": {
+      "duration": 84.88,
+      "src": "/static/audio/security/zh-hant/memory.opus",
+      "steps": [
+        {
+          "end": 24.0,
+          "start": 12.8,
+          "step": 1
+        },
+        {
+          "end": 39.52,
+          "start": 24.0,
+          "step": 2
+        },
+        {
+          "end": 52.0,
+          "start": 39.52,
+          "step": 3
+        },
+        {
+          "end": 75.28,
+          "start": 52.0,
+          "step": 4
+        },
+        {
+          "end": 84.88,
+          "start": 75.28,
+          "step": 5
+        }
+      ]
+    },
+    "pairing": {
+      "duration": 86.64,
+      "src": "/static/audio/security/zh-hant/pairing.opus",
+      "steps": [
+        {
+          "end": 26.64,
+          "start": 15.44,
+          "step": 1
+        },
+        {
+          "end": 40.0,
+          "start": 26.64,
+          "step": 2
+        },
+        {
+          "end": 58.32,
+          "start": 40.0,
+          "step": 3
+        },
+        {
+          "end": 76.0,
+          "start": 58.32,
+          "step": 4
+        },
+        {
+          "end": 86.64,
+          "start": 76.0,
+          "step": 5
+        }
+      ]
+    },
+    "signin": {
+      "duration": 82.88,
+      "src": "/static/audio/security/zh-hant/signin.opus",
+      "steps": [
+        {
+          "end": 28.72,
+          "start": 18.08,
+          "step": 1
+        },
+        {
+          "end": 41.12,
+          "start": 28.72,
+          "step": 2
+        },
+        {
+          "end": 57.12,
+          "start": 41.12,
+          "step": 3
+        },
+        {
+          "end": 69.36,
+          "start": 57.12,
+          "step": 4
+        },
+        {
+          "end": 82.88,
+          "start": 69.36,
+          "step": 5
+        }
+      ]
+    }
+  },
+  "voiceId": "nPczCjzI2devNBz1zQrb"
+}

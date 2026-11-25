@@ -243,3 +243,86 @@ test("interactive tour controls sync data-step and radio selection cleanly", asy
   await expect(figure).not.toHaveAttribute("data-step", /.+/);
   expect(problems).toEqual([]);
 });
+
+test("security Opus narration endpoints, cues manifests and synced mute buttons work cleanly", async ({ page, request, baseURL }) => {
+  const cuesRes = await request.get("/static/audio/security/de/cues.json");
+  expect(cuesRes.status()).toBe(200);
+  const cues = (await cuesRes.json()) as {
+    available?: boolean;
+    modelId?: string;
+    parts?: Record<string, { src?: string }>;
+  };
+  expect(cues.available).toBe(true);
+  expect(cues.modelId).toBe("eleven_v4");
+  for (const part of ["intro", ...FLOWS]) {
+    expect(cues.parts?.[part]?.src).toBe(`/static/audio/security/de/${part}.opus`);
+  }
+
+  const fullOpus = await request.get("/static/audio/security/de/intro.opus");
+  expect(fullOpus.status()).toBe(200);
+  expect(fullOpus.headers()["content-type"]).toBe("audio/ogg; codecs=opus");
+  expect(fullOpus.headers()["accept-ranges"]).toBe("bytes");
+  const fullBytes = await fullOpus.body();
+  expect(fullBytes.subarray(0, 4).toString("ascii")).toBe("OggS");
+
+  const rangedOpus = await request.get("/static/audio/security/de/intro.opus", {
+    headers: { Range: "bytes=0-15" },
+  });
+  expect(rangedOpus.status()).toBe(206);
+  expect(rangedOpus.headers()["content-type"]).toBe("audio/ogg; codecs=opus");
+  expect(rangedOpus.headers()["content-range"]).toBe(`bytes 0-15/${fullBytes.byteLength}`);
+  expect((await rangedOpus.body()).subarray(0, 4).toString("ascii")).toBe("OggS");
+
+  for (const lang of ["de", "en"] as const) {
+    const problems = watch(page, baseURL ?? "");
+    await page.goto(`/${lang}/security`);
+
+    const bars = page.locator("[data-sec-audio]");
+    const muteBtns = page.locator("[data-sec-audio] [data-sec-mute]");
+    const tracks = page.locator("[data-sec-audio] [data-sec-track]");
+    await expect(bars).toHaveCount(5);
+    await expect(muteBtns).toHaveCount(5);
+    await expect(tracks).toHaveCount(5);
+
+    for (let idx = 0; idx < 5; idx++) {
+      await expect(muteBtns.nth(idx)).toBeVisible();
+      await expect(tracks.nth(idx)).toBeVisible();
+      await expect(muteBtns.nth(idx)).toHaveAttribute("aria-pressed", "false");
+      await expect(bars.nth(idx)).not.toHaveAttribute("data-muted", "true");
+    }
+
+    expect(await axe(page)).toEqual([]);
+    expect(await targets(page)).toEqual([]);
+
+    // Muting one player mutes all 5 players cleanly; unmuting restores all 5.
+    await muteBtns.first().click();
+    for (let idx = 0; idx < 5; idx++) {
+      await expect(muteBtns.nth(idx)).toHaveAttribute("aria-pressed", "true");
+      await expect(bars.nth(idx)).toHaveAttribute("data-muted", "true");
+    }
+
+    await muteBtns.nth(1).click();
+    for (let idx = 0; idx < 5; idx++) {
+      await expect(muteBtns.nth(idx)).toHaveAttribute("aria-pressed", "false");
+      await expect(bars.nth(idx)).not.toHaveAttribute("data-muted", "true");
+    }
+
+    // Play the signin Opus clip while muted and verify network fetch + active playback state.
+    await muteBtns.first().click();
+    const signinBar = page.locator('[data-sec-audio="signin"]');
+    const opusResponsePromise = page.waitForResponse(
+      (res) => res.url().endsWith(`/static/audio/security/${lang}/signin.opus`),
+    );
+    await signinBar.locator("[data-sec-play]").click();
+    const opusResponse = await opusResponsePromise;
+    expect([200, 206]).toContain(opusResponse.status());
+    expect(opusResponse.headers()["content-type"]).toBe("audio/ogg; codecs=opus");
+    await expect(signinBar).toHaveAttribute("data-playing", "true");
+    await expect(signinBar.locator("[data-sec-play]")).toHaveAttribute("aria-pressed", "true");
+    await expect(signinBar.locator("[data-sec-mute]")).toBeVisible();
+
+    await signinBar.locator("[data-sec-play]").click();
+    await expect(signinBar).not.toHaveAttribute("data-playing", "true");
+    expect(problems).toEqual([]);
+  }
+});

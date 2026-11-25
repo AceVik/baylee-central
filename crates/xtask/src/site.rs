@@ -923,7 +923,7 @@ fn stage_security_audio(web: &Path, out: &Path, languages: &[String]) -> Result<
                     && (name == "cues.json"
                         || Path::new(name)
                             .extension()
-                            .is_some_and(|ext| ext.eq_ignore_ascii_case("mp3")))
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("opus")))
                 {
                     fs::copy(&path, lang_target.join(name))
                         .or_fail("a security audio file could not be copied")?;

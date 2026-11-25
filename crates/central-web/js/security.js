@@ -4,7 +4,7 @@
 // - Synchronizes audio playback time with each diagram's data-step and radio switch.
 // - Falls back smoothly to an interactive visual step tour when audio files have not been generated yet.
 // Plain DOM only (Trusted Types safe, no markup strings, no console output).
-const AUDIO_SRC_PATTERN = /^\/static\/audio\/security\/[a-z-]+\/[a-z]+\.mp3$/;
+const AUDIO_SRC_PATTERN = /^\/static\/audio\/security\/[a-z-]+\/[a-z]+\.opus$/;
 const TOUR_STEP_MS = 3500;
 let activeCleanup = null;
 let sharedMuted = false;

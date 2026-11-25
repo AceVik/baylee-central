@@ -57,7 +57,7 @@ pub enum Task {
         /// Optional path to an existing Scryfall `.jsonl` or `.jsonl.gz` bulk file.
         bulk_path: Option<String>,
     },
-    /// Synthesizes `/security` narrated `.mp3` clips and step-sync `cues.json`
+    /// Synthesizes `/security` narrated `.opus` clips and step-sync `cues.json`
     /// manifests via `ElevenLabs` `eleven_v4`.
     SecurityAudio(security_audio::Options),
     /// Automated PGO + `FatLTO` (`x86-64-v3`) build pipeline for production servers.
