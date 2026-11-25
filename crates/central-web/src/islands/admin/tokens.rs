@@ -381,7 +381,7 @@ fn rights_view(p: &Page) -> impl IntoView + use<> {
             <legend>{words::rt_preset(lang)}</legend>
             {presets}
         </fieldset>
-        <fieldset class="rt-rights">
+        <fieldset class="choice">
             <legend>{words::rt_rights(lang)}</legend>
             {boxes}
             <p class="hint" id="rt-rights-hint">{words::rt_rights_hint(lang)}</p>

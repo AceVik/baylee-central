@@ -18,6 +18,7 @@ const PAGES = [
   ["/en/account/admin/gateways", "Gateways"],
   ["/en/account/admin/audit", "Audit log"],
   ["/en/account/admin/legacy", "Legacy accounts"],
+  ["/en/account/admin/feedback-tokens", "Feedback tokens"],
   ["/en/account/admin", "Reset a login"],
 ] as const;
 
@@ -59,7 +60,7 @@ test("an administrator finds the navigation on every page of the administration,
     await expect(links).toHaveText(NAV);
     expect(await links.evaluateAll((all) => all.map((a) => a.getAttribute("href")))).toEqual([
       "/en/account/admin/overview", "/en/account/admin/users", "/en/account/admin/gateways", "/en/account/admin/audit",
-      "/en/account/admin/legacy", "/en/account/admin/pictures", "/en/account/admin/feedback", "/en/account/admin",
+      "/en/account/admin/legacy", "/en/account/admin/pictures", "/en/account/admin/feedback", "/en/account/admin/feedback-tokens", "/en/account/admin",
     ]);
     // where the page is
     const current = await links.evaluateAll((all) => all.map((a) => a.getAttribute("aria-current")));

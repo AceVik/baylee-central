@@ -57,7 +57,7 @@ fn second(runtime: &Runtime, operator: &DatabaseConnection, owner: [u8; 16]) -> 
 
 /// Synthetic gzip (the magic, then anything) and its announcement; the
 /// database makes the digest, as this crate's tests link no hash.
-fn part(runtime: &Runtime, operator: &DatabaseConnection) -> (Vec<u8>, Announced) {
+pub(crate) fn part(runtime: &Runtime, operator: &DatabaseConnection) -> (Vec<u8>, Announced) {
     let mut bytes = vec![9; 40_000];
     bytes[0] = 0x1f;
     bytes[1] = 0x8b;

@@ -1748,6 +1748,13 @@ through `js_sys`, as `clip` does).
   an id; anything but 32 lowercase hex digits is a 404. Each page links
   back to `/{lang}/account/admin/overview`; the shared administration
   navigation is wired in when the two branches meet.
+- **The report tokens** (25.11.2026, [reports](../reports.md) §"Report
+  tokens"): `/{lang}/account/admin/feedback-tokens`
+  (`Section::FeedbackTokens`, `islands/admin/tokens.rs`), a page of the
+  administration beside the feedback's: the tokens, a new one from a preset
+  or from its rights, shown once, and their revocation. A report of a
+  token's says so in the list, its filters (the channel and the token), its
+  facts, its notes and its history, where a gateway's says its gateway.
 - **The list** (`islands/feedback/list.rs`): the seven views with their
   counts (the open reports' facets and the trash's total), the search
   (it follows the typing after a pause, Enter at once, Escape empties

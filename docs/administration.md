@@ -48,7 +48,8 @@ pages are to go.*
   list in `central-postgres` (`Action`: `account.admin_granted`,
   `account.admin_removed`, `account.reset_issued`, `account.tag_changed`,
   `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`,
-  `gateway.ranked_verified`, `gateway.ranked_revoked`) and the
+  `gateway.ranked_verified`, `gateway.ranked_revoked`,
+  `report_token.created`, `report_token.revoked`) and the
   ids it touched. No name, reason, note or key; a tag change keeps the two
   tags, which are numbers. Reads are not audited. Each change writes its
   event in the same transaction. Reading a page of it joins today's names
@@ -185,6 +186,36 @@ writes the report's own history (`report_audit`: who, what, the change in
 short, never the report's words), not `audit_events`, and asks for no fresh
 password; a purge, which cannot be undone, does (`AdminRequest::fresh`).
 An assignee is an administrator's account.
+
+## Report tokens (25.11.2026)
+
+An administrator makes and revokes the credentials of the report API
+([reports](reports.md) §"Report tokens") on
+`/{lang}/account/admin/feedback-tokens`. `ReportTokens` lists them (the live
+ones, and those revoked or expired in the last 30 days; at most 128): name,
+rights, who made it and when, its end, its last use to the minute, who
+revoked it, and whether it is paused because its maker is no administrator
+any more. `CreateReportToken { name, scopes, days }` and
+`RevokeReportToken { token }` are changes: each needs the recent password
+and writes its audit event (`report_token.created`,
+`report_token.revoked`) in its transaction. The event holds the token's id
+in `audit_events.report_token_id` and no word of it; a page of the audit
+names the tokens its events touched, as it names accounts and gateways.
+
+At most 32 tokens are live and 32 are made in a day (`Busy`). The token is
+in the answer to its creation and nowhere else, and the page shows it once;
+Central keeps its SHA-256 digest. No answer of `ReportTokens` has a field
+that could carry either.
+
+**Removing an administrator stops every token they made**, at once and
+without a revocation: the query that authenticates a token asks for its
+maker's role. Their tokens show as paused, and work again if they are
+appointed again; revoke them where that must not be.
+
+The runtime has `SELECT`, `INSERT` of a token's own columns and
+`UPDATE (revoked_at, revoked_by, last_used_at)` on `report_tokens`; it can
+change no token's rights, name or end, and deletes none. The startup check
+refuses any other privilege.
 
 ## Schema: migration `m20261028_000012_administration`
 

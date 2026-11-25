@@ -632,6 +632,17 @@ async fn what_the_rules_refuse_is_a_token_s_bad_request_and_a_gateway_s_refusal(
         );
         assert_eq!(send(&app, sent).await, refused, "{method} {path}");
     }
+    let gzip = |kind: &'static str, report: &str, bearer: &str| {
+        request(
+            &Method::PUT,
+            &format!("/v1/reports/{report}/client"),
+            Some(bearer),
+        )
+        .header(header::CONTENT_TYPE, kind)
+        .header(header::CONTENT_LENGTH, "8")
+        .body(Body::from(vec![0x1f; 8]))
+        .unwrap()
+    };
     for (bearer, channel, status) in [
         (report_bearer(), "token", StatusCode::BAD_REQUEST),
         (
@@ -645,15 +656,20 @@ async fn what_the_rules_refuse_is_a_token_s_bad_request_and_a_gateway_s_refusal(
             Some(&intake(channel)),
         );
         assert_eq!(send(&app, sent).await.0, status);
-        let sent = request(
-            &Method::PUT,
-            &format!("/v1/reports/{REPORT}/client"),
-            Some(&bearer),
-        )
-        .header(header::CONTENT_TYPE, "application/gzip")
-        .header(header::CONTENT_LENGTH, "8")
-        .body(Body::from(vec![0x1f; 8]))
-        .unwrap();
+        for (kind, report) in [
+            ("application/gzip", REPORT),
+            ("application/gzip", "nothing"),
+            (JSON, REPORT),
+        ] {
+            let sent = gzip(kind, report, &bearer);
+            assert_eq!(send(&app, sent).await.0, status, "{kind} {report}");
+        }
+        let mut sent = built(
+            request(&Method::POST, "/v1/reports", Some(&bearer)),
+            Some(&intake(channel)),
+        );
+        sent.headers_mut()
+            .insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain"));
         assert_eq!(send(&app, sent).await.0, status);
     }
 }

@@ -672,8 +672,8 @@ impl<R: Reports> Desk<R> {
 async fn file<R: Reports>(State(desk): Counter<R>, request: Request) -> Response {
     let (head, body) = request.into_parts();
     let filed = async {
-        single_headers(&head.headers, "application/json")?;
         let (filing, refused) = desk.filer(&head).await?;
+        single_headers(&head.headers, "application/json").map_err(refused)?;
         let unread = unread(&head)?;
         let (bytes, _place) = unread
             .read(&head, body, MAX_INTAKE_BYTES)
@@ -709,11 +709,11 @@ async fn file_part<R: Reports>(
 ) -> Response {
     let filed = async {
         let (head, body) = request.into_parts();
-        single_headers(&head.headers, "application/gzip")?;
-        let (Some(report), Ok(part)) = (hex_id(&report), Part::from_stored(&part)) else {
-            return Err(Stopped::Failed(Error::Rejected));
-        };
         let (filing, refused) = desk.filer(&head).await?;
+        single_headers(&head.headers, "application/gzip").map_err(refused)?;
+        let (Some(report), Ok(part)) = (hex_id(&report), Part::from_stored(&part)) else {
+            return Err(refused(Error::Rejected));
+        };
         let bytes = desk
             .reports
             .announced(&filing, report, part)

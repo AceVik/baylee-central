@@ -19,6 +19,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 use sha2::{Digest, Sha256};
 
 mod level;
+mod tokens;
 
 const ORIGIN: &str = "https://reports.invalid";
 
@@ -179,6 +180,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     marking(store, &cookie, &other, admin, first).await;
     importing(store, operator, &cookie, admin, owner).await;
     sweeping(store, operator, &cookie, first).await;
+    tokens::run(store, operator, keys).await;
     level::run(store, operator).await;
 }
 

@@ -94,7 +94,9 @@ OPAQUE proof of the password, as a password change does:
    lists), its places
    on other gateways' administrator lists, its terms acceptances and roles,
    and since migration 000026 its e-mail address and one that waits.
-   Audit events stay: they name only ids, which no longer resolve. The
+   Audit events stay: they name only ids, which no longer resolve. So do the
+   report tokens a former administrator made or revoked (migration 000052):
+   they hold the account's id, and stopped working with the role. The
    username and tag are free again for a later registration.
 
 What Central cannot delete: what gateways keep about their players (each
@@ -143,7 +145,9 @@ gateways into the new document (Baylee `baylee_account::Account::login`).
   gateways it owns (id, origin, name, version, website, approved, created,
   last heartbeat), the gateways it administers (id, origin), and the audit
   events naming it as the account acted on or as the administrator who
-  acted. Bounds: sessions two (one per kind), owned gateways eight (the
+  acted (an administrator's making and revocation of a report token among
+  them, by their action and time; the token's row is not in the export,
+  whose shape is the released client's). Bounds: sessions two (one per kind), owned gateways eight (the
   registry's rule), and 256 for each other list (`export::EXPORT_LIST`); a
   list past it is cut and `complete` is false, and the operator then answers
   the rest by hand ([operations](operations.md#deleting-and-exporting-accounts)).

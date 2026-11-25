@@ -1000,6 +1000,11 @@ gateway's token with the `sso` scope:
   five of them until it is whole, else `408` and its slot is free again;
   `204`.
 
+Since 25.11.2026 report tokens use the same routes and more
+([below](#report-tokens-migration-000052)), and the credential of every one
+of them is asked for before its body is read. Metadata over 64 KiB is `413`
+(it was `401`).
+
 The browser listener adds `POST /api/v1/reports/{id}/client|record` for an
 administrator's page, with every check of `POST /api/v1`, 120 a minute per
 address; the answer is the gzip as stored. The proxy compresses the JSON
@@ -1067,6 +1072,97 @@ backups take room of their own. Watch the volume as before.
 Not tested: none of this ran on the server. The bounds and the levels
 query are tested against the PostgreSQL fixture, the slots over HTTP
 against a local listener.
+
+### Report tokens (migration 000052)
+
+[Reports](reports.md) §"Report tokens" has the rights, the routes and the
+reasons. An administrator makes a token on
+`/{lang}/account/admin/feedback-tokens`; its holder sends
+
+```
+Authorization: Bearer brt_<64 hex digits>
+Baylee-Central-Protocol: 2
+Content-Type: application/json
+```
+
+to `https://central.baylee.app` (the proxy passes the whole host to the
+native listener, so nothing in Caddy changes). A request from a page is
+refused as ever (`Origin`, `Sec-Fetch-Site`).
+
+| request | right | body | answer |
+| --- | --- | --- | --- |
+| `POST /v1/reports` | `file` | the metadata, `"channel":"token"` | `201 {"report_id"}` |
+| `PUT /v1/reports/{id}/client`, `…/record` | `file` | gzip, `application/gzip`, `Content-Length` | `204` |
+| `POST /v1/reports/search` | `read` | `{"filter":{…},"sort","descending","offset","limit"}`, all optional | `{"reports":[…],"total"}` |
+| `POST /v1/reports/facets`, `…/crashes` | `read` | `{"filter":{…}}` | counts, crash groups |
+| `GET /v1/reports/stats` | `read` | none | `{"days":[…]}` |
+| `GET /v1/reports/{id}` | `read` | none | the report, its notes and history |
+| `GET /v1/reports/{id}/client`, `…/record` | `read` | none | `application/gzip`, `X-Record-Origin` with a record |
+| `GET /v1/reports/admins` | `triage` | none | `{"admins":[…]}` |
+| `PATCH /v1/reports/{id}` | `triage` | `{"change":{…},"expected_revision":n}` | the report |
+| `POST /v1/reports/{id}/trash`, `…/restore` | `triage` | none | `204` |
+| `POST /v1/reports/{id}/notes` | `triage` | `{"text"}` | the report |
+| `DELETE /v1/reports/{id}/notes/{note}` | `triage` | none | the report; a token's own note |
+| `POST /v1/reports/bulk` | `triage` | `{"reports":[ids],"bulk":{"do":"change","change":{…}}}`, or `trash`, `restore` | `{"changed"}` |
+| `DELETE /v1/reports/{id}` | `purge` | none | `204`, from the trash only |
+| `POST /v1/reports/purge` | `purge` | `{"reports":[ids]}` | `{"changed"}`, from the trash only, all or none |
+
+Ids are 32 lowercase hex digits. The filter's parts are `statuses`, `kinds`,
+`priorities` (`null` is none), `q`, `from`, `to`, `has_record`, `channel`,
+`gateway`, `token`, `assignee`, `unassigned`, `label`, `reporter`,
+`signature`, `duplicate_of` and `trash`; `central_api::report_api` is the
+contract. A record a token files has `"origin":"client"`, at most 4 MiB.
+
+| status | means |
+| --- | --- |
+| `400` | the token is good, the request is not (an id, a body, a rule; a report that is not there) |
+| `401` | the token is not good here: unknown, revoked, expired, its maker no administrator, or without the right; a gateway's refusals as ever |
+| `409` | the report moved past `expected_revision`, or the part is stored already |
+| `413` | a body over 64 KiB |
+| `426` | another protocol |
+| `429` | a budget (below), or a second request at once |
+| `503` | the store is away |
+
+| what | number | where |
+| --- | --- | --- |
+| live tokens, new ones a day | 32, 32 | `central-api`, `report_tokens` |
+| requests of one token an hour besides filing, a selection one for every ten reports | 600 | `REQUESTS_PER_HOUR` |
+| of them, downloads | 120 | `DOWNLOADS_PER_HOUR` |
+| calls at once, all tokens and one | 2, 1 | `central-http`, `slots.rs` |
+| downloads at once, all tokens and one | 2, 1 | `slots.rs` |
+| refused tokens an hour from one address | 30 | `addresses.rs`, `REPORT_REFUSALS` |
+| reports an hour, uploads at once, stored bytes of one token | as a registered gateway's | above |
+| a report's notes together | 192 KiB | `central-api`, `MAX_NOTES_BYTES` |
+
+All but the stored bytes and the notes are in the service's memory: a restart
+forgets them.
+
+**A lost or leaked token** is revoked on the page, at once. Without an
+administrator who can sign in, as `central_migrator`:
+
+```sql
+UPDATE central_identity.report_tokens
+SET revoked_at = pg_catalog.clock_timestamp()
+WHERE name = 'its name' AND revoked_at IS NULL;
+```
+
+**Removing an administrator** stops every token they made
+([administration](administration.md) §"Report tokens").
+
+**Deploying.** Migration 000052 adds `report_tokens`, `reports.filed_by`,
+`report_notes.token_name`, `report_audit.token_name` and
+`audit_events.report_token_id`, each with a default or null, and rewrites no
+row. Its grants are in `ops/grants.sql`:
+`SELECT, INSERT (name, digest, file, read, triage, purge, created_by,
+created_at, expires_at), UPDATE (revoked_at, revoked_by, last_used_at)` on
+`report_tokens`, and nothing new on the others. The binary before it runs
+over all of it; it shows a token's report like a gateway's of that name, and
+it knows no report token, so their requests are refused by it. No secret
+and no setting is new.
+
+**Memory.** Two downloads at once of the largest part (64 MiB) can hold
+about 384 MiB for a moment, by reading the code and not measured, beside
+the uploads' 768 MiB above.
 
 ### The one-time copy of the feedback service's reports
 
