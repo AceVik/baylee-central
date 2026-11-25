@@ -39,6 +39,8 @@ struct Stand {
     wait: AtomicBool,
     go: Notify,
     inside: Notify,
+    /// How often a [`Watched`] body was asked for anything.
+    polls: Arc<AtomicUsize>,
 }
 
 fn gateway() -> Token {
@@ -56,6 +58,11 @@ impl Stand {
 
     fn taken(&self) -> Vec<String> {
         std::mem::take(&mut *self.asked.lock().unwrap())
+    }
+
+    /// A credential is asked about before its body is asked for anything.
+    fn before_the_body(&self) {
+        assert_eq!(self.polls.load(Ordering::SeqCst), 0, "its body came first");
     }
 
     /// Nothing was asked of it.
@@ -88,6 +95,7 @@ impl Reports for Stand {
         bearer: &ReportBearer,
         _: Option<Place>,
     ) -> impl Future<Output = Result<bool, Error>> + Send {
+        self.before_the_body();
         ready(match bearer {
             ReportBearer::Gateway(presented) => {
                 self.note("filing gateway");
@@ -145,6 +153,7 @@ impl Reports for Stand {
         download: bool,
         _: Option<Place>,
     ) -> impl Future<Output = Result<[u8; 16], Error>> + Send {
+        self.before_the_body();
         self.note(format!(
             "access {}{}",
             right.as_str(),
@@ -362,8 +371,38 @@ async fn each_route_asks_for_its_right_and_then_for_its_call() {
     }
 }
 
-/// A body that says whether it was asked for anything.
-struct Watched(Arc<AtomicUsize>);
+/// A body that says how often it was asked for anything, and answers that it
+/// is over, or nothing while it is withheld.
+struct Watched {
+    polls: Arc<AtomicUsize>,
+    length: u64,
+    withheld: bool,
+}
+
+impl Watched {
+    fn new(stand: &Stand) -> Self {
+        stand.polls.store(0, Ordering::SeqCst);
+        Self {
+            polls: Arc::clone(&stand.polls),
+            length: 8,
+            withheld: false,
+        }
+    }
+
+    fn long(stand: &Stand, length: u64) -> Self {
+        Self {
+            length,
+            ..Self::new(stand)
+        }
+    }
+
+    fn withheld(stand: &Stand) -> Self {
+        Self {
+            withheld: true,
+            ..Self::new(stand)
+        }
+    }
+}
 
 impl hyper::body::Body for Watched {
     type Data = Bytes;
@@ -373,17 +412,22 @@ impl hyper::body::Body for Watched {
         self: Pin<&mut Self>,
         _: &mut Context<'_>,
     ) -> Poll<Option<Result<hyper::body::Frame<Bytes>, Self::Error>>> {
-        self.0.fetch_add(1, Ordering::SeqCst);
-        Poll::Pending
+        self.polls.fetch_add(1, Ordering::SeqCst);
+        if self.withheld {
+            Poll::Pending
+        } else {
+            Poll::Ready(None)
+        }
     }
 
     fn size_hint(&self) -> hyper::body::SizeHint {
-        hyper::body::SizeHint::with_exact(8)
+        hyper::body::SizeHint::with_exact(self.length)
     }
 }
 
-/// Nothing of a body is read for a credential that is not good, on any
-/// route, whatever makes it not good; and every such answer is the same.
+/// A body is not asked for anything before its credential is known not to be
+/// good, on any route, whatever makes it not good; nothing of it is acted on,
+/// and every such answer is the same.
 #[tokio::test]
 async fn a_credential_that_is_not_good_is_refused_before_its_body_is_read() {
     let stand = Arc::new(Stand::default());
@@ -427,22 +471,16 @@ async fn a_credential_that_is_not_good_is_refused_before_its_body_is_read() {
     ));
     for (method, path, kind, bearers) in tried {
         for bearer in bearers {
-            let polls = Arc::new(AtomicUsize::new(0));
             // without a client's address, so that no budget ends the asking
             let sent = request(&method, &path, bearer.as_deref())
                 .header(header::CONTENT_LENGTH, "8")
                 .header(header::CONTENT_TYPE, kind)
-                .body(Body::new(Watched(Arc::clone(&polls))))
+                .body(Body::new(Watched::new(&stand)))
                 .unwrap();
             let (status, text) = send(&app, sent).await;
             assert_eq!(
                 (status, text.as_str()),
                 (StatusCode::UNAUTHORIZED, "account request rejected\n"),
-                "{method} {path} {bearer:?}"
-            );
-            assert_eq!(
-                polls.load(Ordering::SeqCst),
-                0,
                 "{method} {path} {bearer:?}"
             );
             assert!(
@@ -454,6 +492,7 @@ async fn a_credential_that_is_not_good_is_refused_before_its_body_is_read() {
             );
         }
     }
+    stand.polls.store(0, Ordering::SeqCst);
     // a gateway's credential is not even asked about where a token is
     for (method, path, ..) in routes() {
         let sent = built(request(&method, &path, Some(&gateways)), None);
@@ -770,27 +809,26 @@ async fn a_gateway_and_a_token_file_alike() {
         );
         assert_eq!(stand.taken(), [who, "announced", "store 8"]);
         // another length than announced is not read
-        let polls = Arc::new(AtomicUsize::new(0));
         let sent = request(
             &Method::PUT,
             &format!("/v1/reports/{REPORT}/record"),
             Some(&bearer),
         )
         .header(header::CONTENT_TYPE, "application/gzip")
-        .header(header::CONTENT_LENGTH, "9")
-        .body(Body::new(Watched(Arc::clone(&polls))))
+        .header(header::CONTENT_LENGTH, "70000")
+        .body(Body::new(Watched::long(&stand, 70_000)))
         .unwrap();
         assert!(send(&app, sent).await.0.is_client_error());
-        assert_eq!(polls.load(Ordering::SeqCst), 0);
+        stand.before_the_body();
         stand.taken();
         // a body past the metadata's bound is refused by its length alone
         let sent = request(&Method::POST, "/v1/reports", Some(&bearer))
             .header(header::CONTENT_TYPE, JSON)
             .header(header::CONTENT_LENGTH, (MAX_INTAKE_BYTES + 1).to_string())
-            .body(Body::new(Watched(Arc::clone(&polls))))
+            .body(Body::new(Watched::long(&stand, 70_000)))
             .unwrap();
         assert_eq!(send(&app, sent).await.0, StatusCode::PAYLOAD_TOO_LARGE);
-        assert_eq!(polls.load(Ordering::SeqCst), 0);
+        stand.before_the_body();
         assert_eq!(stand.taken(), [who]);
     }
 }
@@ -952,17 +990,16 @@ impl hyper::body::Body for Unmeasured {
 async fn a_good_token_s_body_keeps_the_boundary_s_bounds() {
     let stand = Arc::new(Stand::default());
     let app = app(&stand);
-    let polls = Arc::new(AtomicUsize::new(0));
     let sent = request(&Method::POST, "/v1/reports/search", Some(&report_bearer()))
         .header(header::CONTENT_TYPE, JSON)
         .header(
             header::CONTENT_LENGTH,
             (report_api::MAX_BODY_BYTES + 1).to_string(),
         )
-        .body(Body::new(Watched(Arc::clone(&polls))))
+        .body(Body::new(Watched::long(&stand, 70_000)))
         .unwrap();
     assert_eq!(send(&app, sent).await.0, StatusCode::PAYLOAD_TOO_LARGE);
-    assert_eq!(polls.load(Ordering::SeqCst), 0);
+    stand.before_the_body();
     // of unknown length and too long
     let long = Body::new(Unmeasured(Some(
         vec![b' '; report_api::MAX_BODY_BYTES + 1].into(),
@@ -975,12 +1012,12 @@ async fn a_good_token_s_body_keeps_the_boundary_s_bounds() {
     let sent = request(&Method::POST, "/v1/reports/search", Some(&report_bearer()))
         .header(header::CONTENT_TYPE, JSON)
         .header(header::CONTENT_LENGTH, "8")
-        .body(Body::new(Watched(Arc::clone(&polls))))
+        .body(Body::new(Watched::withheld(&stand)))
         .unwrap();
     let started = std::time::Instant::now();
     assert_eq!(send(&app, sent).await.0, StatusCode::REQUEST_TIMEOUT);
     assert!(started.elapsed() >= Duration::from_secs(5));
-    assert!(polls.load(Ordering::SeqCst) > 0);
+    assert!(stand.polls.load(Ordering::SeqCst) > 0);
     assert!(stand.taken().iter().all(|asked| asked == "access read"));
 }
 
@@ -1017,7 +1054,7 @@ async fn a_part_s_body_that_is_withheld_times_out_at_its_pace_and_others_are_ref
     };
     // withheld: 408 at the first window, long before an upload's minute
     let started = std::time::Instant::now();
-    let withheld = Body::new(Watched(Arc::default()));
+    let withheld = Body::new(Watched::withheld(&Stand::default()));
     let Err(stopped) = part_body(withheld, 2_000, pace, Stopped::Failed).await else {
         panic!("a withheld body was read");
     };
@@ -1116,4 +1153,36 @@ fn a_report_route_s_credential_is_one_and_of_one_spelling() {
         HeaderValue::from_bytes(b"Bearer \xff").unwrap(),
     );
     assert!(bearer(&headers).is_err());
+}
+
+/// A refused request's small body is thrown away, so that its sender reads
+/// the answer; a longer one and one of unknown length are left, and one that
+/// is withheld is waited for no longer than its time.
+#[tokio::test]
+async fn a_refused_small_body_is_thrown_away_and_no_other() {
+    let stand = Stand::default();
+    let polled = || stand.polls.load(Ordering::SeqCst);
+    let moment = Duration::from_millis(40);
+    discard(Body::new(Watched::new(&stand)), moment).await;
+    assert_eq!(polled(), 1);
+    discard(Body::new(Watched::long(&stand, DISCARD_BYTES + 1)), moment).await;
+    assert_eq!(polled(), 0);
+    let started = std::time::Instant::now();
+    discard(Body::new(Watched::withheld(&stand)), moment).await;
+    assert!(polled() > 0 && started.elapsed() >= moment);
+    assert!(started.elapsed() < Duration::from_secs(2));
+    let whole: Bytes = vec![b' '; report_api::MAX_BODY_BYTES].into();
+    discard(Body::new(Unmeasured(Some(whole.clone()))), moment).await;
+    discard(Body::from(whole), moment).await;
+    // the answer is the refusal all the same, at once for a body that is there
+    let stand = Arc::new(Stand::default());
+    let app = app(&stand);
+    stand.refuse.store(true, Ordering::SeqCst);
+    let sent = built(
+        request(&Method::POST, "/v1/reports/search", Some(&report_bearer())),
+        Some("{}"),
+    );
+    let started = std::time::Instant::now();
+    assert_eq!(send(&app, sent).await.0, StatusCode::UNAUTHORIZED);
+    assert!(started.elapsed() < DISCARD_TIME);
 }

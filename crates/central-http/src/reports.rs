@@ -6,7 +6,9 @@
 //! route alone, so it is asked for before a byte of the body is read; the
 //! boundary leaves these bodies to this module ([`Unread`]). Until then every
 //! refusal is the native route's fixed one, whatever its cause; a report
-//! token that passed it is told a request the rules refuse as `400`.
+//! token that passed it is told a request the rules refuse as `400`. A small
+//! body of a refused request is thrown away as it comes ([`discard`]), so
+//! that its sender reads the answer.
 //!
 //! **Which credential.** `Bearer brt_…` is a report token and nothing else,
 //! `Bearer <64 hex>` a gateway's or the bridge's and nothing else
@@ -35,12 +37,14 @@ use central_api::{
     reports::{MAX_INTAKE_BYTES, Part, RecordOrigin},
 };
 use central_identity::{IdentityService, Place, ReportCall, ReportReply};
+use http_body_util::{BodyExt, Limited};
+use hyper::body::Body as _;
 use std::{
     future::Future,
     pin::Pin,
     sync::{Arc, Mutex},
     task::{Context, Poll},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 /// What answers the report routes: the identity service, or a test's
@@ -371,10 +375,14 @@ impl<R: Reports> Desk<R> {
         right: ReportScope,
         call: Option<ReportCall>,
     ) -> Result<ReportReply, Stopped> {
-        let (head, _body) = request.into_parts();
-        let (token, id, _slot) = self.begin(&head, right, false).await?;
-        bodyless(&head)?;
-        let call = call.ok_or(Stopped::Request(Error::Rejected))?;
+        let (head, body) = request.into_parts();
+        let begun = async {
+            let begun = self.begin(&head, right, false).await?;
+            bodyless(&head)?;
+            let call = call.ok_or(Stopped::Request(Error::Rejected))?;
+            Ok((begun, call))
+        };
+        let ((token, id, _slot), call) = kept(begun.await, body).await?.0;
         self.reports
             .call(id, &token, call)
             .await
@@ -390,12 +398,15 @@ impl<R: Reports> Desk<R> {
         call: impl FnOnce(T) -> Option<ReportCall>,
     ) -> Result<ReportReply, Stopped> {
         let (head, body) = request.into_parts();
-        let (token, id, _slot) = self.begin(&head, right, false).await?;
-        let unqueried = head.uri.query().is_none();
-        if !unqueried || single_headers(&head.headers, "application/json").is_err() {
-            return Err(Stopped::Request(Error::Rejected));
-        }
-        let unread = unread(&head)?;
+        let begun = async {
+            let begun = self.begin(&head, right, false).await?;
+            let unqueried = head.uri.query().is_none();
+            if !unqueried || single_headers(&head.headers, "application/json").is_err() {
+                return Err(Stopped::Request(Error::Rejected));
+            }
+            Ok((begun, unread(&head)?))
+        };
+        let (((token, id, _slot), unread), body) = kept(begun.await, body).await?;
         let (bytes, _place) = unread
             .read(&head, body, report_api::MAX_BODY_BYTES)
             .await
@@ -407,6 +418,45 @@ impl<R: Reports> Desk<R> {
             .await
             .map_err(Stopped::Request)
     }
+}
+
+/// What a request may go on with, and its body still unread; a refused
+/// request's is thrown away before its refusal is said ([`discard`]).
+async fn kept<T>(begun: Result<T, Stopped>, body: Body) -> Result<(T, Body), Stopped> {
+    match begun {
+        Ok(begun) => Ok((begun, body)),
+        Err(stopped) => {
+            discard(body, DISCARD_TIME).await;
+            Err(stopped)
+        }
+    }
+}
+
+/// How long a refused request's body may take to be thrown away: the grace
+/// every other route's small body has (`boundary.rs`).
+const DISCARD_TIME: Duration = Duration::from_millis(250);
+/// The longest body that is thrown away; a longer one, or one of unknown
+/// length, is left where it is.
+const DISCARD_BYTES: u64 = report_api::MAX_BODY_BYTES as u64;
+
+/// Throw a refused request's small body away as it comes, for `time` at
+/// most. A connection that closes on bytes which were sent and never read is
+/// reset, and the reset takes the answer with it: the sender would see a
+/// broken connection instead of its refusal. Nothing of it is kept or looked
+/// at.
+async fn discard(body: Body, time: Duration) {
+    if body
+        .size_hint()
+        .upper()
+        .is_none_or(|bytes| bytes > DISCARD_BYTES)
+    {
+        return;
+    }
+    let mut body = Limited::new(body, report_api::MAX_BODY_BYTES);
+    let _ = tokio::time::timeout(time, async {
+        while let Some(Ok(_)) = body.frame().await {}
+    })
+    .await;
 }
 
 /// The unread body's boundary, which every request here passed.
@@ -611,11 +661,15 @@ async fn download<R: Reports>(
     let Ok(part) = Part::from_stored(&part) else {
         return nowhere();
     };
-    let (head, _body) = request.into_parts();
+    let (head, body) = request.into_parts();
     let sent = async {
-        let (token, id, _slot) = desk.begin(&head, ReportScope::Read, true).await?;
-        bodyless(&head)?;
-        let report = hex_id(&report).ok_or(Stopped::Request(Error::Rejected))?;
+        let begun = async {
+            let begun = desk.begin(&head, ReportScope::Read, true).await?;
+            bodyless(&head)?;
+            let report = hex_id(&report).ok_or(Stopped::Request(Error::Rejected))?;
+            Ok((begun, report))
+        };
+        let ((token, id, _slot), report) = kept(begun.await, body).await?.0;
         let slot = desk.downloads.take(id)?;
         let (gzip, origin) = desk
             .reports
@@ -672,9 +726,12 @@ impl<R: Reports> Desk<R> {
 async fn file<R: Reports>(State(desk): Counter<R>, request: Request) -> Response {
     let (head, body) = request.into_parts();
     let filed = async {
-        let (filing, refused) = desk.filer(&head).await?;
-        single_headers(&head.headers, "application/json").map_err(refused)?;
-        let unread = unread(&head)?;
+        let begun = async {
+            let (filing, refused) = desk.filer(&head).await?;
+            single_headers(&head.headers, "application/json").map_err(refused)?;
+            Ok((filing, refused, unread(&head)?))
+        };
+        let ((filing, refused, unread), body) = kept(begun.await, body).await?;
         let (bytes, _place) = unread
             .read(&head, body, MAX_INTAKE_BYTES)
             .await
@@ -709,26 +766,30 @@ async fn file_part<R: Reports>(
 ) -> Response {
     let filed = async {
         let (head, body) = request.into_parts();
-        let (filing, refused) = desk.filer(&head).await?;
-        single_headers(&head.headers, "application/gzip").map_err(refused)?;
-        let (Some(report), Ok(part)) = (hex_id(&report), Part::from_stored(&part)) else {
-            return Err(refused(Error::Rejected));
+        let begun = async {
+            let (filing, refused) = desk.filer(&head).await?;
+            single_headers(&head.headers, "application/gzip").map_err(refused)?;
+            let (Some(report), Ok(part)) = (hex_id(&report), Part::from_stored(&part)) else {
+                return Err(refused(Error::Rejected));
+            };
+            let bytes = desk
+                .reports
+                .announced(&filing, report, part)
+                .await
+                .map_err(refused)?;
+            let declared = head
+                .headers
+                .get(header::CONTENT_LENGTH)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok());
+            if declared != Some(u64::from(bytes)) {
+                return Err(refused(Error::Rejected));
+            }
+            let length = usize::try_from(bytes).map_err(|_| Error::Rejected)?;
+            let slot = desk.uploads.begin(R::filer(&filing), Instant::now())?;
+            Ok((filing, refused, report, part, length, slot))
         };
-        let bytes = desk
-            .reports
-            .announced(&filing, report, part)
-            .await
-            .map_err(refused)?;
-        let declared = head
-            .headers
-            .get(header::CONTENT_LENGTH)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.parse::<u64>().ok());
-        if declared != Some(u64::from(bytes)) {
-            return Err(refused(Error::Rejected));
-        }
-        let length = usize::try_from(bytes).map_err(|_| Error::Rejected)?;
-        let slot = desk.uploads.begin(R::filer(&filing), Instant::now())?;
+        let ((filing, refused, report, part, length, slot), body) = kept(begun.await, body).await?;
         let stored = match part_body(body, length, UPLOAD_PACE, refused).await {
             Ok(gzip) => desk
                 .reports

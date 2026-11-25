@@ -69,9 +69,9 @@ fn filed(text: &str) -> ReportIntake {
 pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
     grants(operator).await;
     table(operator).await;
-    let (admin, cookie) = signed_in(store, keys, "token-admin").await;
-    let (_, stranger) = signed_in(store, keys, "token-stranger").await;
-    appoint_admin(operator, "token-admin").await.unwrap();
+    let (admin, cookie) = signed_in(store, keys, "rt-admin").await;
+    let (_, stranger) = signed_in(store, keys, "rt-stranger").await;
+    appoint_admin(operator, "rt-admin").await.unwrap();
     making(store, operator, &cookie, &stranger, admin).await;
     stale(store, operator, keys).await;
     confusion(store, &cookie).await;
@@ -252,8 +252,8 @@ async fn audited(
 
 /// A sign-in of half an hour ago makes and revokes nothing; it reads.
 async fn stale(store: &AccountStore, operator: &DatabaseConnection, keys: &ServerKeys) {
-    let (identity, cookie) = signed_in(store, keys, "token-stale-admin").await;
-    appoint_admin(operator, "token-stale-admin").await.unwrap();
+    let (identity, cookie) = signed_in(store, keys, "rt-stale-admin").await;
+    appoint_admin(operator, "rt-stale-admin").await.unwrap();
     let token = made(store, &cookie, "Before", ReportScopes::ONLY_READ).await;
     sql(
         operator,
@@ -1023,7 +1023,7 @@ async fn maker(
         store.report_stats(one.by()).await.err(),
         Some(Error::Rejected)
     );
-    appoint_admin(operator, "token-admin").await.unwrap();
+    appoint_admin(operator, "rt-admin").await.unwrap();
     let mine = |tokens: Vec<ReportTokenInfo>| tokens.into_iter().find(|t| t.id == one.id).unwrap();
     assert!(!mine(store.admin_report_tokens(cookie).await.unwrap()).suspended);
     assert!(store.report_stats(one.by()).await.is_ok());
