@@ -320,7 +320,9 @@ fn build_gateway_actions(
                     Ok(Response::Owner {
                         answer: OwnerAnswer::TokenCreated { token, .. },
                     }) => {
-                        shown.set(Some(token.hex().as_str().to_owned()));
+                        shown.set(Some(
+                            central_api::owner::token_text(&token).as_str().to_owned(),
+                        ));
                         needs_reauth.set(false);
                         notice.set(None);
                         reload_focus.run(Some("#token-shown".to_owned()));
