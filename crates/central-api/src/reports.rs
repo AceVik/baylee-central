@@ -981,4 +981,242 @@ mod tests {
             .validate()
             .unwrap();
     }
+
+    type Change = fn(&mut ReportIntake);
+
+    #[test]
+    fn a_report_is_accepted_to_each_bound_and_not_one_past_it() {
+        let valid = |change: Change| {
+            let mut report = intake();
+            change(&mut report);
+            report.validate().is_ok()
+        };
+        let cases: [(&str, Change, Change); 9] = [
+            (
+                "reporter",
+                |r| r.reporter = "0aF".repeat(MAX_REPORTER).split_off(2 * MAX_REPORTER),
+                |r| r.reporter = String::new(),
+            ),
+            // Bounds count characters, not octets.
+            (
+                "text",
+                |r| r.text = "ä".repeat(MAX_TEXT),
+                |r| r.text = "ä".repeat(MAX_TEXT + 1),
+            ),
+            (
+                "game",
+                |r| r.game_id = Some("g".repeat(MAX_GAME_ID)),
+                |r| r.game_id = Some("g".repeat(MAX_GAME_ID + 1)),
+            ),
+            (
+                "gateway",
+                |r| r.gateway.name = Some("g".repeat(MAX_SAID)),
+                |r| r.gateway.name = Some("g".repeat(MAX_SAID + 1)),
+            ),
+            (
+                "commit",
+                |r| r.build.as_mut().unwrap().commit = Some("a".repeat(64)),
+                |r| r.build.as_mut().unwrap().commit = Some("a".repeat(65)),
+            ),
+            (
+                "version",
+                |r| r.build.as_mut().unwrap().version = "1".repeat(MAX_SAID),
+                |r| r.build.as_mut().unwrap().version = String::new(),
+            ),
+            (
+                "client file",
+                |r| r.client.as_mut().unwrap().bytes = MAX_CLIENT_GZIP,
+                |r| r.client.as_mut().unwrap().bytes = 0,
+            ),
+            (
+                "gateway's record",
+                |r| r.record.as_mut().unwrap().bytes = MAX_RECORD_GZIP,
+                |r| r.record.as_mut().unwrap().bytes = MAX_RECORD_GZIP + 1,
+            ),
+            (
+                "client's record",
+                |r| {
+                    let record = r.record.as_mut().unwrap();
+                    record.origin = RecordOrigin::Client;
+                    record.bytes = MAX_CLIENT_RECORD_GZIP;
+                },
+                |r| r.record.as_mut().unwrap().bytes = 0,
+            ),
+        ];
+        for (what, inside, outside) in cases {
+            assert!(valid(inside), "{what}");
+            assert!(!valid(outside), "{what}");
+        }
+        // Lines and tabs belong to the text alone; no field takes another control sign.
+        assert!(valid(|r| r.text = "a\n\tb".into()));
+        let refused: [(&str, Change); 9] = [
+            ("escape", |r| r.text = "\u{1b}[2J".into()),
+            ("return", |r| r.text = "a\rb".into()),
+            ("zero", |r| r.text = "a\0b".into()),
+            ("blank lines", |r| r.text = "\n\t\n".into()),
+            ("named in two lines", |r| {
+                r.gateway.name = Some("a\nb".into());
+            }),
+            ("address with a tab", |r| {
+                r.gateway.url = Some("a\tb".into());
+            }),
+            ("version with a mark", |r| {
+                r.gateway.version = Some("1\u{200b}".into());
+            }),
+            ("game with a line", |r| r.game_id = Some("a\nb".into())),
+            ("no game's name", |r| r.game_id = Some(String::new())),
+        ];
+        for (what, change) in refused {
+            assert!(!valid(change), "{what}");
+        }
+    }
+
+    #[test]
+    fn a_crash_is_told_by_a_crash_report_and_a_game_by_its_gateway() {
+        let crash = |message: usize, location: usize| {
+            Some(Crash {
+                message: "m".repeat(message),
+                location: "f".repeat(location),
+            })
+        };
+        let report = |kind, crash| ReportIntake {
+            kind,
+            crash,
+            ..intake()
+        };
+        let most = || crash(MAX_CRASH_MESSAGE, MAX_CRASH_LOCATION);
+        assert!(report(ReportKind::Crash, most()).validate().is_ok());
+        assert!(report(ReportKind::Crash, None).validate().is_ok());
+        assert!(report(ReportKind::Bug, most()).validate().is_err());
+        for crash in [
+            crash(MAX_CRASH_MESSAGE + 1, 1),
+            crash(1, MAX_CRASH_LOCATION + 1),
+        ] {
+            assert!(report(ReportKind::Crash, crash).validate().is_err());
+        }
+        let direct = ReportIntake {
+            channel: Channel::Direct,
+            game_id: None,
+            ..intake()
+        };
+        assert!(direct.validate().is_ok());
+    }
+
+    #[test]
+    fn a_change_is_one_change_of_its_own_shape() {
+        let valid = |change: &ReportChange, bulk| change.validate(bulk).is_ok();
+        let label = |n: usize| format!("label-{n}");
+        let labels = |count: usize| (0..count).map(label).collect::<Vec<_>>();
+        for (issue, accepted) in [
+            (Some(1), true),
+            (Some(10_000_000), true),
+            (None, true),
+            (Some(0), false),
+            (Some(10_000_001), false),
+        ] {
+            let change = ReportChange {
+                issue: Some(issue),
+                ..ReportChange::default()
+            };
+            for bulk in [false, true] {
+                assert_eq!(valid(&change, bulk), accepted, "{issue:?}");
+            }
+        }
+        for (count, accepted) in [(0, true), (MAX_LABELS, true), (MAX_LABELS + 1, false)] {
+            let set = ReportChange {
+                labels: Some(labels(count)),
+                ..ReportChange::default()
+            };
+            assert_eq!(valid(&set, false), accepted, "{count}");
+            // A whole set is one report's; many reports gain and lose labels.
+            assert!(!valid(&set, true));
+            for (add, remove) in [(labels(count), vec![]), (vec![], labels(count))] {
+                let change = ReportChange {
+                    labels_add: add,
+                    labels_remove: remove,
+                    ..ReportChange::default()
+                };
+                assert_eq!(valid(&change, true), accepted && count > 0, "{count}");
+                assert!(!valid(&change, false), "{count}");
+            }
+        }
+        // One bad label among good ones is enough, on either side.
+        for (add, remove) in [(vec!["ok", "Bad"], vec![]), (vec!["ok"], vec!["bad label"])] {
+            let change = ReportChange {
+                labels_add: add.into_iter().map(Into::into).collect(),
+                labels_remove: remove.into_iter().map(Into::into).collect(),
+                ..ReportChange::default()
+            };
+            assert!(!valid(&change, true));
+        }
+    }
+
+    #[test]
+    fn a_label_a_view_and_a_filter_keep_to_their_letters_and_lengths() {
+        assert!(valid_label(&"a".repeat(MAX_LABEL)));
+        assert!(valid_label("ui-2"));
+        for label in [
+            "",
+            "UI",
+            "a b",
+            "a_b",
+            "ä",
+            "a\n",
+            &"a".repeat(MAX_LABEL + 1),
+        ] {
+            assert!(!valid_label(label), "{label:?}");
+        }
+        assert!(valid_view("Open bugs", "status=new&kind=bug"));
+        assert!(valid_view(&"ä".repeat(MAX_VIEW_NAME), ""));
+        assert!(valid_view("a", &"q".repeat(MAX_VIEW_QUERY)));
+        for (name, query) in [
+            (String::new(), "a=b".to_owned()),
+            ("  ".into(), "a=b".into()),
+            ("two\nlines".into(), "a=b".into()),
+            ("over\u{202e}ride".into(), "a=b".into()),
+            ("ä".repeat(MAX_VIEW_NAME + 1), "a=b".into()),
+            ("a".into(), "a b".into()),
+            ("a".into(), "a=b\r\nSet-Cookie:x".into()),
+            ("a".into(), "a=ä".into()),
+            ("a".into(), "q".repeat(MAX_VIEW_QUERY + 1)),
+        ] {
+            assert!(!valid_view(&name, &query), "{name:?} {query:?}");
+        }
+        let filter = |text: &str| {
+            serde_json::from_str::<ReportFilter>(text)
+                .unwrap()
+                .validate()
+                .is_ok()
+        };
+        for accepted in [
+            r#"{"from":"2026-01-01","to":"2026-12-31"}"#,
+            r#"{"signature":"0123456789abcdef0123456789abcdef"}"#,
+            r#"{"unassigned":true}"#,
+            r#"{"reporter":"5bdc"}"#,
+        ] {
+            assert!(filter(accepted), "{accepted}");
+        }
+        for refused in [
+            r#"{"from":"2026-00-01"}"#,
+            r#"{"to":"2026-01-00"}"#,
+            r#"{"to":"2026-01-32"}"#,
+            r#"{"from":"2026/01/01"}"#,
+            r#"{"from":"2026-1-1"}"#,
+            r#"{"from":"2026-01-01T00:00"}"#,
+            r#"{"from":"+026-01-01"}"#,
+            r#"{"from":"202ä-01-1"}"#,
+            r#"{"from":""}"#,
+            r#"{"signature":"0123456789abcdef0123456789abcdeg"}"#,
+            r#"{"signature":"0123456789ABCDEF0123456789abcdef"}"#,
+            r#"{"signature":"0123456789abcdef0123456789abcde"}"#,
+            r#"{"reporter":""}"#,
+            r#"{"reporter":"%"}"#,
+            r#"{"gateway":""}"#,
+            r#"{"gateway":"a\nb"}"#,
+            r#"{"q":"a\u0000b"}"#,
+            r#"{"label":""}"#,
+        ] {
+            assert!(!filter(refused), "{refused}");
+        }
+    }
 }

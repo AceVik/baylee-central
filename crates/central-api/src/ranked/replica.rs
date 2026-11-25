@@ -23,6 +23,8 @@ private_debug!(Evidence, Work, Entry, HostRequest, HostResponse);
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod validation_tests;
 /// Private opening, encoded within Central's global wire limit.
 pub type SetupBytes = crate::private_bytes::PrivateBytes<{ 192 * 1024 }>;
 /// One private ordered input including any format framing.

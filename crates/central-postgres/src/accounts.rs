@@ -431,3 +431,82 @@ fn validate_document(document: &[u8]) -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_username_has_one_spelling_and_no_look_alikes() {
+        for (typed, stored) in [
+            ("abc", "abc"),
+            ("ABC", "abc"),
+            ("a.b-c_d", "a.b-c_d"),
+            ("007", "007"),
+            ("a1b2c3d4e5f6g7h8i9j0k1l2", "a1b2c3d4e5f6g7h8i9j0k1l2"),
+        ] {
+            assert_eq!(username(typed).unwrap(), stored, "{typed}");
+            // The stored spelling is its own.
+            assert_eq!(username(stored).unwrap(), stored, "{typed}");
+        }
+        for refused in [
+            "",
+            "ab",
+            "a1b2c3d4e5f6g7h8i9j0k1l2m",
+            ".abc",
+            "abc.",
+            "-abc",
+            "abc_",
+            "a..b",
+            "a._b",
+            "a-.b",
+            "a b",
+            " abc",
+            "abc ",
+            "abc\n",
+            "abc\0",
+            "a@b",
+            "a/b",
+            "a%b",
+            "abc'--",
+            // Letters that look like, or fold to, Latin ones.
+            "аbc",
+            "ａｂｃ",
+            "ſbc",
+            "\u{212a}abc",
+            "straße",
+            "ab\u{301}c",
+            "abc\u{200b}",
+            "\u{202e}abc",
+        ] {
+            assert!(username(refused).is_err(), "{refused:?}");
+        }
+    }
+
+    #[test]
+    fn a_document_is_a_version_one_sealed_body_within_its_bound() {
+        let most = central_crypto::vault::MAX_OBJECT_BYTES + 41;
+        let document = |length: usize, version: u8| {
+            let mut bytes = vec![7; length];
+            if let Some(first) = bytes.first_mut() {
+                *first = version;
+            }
+            validate_document(&bytes).is_ok()
+        };
+        for (length, accepted) in [
+            (0, false),
+            (1, false),
+            (40, false),
+            (41, true),
+            (most, true),
+            (most + 1, false),
+        ] {
+            assert_eq!(document(length, 1), accepted, "{length}");
+        }
+        for version in [0, 2, 255] {
+            assert!(!document(41, version), "{version}");
+        }
+        assert_eq!(number(i64::MAX.unsigned_abs()).unwrap(), i64::MAX);
+        assert!(number(i64::MAX.unsigned_abs() + 1).is_err());
+    }
+}

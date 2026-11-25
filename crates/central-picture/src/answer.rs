@@ -513,4 +513,59 @@ pub(crate) mod tests {
         assert_eq!(digest(b"ab", Some(b"c")), digest(b"abc", None));
         assert_ne!(digest(b"abc", Some(b"d")), digest(b"abc", None));
     }
+
+    #[test]
+    fn no_changed_bit_and_no_cut_of_a_master_passes() {
+        let good = png(&[
+            raw_chunk(b"IHDR", &header(256, 8, 6, 0)),
+            raw_chunk(b"IDAT", b"pixels"),
+            raw_chunk(b"IEND", b""),
+        ]);
+        assert!(png_master(&good));
+        for at in 0..good.len() {
+            assert!(!png_master(&good[..at]), "cut at {at}");
+            for bit in 0..8 {
+                let mut changed = good.clone();
+                changed[at] ^= 1 << bit;
+                assert!(!png_master(&changed), "octet {at}, bit {bit}");
+            }
+        }
+        // A chunk length no file can hold is refused before it is added to anything.
+        for length in [u32::MAX, u32::MAX - 11, 0x8000_0000] {
+            let mut changed = good.clone();
+            changed[8..12].copy_from_slice(&length.to_be_bytes());
+            assert!(!png_master(&changed), "{length:#x}");
+        }
+    }
+
+    #[test]
+    fn an_avif_s_boxes_keep_their_kinds_sizes_and_brand() {
+        let parts = [
+            boxed(b"ftyp", b"avif\0\0\0\0avifmif1"),
+            boxed(
+                b"meta",
+                &meta_body(&still_items(true), &properties_of(256, b"nclx", true), true),
+            ),
+            boxed(b"mdat", &crate::av1::tests::sequence(8, 8)),
+        ];
+        let good = parts.concat();
+        assert!(avif_framing(&good));
+        let starts = [0, parts[0].len(), parts[0].len() + parts[1].len()];
+        for at in 0..good.len() {
+            assert!(!avif_framing(&good[..at]), "cut at {at}");
+            let header = starts.iter().any(|&start| (start..start + 8).contains(&at));
+            for value in 0..=u8::MAX {
+                if value == good[at] {
+                    continue;
+                }
+                let mut changed = good.clone();
+                changed[at] = value;
+                // Nothing panics; what frames the file or names its brand is fixed.
+                let accepted = avif_framing(&changed);
+                if header || (8..12).contains(&at) {
+                    assert!(!accepted, "octet {at} as {value:#x}");
+                }
+            }
+        }
+    }
 }

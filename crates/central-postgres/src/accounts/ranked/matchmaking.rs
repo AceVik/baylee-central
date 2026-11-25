@@ -190,4 +190,53 @@ mod tests {
                 < preference(first, player(0, 1500, 2), 0, true, 1)
         );
     }
+
+    #[test]
+    fn a_pair_is_judged_the_same_from_either_side_and_never_overflows() {
+        let seats = [
+            player(0, 1500, 1),
+            player(0, 1650, 3),
+            player(7, 1400, 2),
+            player(50, 2600, 4),
+            player(i64::MIN, i32::MIN, 5),
+            player(i64::MAX, i32::MAX, 6),
+            player(-3, 0, u128::MAX),
+        ];
+        for a in seats {
+            for b in seats {
+                for now in [i64::MIN, 0, 60, 120, i64::MAX] {
+                    for sparse in [false, true] {
+                        for repeats in [0, 3, i32::MAX] {
+                            assert_eq!(
+                                preference(a, b, now, sparse, repeats),
+                                preference(b, a, now, sparse, repeats),
+                                "{now} {sparse} {repeats}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn waiting_only_ever_widens_the_search_and_ends_it_open() {
+        for gap in [0, 100, 101, 200, 350, 351, 600, 601, 3000] {
+            for sparse in [false, true] {
+                let pair =
+                    |now| preference(player(0, 0, 1), player(0, gap, 2), now, sparse, 0).is_some();
+                let mut open = false;
+                for now in 0..=120 {
+                    let found = pair(now);
+                    assert!(found || !open, "{gap} closes again at {now}");
+                    open = found;
+                }
+                assert!(open, "{gap} never plays");
+            }
+        }
+        // A wide gap takes nobody who has just arrived, until the older has waited long.
+        let older = player(0, 0, 1);
+        assert_eq!(preference(older, player(115, 500, 2), 119, false, 0), None);
+        assert!(preference(older, player(115, 500, 2), 120, false, 0).is_some());
+    }
 }

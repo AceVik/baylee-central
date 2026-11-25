@@ -248,4 +248,44 @@ mod tests {
             Some(client(1))
         );
     }
+
+    #[test]
+    fn a_place_is_given_back_and_a_refusal_takes_none() {
+        let table = InFlight::new(2, 3);
+        let first = table.admit(client(1), 2).unwrap();
+        let second = table.admit(client(1), 2).unwrap();
+        for _ in 0..3 {
+            assert!(table.admit(client(1), 2).is_none());
+        }
+        assert_eq!((table.count(client(1)), table.addresses()), (2, 1));
+        let third = table.admit(client(2), 2).unwrap();
+        // All places are taken: neither a known address nor a new one enters, and the
+        // refused one leaves no trace.
+        assert!(table.admit(client(2), 2).is_none());
+        assert!(table.admit(client(3), 2).is_none());
+        assert_eq!((table.count(client(3)), table.addresses()), (0, 2));
+        drop(first);
+        assert_eq!(table.count(client(1)), 1);
+        let again = table.admit(client(2), 2).unwrap();
+        assert!(table.admit(client(1), 2).is_none());
+        drop((second, third, again));
+        // Nothing is kept of an address that holds nothing.
+        assert_eq!((table.count(client(1)), table.addresses()), (0, 0));
+        // A share of nothing admits nobody.
+        assert!(table.admit(client(1), 0).is_none());
+        assert_eq!(table.addresses(), 0);
+    }
+
+    #[test]
+    fn a_block_is_24_bits_of_ipv4_and_48_of_ipv6() {
+        let of = |text: &str| Client::from(text.parse::<IpAddr>().unwrap());
+        let same = |a: &str, b: &str| of(a).block() == of(b).block();
+        assert!(same("198.51.100.0", "198.51.100.255"));
+        assert!(!same("198.51.100.255", "198.51.101.255"));
+        assert!(same("2001:db8:1:0::1", "2001:db8:1:ffff:ffff::"));
+        assert!(!same("2001:db8:1::", "2001:db8:2::"));
+        // A mapped address is the IPv4 one, in its block too.
+        assert!(same("::ffff:198.51.100.7", "198.51.100.200"));
+        assert_ne!(of("::ffff:198.51.100.7"), of("::c633:6407"));
+    }
 }

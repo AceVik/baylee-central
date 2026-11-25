@@ -428,3 +428,133 @@ pub(super) async fn stored(db: &impl ConnectionTrait) -> Result<Vec<LegacyRow>, 
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type Change = fn(&mut LegacyRow);
+
+    fn row() -> LegacyRow {
+        LegacyRow {
+            legacy_id: "0192d0c5-7b3e".into(),
+            username: "player.one".into(),
+            display_name: Some("Player".into()),
+            tag: Some(0x1a2b),
+            salt: [1; SALT_BYTES],
+            hash: [2; HASH_BYTES],
+            terms_version: Some("2026-10-01".into()),
+            must_change_password: false,
+            ban: None,
+            snapshot: br#"{"preferences":{},"decks":[]}"#.to_vec(),
+        }
+    }
+
+    fn changed(change: Change) -> LegacyRow {
+        let mut row = row();
+        change(&mut row);
+        row
+    }
+
+    #[test]
+    fn the_digest_moves_with_every_field_and_with_the_order() {
+        let base = legacy_digest(&[row()]);
+        assert_eq!(legacy_digest(&[row()]), base);
+        let changes: [Change; 18] = [
+            |r| r.legacy_id.push('0'),
+            |r| r.username.push('0'),
+            |r| r.display_name = None,
+            |r| r.display_name = Some(String::new()),
+            |r| r.tag = None,
+            |r| r.tag = Some(0x1a2c),
+            |r| r.salt[SALT_BYTES - 1] ^= 1,
+            |r| r.hash[0] ^= 1,
+            |r| r.hash[HASH_BYTES - 1] ^= 1,
+            |r| r.terms_version = None,
+            |r| r.must_change_password = true,
+            |r| r.ban = Some(None),
+            |r| r.ban = Some(Some(0)),
+            |r| r.ban = Some(Some(-1)),
+            |r| r.snapshot.push(b' '),
+            |r| {
+                r.snapshot.pop();
+            },
+            // The same octets, divided between two neighbours differently.
+            |r| {
+                let first = r.username.remove(0);
+                r.legacy_id.push(first);
+            },
+            |r| {
+                r.terms_version = None;
+                r.display_name = Some("2026-10-01".into());
+            },
+        ];
+        let mut seen = std::collections::BTreeSet::from([base]);
+        for (index, change) in changes.into_iter().enumerate() {
+            assert!(seen.insert(legacy_digest(&[changed(change)])), "{index}");
+        }
+        let other = || changed(|r| r.legacy_id = "other".into());
+        assert!(seen.insert(legacy_digest(&[])));
+        assert!(seen.insert(legacy_digest(&[row(), other()])));
+        assert!(seen.insert(legacy_digest(&[other(), row()])));
+        assert!(seen.insert(legacy_digest(&[row(), row()])));
+    }
+
+    #[test]
+    fn a_row_outside_its_rule_is_named_by_its_field_and_never_stored() {
+        assert_eq!(check(&row()), Ok(()));
+        let accepted: [Change; 5] = [
+            |r| r.legacy_id = "a".repeat(64),
+            |r| r.display_name = None,
+            |r| r.tag = None,
+            |r| r.terms_version = Some("v".repeat(64)),
+            |r| r.snapshot = b"{}".to_vec(),
+        ];
+        for (index, change) in accepted.into_iter().enumerate() {
+            assert_eq!(check(&changed(change)), Ok(()), "{index}");
+        }
+        let refused: [(&str, Change); 17] = [
+            ("legacy_id", |r| r.legacy_id.clear()),
+            ("legacy_id", |r| r.legacy_id = "a".repeat(65)),
+            ("legacy_id", |r| r.legacy_id = "a_b".into()),
+            ("legacy_id", |r| r.legacy_id = "a b".into()),
+            ("legacy_id", |r| r.legacy_id = "ä".into()),
+            ("legacy_id", |r| r.legacy_id = "a\n".into()),
+            // A name that would be stored under another spelling is refused, not folded.
+            ("username", |r| r.username = "Player.One".into()),
+            ("username", |r| r.username = "player one".into()),
+            ("username", |r| r.username = "pl".into()),
+            ("display_name", |r| r.display_name = Some(String::new())),
+            ("display_name", |r| {
+                r.display_name = Some("over\u{202e}ride".into());
+            }),
+            ("tag", |r| r.tag = Some(u32::MAX)),
+            ("terms_version", |r| r.terms_version = Some(String::new())),
+            ("terms_version", |r| r.terms_version = Some("v".repeat(65))),
+            ("snapshot", |r| r.snapshot = b"{".to_vec()),
+            ("snapshot", |r| r.snapshot = vec![0xff, 0xfe, 0xfd]),
+            ("snapshot", |r| {
+                r.snapshot = vec![b' '; central_api::legacy::MAX_ARCHIVE_BYTES + 1];
+            }),
+        ];
+        for (index, (field, change)) in refused.into_iter().enumerate() {
+            match check(&changed(change)) {
+                Err(ImportRefusal::Malformed { field: named, .. }) => {
+                    assert_eq!(named, field, "{index}");
+                }
+                other => panic!("{index} {field}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_refusal_shows_no_field_s_content() {
+        let mut secret = row();
+        secret.username = "Secret Name".into();
+        let refusal = check(&secret).unwrap_err();
+        for text in [refusal.to_string(), format!("{refusal:?}")] {
+            assert!(!text.contains("Secret"), "{text}");
+            assert!(text.contains(&secret.legacy_id), "{text}");
+        }
+    }
+}

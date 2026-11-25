@@ -307,4 +307,90 @@ mod tests {
         assert_eq!(Format::Ico.max_bytes(), 1 << 20);
         assert_eq!(Format::Jpeg.max_bytes(), MAX_UPLOAD);
     }
+
+    #[test]
+    fn a_vector_s_root_is_found_only_as_its_first_element_and_early() {
+        let svg = |text: &str| Format::sniff(text.as_bytes()) == Some(Format::Svg);
+        for text in [
+            "<svg/>",
+            "<svg>",
+            "<svg\n>",
+            "\t\r\n <svg >",
+            "<?xml version='1.0'?><?x y?><!-- <html> --><svg>",
+            "<!-- a --><!-- b --><svg>",
+            "<!DOCTYPE svg><svg>",
+            "<!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' 'x'><svg>",
+            "<!DOCTYPE svg [<!ENTITY a 'b'><!ENTITY c 'd'>]><svg>",
+        ] {
+            assert!(svg(text), "{text}");
+        }
+        for text in [
+            "<svg",
+            "<SVG>",
+            "<svg:svg>",
+            "<svg\0>",
+            "x<svg>",
+            "<html><svg>",
+            "<script/><svg>",
+            "<!-- <svg>",
+            "<?xml <svg>",
+            "<!DOCTYPE svg [<!ENTITY a 'b'> <svg>",
+            "<!DOCTYPE html",
+            "<!doctype svg><svg>",
+            "\u{feff}\u{feff}<svg>",
+        ] {
+            assert!(!svg(text), "{text}");
+        }
+        // The root is looked for in the first 64 KiB, and not behind them.
+        let padded = |length: usize| format!("{}<svg>", " ".repeat(length));
+        assert!(svg(&padded(64 * 1024 - 5)));
+        assert!(!svg(&padded(64 * 1024 - 4)));
+        assert!(!svg(&padded(64 * 1024)));
+    }
+
+    #[test]
+    fn an_icon_has_all_the_records_it_counts() {
+        let icon = |count: u16, records: usize| {
+            let mut bytes = vec![0, 0, 1, 0];
+            bytes.extend(count.to_le_bytes());
+            bytes.resize(6 + 16 * records, 0);
+            Format::sniff(&bytes) == Some(Format::Ico)
+        };
+        assert!(icon(1, 1) && icon(255, 255));
+        assert!(!icon(0, 0) && !icon(0, 1));
+        assert!(!icon(2, 1) && !icon(255, 254));
+        assert!(!icon(256, 256) && !icon(u16::MAX, 255));
+    }
+
+    #[test]
+    fn an_avif_brand_stands_inside_its_own_box() {
+        let file = |size: u32, major: &[u8], brands: &[u8], tail: &[u8]| {
+            [
+                &size.to_be_bytes()[..],
+                b"ftyp",
+                major,
+                &[0; 4],
+                brands,
+                tail,
+            ]
+            .concat()
+        };
+        let avif = |bytes: &[u8]| Format::sniff(bytes) == Some(Format::Avif);
+        assert!(avif(&file(16, b"avif", b"", b"")));
+        assert!(avif(&file(16, b"avis", b"", b"")));
+        assert!(avif(&file(24, b"mif1", b"miafavif", b"")));
+        assert!(!avif(&file(24, b"mif1", b"miafmif1", b"")));
+        // Behind the box, or across two brands, it is not one of them.
+        assert!(!avif(&file(20, b"mif1", b"miaf", b"avif")));
+        assert!(!avif(&file(24, b"mif1", b"xxavifxx", b"")));
+        // The box is sixteen to 256 octets and wholly there.
+        let brands = b"miaf".repeat(60);
+        assert!(avif(&file(256, b"avif", &brands, b"")));
+        assert!(!avif(&file(260, b"avif", &brands, &[0; 64])));
+        assert!(!avif(&file(15, b"avif", b"", b"")));
+        assert!(!avif(&file(17, b"avif", b"", b"")));
+        for size in [0, 1, u32::MAX] {
+            assert!(!avif(&file(size, b"avif", &brands, b"")), "{size}");
+        }
+    }
 }

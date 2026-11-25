@@ -29,6 +29,7 @@ mod pairing;
 mod password;
 mod pictures;
 mod profiles;
+mod races;
 mod ranked;
 mod recovery;
 mod register;
@@ -182,6 +183,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     pictures::run(&store, operator, &keys).await;
     challenges::run(&store, operator, &keys).await;
     tower_awards::run(&store, operator, &keys).await;
+    races::run(&store, operator, &keys).await;
     donations::run(&store, operator).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;

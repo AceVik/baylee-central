@@ -353,4 +353,186 @@ mod tests {
             assert!(agent.post(url).send("x").is_err(), "{url}");
         }
     }
+
+    #[test]
+    fn every_refused_range_ends_exactly_at_its_border() {
+        // First and last address of each range, with the neighbours outside it.
+        for (before, first, last, after) in [
+            ("", "0.0.0.0", "0.255.255.255", "1.0.0.0"),
+            ("9.255.255.255", "10.0.0.0", "10.255.255.255", "11.0.0.0"),
+            (
+                "100.63.255.255",
+                "100.64.0.0",
+                "100.127.255.255",
+                "100.128.0.0",
+            ),
+            (
+                "126.255.255.255",
+                "127.0.0.0",
+                "127.255.255.255",
+                "128.0.0.0",
+            ),
+            (
+                "169.253.255.255",
+                "169.254.0.0",
+                "169.254.255.255",
+                "169.255.0.0",
+            ),
+            (
+                "172.15.255.255",
+                "172.16.0.0",
+                "172.31.255.255",
+                "172.32.0.0",
+            ),
+            ("191.255.255.255", "192.0.0.0", "192.0.0.255", "192.0.1.0"),
+            ("192.0.1.255", "192.0.2.0", "192.0.2.255", "192.0.3.0"),
+            (
+                "192.88.98.255",
+                "192.88.99.0",
+                "192.88.99.255",
+                "192.88.100.0",
+            ),
+            (
+                "192.167.255.255",
+                "192.168.0.0",
+                "192.168.255.255",
+                "192.169.0.0",
+            ),
+            (
+                "198.17.255.255",
+                "198.18.0.0",
+                "198.19.255.255",
+                "198.20.0.0",
+            ),
+            (
+                "198.51.99.255",
+                "198.51.100.0",
+                "198.51.100.255",
+                "198.51.101.0",
+            ),
+            (
+                "203.0.112.255",
+                "203.0.113.0",
+                "203.0.113.255",
+                "203.0.114.0",
+            ),
+            ("223.255.255.255", "224.0.0.0", "255.255.255.255", ""),
+            (
+                "",
+                "::",
+                "1fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+                "2000::",
+            ),
+            ("2000:ffff::", "2001::", "2001:1ff:ffff::", "2001:200::"),
+            (
+                "2001:db7:ffff::",
+                "2001:db8::",
+                "2001:db8:ffff::",
+                "2001:db9::",
+            ),
+            ("2001:ffff::", "2002::", "2002:ffff::", "2003::"),
+            ("3ffe:ffff::", "4000::", "ffff::", ""),
+        ] {
+            for ip in [first, last] {
+                assert!(!public(ip.parse().unwrap()), "{ip} is reachable");
+                // The same address written as a mapped one is refused with it.
+                if let Ok(v4) = ip.parse::<std::net::Ipv4Addr>() {
+                    assert!(!public(v4.to_ipv6_mapped().into()), "mapped {ip}");
+                    assert!(!public(v4.to_ipv6_compatible().into()), "compatible {ip}");
+                }
+            }
+            for ip in [before, after].into_iter().filter(|ip| !ip.is_empty()) {
+                assert!(public(ip.parse().unwrap()), "{ip} is refused");
+            }
+        }
+    }
+
+    #[test]
+    fn a_private_answer_refuses_the_name_at_any_place_among_public_ones() {
+        let public = "8.8.8.8:443";
+        for private in ["127.0.0.1:443", "[::1]:443", "169.254.169.254:443"] {
+            for place in 0..4 {
+                let mut answers = [public; 4];
+                answers[place] = private;
+                assert!(resolve(&answers, None).is_err(), "{private} at {place}");
+            }
+        }
+        assert_eq!(resolve(&[public; 4], None).unwrap(), 4);
+        // One answer on another port is as foreign as one on another network.
+        assert!(resolve(&[public, "8.8.4.4:22"], Some(443)).is_err());
+    }
+
+    #[test]
+    fn a_pin_is_bound_to_the_host_of_the_url_as_it_is_written() {
+        for url in [
+            "https://gateway.example@evil.example/x",
+            "https://evil.example/gateway.example",
+            "https://evil.example/?gateway.example",
+            "https://GATEWAY.example/x",
+            "https://gateway.example./x",
+        ] {
+            assert!(
+                answered(url, &["10.0.0.1:443"], None, Some(pin())).is_err(),
+                "{url}"
+            );
+            let found = answered(url, &["8.8.8.8:443"], None, Some(pin())).unwrap();
+            assert_eq!(found, vec!["8.8.8.8:443".parse().unwrap()], "{url}");
+        }
+        // Credentials in front of the pinned host change nothing about it.
+        let found = answered("https://user@gateway.example/x", &[], None, Some(pin())).unwrap();
+        assert_eq!(found, vec!["127.0.0.1:443".parse().unwrap()]);
+    }
+
+    #[test]
+    fn an_agent_never_connects_to_this_machine_however_it_is_spelled() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        for pin in [None, Some(pin())] {
+            let agent = agent(Limits {
+                port: None,
+                total: Duration::from_secs(5),
+                connect: Duration::from_secs(5),
+                pin,
+            });
+            for (scheme, host) in [
+                ("https", "127.0.0.1"),
+                ("https", "127.1"),
+                ("https", "2130706433"),
+                ("https", "0x7f000001"),
+                ("https", "localhost"),
+                ("https", "[::ffff:127.0.0.1]"),
+                ("https", "[::ffff:7f00:1]"),
+                ("https", "user@127.0.0.1"),
+                ("http", "127.0.0.1"),
+            ] {
+                let url = format!("{scheme}://{host}:{port}/x");
+                assert!(agent.post(&url).send("x").is_err(), "{url}");
+                assert_eq!(
+                    listener.accept().unwrap_err().kind(),
+                    std::io::ErrorKind::WouldBlock,
+                    "{url} reached this machine"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_pinned_host_is_dialled_over_https_alone() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let agent = agent(Limits {
+            port: None,
+            total: Duration::from_millis(300),
+            connect: Duration::from_millis(300),
+            pin: Some(Pin::new("gateway.example", address).unwrap()),
+        });
+        assert!(agent.post("http://gateway.example/x").send("x").is_err());
+        assert!(listener.accept().is_err(), "plain HTTP was dialled");
+        // The same host over HTTPS is dialled, so the refusal above is the scheme's.
+        assert!(agent.post("https://gateway.example/x").send("x").is_err());
+        let (_, from) = listener.accept().expect("HTTPS reaches the pinned address");
+        assert!(from.ip().is_loopback());
+    }
 }

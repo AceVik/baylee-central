@@ -236,4 +236,186 @@ pub(crate) mod tests {
             Err(Refusal::Malformed)
         );
     }
+
+    /// Writes fields of any width, most significant bit first.
+    #[derive(Default)]
+    struct Writer(Vec<bool>);
+
+    impl Writer {
+        fn put(&mut self, value: u32, n: u32) -> &mut Self {
+            self.0.extend((0..n).rev().map(|i| (value >> i) & 1 == 1));
+            self
+        }
+
+        /// The header as one OBU whose size is written.
+        fn obu(&self) -> Vec<u8> {
+            let payload: Vec<u8> = self
+                .0
+                .chunks(8)
+                .map(|bits| {
+                    bits.iter()
+                        .enumerate()
+                        .fold(0, |byte, (i, &bit)| byte | (u8::from(bit) << (7 - i)))
+                })
+                .collect();
+            let mut out = vec![0x0a, u8::try_from(payload.len()).unwrap()];
+            out.extend(payload);
+            out
+        }
+    }
+
+    /// A full sequence header (AV1 § 5.5.1) with every optional part that is asked for,
+    /// each filled with ones, so that a part skipped by the wrong width moves the rest.
+    fn full(
+        timing: bool,
+        ticks: Option<u32>,
+        model: bool,
+        delay: bool,
+        width_bits: u32,
+    ) -> Vec<u8> {
+        let mut w = Writer::default();
+        w.put(0, 3).put(0, 1).put(0, 1);
+        w.put(u32::from(timing), 1);
+        if timing {
+            w.put(u32::MAX, 32).put(u32::MAX, 32);
+            w.put(u32::from(ticks.is_some()), 1);
+            if let Some(zeros) = ticks {
+                w.put(0, zeros).put(1, 1).put(u32::MAX, zeros);
+            }
+            w.put(u32::from(model), 1);
+            if model {
+                // Delays of ten bits each.
+                w.put(9, 5).put(u32::MAX, 32).put(31, 5).put(31, 5);
+            }
+        }
+        w.put(u32::from(delay), 1);
+        // Three operating points: below, at and above the level that has a tier.
+        w.put(2, 5);
+        for (level, with_model, with_delay) in [(7, 1, 0), (8, 0, 1), (31, 1, 1)] {
+            w.put(0xfff, 12).put(level, 5);
+            if level > 7 {
+                w.put(1, 1);
+            }
+            if timing && model {
+                w.put(with_model, 1);
+                if with_model == 1 {
+                    w.put(0x3ff, 10).put(0x3ff, 10).put(1, 1);
+                }
+            }
+            if delay {
+                w.put(with_delay, 1);
+                if with_delay == 1 {
+                    w.put(15, 4);
+                }
+            }
+        }
+        w.put(width_bits - 1, 4).put(8, 4);
+        w.put((1 << width_bits) - 2, width_bits).put(0x155, 9);
+        w.obu()
+    }
+
+    #[test]
+    fn a_full_header_is_read_through_every_optional_part() {
+        for timing in [false, true] {
+            for ticks in [None, Some(0), Some(1), Some(31)] {
+                for model in [false, true] {
+                    for delay in [false, true] {
+                        let header = full(timing, ticks, model, delay, 13);
+                        let what = format!("{timing} {ticks:?} {model} {delay}");
+                        assert_eq!(largest(&header), Some((0x1fff, 0x156)), "{what}");
+                        assert_eq!(bounds(&header), Ok(()), "{what}");
+                        let wide = full(timing, ticks, model, delay, 14);
+                        assert_eq!(bounds(&wide), Err(Refusal::TooManyPixels), "{what}");
+                        for end in 1..header.len() {
+                            assert!(bounds(&header[..end]).is_err(), "{what} cut at {end}");
+                        }
+                    }
+                }
+            }
+        }
+        // A tick count that never begins is not read as one.
+        let mut endless = full(true, Some(31), false, false, 13);
+        endless[2..].fill(0);
+        endless[2] = 0b0000_0100;
+        endless[10] = 0b0000_0010;
+        assert_eq!(bounds(&endless), Err(Refusal::Malformed));
+    }
+
+    #[test]
+    fn whatever_passes_the_bound_shows_no_larger_frame() {
+        // Deterministic noise (xorshift) over valid headers: no input panics, and no
+        // accepted one declares a frame past the bound it was accepted under.
+        let seeds = [
+            sequence(12, 12),
+            sequence(16, 16),
+            full(true, Some(1), true, true, 12),
+            [
+                sequence(8, 8),
+                vec![0x32, 0x02, 0xaa, 0xbb],
+                sequence(13, 11),
+            ]
+            .concat(),
+        ];
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let (mut accepted, mut refused) = (0, 0);
+        for round in 0..40_000 {
+            let mut item = seeds[round % seeds.len()].clone();
+            for _ in 0..=next() % 3 {
+                let at = usize::try_from(next() % item.len() as u64).unwrap();
+                item[at] = u8::try_from(next() & 0xff).unwrap();
+            }
+            if next() % 4 == 0 {
+                item.truncate(usize::try_from(next() % item.len() as u64).unwrap());
+            }
+            if bounds(&item).is_err() {
+                refused += 1;
+                continue;
+            }
+            accepted += 1;
+            let (width, height) = largest(&item).expect("an accepted item is readable");
+            assert!(
+                width <= 8_192 && height <= 8_192,
+                "{width} x {height}: {item:x?}"
+            );
+        }
+        // Both outcomes were reached, or the noise proves nothing.
+        assert!(accepted > 1_000 && refused > 1_000, "{accepted} {refused}");
+    }
+
+    #[test]
+    fn a_size_is_at_most_eight_octets_and_inside_the_item() {
+        let payload = sequence(8, 8).split_off(2);
+        let sized = |size: &[u8]| [&[0x0a], size, &payload[..]].concat();
+        let length = u8::try_from(payload.len()).unwrap();
+        // The same size in eight octets, with empty high ones, is the same item.
+        let mut long = [0x80; 8];
+        long[0] |= length;
+        long[7] = 0;
+        assert_eq!(bounds(&sized(&long)), Ok(()));
+        // In nine octets it is none.
+        let mut longer = [0x80; 9];
+        longer[0] |= length;
+        longer[8] = 0;
+        assert_eq!(bounds(&sized(&longer)), Err(Refusal::Malformed));
+        for size in [
+            &[length + 1][..],
+            &[0x7f],
+            &[0xff; 7],
+            &[0xff, 0xff, 0xff, 0xff, 0x0f],
+        ] {
+            assert!(bounds(&sized(size)).is_err(), "{size:x?}");
+        }
+        // Without a size the rest of the item is the unit, whatever it holds.
+        let open = [&[0x08][..], &payload].concat();
+        assert_eq!(bounds(&open), Ok(()));
+        // An extension octet stands before the payload.
+        let extended = [&[0x0c, 0xff][..], &payload].concat();
+        assert_eq!(bounds(&extended), Ok(()));
+    }
 }

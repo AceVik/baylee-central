@@ -300,3 +300,78 @@ pub(super) async fn headers(request: HttpRequest, next: axum::middleware::Next) 
         .or_insert(HeaderValue::from_static("no-store"));
     response
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_picture_s_file_is_its_key_and_one_known_ending() {
+        let digits = "0123456789abcdef".repeat(2);
+        let key = digits.as_str();
+        let bytes = parse_key(key).unwrap();
+        for (ending, encoding) in [
+            (".png", PictureEncoding::Png),
+            (".avif", PictureEncoding::Avif),
+            (".sequence.avif", PictureEncoding::Sequence),
+        ] {
+            let found = file(&format!("{key}{ending}")).unwrap();
+            assert!(found == (bytes, encoding), "{ending}");
+            for bad in [
+                format!("{}{ending}", &key[1..]),
+                format!("{key}0{ending}"),
+                format!("{}{ending}", key.to_uppercase()),
+                format!("../{}{ending}", &key[3..]),
+                format!("{key}{ending}/"),
+                format!("{key}{ending}\0"),
+                format!("{key}{}", ending.to_uppercase()),
+                format!("{key}.png{ending}"),
+                ending.to_owned(),
+            ] {
+                assert!(file(&bad).is_none(), "{bad:?}");
+            }
+        }
+        for bad in ["", key, &format!("{key}."), &format!("{key}.svg")] {
+            assert!(file(bad).is_none(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn an_upload_announces_one_length_and_one_type() {
+        let headers = |name: header::HeaderName, values: &[&str]| {
+            let mut headers = HeaderMap::new();
+            for value in values {
+                headers.append(&name, value.parse().unwrap());
+            }
+            headers
+        };
+        let length = |values: &[&str]| length(&headers(header::CONTENT_LENGTH, values));
+        assert_eq!(length(&["0"]), Some(0));
+        assert_eq!(length(&["1048576"]), Some(1_048_576));
+        for values in [
+            &[][..],
+            &["1", "1"],
+            &[""],
+            &["+1"],
+            &["-1"],
+            &["1 "],
+            &["0x10"],
+            &["1,1"],
+            &["1e3"],
+            &["99999999999999999999999"],
+        ] {
+            assert_eq!(length(values), None, "{values:?}");
+        }
+        let format = |values: &[&str]| format(&headers(header::CONTENT_TYPE, values));
+        assert_eq!(format(&["image/png"]), Some(Format::Png));
+        for values in [
+            &[][..],
+            &["image/png", "image/png"],
+            &["image/png", "text/html"],
+            &["text/html"],
+            &["image/*"],
+        ] {
+            assert_eq!(format(values), None, "{values:?}");
+        }
+    }
+}
