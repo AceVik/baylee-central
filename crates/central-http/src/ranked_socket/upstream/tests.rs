@@ -40,7 +40,7 @@ async fn host_receives_only_fixed_upgrade_headers_and_game_bytes_survive_read_ah
     let id = [8; 16];
     let ticket = "e".repeat(64);
     let expected = format!(
-        "GET /games/{}/ws?ticket={ticket}&protocol=69 HTTP/1.1\r\n",
+        "GET /games/{}/ws?ticket={ticket}&protocol=70 HTTP/1.1\r\n",
         game_id(&id)
     );
     let server = tokio::spawn(async move {

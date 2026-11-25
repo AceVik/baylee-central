@@ -154,7 +154,7 @@ address must be public. Central connects to the addresses it checked and
 verifies the registered hostname during TLS. Only explicitly selected numeric
 loopback development origins can use plaintext. The upstream handshake sends
 the game identifier, a gateway-issued single-use ticket, and game protocol
-version 69. Exclude this route's query string and request credentials from
+version 70. Exclude this route's query string and request credentials from
 gateway and proxy logs. The gateway receives Central's network address.
 
 Central checks the grant before connecting, after the host accepts, and every

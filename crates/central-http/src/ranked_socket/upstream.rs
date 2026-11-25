@@ -18,8 +18,8 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
-/// Baylee's game handshake v69. The negotiated ranked replica wire is additive.
-const GAME_PROTOCOL: u32 = 69;
+/// Baylee's game handshake v70. The negotiated ranked replica wire is additive.
+const GAME_PROTOCOL: u32 = 70;
 pub(super) trait Stream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 
