@@ -41,6 +41,12 @@ pub const MAX_PAGE: u32 = 200;
 pub const MAX_QUERY: usize = 200;
 /// A note, in characters.
 pub const MAX_NOTE: usize = 4_000;
+/// A report's notes together, in bytes: what one report's page can still be
+/// answered with on the wire beside its text and history, and 48 notes of
+/// the longest in plain letters.
+pub const MAX_NOTES_BYTES: usize = 192 * 1024;
+/// The newest lines of a report's history that are shown with it.
+pub const HISTORY: usize = 200;
 /// Labels on one report, and one label's length.
 pub const MAX_LABELS: usize = 16;
 /// One label's length.
@@ -107,9 +113,10 @@ words!(
     Priority { Critical = "critical", High = "high", Normal = "normal", Low = "low" }
 );
 words!(
-    /// How it came: through a gateway's player, or from a client signed in
-    /// nowhere through the official gateway.
-    Channel { Gateway = "gateway", Direct = "direct" }
+    /// How it came: through a gateway's player, from a client signed in
+    /// nowhere through the official gateway, or from a report token
+    /// (`report_tokens`), which is no gateway.
+    Channel { Gateway = "gateway", Direct = "direct", Token = "token" }
 );
 words!(
     /// Who wrote the record: the gateway, or the client (unverified).
@@ -194,7 +201,8 @@ pub struct Crash {
 pub struct ReportIntake {
     /// What the gateway says of itself.
     pub gateway: GatewaySays,
-    /// How it came; `direct` only from the official gateway.
+    /// How it came; `direct` only from the official gateway, `token` from a
+    /// report token and from nothing else.
     pub channel: Channel,
     /// The gateway's pseudonym for its player, or a device's: hex.
     pub reporter: String,
@@ -240,7 +248,7 @@ const fn invisible(c: char) -> bool {
 /// Text another person reads: within `max` characters, no control
 /// character (a tab and a newline aside where `lines`), and none of the
 /// [`invisible`] ones.
-fn shown(text: &str, max: usize, lines: bool) -> bool {
+pub(crate) fn shown(text: &str, max: usize, lines: bool) -> bool {
     chars(text) <= max
         && text
             .chars()
@@ -288,9 +296,15 @@ impl ReportIntake {
                         RecordOrigin::Client => MAX_CLIENT_RECORD_GZIP,
                     }
         });
-        // a direct report carries no game of a gateway's, and a crash names its place only for a crash
-        let consistent = (self.channel == Channel::Gateway || self.game_id.is_none())
-            && (self.crash.is_none() || self.kind == ReportKind::Crash);
+        // a direct report carries no game of a gateway's, a crash names its
+        // place only for a crash, and a token has no record a gateway kept
+        let consistent = (self.channel != Channel::Direct || self.game_id.is_none())
+            && (self.crash.is_none() || self.kind == ReportKind::Crash)
+            && (self.channel != Channel::Token
+                || self
+                    .record
+                    .as_ref()
+                    .is_none_or(|r| r.origin == RecordOrigin::Client));
         if reporter
             && text
             && game
@@ -381,10 +395,13 @@ pub struct ReportFilter {
     pub to: Option<String>,
     /// With a record, or without.
     pub has_record: Option<bool>,
-    /// Through a gateway, or direct.
+    /// Through a gateway, direct, or from a report token.
     pub channel: Option<Channel>,
     /// Filed by the gateway of this name.
     pub gateway: Option<String>,
+    /// Filed by this report token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<[u8; 16]>,
     /// Looked after by this administrator.
     pub assignee: Option<[u8; 16]>,
     /// Looked after by nobody.
@@ -446,7 +463,9 @@ impl ReportFilter {
 
 /// Reads a present field, `null` included, as `Some`: absent stays `None`
 /// (the field's `default`), so a change tells "leave it" from "clear it".
-fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(d: D) -> Result<Option<T>, D::Error> {
+pub(crate) fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Option<T>, D::Error> {
     T::deserialize(d).map(Some)
 }
 
@@ -557,8 +576,12 @@ pub struct ReportSummary {
     pub created_at: i64,
     /// When its triage last changed.
     pub updated_at: i64,
-    /// The authenticated gateway's name in Central (the official one, or a registered one's).
+    /// The authenticated gateway's name in Central (the official one, or a
+    /// registered one's), or the report token's, as it was then.
     pub gateway: String,
+    /// The report token that filed it; none for a gateway's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<[u8; 16]>,
     /// What the gateway called itself.
     pub gateway_says: Option<String>,
     /// The gateway's build as it said.
@@ -609,7 +632,7 @@ pub struct ReportSummary {
     pub notes: u32,
 }
 
-/// A note on a report: an administrator's, internal.
+/// A note on a report: an administrator's or a report token's, internal.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReportNote {
@@ -617,8 +640,11 @@ pub struct ReportNote {
     pub id: [u8; 16],
     /// When.
     pub at: i64,
-    /// Its author.
+    /// Its author: an administrator's account, or a report token.
     pub author: [u8; 16],
+    /// A report token wrote it: its name then, and `author` is its id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// Its words.
     pub text: String,
 }
@@ -629,8 +655,12 @@ pub struct ReportNote {
 pub struct ReportAuditRow {
     /// When.
     pub at: i64,
-    /// The administrator; none for the gateway that filed it or the sweep.
+    /// The administrator or the report token; none for the gateway that
+    /// filed it or the sweep.
     pub actor: Option<[u8; 16]>,
+    /// A report token did it: its name then, and `actor` is its id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// What, such as `report.status`.
     pub action: String,
     /// The change in short, never the report's words.
@@ -669,8 +699,11 @@ pub struct ReportDetail {
     pub record: Option<PartState>,
     /// Its notes, oldest first.
     pub notes: Vec<ReportNote>,
-    /// Its history, oldest first.
+    /// Its history, oldest first: the newest [`HISTORY`] lines.
     pub audit: Vec<ReportAuditRow>,
+    /// Its history has older lines.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub older: bool,
 }
 
 /// How many reports have one value of a dimension.
@@ -681,6 +714,16 @@ pub struct Count<T> {
     pub value: T,
     /// How many.
     pub count: u64,
+}
+
+/// A report token a report names.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NamedToken {
+    /// Its id.
+    pub id: [u8; 16],
+    /// Its name.
+    pub name: String,
 }
 
 /// Counts per dimension, each under the filter but its own dimension.
@@ -699,6 +742,9 @@ pub struct ReportFacets {
     pub labels: Vec<Count<String>>,
     /// By gateway.
     pub gateways: Vec<Count<String>>,
+    /// By report token.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tokens: Vec<Count<NamedToken>>,
     /// By channel.
     pub channels: Vec<Count<Channel>>,
     /// The busiest reporters, at most [`FACET_REPORTERS`].
@@ -873,6 +919,59 @@ mod tests {
         text["kind"] = "bug".into();
         text["sender"] = "x".into();
         assert!(serde_json::from_value::<ReportIntake>(text).is_err());
+    }
+
+    /// A token's report says so, may name a game, and never claims a record
+    /// a gateway kept.
+    #[test]
+    fn a_token_s_report_is_no_gateway_s() {
+        let mut report = intake();
+        report.channel = Channel::Token;
+        assert_eq!(
+            report.validate(),
+            Err(Error::Rejected),
+            "a gateway's record"
+        );
+        let record = report.record.as_mut().unwrap();
+        record.origin = RecordOrigin::Client;
+        record.bytes = MAX_CLIENT_RECORD_GZIP;
+        report.validate().unwrap();
+        report.record.as_mut().unwrap().bytes += 1;
+        assert_eq!(report.validate(), Err(Error::Rejected));
+        report.record = None;
+        report.validate().unwrap();
+        assert!(report.game_id.is_some());
+        assert_eq!(serde_json::to_value(Channel::Token).unwrap(), "token");
+        assert_eq!(Channel::from_stored("token"), Ok(Channel::Token));
+    }
+
+    /// What older administration pages read stays as it was while no token
+    /// is in it.
+    #[test]
+    fn a_report_without_a_token_reads_as_before() {
+        let note = ReportNote {
+            id: [1; 16],
+            at: 1,
+            author: [2; 16],
+            token: None,
+            text: "n".into(),
+        };
+        let row = ReportAuditRow {
+            at: 1,
+            actor: None,
+            token: None,
+            action: "report.filed".into(),
+            detail: String::new(),
+        };
+        for text in [
+            serde_json::to_string(&note).unwrap(),
+            serde_json::to_string(&row).unwrap(),
+            serde_json::to_string(&ReportFilter::default()).unwrap(),
+        ] {
+            assert!(!text.contains("token"), "{text}");
+        }
+        let old = r#"{"id":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"at":1,"author":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"text":"n"}"#;
+        assert_eq!(serde_json::from_str::<ReportNote>(old).unwrap(), note);
     }
 
     #[test]

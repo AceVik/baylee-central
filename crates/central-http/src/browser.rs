@@ -802,6 +802,14 @@ impl Book {
         *used
     }
 
+    /// Whether `client` has spent `limit` in the window it is in at `now`;
+    /// nothing is spent or remembered.
+    pub(crate) fn spent(&self, client: Client, now: Instant, limit: u32, period: Duration) -> bool {
+        self.0
+            .get(&client)
+            .is_some_and(|(start, used)| now.duration_since(*start) < period && *used >= limit)
+    }
+
     /// The units `client` spent in the window it has.
     fn used(&self, client: Client) -> u32 {
         self.0.get(&client).map_or(0, |(_, used)| *used)

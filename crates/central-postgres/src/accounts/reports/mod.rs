@@ -4,9 +4,13 @@
 //! unpacked here; an administrator lists, reads and triages them
 //! (`list.rs`, `triage.rs`). Before a list is read the sweep deletes what
 //! the retention says is over. No column joins a report to an account: the
-//! reporter is the gateway's pseudonym or a device's HMAC.
+//! reporter is the gateway's pseudonym or a device's HMAC. A report token
+//! (`report_tokens.rs`) may file, read and triage as its rights say; who
+//! acts is `actor.rs`'s.
+use super::report_tokens::{ReportToken, still};
 use super::tokens::LIVE_TOKEN;
 use super::{AccountStore, Error, Token, statement, uuid};
+use central_api::report_tokens::ReportScope;
 use central_api::reports::{
     Channel, DONE_DAYS, KEEP_DAYS, PART_SECONDS, Part, RecordOrigin, ReportIntake, TRASH_DAYS,
 };
@@ -14,47 +18,104 @@ use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait, prelude::Uuid};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
+mod actor;
 mod import;
 mod level;
 mod list;
 mod triage;
+use actor::Actor;
+pub use actor::ReportCaller;
 pub use import::{
     ImportedHistory, ImportedNote, ImportedReport, ReportImport, ReportImportRefusal,
 };
 pub use level::{ALL_STORED, GATEWAY_STORED, OFFICIAL_STORED, REPORT_BYTES};
 
-/// Who files a report: the authenticated gateway and its name in Central then.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Filer {
-    /// The gateway's id.
-    pub gateway: [u8; 16],
-    /// Its name in Central.
-    pub label: String,
-    /// It is the official gateway, whose caller the bridge credential proved.
-    pub official: bool,
+/// What files a report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FilerKind {
+    /// The official gateway, whose caller the bridge credential proved.
+    Official,
+    /// An approved registered gateway.
+    Gateway,
+    /// A report token that holds the right to file.
+    Token,
 }
 
-fn filer(row: &QueryResult, official: bool) -> Result<Filer, Error> {
+/// Who files a report: the authenticated gateway or report token and its
+/// name in Central then.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Filer {
+    /// The gateway's id, or the token's.
+    pub id: [u8; 16],
+    /// Its name in Central.
+    pub label: String,
+    /// Which of them it is.
+    pub kind: FilerKind,
+}
+
+impl From<ReportToken> for Filer {
+    fn from(token: ReportToken) -> Self {
+        Self {
+            id: token.id,
+            label: token.name,
+            kind: FilerKind::Token,
+        }
+    }
+}
+
+impl Filer {
+    /// Whether it files reports that came by `channel`: a direct one only
+    /// the official gateway, a token's only a token and nothing else.
+    fn files(&self, channel: Channel) -> bool {
+        match (self.kind, channel) {
+            (FilerKind::Official, Channel::Gateway | Channel::Direct)
+            | (FilerKind::Gateway, Channel::Gateway)
+            | (FilerKind::Token, Channel::Token) => true,
+            (FilerKind::Official | FilerKind::Gateway, Channel::Token)
+            | (FilerKind::Gateway, Channel::Direct)
+            | (FilerKind::Token, Channel::Gateway | Channel::Direct) => false,
+        }
+    }
+
+    /// A report token is asked again, in the transaction that stores what
+    /// it sent: its body came after it was first asked, and a revocation
+    /// answered meanwhile ends it.
+    async fn again(&self, tx: &impl ConnectionTrait) -> Result<(), Error> {
+        if self.kind == FilerKind::Token {
+            still(tx, self.id, ReportScope::File).await?;
+        }
+        Ok(())
+    }
+}
+
+fn filer(row: &QueryResult, kind: FilerKind) -> Result<Filer, Error> {
     let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
     Ok(Filer {
-        gateway: *id.as_bytes(),
+        id: *id.as_bytes(),
         label: row.try_get("", "name").map_err(|_| Error::Unavailable)?,
-        official,
+        kind,
     })
 }
 
 /// One line of a report's history, in `db`'s transaction: who (none for
 /// the gateway that filed it or the sweep), what, the change in short.
-pub(super) async fn history(
+async fn history(
     db: &impl ConnectionTrait,
     report: Uuid,
-    actor: Option<Uuid>,
+    actor: Option<&Actor>,
     action: &str,
     detail: &str,
 ) -> Result<(), Error> {
     db.execute_raw(statement(
-        "INSERT INTO central_identity.report_audit (report_id, actor, action, detail) VALUES ($1, $2, $3, $4)",
-        vec![report.into(), actor.into(), format!("report.{action}").into(), detail.into()],
+        "INSERT INTO central_identity.report_audit (report_id, actor, token_name, action, detail)
+         VALUES ($1, $2, $3, $4, $5)",
+        vec![
+            report.into(),
+            actor.map(|actor| actor.id).into(),
+            actor.and_then(|actor| actor.token_name.clone()).into(),
+            format!("report.{action}").into(),
+            detail.into(),
+        ],
     ))
     .await
     .map_err(|_| Error::Unavailable)?;
@@ -64,10 +125,10 @@ pub(super) async fn history(
 /// Opens again, in `db`'s transaction, the duplicates of the reports in
 /// `going` that do not go with them: a duplicate needs its original, so it
 /// becomes `triaged`, with a line in its history.
-pub(super) async fn release(
+async fn release(
     db: &impl ConnectionTrait,
     going: &[Uuid],
-    actor: Option<Uuid>,
+    actor: Option<&Actor>,
 ) -> Result<(), Error> {
     if going.is_empty() {
         return Ok(());
@@ -168,7 +229,16 @@ impl AccountStore {
             .await
             .map_err(|_| Error::Unavailable)?
             .ok_or(Error::Rejected)?;
-        filer(&row, false)
+        filer(&row, FilerKind::Gateway)
+    }
+
+    /// The report token behind `token` as a report's filer.
+    ///
+    /// # Errors
+    /// `Rejected` for anything but a live report token that may file;
+    /// storage failure.
+    pub async fn report_token_filer(&self, token: &Token) -> Result<Filer, Error> {
+        Ok(self.report_token(token, ReportScope::File).await?.into())
     }
 
     /// The official gateway as a report's filer; its caller proved the bridge credential.
@@ -185,45 +255,54 @@ impl AccountStore {
             .await
             .map_err(|_| Error::Unavailable)?
             .ok_or(Error::Unavailable)?;
-        filer(&row, true)
+        filer(&row, FilerKind::Official)
     }
 
     /// File `report` for `filer`, its parts announced. `direct` only from the
-    /// official gateway, and only while the gateway's reports and everyone's
-    /// stay within what they may take (`level.rs`). Returns the report's id.
+    /// official gateway and `token` only from a report token, and only while
+    /// the filer's reports and everyone's stay within what they may take
+    /// (`level.rs`). Returns the report's id.
     ///
     /// # Errors
-    /// `Rejected` for a report out of its bounds or a direct one from
-    /// another gateway; `Busy` past what the gateway's reports or all
-    /// reports may take, or while another filing is weighed; storage
-    /// failure.
+    /// `Rejected` for a report out of its bounds, one by a channel that is
+    /// not the filer's, or a report token that no longer may file; `Busy`
+    /// past what the filer's reports or all reports may take, or while
+    /// another filing is weighed; storage failure.
     pub async fn file_report(
         &self,
         filer: &Filer,
         report: &ReportIntake,
     ) -> Result<[u8; 16], Error> {
         report.validate()?;
-        if report.channel == Channel::Direct && !filer.official {
+        if !filer.files(report.channel) {
             return Err(Error::Rejected);
         }
+        // A token's report is stored as any caller's with a credential is,
+        // and says in a column of its own that a token filed it: the binary
+        // before this one knows two channels.
+        let (channel, filed_by) = match report.channel {
+            Channel::Token => (Channel::Gateway, "token"),
+            channel => (channel, "gateway"),
+        };
         let record = report.record.as_ref();
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        filer.again(&tx).await?;
         level::admit(&tx, filer, report).await?;
         let row = tx
             .query_one_raw(statement(
                 "INSERT INTO central_identity.reports (gateway_id, gateway_label, gateway_says, gateway_url,
                      gateway_version, channel, reporter, kind, text, game_id, build_version, build_commit,
                      crash_message, crash_location, signature, client_bytes, client_sha256, record_bytes,
-                     record_sha256, record_complete, record_origin)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                     record_sha256, record_complete, record_origin, filed_by)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
                  RETURNING id",
                 vec![
-                    uuid(filer.gateway).into(),
+                    uuid(filer.id).into(),
                     filer.label.clone().into(),
                     report.gateway.name.clone().into(),
                     report.gateway.url.clone().into(),
                     report.gateway.version.clone().into(),
-                    report.channel.as_str().into(),
+                    channel.as_str().into(),
                     report.reporter.clone().into(),
                     report.kind.as_str().into(),
                     report.text.clone().into(),
@@ -239,13 +318,25 @@ impl AccountStore {
                     record.map(|r| r.sha256.to_vec()).into(),
                     record.map(|r| r.complete).into(),
                     record.map(|r| r.origin.as_str()).into(),
+                    filed_by.into(),
                 ],
             ))
             .await
             .map_err(|_| Error::Unavailable)?
             .ok_or(Error::Unavailable)?;
         let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
-        history(&tx, id, None, "filed", &format!("by {}", filer.label)).await?;
+        let by_token = (filer.kind == FilerKind::Token).then(|| Actor {
+            id: uuid(filer.id),
+            token_name: Some(filer.label.clone()),
+        });
+        history(
+            &tx,
+            id,
+            by_token.as_ref(),
+            "filed",
+            &format!("by {}", filer.label),
+        )
+        .await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(*id.as_bytes())
     }
@@ -278,7 +369,7 @@ impl AccountStore {
                      WHERE r.id = $1 AND r.gateway_id = $2
                        AND r.created_at > pg_catalog.clock_timestamp() - interval '{PART_SECONDS} seconds'"
                 ),
-                vec![uuid(report).into(), uuid(filer.gateway).into(), part.as_str().into()],
+                vec![uuid(report).into(), uuid(filer.id).into(), part.as_str().into()],
             ))
             .await
             .map_err(|_| Error::Unavailable)?
@@ -301,8 +392,9 @@ impl AccountStore {
     ///
     /// # Errors
     /// `Rejected` for another gateway's report, one too old, a part it did
-    /// not announce or bytes other than announced; `Conflict` when the part
-    /// is stored already; storage failure.
+    /// not announce, bytes other than announced or a report token that no
+    /// longer may file; `Conflict` when the part is stored already; storage
+    /// failure.
     pub async fn file_report_part(
         &self,
         filer: &Filer,
@@ -314,15 +406,16 @@ impl AccountStore {
             Part::Client => ("client_bytes", "client_sha256"),
             Part::Record => ("record_bytes", "record_sha256"),
         };
-        let row = self
-            .db
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        filer.again(&tx).await?;
+        let row = tx
             .query_one_raw(statement(
                 &format!(
                     "SELECT r.{bytes} AS bytes, r.{sha} AS sha256 FROM central_identity.reports r
                      WHERE r.id = $1 AND r.gateway_id = $2
                        AND r.created_at > pg_catalog.clock_timestamp() - interval '{PART_SECONDS} seconds'"
                 ),
-                vec![uuid(report).into(), uuid(filer.gateway).into()],
+                vec![uuid(report).into(), uuid(filer.id).into()],
             ))
             .await
             .map_err(|_| Error::Unavailable)?
@@ -338,8 +431,7 @@ impl AccountStore {
         if !same {
             return Err(Error::Rejected);
         }
-        let stored = self
-            .db
+        let stored = tx
             .execute_raw(statement(
                 "INSERT INTO central_identity.report_parts (report_id, part, gzip) VALUES ($1, $2, $3)
                  ON CONFLICT DO NOTHING",
@@ -350,23 +442,24 @@ impl AccountStore {
         if stored.rows_affected() == 0 {
             return Err(Error::Conflict);
         }
-        Ok(())
+        tx.commit().await.map_err(|_| Error::Unavailable)
     }
 
-    /// One part of a report as stored, for the administrator behind
-    /// `browser`: the gzip and, for a record, who wrote it.
+    /// One part of a report as stored, for `caller`: the gzip and, for a
+    /// record, who wrote it.
     ///
     /// # Errors
-    /// `Rejected` without an administrator's live browser session, for an
-    /// unknown report or a part that has not arrived; storage failure.
+    /// `Rejected` without an administrator's live browser session or a
+    /// report token that may read, for an unknown report or a part that has
+    /// not arrived; storage failure.
     pub async fn report_part(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         report: [u8; 16],
         part: Part,
     ) -> Result<(Vec<u8>, Option<RecordOrigin>), Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        Self::administrator(&tx, browser).await?;
+        Actor::check(&tx, caller, ReportScope::Read).await?;
         let row = tx
             .query_one_raw(statement(
                 "SELECT p.gzip, r.record_origin FROM central_identity.report_parts p

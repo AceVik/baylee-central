@@ -7,11 +7,12 @@ use super::tokens::{LIVE_TOKEN, STATE, TOKEN_COLUMNS, metadata, state, token_inf
 use super::{AccountStore, Error, Session, Token, statement, username};
 use central_api::admin::{
     ACCOUNT_LIST, AccountQuery, AccountState, AdminAccount, AdminGateway, AuditEvent, NamedAccount,
-    NamedGateway, OwnedGateway, PAGE, RankedHosting,
+    NamedGateway, OwnedGateway, PAGE, RankedHosting, TokenEvent,
 };
 use central_api::gateway::GatewayState;
 use central_api::owner::TokenInfo;
 use central_api::profile::valid_tag;
+use central_api::reports::NamedToken;
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, QueryResult, TransactionTrait, Value, prelude::Uuid,
 };
@@ -39,6 +40,10 @@ pub enum Action {
     RankedRevoked,
     /// A gateway token was revoked by an administrator.
     GatewayTokenRevoked,
+    /// An administrator made a report token.
+    ReportTokenCreated,
+    /// An administrator revoked a report token.
+    ReportTokenRevoked,
     /// An administrator closed registration.
     RegistrationClosed,
     /// An administrator opened registration again.
@@ -68,6 +73,8 @@ impl Action {
             Self::RankedVerified => "gateway.ranked_verified",
             Self::RankedRevoked => "gateway.ranked_revoked",
             Self::GatewayTokenRevoked => "gateway.token_revoked",
+            Self::ReportTokenCreated => "report_token.created",
+            Self::ReportTokenRevoked => "report_token.revoked",
             Self::RegistrationClosed => "registration.closed",
             Self::RegistrationOpened => "registration.opened",
             Self::PictureKept => "picture.kept",
@@ -117,7 +124,7 @@ pub(super) fn id(row: &QueryResult, column: &str) -> Result<[u8; 16], Error> {
     Ok(*id.as_bytes())
 }
 
-fn optional_id(row: &QueryResult, column: &str) -> Result<Option<[u8; 16]>, Error> {
+pub(super) fn optional_id(row: &QueryResult, column: &str) -> Result<Option<[u8; 16]>, Error> {
     let id: Option<Uuid> = row.try_get("", column).map_err(|_| Error::Unavailable)?;
     Ok(id.map(|id| *id.as_bytes()))
 }
@@ -190,6 +197,8 @@ pub struct AuditPage {
     pub accounts: Vec<NamedAccount>,
     /// The gateways the events name that still exist, each once.
     pub gateways: Vec<NamedGateway>,
+    /// The report tokens the events made or revoked.
+    pub report_tokens: Vec<TokenEvent>,
 }
 
 /// A page of at most [`PAGE`] rows, and whether another follows.
@@ -205,7 +214,7 @@ fn page<T>(
     Ok((items, rows.len() > PAGE))
 }
 
-fn limit(n: usize) -> Value {
+pub(super) fn limit(n: usize) -> Value {
     i64::try_from(n).unwrap_or(i64::MAX).into()
 }
 
@@ -458,11 +467,13 @@ impl AccountStore {
                     "SELECT {EVENT_COLUMNS},
                          actor.id IS NOT NULL AS actor_known, actor.display_name AS actor_name, actor.tag AS actor_tag,
                          subject.id IS NOT NULL AS subject_known, subject.display_name AS subject_name, subject.tag AS subject_tag,
-                         gw.name AS gateway_name, gw.origin AS gateway_origin
+                         gw.name AS gateway_name, gw.origin AS gateway_origin,
+                         token.id AS token_id, token.name AS token_name
                      FROM central_identity.audit_events e
                      LEFT JOIN central_identity.accounts actor ON actor.id = e.actor_account
                      LEFT JOIN central_identity.accounts subject ON subject.id = e.account_id
                      LEFT JOIN central_identity.gateways gw ON gw.id = e.gateway_id
+                     LEFT JOIN central_identity.report_tokens token ON token.id = e.report_token_id
                      WHERE ($1::uuid IS NULL OR e.account_id = $1) AND ($2::uuid IS NULL OR e.id < $2)
                      ORDER BY e.id DESC LIMIT $3"
                 ),
@@ -477,7 +488,19 @@ impl AccountStore {
         let (events, more) = page(&rows, event)?;
         let mut accounts = BTreeMap::new();
         let mut gateways = BTreeMap::new();
+        let mut report_tokens = Vec::new();
         for (row, event) in rows.iter().zip(&events) {
+            if let Some(token) = optional_id(row, "token_id")? {
+                report_tokens.push(TokenEvent {
+                    event: event.id,
+                    token: NamedToken {
+                        id: token,
+                        name: row
+                            .try_get("", "token_name")
+                            .map_err(|_| Error::Unavailable)?,
+                    },
+                });
+            }
             for (id, prefix) in [(event.actor, "actor"), (event.account, "subject")] {
                 let Some(id) = id else { continue };
                 let known: bool = row
@@ -523,6 +546,7 @@ impl AccountStore {
             more,
             accounts: accounts.into_values().collect(),
             gateways: gateways.into_values().collect(),
+            report_tokens,
         })
     }
 

@@ -7,6 +7,8 @@
 //! and ages out each gateway's revocations and never rewrites one. It
 //! files reports and their parts once, triages a report by column and
 //! deletes reports; it never changes a report's words, a part or its history.
+//! It stores report tokens with the rights they keep, and may set only when
+//! one was revoked, by whom, and last used.
 //! It replaces and deletes profile pictures, files picture reports and
 //! decides them by column, but never deletes one (the operator's sweep does).
 //! It adds a donation once and converts one that came without a rate, by its
@@ -57,6 +59,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('report_audit', ARRAY['SELECT','INSERT'], NULL),
              ('report_views', ARRAY['SELECT','INSERT','DELETE'], ARRAY['query']),
              ('report_seen', ARRAY['SELECT','INSERT','DELETE'], NULL),
+             ('report_tokens', ARRAY['SELECT'], ARRAY['revoked_at','revoked_by','last_used_at']),
              ('pictures', ARRAY['SELECT','INSERT','DELETE'], ARRAY['key','avif','png','sequence','sha256','side','set_at']),
              ('picture_reports', ARRAY['SELECT','INSERT'], ARRAY['state','decided_at','decided_by']),
              ('picture_notices', ARRAY['SELECT','INSERT','UPDATE','DELETE'], NULL),
@@ -121,6 +124,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
                ('advent_entitlements',ARRAY['account_id','year','door','art_id']),
                ('cosmetic_equip_rights',ARRAY['account_id','art_id','advent_id','league','division']),
                ('gateway_approvals', ARRAY['gateway_id','enabled']),
+               ('report_tokens', ARRAY['name','digest','file','read','triage','purge','created_by','created_at','expires_at']),
                ('ranked_hosts', ARRAY['host_id','ranked_epoch','capacity','seen_at','compatibility']),
                ('ranked_matches', ARRAY['season_id','format','account_a','account_b','commitment_a','commitment_b','host_id','ranked_epoch','origin']),
                ('ranked_tickets', ARRAY['account_id','request_id','season_id','format','commitment','queue_elo','replicable']))

@@ -3,12 +3,15 @@
 //! duplicate level, the revision against unseen overwrites, `done_at` with
 //! the done statuses, notes removed by their author only, the trash, and a
 //! history line for every change, never the report's words.
+use super::super::admin::limit;
 use super::super::{AccountStore, Error, Token, statement, uuid};
 use super::list::{SUMMARY_COLUMNS, split, summary};
-use super::{history, release, sweep};
+use super::{Actor, ReportCaller, history, release, sweep};
+use central_api::report_tokens::ReportScope;
 use central_api::reports::{
-    BulkAction, MAX_BULK, MAX_NOTE, MAX_SEEN, MAX_VIEWS, PartState, ReportAdmin, ReportAuditRow,
-    ReportChange, ReportDetail, ReportNote, ReportStatus, SavedView, valid_view,
+    BulkAction, HISTORY, MAX_BULK, MAX_NOTE, MAX_NOTES_BYTES, MAX_SEEN, MAX_VIEWS, PartState,
+    ReportAdmin, ReportAuditRow, ReportChange, ReportDetail, ReportNote, ReportStatus, SavedView,
+    valid_view,
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, prelude::Uuid};
 
@@ -186,11 +189,11 @@ fn lines(was: &Triage, next: &Decided) -> Vec<(&'static str, String)> {
     lines
 }
 
-/// Apply `change` to `report` by `admin` in `tx`: the rules, the row and its
+/// Apply `change` to `report` by `actor` in `tx`: the rules, the row and its
 /// history. Returns whether anything changed.
 async fn apply(
     tx: &DatabaseTransaction,
-    admin: Uuid,
+    actor: &Actor,
     report: Uuid,
     change: &ReportChange,
     expected: Option<u32>,
@@ -238,7 +241,7 @@ async fn apply(
             history(
                 tx,
                 get(row, "id")?,
-                Some(admin),
+                Some(actor),
                 "duplicate",
                 &original.to_string(),
             )
@@ -246,7 +249,7 @@ async fn apply(
         }
     }
     for (action, detail) in lines {
-        history(tx, report, Some(admin), action, &detail).await?;
+        history(tx, report, Some(actor), action, &detail).await?;
     }
     Ok(true)
 }
@@ -254,7 +257,7 @@ async fn apply(
 /// Into the trash, out of it, or deleted for good from it, in `tx`.
 async fn bin(
     tx: &DatabaseTransaction,
-    admin: Uuid,
+    actor: &Actor,
     report: Uuid,
     how: &BulkAction,
 ) -> Result<bool, Error> {
@@ -272,7 +275,7 @@ async fn bin(
         ),
         BulkAction::Purge if was.trashed => {
             // its duplicates keep no original: they are opened again first
-            release(tx, &[report], Some(admin)).await?;
+            release(tx, &[report], Some(actor)).await?;
             (
                 "DELETE FROM central_identity.reports WHERE id = $1",
                 "purged",
@@ -284,28 +287,27 @@ async fn bin(
     tx.execute_raw(statement(sql, vec![report.into()]))
         .await
         .map_err(|_| Error::Unavailable)?;
-    history(tx, report, Some(admin), action, "").await?;
+    history(tx, report, Some(actor), action, "").await?;
     Ok(true)
 }
 
+/// The right a bin's action needs: a purge, which cannot be undone, its own.
+fn right(how: &BulkAction) -> ReportScope {
+    match how {
+        BulkAction::Purge => ReportScope::Purge,
+        BulkAction::Change { .. } | BulkAction::Trash | BulkAction::Restore => ReportScope::Triage,
+    }
+}
+
 impl AccountStore {
-    /// The administrator behind `browser` in `tx`, refused unless their
-    /// password sign-in is fresh when `fresh` (a purge).
-    async fn triager(
-        tx: &DatabaseTransaction,
-        browser: &Token,
-        fresh: bool,
-    ) -> Result<Uuid, Error> {
-        let (admin, recent) = Self::administrator(tx, browser).await?;
-        if fresh && !recent {
-            return Err(Error::Rejected);
-        }
-        Ok(admin)
+    /// The administrator behind `browser` in `tx`.
+    async fn triager(tx: &DatabaseTransaction, browser: &Token) -> Result<Uuid, Error> {
+        Ok(Self::administrator(tx, browser).await?.0)
     }
 
     async fn detail(
         tx: &DatabaseTransaction,
-        admin: Uuid,
+        actor: &Actor,
         report: Uuid,
     ) -> Result<ReportDetail, Error> {
         let row = tx
@@ -317,7 +319,7 @@ impl AccountStore {
                          EXISTS (SELECT 1 FROM central_identity.report_parts p WHERE p.report_id = r.id AND p.part = 'record') AS record_in
                      FROM central_identity.reports r WHERE r.id = $2"
                 ),
-                vec![admin.into(), report.into()],
+                vec![actor.id.into(), report.into()],
             ))
             .await
             .map_err(|_| Error::Unavailable)?
@@ -336,7 +338,7 @@ impl AccountStore {
         let record = part(get(&row, "record_bytes")?, get(&row, "record_in")?)?;
         let notes = tx
             .query_all_raw(statement(
-                "SELECT id, floor(extract(epoch FROM at))::bigint AS at, author, text
+                "SELECT id, floor(extract(epoch FROM at))::bigint AS at, author, token_name, text
                  FROM central_identity.report_notes WHERE report_id = $1 ORDER BY at, id",
                 vec![report.into()],
             ))
@@ -348,23 +350,29 @@ impl AccountStore {
                     id: *get::<Uuid>(n, "id")?.as_bytes(),
                     at: get(n, "at")?,
                     author: *get::<Uuid>(n, "author")?.as_bytes(),
+                    token: get(n, "token_name")?,
                     text: get(n, "text")?,
                 })
             })
             .collect::<Result<_, Error>>()?;
-        let audit = tx
+        // the newest lines, and one more that says there are older ones
+        let lines = tx
             .query_all_raw(statement(
-                "SELECT floor(extract(epoch FROM at))::bigint AS at, actor, action, detail
-                 FROM central_identity.report_audit WHERE report_id = $1 ORDER BY id",
-                vec![report.into()],
+                "SELECT floor(extract(epoch FROM at))::bigint AS at, actor, token_name, action, detail
+                 FROM central_identity.report_audit WHERE report_id = $1 ORDER BY id DESC LIMIT $2",
+                vec![report.into(), limit(HISTORY + 1)],
             ))
             .await
-            .map_err(|_| Error::Unavailable)?
+            .map_err(|_| Error::Unavailable)?;
+        let audit = lines
             .iter()
+            .take(HISTORY)
+            .rev()
             .map(|a| {
                 Ok(ReportAuditRow {
                     at: get(a, "at")?,
                     actor: get::<Option<Uuid>>(a, "actor")?.map(|id| *id.as_bytes()),
+                    token: get(a, "token_name")?,
                     action: get(a, "action")?,
                     detail: get(a, "detail")?,
                 })
@@ -381,23 +389,24 @@ impl AccountStore {
             record,
             notes,
             audit,
+            older: lines.len() > HISTORY,
         })
     }
 
-    /// One report with its notes and history, for the administrator behind `browser`.
+    /// One report with its notes and history, for `caller`.
     ///
     /// # Errors
-    /// `Rejected` without an administrator's live browser session or for an
-    /// unknown report; storage failure.
+    /// `Rejected` without an administrator's live browser session or a
+    /// report token that may read, or for an unknown report; storage failure.
     pub async fn report_detail(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         report: [u8; 16],
     ) -> Result<ReportDetail, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let reader = Actor::check(&tx, caller, ReportScope::Read).await?;
         sweep(&tx).await?;
-        let detail = Self::detail(&tx, admin, uuid(report)).await?;
+        let detail = Self::detail(&tx, &reader, uuid(report)).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(detail)
     }
@@ -407,33 +416,35 @@ impl AccountStore {
     /// # Errors
     /// `Rejected` for a change out of bounds or against the rules (a second
     /// duplicate level, an assignee who is no administrator, a duplicate
-    /// without its original), an unknown report or no administrator;
-    /// `Conflict` on another revision; storage failure.
+    /// without its original), an unknown report, or neither an
+    /// administrator nor a report token that may triage; `Conflict` on
+    /// another revision; storage failure.
     pub async fn set_report(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         report: [u8; 16],
         change: &ReportChange,
         expected: Option<u32>,
     ) -> Result<ReportDetail, Error> {
         change.validate(false)?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
-        apply(&tx, admin, uuid(report), change, expected).await?;
-        let detail = Self::detail(&tx, admin, uuid(report)).await?;
+        let actor = Actor::check(&tx, caller, ReportScope::Triage).await?;
+        apply(&tx, &actor, uuid(report), change, expected).await?;
+        let detail = Self::detail(&tx, &actor, uuid(report)).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(detail)
     }
 
     /// Change, trash, restore or purge a selection in one transaction: all of
-    /// it or none. A purge needs a fresh password sign-in. Returns how many changed.
+    /// it or none. A purge needs an administrator's fresh password sign-in,
+    /// or a report token that may purge. Returns how many changed.
     ///
     /// # Errors
     /// As [`Self::set_report`] for any of them, and `Rejected` for an empty
     /// or oversized selection or a purge of a report not in the trash.
     pub async fn reports_bulk(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         reports: &[[u8; 16]],
         how: &BulkAction,
     ) -> Result<u32, Error> {
@@ -448,12 +459,12 @@ impl AccountStore {
         ids.sort_unstable();
         ids.dedup();
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, matches!(how, BulkAction::Purge)).await?;
+        let actor = Actor::check(&tx, caller, right(how)).await?;
         let mut changed = 0_u32;
         for report in ids {
             let did = match how {
-                BulkAction::Change { change } => apply(&tx, admin, report, change, None).await?,
-                bin_action => bin(&tx, admin, report, bin_action).await?,
+                BulkAction::Change { change } => apply(&tx, &actor, report, change, None).await?,
+                bin_action => bin(&tx, &actor, report, bin_action).await?,
             };
             changed += u32::from(did);
         }
@@ -461,13 +472,14 @@ impl AccountStore {
         Ok(changed)
     }
 
-    /// Into the trash, out of it, or (with a fresh sign-in) deleted for good from it.
+    /// Into the trash, out of it, or deleted for good from it (an
+    /// administrator with a fresh sign-in, a report token that may purge).
     ///
     /// # Errors
     /// As [`Self::reports_bulk`].
     pub async fn bin_report(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         report: [u8; 16],
         how: &BulkAction,
     ) -> Result<(), Error> {
@@ -475,20 +487,22 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, matches!(how, BulkAction::Purge)).await?;
-        bin(&tx, admin, uuid(report), how).await?;
+        let actor = Actor::check(&tx, caller, right(how)).await?;
+        bin(&tx, &actor, uuid(report), how).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(())
     }
 
-    /// A note on a report by the administrator behind `browser`. Answers the report.
+    /// A note on a report by `caller`. Answers the report.
     ///
     /// # Errors
-    /// `Rejected` for an empty or overlong note, an unknown report or no
-    /// administrator; storage failure.
+    /// `Rejected` for an empty or overlong note, an unknown report, or
+    /// neither an administrator nor a report token that may triage; `Busy`
+    /// when the report's notes would be more than [`MAX_NOTES_BYTES`];
+    /// storage failure.
     pub async fn add_report_note(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         report: [u8; 16],
         text: &str,
     ) -> Result<ReportDetail, Error> {
@@ -496,16 +510,37 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let actor = Actor::check(&tx, caller, ReportScope::Triage).await?;
         locked(&tx, uuid(report)).await?;
+        // The report's row is locked, so its notes are weighed one at a time.
+        let held: i64 = tx
+            .query_one_raw(statement(
+                "SELECT COALESCE(sum(octet_length(text)), 0)::bigint AS bytes
+                 FROM central_identity.report_notes WHERE report_id = $1",
+                vec![uuid(report).into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Unavailable)
+            .and_then(|row| get(&row, "bytes"))?;
+        let held = usize::try_from(held).map_err(|_| Error::Unavailable)?;
+        if held.saturating_add(text.len()) > MAX_NOTES_BYTES {
+            return Err(Error::Busy);
+        }
         tx.execute_raw(statement(
-            "INSERT INTO central_identity.report_notes (report_id, author, text) VALUES ($1, $2, $3)",
-            vec![uuid(report).into(), admin.into(), text.into()],
+            "INSERT INTO central_identity.report_notes (report_id, author, token_name, text)
+             VALUES ($1, $2, $3, $4)",
+            vec![
+                uuid(report).into(),
+                actor.id.into(),
+                actor.token_name.clone().into(),
+                text.into(),
+            ],
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
-        history(&tx, uuid(report), Some(admin), "note", "added").await?;
-        let detail = Self::detail(&tx, admin, uuid(report)).await?;
+        history(&tx, uuid(report), Some(&actor), "note", "added").await?;
+        let detail = Self::detail(&tx, &actor, uuid(report)).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(detail)
     }
@@ -513,27 +548,34 @@ impl AccountStore {
     /// A note removed by its author. Answers the report.
     ///
     /// # Errors
-    /// `Rejected` for another's note, an unknown one or no administrator; storage failure.
+    /// `Rejected` for another's note, an unknown one, or neither an
+    /// administrator nor a report token that may triage; storage failure.
     pub async fn remove_report_note(
         &self,
-        browser: &Token,
+        caller: ReportCaller<'_>,
         report: [u8; 16],
         note: [u8; 16],
     ) -> Result<ReportDetail, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let actor = Actor::check(&tx, caller, ReportScope::Triage).await?;
         let removed = tx
             .execute_raw(statement(
-                "DELETE FROM central_identity.report_notes WHERE id = $1 AND report_id = $2 AND author = $3",
-                vec![uuid(note).into(), uuid(report).into(), admin.into()],
+                "DELETE FROM central_identity.report_notes WHERE id = $1 AND report_id = $2 AND author = $3
+                 AND (token_name IS NOT NULL) = $4",
+                vec![
+                    uuid(note).into(),
+                    uuid(report).into(),
+                    actor.id.into(),
+                    actor.token_name.is_some().into(),
+                ],
             ))
             .await
             .map_err(|_| Error::Unavailable)?;
         if removed.rows_affected() == 0 {
             return Err(Error::Rejected);
         }
-        history(&tx, uuid(report), Some(admin), "note", "removed").await?;
-        let detail = Self::detail(&tx, admin, uuid(report)).await?;
+        history(&tx, uuid(report), Some(&actor), "note", "removed").await?;
+        let detail = Self::detail(&tx, &actor, uuid(report)).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(detail)
     }
@@ -556,7 +598,7 @@ impl AccountStore {
     /// `Rejected` without an administrator; storage failure.
     pub async fn report_views(&self, browser: &Token) -> Result<Vec<SavedView>, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let admin = Self::triager(&tx, browser).await?;
         let views = Self::views(&tx, admin).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(views)
@@ -576,7 +618,7 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let admin = Self::triager(&tx, browser).await?;
         let replaced = tx
             .execute_raw(statement(
                 "UPDATE central_identity.report_views SET query = $3 WHERE admin = $1 AND name = $2",
@@ -610,7 +652,7 @@ impl AccountStore {
         view: [u8; 16],
     ) -> Result<Vec<SavedView>, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let admin = Self::triager(&tx, browser).await?;
         tx.execute_raw(statement(
             "DELETE FROM central_identity.report_views WHERE id = $1 AND admin = $2",
             vec![uuid(view).into(), admin.into()],
@@ -636,7 +678,7 @@ impl AccountStore {
             return Err(Error::Rejected);
         }
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        let admin = Self::triager(&tx, browser, false).await?;
+        let admin = Self::triager(&tx, browser).await?;
         let ids = reports
             .iter()
             .map(|r| uuid(*r).to_string())
@@ -658,13 +700,15 @@ impl AccountStore {
         Ok(())
     }
 
-    /// The administrators a report may be assigned to, for the administrator behind `browser`.
+    /// The administrators a report may be assigned to, for `caller`, who may
+    /// assign one.
     ///
     /// # Errors
-    /// `Rejected` without an administrator; storage failure.
-    pub async fn report_admins(&self, browser: &Token) -> Result<Vec<ReportAdmin>, Error> {
+    /// `Rejected` without an administrator or a report token that may
+    /// triage; storage failure.
+    pub async fn report_admins(&self, caller: ReportCaller<'_>) -> Result<Vec<ReportAdmin>, Error> {
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
-        Self::triager(&tx, browser, false).await?;
+        Actor::check(&tx, caller, ReportScope::Triage).await?;
         let admins = tx
             .query_all_raw(statement(
                 "SELECT a.id, a.display_name, a.tag FROM central_identity.accounts a

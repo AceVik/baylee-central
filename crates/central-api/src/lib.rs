@@ -23,6 +23,8 @@ mod private_bytes;
 pub mod profile;
 pub mod ranked;
 pub mod register;
+pub mod report_api;
+pub mod report_tokens;
 pub mod reports;
 pub mod reset_code;
 pub mod social;

@@ -194,7 +194,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        50
+        51
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -316,7 +316,12 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "DROP TABLE central_identity.friend_invites, central_identity.card_search_names, central_identity.card_printings;
+            "DROP TABLE central_identity.report_tokens;
+             ALTER TABLE central_identity.reports DROP COLUMN filed_by;
+             ALTER TABLE central_identity.report_notes DROP COLUMN token_name;
+             ALTER TABLE central_identity.report_audit DROP COLUMN token_name;
+             ALTER TABLE central_identity.audit_events DROP COLUMN report_token_id;
+             DROP TABLE central_identity.friend_invites, central_identity.card_search_names, central_identity.card_printings;
              DROP TABLE central_identity.chat_group_pictures;
              ALTER TABLE central_identity.chat_members DROP COLUMN admin;
              ALTER TABLE central_identity.chat_groups DROP COLUMN description;
@@ -375,7 +380,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        50
+        51
     );
     assert_eq!(
         scalar(
