@@ -45,7 +45,7 @@ interface PlayerState {
   playing: boolean;
 }
 
-const AUDIO_SRC_PATTERN = /^\/static\/audio\/security\/[a-z-]+\/[a-z]+\.mp3$/;
+const AUDIO_SRC_PATTERN = /^\/static\/audio\/security\/[a-z-]+\/[a-z]+\.opus$/;
 const TOUR_STEP_MS = 3500;
 let activeCleanup: (() => void) | null = null;
 let sharedMuted = false;

@@ -1,0 +1,137 @@
+{
+  "available": true,
+  "lang": "pt-br",
+  "modelId": "eleven_v4",
+  "parts": {
+    "chat": {
+      "duration": 84.0,
+      "src": "/static/audio/security/pt-br/chat.opus",
+      "steps": [
+        {
+          "end": 25.0,
+          "start": 11.68,
+          "step": 1
+        },
+        {
+          "end": 44.12,
+          "start": 25.0,
+          "step": 2
+        },
+        {
+          "end": 59.2,
+          "start": 44.12,
+          "step": 3
+        },
+        {
+          "end": 72.08,
+          "start": 59.2,
+          "step": 4
+        },
+        {
+          "end": 84.0,
+          "start": 72.08,
+          "step": 5
+        }
+      ]
+    },
+    "intro": {
+      "duration": 28.32,
+      "src": "/static/audio/security/pt-br/intro.opus",
+      "steps": []
+    },
+    "memory": {
+      "duration": 88.88,
+      "src": "/static/audio/security/pt-br/memory.opus",
+      "steps": [
+        {
+          "end": 26.08,
+          "start": 13.6,
+          "step": 1
+        },
+        {
+          "end": 42.72,
+          "start": 26.08,
+          "step": 2
+        },
+        {
+          "end": 56.16,
+          "start": 42.72,
+          "step": 3
+        },
+        {
+          "end": 78.8,
+          "start": 56.16,
+          "step": 4
+        },
+        {
+          "end": 88.88,
+          "start": 78.8,
+          "step": 5
+        }
+      ]
+    },
+    "pairing": {
+      "duration": 92.0,
+      "src": "/static/audio/security/pt-br/pairing.opus",
+      "steps": [
+        {
+          "end": 28.88,
+          "start": 15.92,
+          "step": 1
+        },
+        {
+          "end": 42.32,
+          "start": 28.88,
+          "step": 2
+        },
+        {
+          "end": 61.12,
+          "start": 42.32,
+          "step": 3
+        },
+        {
+          "end": 80.32,
+          "start": 61.12,
+          "step": 4
+        },
+        {
+          "end": 92.0,
+          "start": 80.32,
+          "step": 5
+        }
+      ]
+    },
+    "signin": {
+      "duration": 90.0,
+      "src": "/static/audio/security/pt-br/signin.opus",
+      "steps": [
+        {
+          "end": 31.72,
+          "start": 19.28,
+          "step": 1
+        },
+        {
+          "end": 45.24,
+          "start": 31.72,
+          "step": 2
+        },
+        {
+          "end": 62.72,
+          "start": 45.24,
+          "step": 3
+        },
+        {
+          "end": 75.8,
+          "start": 62.72,
+          "step": 4
+        },
+        {
+          "end": 90.0,
+          "start": 75.8,
+          "step": 5
+        }
+      ]
+    }
+  },
+  "voiceId": "nPczCjzI2devNBz1zQrb"
+}

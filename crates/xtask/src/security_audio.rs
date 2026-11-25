@@ -1,7 +1,7 @@
 //! Pure-Rust `ElevenLabs` v4 narration synthesis for `/security`:
 //! extracts spoken scripts directly from `crates/central-web/locales/*/security.ftl`,
 //! calls `ElevenLabs` `model_id = "eleven_v4"` with timestamps, maps character-level
-//! alignments to step cue windows, and writes `.mp3` + `cues.json` under
+//! alignments to step cue windows, and writes `.opus` + `cues.json` under
 //! `crates/central-web/static/audio/security/{lang}/`.
 //!
 //! Secrets handling: reads `ELEVENLABS_API_KEY` from the process environment only;
@@ -27,7 +27,7 @@ pub const DEFAULT_VOICE_ID: &str = "nPczCjzI2devNBz1zQrb";
 /// `ElevenLabs` synthesis model identifier required for `/security` narration.
 pub const MODEL_ID: &str = "eleven_v4";
 const API_BASE: &str = "https://api.elevenlabs.io/v1";
-const OUTPUT_FORMAT: &str = "mp3_44100_128";
+const OUTPUT_FORMAT: &str = "opus_48000_64";
 const MAX_RESPONSE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_ERROR_BYTES: u64 = 4096;
 
@@ -40,7 +40,7 @@ pub struct Options {
     pub voice_id: Option<String>,
     /// Extract scripts and report planned work without calling `ElevenLabs`.
     pub dry_run: bool,
-    /// Overwrite existing `.mp3` clips and cue manifests.
+    /// Overwrite existing `.opus` clips and cue manifests.
     pub force: bool,
 }
 
@@ -176,9 +176,9 @@ pub struct Alignment {
 pub struct StepCue {
     /// Diagram step (`1..=5`).
     pub step: u8,
-    /// Start second in the `.mp3` stream.
+    /// Start second in the `.opus` stream.
     pub start: f64,
-    /// End second in the `.mp3` stream.
+    /// End second in the `.opus` stream.
     pub end: f64,
 }
 
@@ -659,14 +659,21 @@ fn synthesize_with_voice(
 
     let status = response.status().as_u16();
     if status != 200 {
-        let _ = response
+        let err_bytes = response
             .body_mut()
             .with_config()
             .limit(MAX_ERROR_BYTES)
-            .read_to_vec();
+            .read_to_vec()
+            .unwrap_or_default();
+        let detail = String::from_utf8_lossy(&err_bytes);
+        let detail = detail.trim();
         return Err((
             status,
-            format!("ElevenLabs returned HTTP {status} for `{lang}`"),
+            if detail.is_empty() {
+                format!("ElevenLabs returned HTTP {status} for `{lang}`")
+            } else {
+                format!("ElevenLabs returned HTTP {status} for `{lang}`: {detail}")
+            },
         ));
     }
 
@@ -687,6 +694,16 @@ fn synthesize_with_voice(
     let audio = decode_base64(b64).map_err(|err| (status, err.to_string()))?;
     if audio.is_empty() {
         return Err((status, "ElevenLabs returned empty audio bytes".to_owned()));
+    }
+    if !audio.starts_with(b"OggS") {
+        let mut head = String::new();
+        for byte in audio.iter().take(4) {
+            let _ = std::fmt::Write::write_fmt(&mut head, format_args!("{byte:02x}"));
+        }
+        return Err((
+            status,
+            format!("ElevenLabs did not return an Ogg/Opus stream (head bytes: {head})"),
+        ));
     }
     let alignment = parse_alignment(&json_val).map_err(|err| (status, err.to_string()))?;
     Ok((audio, alignment))
@@ -730,10 +747,10 @@ fn synthesize_language(
     };
 
     for (part, script) in parts {
-        let mp3_name = format!("{}.mp3", part.key());
-        let mp3_path = out_dir.join(&mp3_name);
-        if !ctx.force && mp3_path.is_file() && parts_map.contains_key(part.key()) {
-            println!("Skipping existing {lang}/{mp3_name}");
+        let audio_name = format!("{}.opus", part.key());
+        let audio_path = out_dir.join(&audio_name);
+        if !ctx.force && audio_path.is_file() && parts_map.contains_key(part.key()) {
+            println!("Skipping existing {lang}/{audio_name}");
             continue;
         }
 
@@ -750,7 +767,7 @@ fn synthesize_language(
 
         let (audio_bytes, alignment) = synthesized;
         let (duration, step_cues) = extract_step_cues(script, &alignment);
-        fs::write(&mp3_path, audio_bytes).or_fail("could not write synthesized MP3 file")?;
+        fs::write(&audio_path, audio_bytes).or_fail("could not write synthesized Opus file")?;
 
         let steps_json: Vec<Value> = step_cues
             .iter()
@@ -765,13 +782,13 @@ fn synthesize_language(
         parts_map.insert(
             part.key().to_owned(),
             json!({
-                "src": format!("/static/audio/security/{lang}/{mp3_name}"),
+                "src": format!("/static/audio/security/{lang}/{audio_name}"),
                 "duration": duration,
                 "steps": steps_json,
             }),
         );
         println!(
-            "Synthesized {lang}/{mp3_name} ({duration:.2}s, {} step cues)",
+            "Synthesized {lang}/{audio_name} ({duration:.2}s, {} step cues)",
             step_cues.len()
         );
     }
@@ -822,7 +839,7 @@ pub fn run(root: &Path, options: &Options) -> Result<()> {
         for (lang, parts) in &scripts_by_lang {
             for (part, script) in parts {
                 println!(
-                    "[dry-run] {lang}/{}.mp3: {} chars, {} steps (model={MODEL_ID}, voice={voice_id})",
+                    "[dry-run] {lang}/{}.opus: {} chars, {} steps (model={MODEL_ID}, voice={voice_id})",
                     part.key(),
                     script.text.chars().count(),
                     script.steps.len()

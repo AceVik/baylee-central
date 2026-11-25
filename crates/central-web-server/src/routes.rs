@@ -657,11 +657,11 @@ fn cards_suggest(uri: &Uri) -> Response {
 const SECURITY_AUDIO_PREFIX: &str = "/static/audio/security/";
 const SECURITY_AUDIO_FILES: [(&str, &str); 6] = [
     ("cues.json", "application/json; charset=utf-8"),
-    ("intro.mp3", "audio/mpeg"),
-    ("signin.mp3", "audio/mpeg"),
-    ("memory.mp3", "audio/mpeg"),
-    ("chat.mp3", "audio/mpeg"),
-    ("pairing.mp3", "audio/mpeg"),
+    ("intro.opus", "audio/ogg; codecs=opus"),
+    ("signin.opus", "audio/ogg; codecs=opus"),
+    ("memory.opus", "audio/ogg; codecs=opus"),
+    ("chat.opus", "audio/ogg; codecs=opus"),
+    ("pairing.opus", "audio/ogg; codecs=opus"),
 ];
 const EMPTY_CUES_JSON: &[u8] = b"{\"available\":false,\"parts\":{}}\n";
 
@@ -1000,13 +1000,13 @@ mod tests {
             std::env::temp_dir().join(format!("baylee-routes-audio-test-{}", std::process::id()));
         let en_dir = root.join("static/audio/security/en");
         std::fs::create_dir_all(&en_dir).unwrap();
-        let fake_mp3 = b"ID3-fake-mp3-data";
-        std::fs::write(en_dir.join("intro.mp3"), fake_mp3).unwrap();
+        let fake_opus = b"OggS-fake-opus-data";
+        std::fs::write(en_dir.join("intro.opus"), fake_opus).unwrap();
 
         let headers = HeaderMap::new();
         // Traversal or unknown files/languages must never resolve.
         assert!(
-            security_audio_response(&root, "/static/audio/security/../en/intro.mp3", &headers)
+            security_audio_response(&root, "/static/audio/security/../en/intro.opus", &headers)
                 .is_none()
         );
         assert!(
@@ -1014,7 +1014,7 @@ mod tests {
                 .is_none()
         );
         assert!(
-            security_audio_response(&root, "/static/audio/security/xx/intro.mp3", &headers)
+            security_audio_response(&root, "/static/audio/security/xx/intro.opus", &headers)
                 .is_none()
         );
 
@@ -1027,25 +1027,28 @@ mod tests {
             "application/json; charset=utf-8"
         );
 
-        // Present MP3 supports full download and partial byte-range requests.
-        let full = security_audio_response(&root, "/static/audio/security/en/intro.mp3", &headers)
-            .expect("intro mp3");
+        // Present Opus file supports full download and partial byte-range requests.
+        let full = security_audio_response(&root, "/static/audio/security/en/intro.opus", &headers)
+            .expect("intro opus");
         assert_eq!(full.status(), StatusCode::OK);
-        assert_eq!(full.headers()[header::CONTENT_TYPE], "audio/mpeg");
+        assert_eq!(
+            full.headers()[header::CONTENT_TYPE],
+            "audio/ogg; codecs=opus"
+        );
         assert_eq!(full.headers()[header::ACCEPT_RANGES], "bytes");
 
         let mut ranged_headers = HeaderMap::new();
         ranged_headers.insert(header::RANGE, HeaderValue::from_static("bytes=4-7"));
         let part = security_audio_response(
             &root,
-            "/static/audio/security/en/intro.mp3",
+            "/static/audio/security/en/intro.opus",
             &ranged_headers,
         )
-        .expect("ranged mp3");
+        .expect("ranged opus");
         assert_eq!(part.status(), StatusCode::PARTIAL_CONTENT);
         assert_eq!(
             part.headers()[header::CONTENT_RANGE],
-            format!("bytes 4-7/{}", fake_mp3.len()).as_str()
+            format!("bytes 4-7/{}", fake_opus.len()).as_str()
         );
 
         assert!(MOVED.contains(&"invite"));
