@@ -353,6 +353,8 @@ test("signed in, each action puts the focus where its result is", async ({ page 
   await second.locator(".gw-mint-form button[type=submit]").click();
   // the new token takes the focus; kept, its gateway's card does
   await expect(page.getByRole("heading", { name: "Your new token" })).toBeFocused();
+  // in the form a gateway's console takes it: the prefix, then the hex
+  await expect(page.locator(".secret-box code")).toHaveText(`bgt_${"05".repeat(32)}`);
   await page.getByRole("button", { name: "I have saved it" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Gateway 2" })).toBeFocused();
