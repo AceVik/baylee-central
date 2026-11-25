@@ -12,7 +12,7 @@ build = "build.rs"
 central-api = { path = "../central-api", version = "=0.1.0" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
-sha2 = { version = "=0.11.1", default-features = false }
+sha2 = { version = "=0.11.2", default-features = false }
 
 # Leptos renders on the server and hydrates the islands in the browser; the
 # target, never a feature of ours, picks the half (docs/proposals/frontend-rewrite.md
