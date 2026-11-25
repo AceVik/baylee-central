@@ -1,5 +1,5 @@
-<!-- version: 2026-11-19 -->
-<!-- updated: 2026-11-19 -->
+<!-- version: 2026-11-25 -->
+<!-- updated: 2026-11-25 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -46,7 +46,7 @@ Anspruch auf eine bestimmte Verfügbarkeit gibt es nicht.
    Du kannst Baylee damit pseudonym
    nutzen (§ 19 Abs. 2 TDDDG). Offline gegen den Computer spielen kannst du
    ganz ohne Konto.
-2. **Alter.** Du musst mindestens 16 Jahre alt sein. Bist du noch nicht
+2. **Alter.** Du musst mindestens 13 Jahre alt sein. Bist du noch nicht
    volljährig, brauchst du für ein Konto die Zustimmung deiner Eltern oder
    anderer Sorgeberechtigter.
 3. **Benutzername und Anzeigename** dürfen keine Rechte Dritter verletzen,

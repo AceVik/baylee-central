@@ -25,4 +25,4 @@ date-picker-next-month = Следующий месяц
 date-picker-prev-year = Предыдущий год
 date-picker-next-year = Следующий год
 date-picker-placeholder = Выберите дату рождения
-date-picker-age-error = Вам должно быть не менее 16 лет.
+date-picker-age-error = Вам должно быть не менее 13 лет.

@@ -25,4 +25,4 @@ date-picker-next-month = Próximo mês
 date-picker-prev-year = Ano anterior
 date-picker-next-year = Próximo ano
 date-picker-placeholder = Selecionar data de nascimento
-date-picker-age-error = Você precisa ter pelo menos 16 anos.
+date-picker-age-error = Você precisa ter pelo menos 13 anos.

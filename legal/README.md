@@ -1,6 +1,7 @@
 # Legal texts of Baylee Central
 
-**Status: the terms and the privacy policy are at version 2026-11-19.** The
+**Status: the terms and the privacy policy are at version 2026-11-25** (the
+minimum age, below; before it 2026-11-19). The
 privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
 reviewed by the owner on 19.11.2026; the status his later decision of the same
 day added changed that paragraph and point again, and he approved the German
@@ -136,3 +137,18 @@ should it be published before the owner reads these sentences, they make a
 new version of the privacy policy (shown, not accepted). The English follows
 the German; the website's privacy page (`privacy-chat`, eleven languages,
 the nine beside German and English machine translations) says the same.
+
+**Version 2026-11-25: the minimum age is 13.** On 25.11.2026 the owner
+decided that Central, like the official gateway, takes players from 13, the
+age Magic: The Gathering itself names (Baylee #316). The terms' § 2 says 13
+and keeps the parents' consent for anyone not yet of age (§§ 106 ff. BGB);
+being a new version of the terms, every account is asked to accept it again.
+The privacy policy's date-of-birth check says 13, and § 8 adds that a
+consent (crash reports, notifications) given under 16 counts only with the
+parents' agreement (Art. 8 GDPR, 16 in Germany): the account itself rests on
+the contract (Art. 6(1)(b)), which Art. 8 does not govern. Registration's
+age box, the date picker's warning and the profile's birth-date check
+(`central-postgres` `set_profile_details`) say and check 13; the website's
+privacy page says the same in its eleven languages, the nine beside German
+and English machine translations. Written by the implementing agent; the
+owner's review of these sentences is still to come.
