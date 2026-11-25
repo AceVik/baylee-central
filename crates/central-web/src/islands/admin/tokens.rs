@@ -551,7 +551,7 @@ fn card(p: &Page, token: &ReportTokenInfo, now: i64) -> impl IntoView + use<> {
                     token.revoked_by_name.as_deref(),
                     token.revoked_by_tag,
                 );
-                words::rt_revoked_by(lang, &name, &time)
+                words::rt_revoked_by(lang, &time, &name)
             }
             None => words::rt_revoked_at(lang, &time),
         };

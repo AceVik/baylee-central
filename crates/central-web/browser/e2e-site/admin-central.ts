@@ -307,11 +307,11 @@ function change(w: World, asked: Asked, answer: Answer, done: (other: boolean) =
       break;
     }
     case "create_report_token": {
-      const made = reportTokenOf(9, asked.name ?? "", { scopes: asked.scopes ?? [] });
-      w.reportTokens.unshift(made);
+      const issued = reportTokenOf(9, asked.name ?? "", { scopes: asked.scopes ?? [] });
+      w.reportTokens.unshift(issued);
       if (next === "lost") return abort();
       if (next === "other") return done(true);
-      return answer({ answer: "report_token_created", id: made.id, token: SECRET, expires_at: FAR });
+      return answer({ answer: "report_token_created", id: issued.id, token: SECRET, expires_at: FAR });
     }
     case "revoke_report_token": {
       const token = w.reportTokens.find((t) => same(t.id, asked.token));
