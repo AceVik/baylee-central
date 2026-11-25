@@ -235,15 +235,25 @@ impl Mails {
     /// `Busy` when the account asked too often, when no place to send is
     /// free and when the mailer did not take the mail; `Rejected` when the
     /// mailer refuses the address itself.
-    async fn code(
+    pub(super) async fn code(
         &self,
         mailer: Arc<dyn Mailer>,
         account: [u8; 16],
         address: &str,
         lang: &str,
     ) -> Result<MailCode, Error> {
-        // The place first: a request that finds none spent no mail of the
-        // account's.
+        let code = MailCode::generate()?;
+        let mail = Mail::confirm(address, account, lang, &code, CODE_MINUTES);
+        self.deliver_checked(mailer, account, mail).await?;
+        Ok(code)
+    }
+
+    pub(super) async fn deliver_checked(
+        &self,
+        mailer: Arc<dyn Mailer>,
+        account: [u8; 16],
+        mail: Mail,
+    ) -> Result<(), Error> {
         let permit = self
             .sending
             .clone()
@@ -253,8 +263,6 @@ impl Mails {
             .lock()
             .map_err(|_| Error::Unavailable)?
             .code_mail(account, Instant::now())?;
-        let code = MailCode::generate()?;
-        let mail = Mail::confirm(address, account, lang, &code, CODE_MINUTES);
         let outcome = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             mailer.send(&mail)
@@ -262,7 +270,7 @@ impl Mails {
         .await
         .map_err(|_| Error::Unavailable)?;
         match outcome {
-            Outcome::Sent => Ok(code),
+            Outcome::Sent => Ok(()),
             Outcome::Rejected => Err(Error::Rejected),
             Outcome::Busy | Outcome::Unavailable => Err(Error::Busy),
         }
@@ -535,6 +543,50 @@ impl IdentityService {
             .withdraw_mailed_reset(reset.account, &digest)
             .await;
         Delivery::Failed
+    }
+}
+
+impl IdentityService {
+    /// Save an onboarding address as pending when unconfirmed (after mail
+    /// delivery succeeds) and send a ZIP recovery-code backup email
+    /// (`baylee-recovery-code.zip`).
+    pub(super) async fn send_recovery_backup_mail(
+        &self,
+        cookie: Option<&Token>,
+        email: &str,
+        zip_base64: String,
+        encrypted: bool,
+        lang: &str,
+    ) -> Result<Response, Error> {
+        let cookie = cookie.ok_or(Error::Rejected)?;
+        let mailer = self.mails.needed()?;
+        central_api::email::address(email)?;
+        central_api::email::language(lang)?;
+        central_api::email::validate_backup_zip_base64(&zip_base64)?;
+        let prep = self
+            .store
+            .prepare_recovery_backup(cookie, email, lang)
+            .await?;
+        let mail = Mail::recovery_backup(
+            &prep.email,
+            prep.account,
+            lang,
+            &prep.handle,
+            encrypted,
+            zeroize::Zeroizing::new(zip_base64),
+        );
+        self.mails
+            .deliver_checked(mailer, prep.account, mail)
+            .await?;
+        if prep.needs_pending {
+            let placeholder = MailCode::generate()?;
+            let mut salt = [0_u8; 16];
+            getrandom::fill(&mut salt).map_err(|_| Error::Unavailable)?;
+            self.store
+                .save_recovery_backup_pending(cookie, email, lang, &placeholder.digest(&salt))
+                .await?;
+        }
+        Ok(Response::Done)
     }
 }
 

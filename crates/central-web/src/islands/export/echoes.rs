@@ -6,7 +6,7 @@ use super::super::{
 use central_api::wire;
 
 pub(super) async fn receipts() -> Result<serde_json::Value, Failure> {
-    let stamp = session::marker().ok_or(Failure::Rejected)?;
+    let stamp = session::login_stamp().ok_or(Failure::Rejected)?;
     let mut after = None;
     let mut rows = Vec::new();
     let mut progress = None;
@@ -16,7 +16,7 @@ pub(super) async fn receipts() -> Result<serde_json::Value, Failure> {
         else {
             return Err(Failure::Malformed);
         };
-        if session::marker().as_ref() != Some(&stamp) {
+        if session::login_stamp().as_ref() != Some(&stamp) {
             return Err(Failure::Rejected);
         }
         export.validate(after).map_err(|_| Failure::Malformed)?;

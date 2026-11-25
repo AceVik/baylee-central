@@ -4,7 +4,7 @@
 //! account run one after the other and each reads what the other committed.
 //! Nothing here sends mail: the identity service mails a code, and stores
 //! its digest only after the mailer took the mail.
-use super::{AccountStore, Error, Session, statement, uuid};
+use super::{AccountStore, Error, Session, Token, statement, uuid};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
 
 /// Minutes a mailed confirmation code lasts: enough to open a mailbox and
@@ -49,6 +49,28 @@ impl std::fmt::Debug for Email {
     }
 }
 
+/// Account id (UUID bytes) and metadata resolved by `prepare_recovery_backup`
+/// for mailing a ZIP backup to an account's own address. Debug says nothing sensitive.
+pub struct RecoveryBackupPrep {
+    /// Account id (UUID bytes) for the mailer rate-limit key.
+    pub account: [u8; 16],
+    /// Safe public handle (`Name#tag`) or sign-in name for the email text.
+    pub handle: String,
+    /// Target address (`central_api::email::address`-validated).
+    pub email: String,
+    /// `true` when the account has no confirmed address yet so the address
+    /// should be recorded as pending after delivery succeeds.
+    pub needs_pending: bool,
+}
+
+impl std::fmt::Debug for RecoveryBackupPrep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecoveryBackupPrep")
+            .field("email", &"[REDACTED]")
+            .finish_non_exhaustive()
+    }
+}
+
 /// A confirmed address to be told of a change: one that was replaced or
 /// removed, or the account's own when its login changed.
 pub struct Told {
@@ -67,7 +89,7 @@ impl std::fmt::Debug for Told {
 /// The enrolled account behind the live `session` and whether its password
 /// sign-in is fresh. With `lock` the account's row stays locked until the
 /// transaction ends.
-async fn holder(
+pub(in crate::accounts) async fn holder(
     db: &impl ConnectionTrait,
     session: Session<'_>,
     lock: bool,
@@ -406,6 +428,137 @@ impl AccountStore {
         let email = held(&tx, account, fresh).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok((email, told))
+    }
+
+    /// Validate the live onboarding browser session and resolve the target
+    /// account + backup recipient without committing any pending address yet.
+    /// When the account already has a confirmed address, `address` must match
+    /// it (`needs_pending = false`); otherwise the sign-in must still be fresh
+    /// within the 30-minute onboarding window (`needs_pending = true`), and
+    /// [`Self::save_recovery_backup_pending`] records the pending address only
+    /// after mail delivery succeeds.
+    ///
+    /// # Errors
+    /// `Rejected` for an invalid address/language, missing or stale browser
+    /// session, or mismatched confirmed address; `Unavailable` on storage
+    /// failure.
+    pub async fn prepare_recovery_backup(
+        &self,
+        browser: &Token,
+        address: &str,
+        lang: &str,
+    ) -> Result<RecoveryBackupPrep, Error> {
+        central_api::email::address(address)?;
+        central_api::email::language(lang)?;
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let session = Session::Browser(browser);
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT a.id, a.username_key, a.display_name, a.tag,
+                     COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp()
+                         - interval '30 minutes' AS fresh
+                 FROM central_identity.accounts a
+                 JOIN central_identity.sessions s
+                     ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 WHERE s.digest = $1 AND s.kind = 'browser' AND a.credential IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp()",
+                vec![session.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        let fresh: bool = row.try_get("", "fresh").map_err(|_| Error::Unavailable)?;
+        let username: String = row
+            .try_get("", "username_key")
+            .map_err(|_| Error::Unavailable)?;
+        let (display_name, tag) = super::profiles::columns(&row)?;
+        let handle = match (display_name, tag) {
+            (Some(name), Some(tag)) => central_api::profile::handle(&name, tag),
+            _ => username,
+        };
+        let needs_pending = if let Some(existing) = confirmed(&tx, account).await? {
+            if existing.address != address {
+                return Err(Error::Rejected);
+            }
+            false
+        } else {
+            if !fresh {
+                return Err(Error::Rejected);
+            }
+            true
+        };
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(RecoveryBackupPrep {
+            account: *account.as_bytes(),
+            handle,
+            email: address.to_owned(),
+            needs_pending,
+        })
+    }
+
+    /// Record an onboarding backup email as pending after delivery succeeded,
+    /// re-checking the 30-minute onboarding freshness window and `NOT EXISTS` in
+    /// `account_emails` under an account row lock.
+    ///
+    /// # Errors
+    /// `Rejected` when the session vanished or ceased to be fresh;
+    /// `Unavailable` on storage failure.
+    pub async fn save_recovery_backup_pending(
+        &self,
+        browser: &Token,
+        address: &str,
+        lang: &str,
+        pending_code_digest: &[u8; 32],
+    ) -> Result<(), Error> {
+        central_api::email::address(address)?;
+        central_api::email::language(lang)?;
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let session = Session::Browser(browser);
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT a.id,
+                     COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp()
+                         - interval '30 minutes' AS fresh
+                 FROM central_identity.accounts a
+                 JOIN central_identity.sessions s
+                     ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 WHERE s.digest = $1 AND s.kind = 'browser' AND a.credential IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp()
+                 FOR UPDATE OF a",
+                vec![session.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        let fresh: bool = row.try_get("", "fresh").map_err(|_| Error::Unavailable)?;
+        if !fresh {
+            return Err(Error::Rejected);
+        }
+        tx.execute_raw(statement(
+            "INSERT INTO central_identity.account_email_pending
+                 (account_id, address, lang, code_digest, expires_at)
+             SELECT $1, $2, $3, $4,
+                 pg_catalog.clock_timestamp() + pg_catalog.make_interval(mins => $5)
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM central_identity.account_emails WHERE account_id = $1
+             )
+             ON CONFLICT (account_id) DO UPDATE SET address = EXCLUDED.address,
+                 lang = EXCLUDED.lang, code_digest = EXCLUDED.code_digest,
+                 expires_at = EXCLUDED.expires_at, tries = 0",
+            vec![
+                account.into(),
+                address.into(),
+                lang.into(),
+                pending_code_digest.to_vec().into(),
+                MAIL_CODE_MINUTES.into(),
+            ],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(())
     }
 }
 

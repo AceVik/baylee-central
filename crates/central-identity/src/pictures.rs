@@ -15,7 +15,7 @@
 use super::{Error, IdentityService, Response, Surface, Token};
 use central_api::admin::AdminAnswer;
 use central_api::picture::{PictureAdmin, PictureDigest, PictureKey, PictureRequest};
-use central_picture::{Format, Motion, Refusal, Worker};
+use central_picture::{Converted, Format, Motion, Refusal, Worker};
 use central_postgres::pictures::{Encoding, OwnPicture, PictureFiles};
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -71,9 +71,11 @@ fn kept_still(motion: &Motion) {
     );
 }
 
-/// An admitted upload: its account. It holds no conversion slot.
+/// An admitted upload: its account (and target group for a group picture).
+/// It holds no conversion slot.
 pub struct Admitted {
     account: [u8; 16],
+    group: Option<[u8; 16]>,
 }
 
 /// A conversion slot: its account, given back when dropped.
@@ -205,7 +207,69 @@ impl IdentityService {
         }
         Ok(Admitted {
             account: admission.account,
+            group: None,
         })
+    }
+
+    /// Admit a group picture upload by the browser session `cookie` for
+    /// `group`, before its body is read.
+    ///
+    /// # Errors
+    /// `Account(Rejected)` without a live browser session or joined group
+    /// admin role, `Account(TermsRequired)` before Central's terms are
+    /// accepted, `Blocked` while an administrator's block is in force,
+    /// `Account(Busy)` when the budget is spent, and `Account(Unavailable)`
+    /// without a worker.
+    pub async fn admit_group_picture(
+        &self,
+        cookie: &Token,
+        group: [u8; 16],
+    ) -> Result<Admitted, UploadRefusal> {
+        if self.pictures.worker.is_none() {
+            return Err(Error::Unavailable.into());
+        }
+        self.require_terms(Some(cookie), Surface::Browser).await?;
+        let admission = self.store.group_picture_admission(cookie, group).await?;
+        if admission.block.is_some() {
+            return Err(UploadRefusal::Blocked);
+        }
+        if !admission.room {
+            return Err(Error::Busy.into());
+        }
+        Ok(Admitted {
+            account: admission.account,
+            group: Some(group),
+        })
+    }
+
+    async fn convert_admitted(
+        &self,
+        account: [u8; 16],
+        format: Format,
+        bytes: Vec<u8>,
+    ) -> Result<(PictureKey, Converted), UploadRefusal> {
+        let worker = self
+            .pictures
+            .worker
+            .clone()
+            .ok_or(UploadRefusal::Account(Error::Unavailable))?;
+        // The whole body is here: only now a slot, and it goes with the
+        // conversion onto its thread, so it is held until the worker ended.
+        let slot =
+            Slot::take(&self.pictures.slots, account).ok_or(UploadRefusal::Account(Error::Busy))?;
+        self.store.charge_picture(account).await?;
+        let converted = tokio::task::spawn_blocking(move || {
+            let converted = worker.convert(format, &bytes);
+            drop(slot);
+            converted
+        })
+        .await
+        .map_err(|_| UploadRefusal::Picture(Refusal::Failed))?
+        .map_err(UploadRefusal::Picture)?;
+        kept_still(&converted.motion);
+        let mut key: PictureKey = [0; 16];
+        getrandom::fill(&mut key).map_err(|_| UploadRefusal::Account(Error::Unavailable))?;
+        Ok((key, converted))
     }
 
     /// Convert and store an admitted upload of `bytes`, declared `format`.
@@ -222,27 +286,12 @@ impl IdentityService {
         format: Format,
         bytes: Vec<u8>,
     ) -> Result<Response, UploadRefusal> {
-        let worker = self
-            .pictures
-            .worker
-            .clone()
-            .ok_or(UploadRefusal::Account(Error::Unavailable))?;
-        // The whole body is here: only now a slot, and it goes with the
-        // conversion onto its thread, so it is held until the worker ended.
-        let slot = Slot::take(&self.pictures.slots, admitted.account)
-            .ok_or(UploadRefusal::Account(Error::Busy))?;
-        self.store.charge_picture(admitted.account).await?;
-        let converted = tokio::task::spawn_blocking(move || {
-            let converted = worker.convert(format, &bytes);
-            drop(slot);
-            converted
-        })
-        .await
-        .map_err(|_| UploadRefusal::Picture(Refusal::Failed))?
-        .map_err(UploadRefusal::Picture)?;
-        kept_still(&converted.motion);
-        let mut key: PictureKey = [0; 16];
-        getrandom::fill(&mut key).map_err(|_| UploadRefusal::Account(Error::Unavailable))?;
+        if admitted.group.is_some() {
+            return Err(UploadRefusal::Account(Error::Rejected));
+        }
+        let (key, converted) = self
+            .convert_admitted(admitted.account, format, bytes)
+            .await?;
         let own = self
             .store
             .set_picture(
@@ -258,6 +307,46 @@ impl IdentityService {
             )
             .await?;
         Ok(answer(own))
+    }
+
+    /// Convert and store an admitted group picture upload of `bytes`, declared
+    /// `format`, notifying live social push listeners for all members and
+    /// invitees. Returns the new key and whether the picture moves.
+    ///
+    /// # Errors
+    /// As [`Self::store_picture`], plus `Account(Rejected)` if the caller is
+    /// no longer a joined group administrator.
+    pub async fn store_group_picture(
+        &self,
+        admitted: Admitted,
+        cookie: &Token,
+        format: Format,
+        bytes: Vec<u8>,
+    ) -> Result<(PictureKey, bool), UploadRefusal> {
+        let Some(group) = admitted.group else {
+            return Err(UploadRefusal::Account(Error::Rejected));
+        };
+        let (key, converted) = self
+            .convert_admitted(admitted.account, format, bytes)
+            .await?;
+        let moving = converted.sequence().is_some();
+        let concerns = self
+            .store
+            .set_group_picture(
+                cookie,
+                admitted.account,
+                group,
+                key,
+                PictureFiles {
+                    avif: &converted.avif,
+                    png: &converted.png,
+                    sequence: converted.sequence(),
+                    sha256: converted.sha256,
+                },
+            )
+            .await?;
+        self.tell(&concerns);
+        Ok((key, moving))
     }
 
     /// A picture's bytes by its key, for anyone, with the PNG master's

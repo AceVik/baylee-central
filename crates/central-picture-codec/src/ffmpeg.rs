@@ -464,6 +464,7 @@ impl Scratch {
         let base = std::env::temp_dir();
         for n in 0..64 {
             let path = base.join(format!("central-picture-{}-{n}", std::process::id()));
+            #[cfg_attr(not(unix), allow(unused_mut))]
             let mut builder = std::fs::DirBuilder::new();
             #[cfg(unix)]
             std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);

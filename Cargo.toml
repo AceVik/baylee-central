@@ -20,6 +20,13 @@ pedantic = { level = "deny", priority = -1 }
 overflow-checks = true
 strip = "debuginfo"
 
+# Release profile with full FatLTO and single codegen unit for PGO builds
+# (`cargo xtask pgo`) targeting x86-64-v3 Linux production binaries.
+[profile.release-pgo]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+
 [profile.dev]
 overflow-checks = true
 

@@ -50,7 +50,9 @@ pub use donations::{
     CONVERT_DAYS, DONATION_DAYS, Donation, DonationKind, DonationSums, GITHUB_WINDOW_DAYS,
     KOFI_WINDOW_DAYS, MOST_AMOUNT, MOST_EURO_CENTS, Platform, Recorded,
 };
-pub use email::{EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, Told};
+pub use email::{
+    EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, RecoveryBackupPrep, Told,
+};
 pub use legacy::LegacyMove;
 pub use migration::Status;
 pub use pairing::{Approval, Claim, MAX_POLLS, OPEN_IN_ALL, OPEN_PER_ACCOUNT, Redeemed};
@@ -67,7 +69,7 @@ pub use reports::{
 pub use reset::{
     ISSUED_RESET_HOURS, MAILED_RESET_HOURS, MailedReset, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY,
 };
-pub use sessions::{Issued, Session};
+pub use sessions::{Issued, RefreshOutcome, Session};
 pub use streams::{
     GatewayGrant, GatewayPush, GatewayPushResult, MAX_SIDS_PER_SESSION, PUSH_ATTEMPTS,
     REVOCATION_PAGE, RevocationPage,
@@ -108,10 +110,11 @@ fn origins<S: AsRef<str>>(set: &[S]) -> Result<Value, Error> {
 fn any_origin(n: u8) -> String {
     format!("ANY(pg_catalog.string_to_array(${n}::text,' '))")
 }
-/// A registered gateway `g` an administrator has not disabled: approved or
-/// still pending. A pending gateway signs players in by token
+/// A registered gateway `g` an administrator has not disabled and not soft-deleted:
+/// approved or still pending. A pending gateway signs players in by token
 /// (`GatewayState`); only the directory waits for the approval.
-const NOT_DISABLED: &str = "NOT EXISTS(SELECT 1 FROM central_identity.gateway_approvals d
+const NOT_DISABLED: &str =
+    "g.deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM central_identity.gateway_approvals d
     WHERE d.gateway_id=g.id AND NOT d.enabled)";
 fn uuid(id: [u8; 16]) -> Uuid {
     Uuid::from_bytes(id)
@@ -323,6 +326,25 @@ impl AccountStore {
         document: &[u8],
         recovery: Option<&[u8]>,
     ) -> Result<(), Error> {
+        self.enroll_concerning(ticket, record, wrapped, document, recovery)
+            .await
+            .map(|_| ())
+    }
+
+    /// Atomically commit first enrollment (`credential`, `wrapped_master`,
+    /// encrypted document) and consume any reserved friend invite, returning
+    /// live push/presence notifications for any new mutual friendship.
+    ///
+    /// # Errors
+    /// Rejects invalid/expired tickets, malformed cryptographic fields, or blocked/full friend limits.
+    pub async fn enroll_concerning(
+        &self,
+        ticket: &Token,
+        record: &[u8],
+        wrapped: &[u8],
+        document: &[u8],
+        recovery: Option<&[u8]>,
+    ) -> Result<Concerns, Error> {
         ServerKeys::enrollment_record(record).map_err(|_| Error::Rejected)?;
         WrappedMasterKey::from_bytes(wrapped).map_err(|_| Error::Rejected)?;
         if let Some(recovery) = recovery {
@@ -349,19 +371,35 @@ impl AccountStore {
             ("registered", Some(_)) | ("legacy", None) => {}
             _ => return Err(Error::Rejected),
         }
-        let result = tx.execute_raw(statement(
-            "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3, document = $4,
-             recovery_wrapped_master = $5, document_revision = 1, enrollment_digest = NULL,
-             enrollment_expires = NULL
-             WHERE enrollment_digest = $1 AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL
-             AND source = $6",
-            vec![digest.into(), record.to_vec().into(), wrapped.to_vec().into(), document.to_vec().into(),
-                recovery.map(<[u8]>::to_vec).into(), source.into()],
-        )).await.map_err(|_| Error::Unavailable)?;
-        if result.rows_affected() != 1 {
-            return Err(Error::Rejected);
-        }
-        tx.commit().await.map_err(|_| Error::Unavailable)
+        let enrolled_row = tx
+            .query_one_raw(statement(
+                "UPDATE central_identity.accounts SET credential = $2, wrapped_master = $3, document = $4,
+                 recovery_wrapped_master = $5, document_revision = 1, enrollment_digest = NULL,
+                 enrollment_expires = NULL
+                 WHERE enrollment_digest = $1 AND enrollment_expires > pg_catalog.clock_timestamp() AND credential IS NULL
+                 AND source = $6
+                 RETURNING id, tag",
+                vec![
+                    digest.into(),
+                    record.to_vec().into(),
+                    wrapped.to_vec().into(),
+                    document.to_vec().into(),
+                    recovery.map(<[u8]>::to_vec).into(),
+                    source.into(),
+                ],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account_id: sea_orm::prelude::Uuid = enrolled_row
+            .try_get("", "id")
+            .map_err(|_| Error::Unavailable)?;
+        let account_tag: Option<i32> = enrolled_row
+            .try_get("", "tag")
+            .map_err(|_| Error::Unavailable)?;
+        let concerns = social::invites::finalize_on_enroll(&tx, account_id, account_tag).await?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(concerns)
     }
 
     /// Read a credential for an OPAQUE exchange; the context is checked independently.

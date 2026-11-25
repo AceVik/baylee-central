@@ -491,9 +491,10 @@ to it instead of answering 404, with the `Host` unchanged (Caddy's default for
 a plain-HTTP upstream):
 
 ```caddyfile
-	# A profile picture's upload (docs/profile-pictures.md): the route's
+	# Profile and group picture uploads (docs/profile-pictures.md): the route's
 	# own bound, 8 MiB and its frame; the longer path is tried first.
-	handle /api/v1/picture {
+	@picture_upload path /api/v1/picture /api/v1/groups/*/picture
+	handle @picture_upload {
 		request_body {
 			max_size 9MiB
 		}
@@ -1574,7 +1575,8 @@ repository, and the deploy hook builds and installs this site instead
   			header_up -Cookie
   		}
   	}
-  	handle /api/v1/picture {
+  	@picture_upload path /api/v1/picture /api/v1/groups/*/picture
+  	handle @picture_upload {
   		request_body {
   			max_size 9MiB
   		}

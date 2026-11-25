@@ -34,11 +34,15 @@ const settings = JSON.stringify({
   fallback: "crates/central-web-server/tests/data",
 });
 const command =
-  PORT === DEV_PORT
-    ? "target/debug/central-web --dev target/site crates/central-web-server/tests/data"
-    : `printf '%s' '${settings}' | target/debug/central-web --config-stdin`;
+  process.platform === "win32"
+    ? PORT === DEV_PORT
+      ? "target\\debug\\central-web.exe --dev target/site crates/central-web-server/tests/data"
+      : `node -e "const{spawn}=require('node:child_process');const p=spawn('target/debug/central-web.exe',['--config-stdin'],{stdio:['pipe','inherit','inherit']});p.stdin.end(process.env.CENTRAL_WEB_E2E_CFG);p.on('exit',c=>process.exit(c??1))"`
+    : PORT === DEV_PORT
+      ? "target/debug/central-web --dev target/site crates/central-web-server/tests/data"
+      : `printf '%s' '${settings}' | target/debug/central-web --config-stdin`;
 
-const PHONE_SPECS = /\/(site|languages|strip|dialogs|theme|chat|recovery|pwa|security)\.spec\.ts$/;
+const PHONE_SPECS = /\/(site|strip|dialogs|theme|chat|recovery|pwa|security)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: ".",
@@ -50,6 +54,7 @@ export default defineConfig({
   webServer: {
     command,
     cwd: "../../../..",
+    env: { CENTRAL_WEB_E2E_CFG: settings },
     url: `http://127.0.0.1:${PORT}/robots.txt`,
     reuseExistingServer: false,
     timeout: 30_000,

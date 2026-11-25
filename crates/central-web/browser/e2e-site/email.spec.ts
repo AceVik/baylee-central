@@ -104,6 +104,28 @@ function central(seen: Body[], w: World) {
           result: "account_summary", identity: { account: ACCOUNT, epoch: 1 }, username: "erika", display_name: "Erika", tag: 0x1a2b,
           source: "registered", recovery: true, admin: false, signed_in_at: THEN, expires_at: 4_102_444_800,
         });
+      case "picture":
+        if (body.request?.action === "mine") return json({ result: "my_picture", picture: null, notice: null, block: null });
+        return refused(401);
+      case "profile_details":
+        return json({
+          result: "profile_details",
+          details: { first_name: null, last_name: null, birth_date: null, public_profile: false },
+        });
+      case "own_badges":
+        return json({
+          result: "own_badges",
+          badges: {
+            ranked_season: null,
+            ranked_standings: [],
+            ranked_awards: [],
+            best_rank: null,
+            challenge_badges: [],
+            tower_badges: [],
+            echoes_badges: [],
+            social_badges: [],
+          },
+        });
       case "owner":
         if (body.request?.action !== "sessions") return refused(401);
         return json({
@@ -186,7 +208,7 @@ async function open(page: Page, w: World, options: { path?: string; canned?: boo
   if (options.canned ?? true) {
     await page.route("**/assets/crypto-worker.*.js", (route) => route.fulfill({ contentType: "text/javascript", body: WORKER }));
   }
-  await page.goto(options.path ?? "/en/account/security");
+  await page.goto(options.path ?? "/en/account/profile");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   return { seen, problems };
 }
@@ -194,13 +216,13 @@ async function open(page: Page, w: World, options: { path?: string; canned?: boo
 // a route does not see what a service worker fetches: the canned Worker
 test.use({ serviceWorkers: "block" });
 
-const card = (page: Page) => page.locator("section[aria-labelledby=email-title]");
+const card = (page: Page) => page.locator("[aria-labelledby=email-title]");
 const address = (page: Page) => page.locator("#email-address");
 const password = (page: Page) => page.locator("#email-password");
 const code = (page: Page) => page.locator("#email-code");
 const alert = (page: Page) => card(page).getByRole("alert");
 const said = (page: Page) => page.locator("#email-said");
-const button = (page: Page, name: string) => card(page).getByRole("button", { name, exact: true });
+const button = (page: Page, name: string) => card(page).getByRole("button", { name, exact: true }).last();
 /** What was asked about the address since `from`. */
 const actions = (seen: Body[], from = 0) => seen.slice(from).filter((body) => body.operation === "email").map((body) => body.request?.action);
 const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
@@ -232,17 +254,17 @@ test("without an address the section explains itself, and the form sends nothing
   const { seen, problems } = await open(page, world());
   const section = card(page);
   await expect(section.getByRole("heading", { name: "E-mail address" })).toBeVisible();
-  // below the password's change
-  await expect(page.locator("section[aria-labelledby=password-title] + section")).toHaveAttribute("aria-labelledby", "email-title");
+  // inside the personal data and e-mail card on the profile page
+  await expect(page.locator("section[aria-labelledby=profile-personal-title] [aria-labelledby=email-title]")).toHaveCount(1);
   await expect(address(page)).toBeVisible();
   await expect(section).toContainText("An e-mail address is optional.");
   await expect(section.locator(".notice")).toHaveText(
     "Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.",
   );
-  await expect(section.locator("label[for=email-address]")).toHaveText("E-mail address");
+  await expect(section.locator("label[for=email-address]")).toHaveText("Email address");
   await expect(address(page)).toHaveAttribute("type", "email");
   await expect(address(page)).toHaveAttribute("autocomplete", "email");
-  await expect(section.locator("label[for=email-password]")).toHaveText("Your password, to confirm");
+  await expect(section.locator("label[for=email-password]")).toHaveText("Current password to confirm");
   await expect(password(page)).toHaveAttribute("type", "password");
   await expect(password(page)).toHaveAttribute("autocomplete", "current-password");
   // no field has a name: nothing here is a form a browser could send
@@ -261,7 +283,7 @@ test("without an address the section explains itself, and the form sends nothing
   await address(page).fill(NEW);
   await button(page, "Send confirmation code").click();
   await expect(alert(page)).toHaveText("Enter an e-mail address and your password.");
-  const unwritable = "We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.";
+  const unwritable = "We cannot write to this address. Enter one plain address such as name@example.org (accented letters and umlauts do not work).";
   // (an umlaut in the domain is not among them: Chrome hands the page its
   // punycode, which is an address like any other)
   for (const bad of ["erika", "erika@localhost", "jürgen@example.org", "Erika <erika@example.org>"]) {
@@ -287,8 +309,6 @@ test("naming an address signs in once more, and the mailed code confirms it", as
   const start = seen[asked + 1] as { identity: unknown; message: number[] };
   expect(start.identity).toEqual({ account: ACCOUNT, epoch: 1 });
   expect(seen.findLast((body) => body.operation === "email")).toEqual({ operation: "email", request: { action: "set", address: NEW, lang: "en" } });
-  // the session is a newer one: the list beside the section is read again
-  await expect.poll(() => seen.findLastIndex((body) => body.operation === "owner")).toBeGreaterThan(asked + 2);
   // the keyboard goes on at the code
   await expect(code(page)).toBeFocused();
   await expect(code(page)).toHaveAttribute("autocomplete", "one-time-code");
@@ -298,7 +318,7 @@ test("naming an address signs in once more, and the mailed code confirms it", as
   await expect(card(page).locator("input[name]")).toHaveCount(0);
   await expect(card(page).locator("code")).toHaveAttribute("translate", "no");
   await sound(page);
-  await tabs(page, code(page), [button(page, "Confirm"), button(page, "Send again"), button(page, "Use another address")]);
+  await tabs(page, code(page), [card(page).locator("button.inset-end"), button(page, "Verify"), button(page, "Resend code"), button(page, "Withdraw")]);
 
   // typed as a person types it; shown in capitals, sent as it was mailed
   await code(page).fill(" 000g 40r4");
@@ -315,7 +335,7 @@ test("naming an address signs in once more, and the mailed code confirms it", as
   await expect(code(page)).toHaveCount(0);
   await expect(address(page)).toHaveCount(0);
   await sound(page);
-  await tabs(page, button(page, "Change"), [button(page, "Remove")]);
+  await tabs(page, button(page, "Change"), [button(page, "Remove email")]);
   // the password went to the Worker and nowhere else
   expect(JSON.stringify(seen)).not.toContain("lantern");
   expect(problems).toEqual([]);
@@ -329,14 +349,14 @@ test("a wrong code is said and the state read again; after several the address i
   // what is no code at all is not sent, and is no wrong code either
   for (const none of ["", "000G-40R", "RESET-000G-40R4", "000G-40RU"]) {
     await code(page).fill(none);
-    await button(page, "Confirm").click();
+    await button(page, "Verify").click();
     await expect(alert(page)).toHaveText("That is not a confirmation code. It has eight characters, as in XXXX-XXXX.");
   }
   expect(seen.slice(asked)).toEqual([]);
 
   const wrong = "That code is not right. Check it and try again. After several wrong codes you have to enter the address again.";
   await code(page).fill("zzzz-zzzz");
-  await button(page, "Confirm").click();
+  await button(page, "Verify").click();
   await expect(alert(page)).toHaveText(wrong);
   expect(actions(seen, asked)).toEqual(["confirm", "status"]);
   // to type it again: the field has the keyboard and still what was typed
@@ -347,7 +367,7 @@ test("a wrong code is said and the state read again; after several the address i
   await code(page).press("Enter");
   await expect.poll(() => actions(seen, asked)).toEqual(["confirm", "status", "confirm", "status"]);
   // the button is the page's again once the state was read
-  await expect(button(page, "Confirm")).not.toHaveAttribute("aria-disabled", "true");
+  await expect(button(page, "Verify")).not.toHaveAttribute("aria-disabled", "true");
   await expect(code(page)).toBeVisible();
   // the third: Central gave the address up, the page shows what it holds
   // and says that the address has to be entered again, not "try again"
@@ -372,7 +392,7 @@ test("same-second sign-ins get distinct non-secret local change markers", async 
   const first = await marker();
   expect(Object.keys(first).sort()).toEqual(["change", "expiresAt"]);
   expect(first.change).toHaveLength(16);
-  await button(page, "Use another address").click();
+  await button(page, "Withdraw").click();
   await expect(address(page)).toBeVisible();
   await send(page, OLD);
   await expect(code(page)).toBeVisible();
@@ -409,7 +429,7 @@ test("a code is sent again, too many mails are said, and another address takes t
   await expect(code(page)).toBeVisible();
   let asked = seen.length;
   await code(page).fill("000g");
-  await button(page, "Send again").click();
+  await button(page, "Resend code").click();
   await expect(said(page)).toHaveText("A new code is on its way. The earlier one no longer works.");
   expect(seen.slice(asked)).toEqual([{ operation: "email", request: { action: "resend", lang: "en" } }]);
   // the code that was begun is the earlier one's
@@ -418,17 +438,17 @@ test("a code is sent again, too many mails are said, and another address takes t
 
   asked = seen.length;
   w.next.resend = 429;
-  await button(page, "Send again").click();
+  await button(page, "Resend code").click();
   await expect(alert(page)).toHaveText("Too many mails for now. Try again later.");
   // what was said before is over
   await expect(said(page)).toHaveText("");
   // nothing was sent and nothing new waits: there is nothing to read again
   expect(actions(seen, asked)).toEqual(["resend"]);
-  await expect(button(page, "Send again")).toBeFocused();
+  await expect(button(page, "Resend code")).toBeFocused();
   await sound(page);
 
   asked = seen.length;
-  await button(page, "Use another address").click();
+  await button(page, "Withdraw").click();
   await expect(said(page)).toHaveText("The address is withdrawn. No code is waited for any more.");
   expect(actions(seen, asked)).toEqual(["withdraw"]);
   await expect(address(page)).toBeFocused();
@@ -477,7 +497,7 @@ test("a confirmed address stays until another is confirmed, and the same address
 
   // withdrawn: the confirmed one is still there, and so is the way back to it
   asked = seen.length;
-  await button(page, "Use another address").click();
+  await button(page, "Withdraw").click();
   await expect(address(page)).toBeFocused();
   expect(actions(seen, asked)).toEqual(["withdraw"]);
   await expect(facts.locator("dd").first()).toHaveText(OLD);
@@ -489,9 +509,9 @@ test("a confirmed address stays until another is confirmed, and the same address
 test("removing asks first and says what it means", async ({ page }) => {
   const w = world(confirmed());
   const { seen } = await open(page, w);
-  await expect(button(page, "Remove")).toBeVisible();
+  await expect(button(page, "Remove email")).toBeVisible();
   const asked = seen.length;
-  await button(page, "Remove").click();
+  await button(page, "Remove email").click();
   const question = page.locator("#email-remove-ask");
   await expect(question).toHaveText(
     "Remove this address? We tell the address that it was removed. After that you can no longer get a reset code by e-mail.",
@@ -502,10 +522,10 @@ test("removing asks first and says what it means", async ({ page }) => {
   await sound(page);
   await tabs(page, question, [button(page, "Remove address"), button(page, "Keep it")]);
   await button(page, "Keep it").click();
-  await expect(button(page, "Remove")).toBeFocused();
+  await expect(button(page, "Remove email")).toBeFocused();
   expect(seen.slice(asked)).toEqual([]);
 
-  await button(page, "Remove").click();
+  await button(page, "Remove email").click();
   await button(page, "Remove address").click();
   await expect(said(page)).toHaveText("Your e-mail address is removed.");
   await expect(said(page)).toBeFocused();
@@ -520,7 +540,7 @@ test("where Central sends no mail there is no form, and what is stored can still
   const w = world({ mail: false, ...confirmed(), ...waiting() });
   const { seen } = await open(page, w);
   const section = card(page);
-  await expect(section).toContainText("This server sends no mail, so an e-mail address cannot be set or confirmed here.");
+  await expect(section).toContainText("Email delivery is not configured on this server.");
   await expect(section.locator("dl.facts dt")).toHaveText(["Your address", "Confirmed", "Waits for its code"]);
   await expect(section.locator("dl.facts dd").last()).toHaveText(NEW);
   await expect(section.locator("input")).toHaveCount(0);
@@ -534,7 +554,7 @@ test("where Central sends no mail there is no form, and what is stored can still
   await expect(section.locator("dl.facts dt")).toHaveText(["Your address", "Confirmed"]);
   await expect(button(page, "Withdraw")).toHaveCount(0);
 
-  await button(page, "Remove").click();
+  await button(page, "Remove email").click();
   // no mail goes out here, so the question does not say that one does
   await expect(page.locator("#email-remove-ask")).toHaveText("Remove this address? While this server sends no mail, you cannot set one again.");
   await expect(page.locator("#email-remove-ask")).toBeFocused();
@@ -544,7 +564,7 @@ test("where Central sends no mail there is no form, and what is stored can still
   await expect(said(page)).toBeFocused();
   expect(actions(seen, asked)).toEqual(["withdraw", "remove"]);
   await expect(section.locator("input, button")).toHaveCount(0);
-  await expect(section).toContainText("This server sends no mail");
+  await expect(section).toContainText("Email delivery is not configured on this server.");
   await sound(page);
 });
 
@@ -557,17 +577,17 @@ test("an answer that does not arrive is no refusal: the page says so and reads w
   // Central is unavailable: nothing is known, and what it holds is the same
   let asked = seen.length;
   w.next.resend = 503;
-  await button(page, "Send again").click();
+  await button(page, "Resend code").click();
   await expect(alert(page)).toHaveText(unsure);
   expect(actions(seen, asked)).toEqual(["resend", "status"]);
-  await expect(button(page, "Send again")).toBeFocused();
+  await expect(button(page, "Resend code")).toBeFocused();
   await expect(code(page)).toBeVisible();
 
   // the confirmation went through and its answer was lost on the way
   asked = seen.length;
   w.next.confirm = "lost";
   await code(page).fill(CODE);
-  await button(page, "Confirm").click();
+  await button(page, "Verify").click();
   await expect(alert(page)).toHaveText(unsure);
   expect(actions(seen, asked)).toEqual(["confirm", "status"]);
   await expect(card(page).locator("dl.facts dd").first()).toHaveText(NEW);
@@ -584,8 +604,8 @@ test("a session that is gone is said, and a Central that keeps no addresses sign
   const section = card(page);
   // refused, and the session is alive: the rest of the page is as it was
   await expect(section).toContainText("The e-mail address cannot be shown right now.");
-  await expect(page.locator("#password-current")).toBeVisible();
-  await expect(page.locator(".sessions li")).toHaveCount(1);
+  await expect(page.locator("#profile-first-name")).toBeVisible();
+  await expect(page.locator("#profile-public")).toBeAttached();
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   const first = seen.findIndex((body) => body.operation === "email");
   expect(seen.slice(first + 1).map((body) => body.operation)).toContain("account_summary");
@@ -599,7 +619,7 @@ test("a session that is gone is said, and a Central that keeps no addresses sign
   w.gone = true;
   const asked = seen.length;
   await code(page).fill(CODE);
-  await button(page, "Confirm").click();
+  await button(page, "Verify").click();
   await expect(page.getByText("You are not signed in.")).toBeVisible();
   // the code's refusal, the state's, and only then the question that settles it
   expect(operations(seen, asked).slice(0, 3)).toEqual(["email", "email", "account_summary"]);
@@ -620,7 +640,7 @@ test("Central not answering at all is said in the section, with a way to try aga
 
 test("German and an address as long as one gets hold at 320 px", async ({ page }) => {
   const w = world({ ...confirmed(LONG), ...waiting(LONG.replace("a", "e")) });
-  const { seen } = await open(page, w, { path: "/de/account/security" });
+  const { seen } = await open(page, w, { path: "/de/account/profile" });
   const section = card(page);
   await expect(section.getByRole("heading", { name: "E-Mail-Adresse" })).toBeVisible();
   await expect(section).toContainText("geschickt. Er gilt 15 Minuten.");
@@ -630,21 +650,21 @@ test("German and an address as long as one gets hold at 320 px", async ({ page }
 
   // the mail is asked for in the page's language
   const asked = seen.length;
-  await button(page, "Noch einmal schicken").click();
+  await button(page, "Code erneut senden").click();
   await expect(said(page)).toHaveText("Ein neuer Code ist unterwegs. Der frühere gilt nicht mehr.");
   expect(seen.slice(asked)).toEqual([{ operation: "email", request: { action: "resend", lang: "de" } }]);
 
-  await button(page, "Andere Adresse verwenden").click();
+  await button(page, "Zurückziehen").click();
   await expect(address(page)).toBeFocused();
   await expect(section.locator(".notice")).toHaveText(
     "Wer dieses Postfach lesen kann, kann deine Anmeldung zurücksetzen. Deine verschlüsselten Daten überstehen einen Reset nur mit deinem Wiederherstellungscode.",
   );
-  await expect(section.locator("label[for=email-password]")).toHaveText("Dein Passwort, zur Bestätigung");
+  await expect(section.locator("label[for=email-password]")).toHaveText("Aktuelles Passwort zur Bestätigung");
   await sound(page);
   await button(page, "Bisherige Adresse behalten").click();
   await expect(section.locator("dl.facts dd").first()).toHaveText(LONG);
   await sound(page);
-  await button(page, "Entfernen").click();
+  await button(page, "E-Mail entfernen").click();
   await expect(page.locator("#email-remove-ask")).toBeFocused();
   await sound(page);
 });
@@ -663,7 +683,7 @@ test("the export's file holds the address beside the export, or the page says th
   // the address is asked for once the export answered
   // the picture's facts and the reports filed join the file (picture.spec.ts)
   const after = seen.slice(asked);
-  expect(after.filter((body) => body.operation !== "picture")).toEqual([
+  expect(after.filter((body) => body.operation !== "picture" && body.operation !== "export_profile_details")).toEqual([
     { operation: "account_export" }, { operation: "email", request: { action: "status" } },
     { operation: "challenges", request: { action: "export", table: "participation", after: null } },
     { operation: "challenges", request: { action: "export", table: "attempts", after: null } },
@@ -689,7 +709,7 @@ test("the export's file holds the address beside the export, or the page says th
   asked = seen.length;
   await page.getByRole("button", { name: "Prepare the export" }).click();
   await expect(page.locator("#export-save")).toBeFocused();
-  await expect(page.locator("#export-no-email")).toHaveText("The e-mail address could not be read; it is not in this file.");
+  await expect(page.locator("#export-no-email")).toHaveText("The e-mail address could not be read, as it is not in this file.");
   expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES, presence: "afk" });
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   await sound(page);
@@ -715,14 +735,14 @@ test("a wrong password is refused in the real Worker, and nothing about the addr
   expect(problems).toEqual([]);
 });
 
-/** The security page's address bar and its history's current entry hold no fragment. */
+/** The profile page's address bar and its history's current entry hold no fragment. */
 async function gone(page: Page) {
-  await expect(page).toHaveURL(/\/en\/account\/security$/);
+  await expect(page).toHaveURL(/\/en\/account\/profile$/);
   expect(await page.evaluate(() => [location.hash, location.href.includes("#")])).toEqual(["", false]);
 }
 
-// The confirmation mail's button links to `/{lang}/account/security#code=XXXX-XXXX`
-// (docs/email.md, "The code in the button's link"): the area takes the
+// Legacy confirmation mail buttons link to `/{lang}/account/security#code=XXXX-XXXX`,
+// which redirects to `/{lang}/account/profile#code=XXXX-XXXX`: the area takes the
 // fragment off the address bar at once, and the e-mail section fills the
 // field of an address that waits; nothing is confirmed until the person
 // presses the button.
@@ -756,7 +776,7 @@ test.describe("the code from the confirmation mail's button", () => {
     // the page is left as it was, what was typed included.
     await code(page).fill("zzzz");
     const reads = seen.length;
-    await page.goto(LINKED);
+    await page.goto(`/en/account/profile#code=${CODE}`);
     await gone(page);
     await expect(code(page)).toHaveValue("zzzz");
     expect(seen.length).toBe(reads);
@@ -767,7 +787,7 @@ test.describe("the code from the confirmation mail's button", () => {
     await expect(code(page)).toHaveValue(CODE);
     await gone(page);
     const asked = seen.length;
-    await button(page, "Confirm").click();
+    await button(page, "Verify").click();
     await expect(said(page)).toHaveText("Your e-mail address is confirmed.");
     expect(actions(seen, asked)).toEqual(["confirm"]);
     expect(seen.at(-1)).toEqual({ operation: "email", request: { action: "confirm", code: CODE } });
@@ -789,7 +809,7 @@ test.describe("the code from the confirmation mail's button", () => {
     ["nothing", "#code="],
   ] as const) {
     test(`${what} in the fragment fills nothing, and the fragment goes all the same`, async ({ page }) => {
-      const { seen, problems } = await open(page, world(waiting()), { path: `/en/account/security${hash}` });
+      const { seen, problems } = await open(page, world(waiting()), { path: `/en/account/profile${hash}` });
       await expect(code(page)).toBeVisible();
       await expect(code(page)).toHaveValue("");
       await gone(page);
@@ -830,7 +850,7 @@ test.describe("the code from the confirmation mail's button", () => {
 
   test("where Central sends no mail the code is dropped", async ({ page }) => {
     const { seen } = await open(page, world({ mail: false, ...waiting() }), { path: LINKED });
-    await expect(card(page)).toContainText("This server sends no mail, so an e-mail address cannot be set or confirmed here.");
+    await expect(card(page)).toContainText("Email delivery is not configured on this server.");
     await expect(code(page)).toHaveCount(0);
     await gone(page);
     expect(actions(seen)).toEqual(["status"]);
@@ -862,8 +882,8 @@ test.describe("the code from the confirmation mail's button", () => {
     const { seen } = await open(page, world(waiting()), { path: `/en/account#code=${CODE}` });
     await expect(page).toHaveURL(/\/en\/account$/);
     expect(await page.evaluate(() => location.hash)).toBe("");
-    // the security page reached from there has the field empty
-    await page.goto("/en/account/security");
+    // the profile page reached from there has the field empty
+    await page.goto("/en/account/profile");
     await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
     await expect(code(page)).toHaveValue("");
     expect(actions(seen)).toEqual(["status"]);

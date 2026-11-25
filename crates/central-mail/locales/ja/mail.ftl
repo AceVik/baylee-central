@@ -60,3 +60,22 @@ issued-not-you = 依頼していない場合は、ログインして、セキュ
 
 # The confirmation mail's button, which opens the security page with the code filled in.
 confirm-link = アドレスを確認
+
+recovery-backup-subject = Baylee 回復コードのバックアップ
+recovery-backup-title = 回復コードのバックアップ
+recovery-backup-intro = Baylee アカウント { $name } の回復コードのバックアップを添付しています。
+recovery-backup-encrypted = baylee-recovery-code.zip は設定したパスワードで暗号化されています。
+recovery-backup-plain = baylee-recovery-code.zip はパスワードなしで送信されました。安全な場所に保存してからこのメールを削除してください。
+recovery-backup-fact-file = このアーカイブはこのメールボックスとは別の安全な場所に保管してください。
+recovery-backup-fact-reset = このコードとメール宛てのリセットの両方を入手できる人は暗号化データを開けます。
+recovery-backup-warning = 心当たりがない場合は、このメールを無視するかアカウント設定を確認してください。
+recovery-backup-link = アカウントを開く
+invite-subject = Baylee フレンド招待
+invite-title = フレンド招待
+invite-intro = { $name } さんが Baylee でフレンドに招待しました。
+invite-note-label = メッセージ：
+invite-fact-friend = この1回限りのリンクを承認すると、Baylee で相互フレンドになります。
+invite-valid-one = 招待リンクの有効期限は1日間です。
+invite-valid = 招待リンクの有効期限は { $days } 日間です。
+invite-warning = 心当たりがない場合は、このメールを無視してください。
+invite-link = 招待を開く

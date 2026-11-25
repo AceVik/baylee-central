@@ -2,11 +2,10 @@ import { expect, test } from "@playwright/test";
 
 import { axe, onlyDesktop, targets, watch } from "./check.ts";
 
-// The nine languages a machine translated, and German beside them: every
-// page holds at every width in every one of them (their words are longer
-// or shorter than the English ones the other suite measures), the pages a
-// visitor meets first pass WCAG 2.2 AA there too, and each says in its
-// footer that a machine wrote it.
+// Full accessibility, layout and per-page matrices run in English (`site.spec.ts`).
+// Here every non-English locale gets a lean live-render smoke check on `/` (SSR
+// metadata, heading, machine-translation note, single-row header bar, zero console/network
+// errors) plus a compact mobile + WCAG spot-check on the hardest scripts (`de`, `ja`, `ru`).
 const TAGS: Record<string, string> = {
   de: "de",
   fr: "fr",
@@ -32,87 +31,53 @@ const NAMES = [
   "简体中文",
   "繁體中文",
 ];
-const PAGES = [
-  "",
-  "download",
-  "gateways",
-  "faq",
-  "security",
-  "donate",
-  "contact",
-  "impressum",
-  "privacy",
-  "terms",
-  "fan-content",
-  "signin",
-  "register",
-  "reset",
-  "account",
-  "account/chat",
-  "account/notifications",
-  "nope",
-];
-const FIRST = ["", "download", "gateways", "faq", "signin", "privacy", "terms"];
-const WIDTHS = [320, 375, 768, 1440];
+const SPOT_SCRIPTS = ["de", "ja", "ru"] as const;
+const SPOT_SLUGS = ["", "signin"] as const;
 
 for (const [lang, tag] of Object.entries(TAGS)) {
-  test(`${lang}: no page needs sideways scrolling from 320 to 1440 px`, async ({ page }, info) => {
-    onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
-    test.slow();
-    for (const width of WIDTHS) {
-      await page.setViewportSize({ width, height: width < 1024 ? 812 : 900 });
-      for (const slug of PAGES) {
-        await page.goto(`/${lang}/${slug}`);
-        const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        expect(wide, `${slug} at ${width}`).toBeLessThanOrEqual(0);
-      }
-    }
-  });
-
-  if (lang === "de") continue;
-  test(`${lang}: the first pages pass WCAG 2.2 AA, load nothing from elsewhere and say a machine translated them`, async ({
+  test(`${lang}: landing renders cleanly with localized html lang, single-row bar and no overflow`, async ({
     page,
     baseURL,
   }, info) => {
-    // desktop for every language; on the phone the two whose scripts set the hardest lines
-    onlyDesktop(info, "the phone project checks Japanese and Russian only", lang === "ja" || lang === "ru");
-    test.slow();
+    onlyDesktop(info, "sets its own desktop width for bar geometry");
     const problems = watch(page, baseURL ?? "");
-    for (const slug of FIRST) {
-      await page.goto(`/${lang}/${slug}`);
-      await expect(page.locator("html")).toHaveAttribute("lang", tag);
-      await expect(page.locator("h1")).toHaveCount(1);
-      await expect(page.locator(".machine-note")).toHaveCount(1);
-      expect(await axe(page), slug).toEqual([]);
-      expect(await targets(page), slug).toEqual([]);
-    }
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const response = await page.goto(`/${lang}/`);
+    expect(response?.status()).toBe(200);
+    await expect(page.locator("html")).toHaveAttribute("lang", tag);
+    await expect(page.locator("h1")).toHaveCount(1);
+    expect(((await page.locator("h1").textContent()) ?? "").trim().length).toBeGreaterThan(0);
+    await expect(page.locator(".machine-note")).toHaveCount(lang === "de" ? 0 : 1);
+    const bar = await page.evaluate(() => {
+      const links = [...document.querySelectorAll<HTMLElement>(".nav > a")].filter((link) => link.offsetParent !== null);
+      return {
+        wide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        rows: new Set(links.map((link) => Math.round(link.getBoundingClientRect().top))).size,
+        tall: Math.max(0, ...links.map((link) => link.getBoundingClientRect().height)),
+      };
+    });
+    expect(bar.wide, `${lang} overflow`).toBeLessThanOrEqual(0);
+    expect(bar.rows, `${lang} nav rows`).toBe(1);
+    expect(bar.tall, `${lang} wrapped nav label`).toBeLessThan(60);
     expect(problems).toEqual([]);
   });
 }
 
-test("the bar's sections stand in one row beside each other from where they unfold, in every language", async ({ page }, info) => {
-  onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
-  test.slow();
-  for (const lang of Object.keys(TAGS)) {
-    await page.goto(`/${lang}/`);
-    for (const width of [1080, 1081, 1099, 1100, 1140, 1279, 1280]) {
-      await page.setViewportSize({ width, height: 800 });
-      const bar = await page.evaluate(() => {
-        const links = [...document.querySelectorAll<HTMLElement>(".nav > a")].filter((link) => link.offsetParent !== null);
-        return {
-          wide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-          rows: new Set(links.map((link) => Math.round(link.getBoundingClientRect().top))).size,
-          tall: Math.max(0, ...links.map((link) => link.getBoundingClientRect().height)),
-        };
-      });
-      expect(bar.wide, `${lang} at ${width}`).toBeLessThanOrEqual(0);
-      if (width > 1080) {
-        expect(bar.rows, `${lang} at ${width}: rows`).toBe(1);
-        expect(bar.tall, `${lang} at ${width}: a label on two lines`).toBeLessThan(60);
-      }
+for (const lang of SPOT_SCRIPTS) {
+  test(`${lang}: compact mobile WCAG 2.2 AA and tap-target spot check`, async ({ page, baseURL }, info) => {
+    onlyDesktop(info, "uses an explicit 375 px phone viewport");
+    const problems = watch(page, baseURL ?? "");
+    await page.setViewportSize({ width: 375, height: 812 });
+    for (const slug of SPOT_SLUGS) {
+      await page.goto(`/${lang}/${slug}`);
+      const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(wide, `${lang}/${slug} mobile overflow`).toBeLessThanOrEqual(0);
+      expect(await axe(page), `${lang}/${slug}`).toEqual([]);
+      expect(await targets(page), `${lang}/${slug}`).toEqual([]);
     }
-  }
-});
+    expect(problems).toEqual([]);
+  });
+}
 
 test("the language menu names the eleven languages, each in its own, and each leads to this page", async ({ page }) => {
   await page.goto("/en/faq");

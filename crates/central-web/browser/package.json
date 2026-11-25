@@ -8,16 +8,19 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p .",
-    "lint": "oxlint --deny-warnings e2e-site e2e-real",
-    "check": "npm run typecheck && npm run lint",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.scripts.dom.json && tsc --noEmit -p tsconfig.scripts.classic.json && tsc --noEmit -p tsconfig.scripts.sw.json && tsc --noEmit -p tsconfig.scripts.workers.json",
+    "build:scripts": "node scripts/build-scripts.ts",
+    "check:scripts": "node scripts/build-scripts.ts --check",
+    "lint": "oxlint --deny-warnings e2e-site e2e-real scripts && cd .. && oxlint -c browser/.oxlintrc.json --deny-warnings ts",
+    "check": "npm run typecheck && npm run check:scripts && npm run lint",
     "e2e:site": "playwright test -c e2e-site/playwright.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.64.0",
     "@types/node": "24.19.2",
+    "@webgpu/types": "0.1.74",
     "oxlint": "1.88.0",
-    "typescript": "7.0.2"
+    "typescript": "7.1.0-beta"
   }
 }

@@ -9,12 +9,16 @@
 //! Worker resumes it. Only where nothing is kept (another browser, cleared
 //! storage) does the page ask to sign in again, in the chat's own Worker.
 
+mod cache;
 pub(super) mod glyph;
-mod model;
+mod mentions;
+pub mod model;
 mod people;
-mod talk;
-mod time;
-mod wire;
+mod preview;
+mod socket;
+pub(super) mod talk;
+pub(super) mod time;
+pub(super) mod wire;
 
 mod engine;
 
@@ -178,6 +182,8 @@ pub struct Ctl {
     pub social_busy: RwSignal<bool>,
     /// The last contact or group change failed.
     pub social_failed: RwSignal<bool>,
+    /// Monotonic revision bumped when `/api/v1/ws` reports invite-relevant changes.
+    pub invites_rev: RwSignal<u64>,
     engine: StoredValue<Option<Handle>, LocalStorage>,
 }
 
@@ -189,8 +195,29 @@ impl Ctl {
             groups: RwSignal::new(None),
             social_busy: RwSignal::new(false),
             social_failed: RwSignal::new(false),
+            invites_rev: RwSignal::new(0),
             engine: StoredValue::new_local(None),
         }
+    }
+
+    /// Bumps the friend-invite list revision so an open invite dialog reloads.
+    pub fn bump_invites(self) {
+        self.invites_rev.update(|rev| *rev = rev.wrapping_add(1));
+    }
+
+    /// Handles server push notification that this session was revoked.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    pub fn session_revoked(self) {
+        session::forget();
+        self.shown.update(|s| {
+            s.phase = Phase::Ended;
+            s.loading = false;
+        });
+        self.engine.with_value(|engine| {
+            if let Some(engine) = engine {
+                engine.close();
+            }
+        });
     }
 
     fn push(self, job: engine::Job) {
@@ -503,14 +530,22 @@ pub fn missing_view(lang: Lang, worker: String, me: Me, ctl: Ctl) -> impl IntoVi
             <form class="form" method="post" novalidate=true on:submit=submit>
                 <div class="field">
                     <label for="chat-name">{words::signin_name(lang)}</label>
-                    <input id="chat-name" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"
-                        on:input=move |ev| username.set(event_target_value(&ev)) />
+                    <div class="inset">
+                        {super::field::mark(glyph::USER)}
+                        <input id="chat-name" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"
+                            on:input=move |ev| username.set(event_target_value(&ev)) />
+                    </div>
                 </div>
-                <div class="field">
-                    <label for="chat-password">{words::signin_password(lang)}</label>
-                    <input id="chat-password" type="password" autocomplete="current-password"
-                        on:input=move |ev| password.set(event_target_value(&ev)) prop:value=move || password.get() />
-                </div>
+                {super::field::password_box(
+                    lang,
+                    "chat-password",
+                    words::signin_password(lang),
+                    "current-password",
+                    password,
+                    None,
+                    None,
+                    "1024",
+                )}
                 <p class="error" role="alert">{move || error.get()}</p>
                 <button type="submit" class="button primary" aria-disabled=move || busy.get().then_some("true")>
                     {move || if busy.get() { words::chat_opening(lang) } else { words::chat_open(lang) }}
@@ -526,6 +561,7 @@ pub fn missing_view(lang: Lang, worker: String, me: Me, ctl: Ctl) -> impl IntoVi
 /// tags change.
 fn read_pictures(who_is: RwSignal<Who>, ctl: Ctl) {
     let keys = crate::islands::picture::Keys::provide();
+    let ranks = crate::islands::ui::rank_avatar::Ranks::provide();
     let asked = StoredValue::new(Vec::<u32>::new());
     Effect::new(move |_| {
         let Who::Ready(me) = who_is.get() else {
@@ -546,14 +582,21 @@ fn read_pictures(who_is: RwSignal<Who>, ctl: Ctl) {
             if let Some(Ok(snapshot)) = g {
                 for group in &snapshot.groups {
                     tags.extend(group.members.iter().map(|m| m.person.tag));
+                    tags.extend(group.invited.iter().map(|p| p.tag));
                 }
+                tags.extend(snapshot.invites.iter().map(|inv| inv.inviter.tag));
             }
+        });
+        ctl.shown.with(|s| {
+            tags.extend(s.known.keys().copied());
+            tags.extend(s.reviews.keys().copied());
         });
         tags.sort_unstable();
         tags.dedup();
         if asked.with_value(|held| *held != tags) {
             asked.set_value(tags.clone());
-            keys.read(tags);
+            keys.read(tags.clone());
+            ranks.read(tags);
         }
     });
 }
@@ -562,6 +605,7 @@ fn read_pictures(who_is: RwSignal<Who>, ctl: Ctl) {
 pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView {
     let who_is = RwSignal::new(Who::Loading);
     let ctl = Ctl::new();
+    let presence = socket::Presence::provide();
     let tab = RwSignal::new(if section == Section::Contacts {
         Tab::Contacts
     } else {
@@ -571,6 +615,15 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
     let worker = StoredValue::new(worker);
     read_pictures(who_is, ctl);
     Effect::new(move |_| {
+        if let Some(me) = who_is.with(|w| match w {
+            Who::Ready(me) => Some(me.clone()),
+            _ => None,
+        }) {
+            presence.set_own(me.tag);
+            socket::start(ctl, presence);
+        }
+    });
+    Effect::new(move |_| {
         leptos::task::spawn_local(async move {
             let found = who().await;
             if matches!(found, Who::Ready(_)) {
@@ -578,32 +631,17 @@ pub fn Messenger(lang: Lang, section: Section, worker: String) -> impl IntoView 
                 ctl.reload_groups();
             }
             if let Who::Ready(me) = &found {
-                {
-                    let (now_tab, conv) = address(me.tag);
+                let (now_tab, conv) = address(me.tag);
+                tab.set(now_tab);
+                selected.set(conv);
+                let own = me.tag;
+                // for the page's life: the island is never taken down
+                let _ = window_event_listener(leptos::ev::popstate, move |_| {
+                    let (now_tab, conv) = address(own);
                     tab.set(now_tab);
                     selected.set(conv);
-                    let own = me.tag;
-                    // for the page's life: the island is never taken down
-                    let _ = window_event_listener(leptos::ev::popstate, move |_| {
-                        let (now_tab, conv) = address(own);
-                        tab.set(now_tab);
-                        selected.set(conv);
-                    });
-                    leptos::task::spawn_local(open(worker.get_value(), me.clone(), ctl));
-                    // contacts every 10 s and groups every 5 s while in view
-                    let refresh = |every: u64, what: fn(Ctl)| {
-                        let _ = set_interval(
-                            move || {
-                                if !document().hidden() {
-                                    what(ctl);
-                                }
-                            },
-                            std::time::Duration::from_millis(every),
-                        );
-                    };
-                    refresh(10_000, Ctl::reload_contacts);
-                    refresh(5_000, Ctl::reload_groups);
-                }
+                });
+                leptos::task::spawn_local(open(worker.get_value(), me.clone(), ctl));
             }
             who_is.set(found);
         });

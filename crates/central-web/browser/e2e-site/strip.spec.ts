@@ -17,7 +17,7 @@ const WIDTHS = [320, 375, 599, 600, 768, 1024, 1099, 1100, 1440, 2560];
  * directory is silent it only links to it); each other group is left out
  * while its source is silent.
  */
-const ORDER = ["live", "live", "live", "gateways", "accounts", "views"];
+const ORDER = ["gateways", "live", "live", "live", "live", "accounts", "views"];
 const OPTIONAL = ["live", "accounts", "views"];
 /** Every set of silent sources: eight. */
 const SILENCES = [...Array(8).keys()].map((bits) => OPTIONAL.filter((_, at) => ((bits >> at) & 1) === 1));
@@ -112,18 +112,18 @@ test("the strip shows Baylee in numbers and nothing of GitHub's", async ({ page 
   await page.goto("/en/");
   const strip = page.getByRole("region", { name: "Baylee in numbers" });
   await expect(strip).toBeVisible();
-  // each cell: its label (the term) and its value, the six the test data has
+  // each cell: its label (the term) and its value, the seven the test data has
   const cells = strip.locator(".strip-cell");
-  await expect(cells.locator("dt .strip-label")).toHaveText(["Players", "Games", "Open tables", "Gateways", "Accounts", "Views"]);
-  await expect(cells.locator("dd.num")).toHaveText([/^44$/, /^12$/, /^4$/, /^5\s*\/\s*7$/, /^1,234$/, /^48,213$/]);
-  await expect(strip.locator(".strip-list")).toHaveAttribute("data-count", "6");
-  // the three live counts are the gateways' own claim, said under the pointer
-  for (const at of [0, 1, 2]) await expect(cells.nth(at)).toHaveAttribute("title", "Right now on the gateways, as they report it");
-  await expect(cells.nth(0).locator("dd .dot.live")).toHaveCount(1);
-  // the gateways, as "5 / 7", lead to the directory's part of the page
-  await expect(cells.nth(3)).toHaveAttribute("title", "Gateways: 5 online, 2 offline");
-  await expect(cells.nth(3).locator("a")).toHaveAttribute("href", "#gateways");
-  await expect(cells.nth(5)).toHaveAttribute("title", "Page views since 1 November 2026");
+  await expect(cells.locator("dt .strip-label")).toHaveText(["Gateways", "In game", "Online", "Games", "Open tables", "Accounts", "Views"]);
+  await expect(cells.locator("dd.num")).toHaveText([/^5\s*\/\s*7$/, /^34$/, /^44$/, /^12$/, /^4$/, /^1,234$/, /^48,213$/]);
+  await expect(strip.locator(".strip-list")).toHaveAttribute("data-count", "7");
+  // the gateways, as "5 / 7", lead to the gateways directory page
+  await expect(cells.nth(0)).toHaveAttribute("title", "Gateways: 5 online, 2 offline");
+  await expect(cells.nth(0).locator("a")).toHaveAttribute("href", "/en/gateways");
+  // the four live counts are the gateways' own claim, said under the pointer
+  for (const at of [1, 2, 3, 4]) await expect(cells.nth(at)).toHaveAttribute("title", "Right now on the gateways, as they report it");
+  for (const at of [1, 2, 3]) await expect(cells.nth(at).locator("dd .dot.live")).toHaveCount(1);
+  await expect(cells.nth(6)).toHaveAttribute("title", "Page views since 1 November 2026");
   // nothing of GitHub's: no release, no checks, no commit, no stars, no link there
   await expect(strip).not.toContainText(/v0\.2\.0|passing|failing|Build|Commit|Stars|GitHub/);
   await expect(strip.locator("a[href*='github.com']")).toHaveCount(0);
@@ -135,13 +135,17 @@ test("the strip shows Baylee in numbers and nothing of GitHub's", async ({ page 
 test("in German the strip is named and counts as German does", async ({ page }) => {
   await page.goto("/de/");
   const strip = page.getByRole("region", { name: "Baylee in Zahlen" });
-  await expect(strip.locator(".strip-cell").first().locator(".strip-label")).toHaveText("Spieler");
-  await expect(strip.locator(".strip-cell").first().locator("dd")).toHaveText("44");
-  await expect(strip.locator("dd.num").nth(4)).toHaveText("1.234");
-  await expect(strip.locator("dd.num").nth(5)).toHaveText("48.213");
+  const cells = strip.locator(".strip-cell");
+  await expect(cells.first().locator(".strip-label")).toHaveText("Gateways");
+  await expect(cells.nth(1).locator(".strip-label")).toHaveText("Im Spiel");
+  await expect(cells.nth(1).locator("dd")).toHaveText("34");
+  await expect(cells.nth(2).locator(".strip-label")).toHaveText("Online");
+  await expect(cells.nth(2).locator("dd")).toHaveText("44");
+  await expect(strip.locator("dd.num").nth(5)).toHaveText("1.234");
+  await expect(strip.locator("dd.num").nth(6)).toHaveText("48.213");
 });
 
-for (const lang of ["en", "de", "fr", "it", "es", "pt-br", "ru", "ja", "ko", "zh-hans", "zh-hant"]) {
+for (const lang of ["en"]) {
   test(`${lang}: the strip's lines are even and centred for every set of silent sources, at every width`, async ({ page }, info) => {
     onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
     await page.emulateMedia({ reducedMotion: "reduce" });

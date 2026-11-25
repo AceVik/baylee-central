@@ -4,32 +4,28 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: foundation-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
 jobs:
-  # The server (central-service and its crates) runs in production on Linux
-  # x86-64 alone, so only ubuntu-24.04 builds and tests it, release build and
-  # development smoke included (owner, 29.10.2026). Windows and both macOS
-  # architectures check what the Baylee desktop client links from here
-  # (central-api, central-client and their workspace dependencies, read from
-  # `cargo metadata`), with the policy and the tasks: `cargo xtask gate
-  # --client` (docs/xtask.md). The matrix and job name stay as they were:
-  # branch protection requires `verify (<os>)` for all four.
-  verify:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
-    runs-on: ${{ matrix.os }}
-    # A cold Linux build includes the complete gate and release linking before
-    # both lifecycle smoke checks. The 25-minute bound canceled release linking
-    # after the tests passed on 2026-11-14; keep every check and bound the job.
-    timeout-minutes: 40
-    # bash on every runner, Windows' Git Bash included: the checks are
-    # `cargo xtask` tasks (crates/xtask, docs/xtask.md), not shell scripts.
+  # Central and baylee.app target Linux x86-64-v3 on Ubuntu 26.04 exclusively.
+  # Branch protection note: replace legacy OS-matrix checks (`verify (ubuntu-24.04)`,
+  # `verify (windows-2025)`, `verify (macos-15)`, `verify (macos-15-intel)`) with
+  # `verify` below. All independent jobs fan out at t=0; only main pushes write
+  # shared Swatinem/rust-cache buckets so PRs stay fast without evicting main.
+
+  fast-checks:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
     defaults:
       run:
         shell: bash
@@ -38,35 +34,106 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal --component clippy --component rustfmt
-      - name: Fetch locked dependencies
-        run: cargo fetch --locked
-      # nasm: rav1e's and rav1d's x86-64 assembly in the picture worker's
-      # codecs (docs/dependency-proposal/profile-picture.md, owner 12.11.2026).
-      # ffmpeg: Ubuntu's, with libaom-av1, which encodes animated profile
-      # pictures, and libsvtav1, the worker's fallback without it; the
-      # codec's animation tests need both and fail without them here
-      # (PICTURE_REQUIRE_FFMPEG, PICTURE_REQUIRE_SVT), where elsewhere they
-      # say SKIPPED.
+        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-dev
+          save-if: false
+      - run: cargo fetch --locked
+      - name: Format, code policy, compiler unsafe probe and advisory scopes
+        run: |
+          cargo fmt --all -- --check
+          cargo xtask policy --compiler-probe
+          cargo xtask crypto-scope
+          cargo xtask chrono-scope
+
+  lint:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain and wasm32 target
+        run: rustup toolchain install 1.99.0 --profile minimal --component clippy --target wasm32-unknown-unknown
+      - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-dev
+          save-if: false
+      - run: cargo fetch --locked
       - name: Native Web Push crypto and picture codec build tools
-        if: matrix.os == 'ubuntu-24.04'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm ffmpeg
-      - name: Policy, tests, lint and release build
-        if: matrix.os == 'ubuntu-24.04'
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm
+      - name: Clippy workspace (native)
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Clippy browser islands (public and admin)
+        run: |
+          cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib -- -D warnings
+          cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib --all-features -- -D warnings
+
+  test:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned toolchain
+        run: rustup toolchain install 1.99.0 --profile minimal
+      - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-dev
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      - uses: taiki-e/install-action@d042af60014eb018fcd01f57f4f62118b69e3ea6 # nextest
+      - run: cargo fetch --locked
+      - name: Native Web Push crypto and picture codec build tools
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm ffmpeg
+      - name: Run workspace unit, integration and doc tests
         env:
           PICTURE_FFMPEG: /usr/bin/ffmpeg
           PICTURE_REQUIRE_FFMPEG: "1"
           PICTURE_REQUIRE_SVT: "1"
-        run: cargo xtask gate
-      - name: Policy, tests and lint of the client's crates
-        if: matrix.os != 'ubuntu-24.04'
-        run: cargo xtask gate --client
+        run: |
+          cargo nextest run --locked --workspace --all-targets --all-features --no-fail-fast
+          cargo test --locked --workspace --all-features --doc
+
+  build-release:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Assert runner supports x86-64-v3 (AVX2)
+        run: grep -qw avx2 /proc/cpuinfo
+      - name: Install pinned toolchain
+        run: rustup toolchain install 1.99.0 --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-release-v3
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      - run: cargo fetch --locked
+      - name: Native Web Push crypto and picture codec build tools
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm
+      - name: Build x86-64-v3 release binaries
+        env:
+          RUSTFLAGS: -C target-cpu=x86-64-v3
+        run: cargo build --locked --workspace --all-features --release
       - name: Verify development lifecycle and failure cleanup
-        if: matrix.os == 'ubuntu-24.04'
         run: |
           cargo xtask smoke
-          # The deliberate failure must fail, and only for its own reason,
-          # after its cleanup.
           set +e
           failure=$(cargo xtask smoke --exercise-failure 2>&1 >/dev/null)
           status=$?
@@ -75,26 +142,51 @@ jobs:
             echo "Expected development failure did not occur: $failure"
             exit 1
           fi
+
+  verify:
+    needs: [fast-checks, lint, test, build-release]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: Aggregate required Rust gate results
+        shell: bash
+        env:
+          FAST: ${{ needs.fast-checks.result }}
+          LINT: ${{ needs.lint.result }}
+          TEST: ${{ needs.test.result }}
+          REL: ${{ needs.build-release.result }}
+        run: |
+          echo "fast-checks=$FAST lint=$LINT test=$TEST build-release=$REL"
+          if [ "$FAST" != "success" ] || [ "$LINT" != "success" ] || [ "$TEST" != "success" ] || [ "$REL" != "success" ]; then
+            exit 1
+          fi
+
   dependencies:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: rustup toolchain install 1.99.0 --profile minimal
-      - run: cargo install cargo-audit --version 0.22.2 --locked
-      - run: cargo install cargo-deny --version 0.20.2 --locked
-      - run: cargo fetch --locked
-      - name: Verify the exact scope of the bigint advisory exception
-        run: cargo xtask crypto-scope
-      - name: Verify that chrono is in no build (RUSTSEC-2026-0543)
-        run: cargo xtask chrono-scope
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      - name: Install pinned toolchain
+        run: rustup toolchain install 1.99.0 --profile minimal
+      - name: Cache cargo-audit binary
+        id: audit-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-0.22.2
+      - if: steps.audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --version 0.22.2 --locked
       - run: cargo audit --deny warnings
-      - run: cargo deny check
 
   secrets:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,20 +194,33 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - run: rustup toolchain install 1.99.0 --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-dev
+          save-if: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/gitleaks
+          key: ${{ runner.os }}-gitleaks-8.30.1
       - name: Scan source and history with pinned Gitleaks, and its self-test
         run: cargo xtask secrets
 
   postgres:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.99.0 --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-dev
+          save-if: false
       - name: Real PostgreSQL migrations, roles, TLS and UUIDv7
         run: cargo xtask postgres
       - name: Fixture cleanup after failure
+        shell: bash
         run: |
           set +e
           failure=$(cargo xtask postgres --exercise-failure 2>&1 >/dev/null)
@@ -126,26 +231,25 @@ jobs:
             exit 1
           fi
 
-  # The website's browser crypto (crates/central-web/crypto/README.md): the
-  # committed WebAssembly module and glue must be what the source builds,
-  # byte for byte, here on Linux whatever machine built them.
   wasm:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-wasm
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
       - name: Rebuild central-web-crypto and compare with crates/central-web/crypto
         run: cargo xtask wasm --check
 
-  # The browser test suites' own checks (crates/central-web/browser/README.md):
-  # the typecheck and the lint of the Playwright suites. The suites themselves
-  # run in the site job.
   web:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: crates/central-web/browser
@@ -161,31 +265,27 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
 
-  # The server-rendered site (docs/proposals/frontend-rewrite.md): the
-  # islands linted for the browser's target, the assets built as a deployment
-  # builds them, then every page in a real browser: axe-core (WCAG 2.2 AA) in
-  # both colour schemes, 44 px targets, no sideways scrolling from 320 to
-  # 2560 px, no request to another origin, keyboard paths and the islands.
   site:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown --component clippy
-      # `cargo xtask site` reads the whole locked graph offline for the
-      # third-party notices; this job builds only a part of it.
-      - name: Fetch locked dependencies
-        run: cargo fetch --locked
-      - name: Clippy for the browser's half
-        run: cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib -- -D warnings
-      # the administration's module (`admin`) in a run of its own: in one
-      # run the features would meet, and the public module go unlinted
-      - name: Clippy for the administration's module
-        run: cargo clippy --locked -p central-web -p central-web-islands --target wasm32-unknown-unknown --lib --all-features -- -D warnings
+      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-site
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      - run: cargo fetch --locked
+      - name: Install WASM optimizer and Brotli precompressor
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends binaryen brotli
       - run: cargo build --locked -p central-web-server
-      - run: cargo xtask site
+      - env:
+          CENTRAL_REQUIRE_WASM_OPT: "1"
+        run: cargo xtask site
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.21.0
@@ -193,7 +293,17 @@ jobs:
           cache-dependency-path: crates/central-web/browser/package-lock.json
       - run: npm ci --no-audit --no-fund
         working-directory: crates/central-web/browser
-      - run: npx playwright install --with-deps chromium
+      - name: Cache Playwright Chromium browser binaries
+        id: pw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('crates/central-web/browser/package-lock.json') }}
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: crates/central-web/browser
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
         working-directory: crates/central-web/browser
       - run: npm run e2e:site
         working-directory: crates/central-web/browser

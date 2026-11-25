@@ -28,19 +28,25 @@ mod feedback;
 mod field;
 mod focus;
 mod fragment;
+mod gateways;
 mod impressum;
+mod invite;
 mod keep;
 #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 mod moderation;
 pub(crate) mod net;
 mod password;
 mod picture;
+mod player;
 mod pow;
 mod push;
 mod reset;
 mod session;
+mod time;
 #[cfg(target_arch = "wasm32")]
 mod trusted;
+mod ui;
+mod zip;
 
 // The pages use the islands on the server; in the browser they are reached
 // through their WebAssembly exports only.
@@ -56,5 +62,9 @@ pub(crate) use chat::Messenger;
 pub(crate) use contact::ContactForm;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use impressum::Impressum;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use invite::InviteCard;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use player::PlayerProfile;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use reset::Reset;

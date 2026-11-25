@@ -84,7 +84,7 @@ async fn caller(db: &impl ConnectionTrait, session: Session<'_>) -> Result<Uuid,
          ON s.account_id=a.id AND s.credential_revision=a.credential_revision
          WHERE s.digest=$1 AND s.kind=$2 AND s.expires_at>pg_catalog.clock_timestamp()
          AND a.restored AND a.credential IS NOT NULL
-         AND COALESCE(s.proven_at,s.created_at)+interval '12 hours'>pg_catalog.clock_timestamp()",
+         AND (s.kind='browser' OR COALESCE(s.proven_at,s.created_at)+interval '12 hours'>pg_catalog.clock_timestamp())",
             vec![session.digest().to_vec().into(), session.kind().into()],
         ))
         .await

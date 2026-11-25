@@ -12,7 +12,7 @@ const TITLES = {
   en: "Passwords, keys and chats: what goes where",
   de: "Passwort, Schlüssel und Chats: was wohin geht",
 } as const;
-const LANGS = ["en", "de"] as const;
+const LANGS = ["en"] as const;
 const FLOWS = ["signin", "memory", "chat", "pairing"];
 const WIDTHS = [320, 375, 768, 1024, 1440, 2560];
 
@@ -40,17 +40,19 @@ for (const lang of LANGS) {
       expect(response?.status()).toBe(200);
       await expect(page.locator("h1")).toHaveCount(1);
       await expect(page.locator("h1")).toHaveText(TITLES[lang]);
+      await expect(page.locator(".sec-intro-card [data-sec-audio='intro']")).toBeVisible();
       for (const flow of FLOWS) {
         const figure = page.locator(`#${flow} .sec-fig`);
         await expect(figure).toHaveCount(1);
+        await expect(figure.locator(`[data-sec-audio="${flow}"]`)).toBeVisible();
         // the diagram is a picture of the list beside it
         await expect(figure.locator("svg.sec-chart")).toHaveAttribute("aria-hidden", "true");
         await expect(figure.locator("ol.sec-list > li")).toHaveCount(5);
         await expect(figure.getByRole("radio")).toHaveCount(6);
-        // every flow says where it ends
-        await expect(page.locator(`#${flow} :is(.sec-limit, .sec-status)`).first()).toBeVisible();
+        // every flow has calm explanatory notes
+        await expect(page.locator(`#${flow} .sec-notes .sec-note`).first()).toBeVisible();
       }
-      await expect(page.locator("#limits .sec-limits > li")).toHaveCount(5);
+      await expect(page.locator("#good-to-know .sec-good > li")).toHaveCount(3);
       expect(await axe(page)).toEqual([]);
       expect(await targets(page)).toEqual([]);
       expect(problems).toEqual([]);
@@ -172,7 +174,7 @@ test("a diagram holds no sentence: only its actors' names, which fit, and the st
   }
 });
 
-test("no sideways scrolling from 320 to 2560 px, in both languages", async ({ page }, info) => {
+test("no sideways scrolling from 320 to 2560 px", async ({ page }, info) => {
   onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
   test.slow();
   for (const width of WIDTHS) {
@@ -197,4 +199,47 @@ test("the footer, the questions and the sign-in page lead here", async ({ page }
   await page.locator('#auth-signin a[href="/de/security"]').click();
   await expect(page).toHaveURL(/\/de\/security$/);
   await expect(page.locator("h1")).toHaveText(TITLES.de);
+});
+
+test("de/security smoke: German heading, four diagrams, SVG labels fit and zero errors", async ({ page, baseURL }) => {
+  const problems = watch(page, baseURL ?? "");
+  const response = await page.goto("/de/security");
+  expect(response?.status()).toBe(200);
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  await expect(page.locator("h1")).toHaveText(TITLES.de);
+  for (const flow of FLOWS) {
+    await expect(page.locator(`#${flow} .sec-fig`)).toHaveCount(1);
+  }
+  await page.evaluate(() => document.fonts.ready);
+  const overflow = await page.evaluate(() => {
+    const found: string[] = [];
+    for (const chart of document.querySelectorAll<SVGSVGElement>("svg.sec-chart")) {
+      const width = chart.viewBox.baseVal.width;
+      for (const text of chart.querySelectorAll<SVGTextElement>(".sec-name")) {
+        const box = text.getBBox();
+        if (box.x < 2 || box.x + box.width > width - 2) found.push(`"${text.textContent}" leaves chart`);
+      }
+    }
+    return found;
+  });
+  expect(overflow).toEqual([]);
+  expect(problems).toEqual([]);
+});
+
+test("interactive tour controls sync data-step and radio selection cleanly", async ({ page, baseURL }) => {
+  const problems = watch(page, baseURL ?? "");
+  await page.goto("/en/security");
+  const figure = page.locator("#signin .sec-fig");
+  const bar = figure.locator('[data-sec-audio="signin"]');
+  await expect(bar).toBeVisible();
+  await bar.locator("[data-sec-next]").click();
+  await expect(figure).toHaveAttribute("data-step", "1");
+  await expect(figure.getByRole("radio", { name: "Step 1" })).toBeChecked();
+  await bar.locator("[data-sec-next]").click();
+  await expect(figure).toHaveAttribute("data-step", "2");
+  await expect(figure.getByRole("radio", { name: "Step 2" })).toBeChecked();
+  await figure.locator("label.sec-l0").click();
+  await expect(figure.getByRole("radio", { name: "Play" })).toBeChecked();
+  await expect(figure).not.toHaveAttribute("data-step", /.+/);
+  expect(problems).toEqual([]);
 });

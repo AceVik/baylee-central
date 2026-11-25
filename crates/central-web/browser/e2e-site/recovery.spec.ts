@@ -29,8 +29,6 @@ const FILE = [
   "Keep it where only you can reach it. Nobody at Baylee will ever ask you for it.",
   "",
 ].join("\n");
-const WARNING =
-  "Careful: the code then lies in your mailbox. Whoever can read your mail can also have a reset code sent there, and with both reset your sign-in and open your encrypted data.";
 
 /** The crypto Worker, canned: the proof, the enrolment and the sign-ins. */
 const WORKER = `
@@ -51,12 +49,19 @@ self.addEventListener("message", (event) => {
 });`;
 
 type Held = { mail: boolean; address: string | null; confirmed_at: number | null; pending: string | null; pending_until: number | null };
-type Body = { operation?: string; request?: { action?: string; address?: string; lang?: string; code?: string } } & Record<string, unknown>;
+type Body = {
+  operation?: string;
+  email?: string;
+  attachment_base64?: string;
+  encrypted?: boolean;
+  lang?: string;
+  request?: { action?: string; address?: string; lang?: string; code?: string };
+} & Record<string, unknown>;
 type World = {
   held: Held;
   /** Central's terms are in force and not accepted yet. */
   terms: boolean;
-  /** The next `set` finds the sign-in too old. */
+  /** The next `send_recovery_backup_mail` fails. */
   stale: boolean;
 };
 
@@ -141,6 +146,9 @@ function central(seen: Body[], w: World) {
         }
         return json({ result: "email", state: held });
       }
+      case "send_recovery_backup_mail":
+        if (w.stale) return refused(503);
+        return json({ result: "done" });
       default:
         return refused(401);
     }
@@ -254,7 +262,7 @@ test("the code step offers every way to keep the code, each made only when it is
   await expect(section.locator(".who-label")).toHaveText("Your handle");
   await expect(section.locator(".who-handle")).toHaveText("Erika#1a2b");
   await expect(section).toContainText("Keep it somewhere safe where you will find it even without this device.");
-  await expect(field(page)).toBeVisible();
+  await expect(field(page)).toBeHidden();
 
   // Before any of them is pressed, the code is in the page once, as text,
   // and no address, file or sheet holds it.
@@ -265,46 +273,40 @@ test("the code step offers every way to keep the code, each made only when it is
   await expect(page.locator("a[download], a[href^='mailto:'], .code-sheet")).toHaveCount(0);
   expect(page.url()).not.toContain(CODE);
 
-  const ways = ["Copy", "Save as a text file", "Print", "Save in password manager", "Mail it to myself"];
+  const ways = ["Save as a text file", "Print", "Save in password manager", "Mail it to myself"];
+  await expect(button(page, "Copy recovery code")).toBeVisible();
   for (const name of ways) await expect(button(page, name)).toBeVisible();
-  await expect(section.locator("#code-mail-warning")).toHaveText(WARNING);
-  // the warning unfolds with the first press or an address typed; the button names it
-  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-controls", "code-mail-warning");
+  // the backup panel unfolds on click; the button controls and names it
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-controls", "code-mail-panel");
   await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-expanded", "false");
-  await expect(field(page)).toHaveAttribute("type", "email");
-  await expect(field(page)).toHaveAttribute("autocomplete", "email");
-  await expect(field(page)).not.toHaveAttribute("name", /.*/);
-  await expect(section.locator("label[for=code-email]")).toHaveText("E-mail address (optional)");
-  await expect(field(page)).toHaveAccessibleDescription(
-    /^For a reset code if you forget your password\..*Whoever can read this mailbox can reset your sign-in\./,
-  );
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-pressed", "false");
   await sound(page);
-  // the keyboard goes through the ways, the address, the box and on
-  await tabs(page, button(page, "Copy"), [
-    ...ways.slice(1).map((name) => button(page, name)),
-    field(page),
+
+  // the keyboard goes through Copy, the ways, the confirmation box and Continue while collapsed
+  await tabs(page, button(page, "Copy recovery code"), [
+    ...ways.map((name) => button(page, name)),
     page.locator("#code-kept"),
     button(page, "Continue"),
   ]);
 
-  // The mail: built on the click, to the address typed, with the subject
-  // and the body made here, and never put into the page.
-  await field(page).fill(ADDRESS);
-  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-expanded", "true");
-  const asked: string[] = [];
-  const protocol = await page.context().newCDPSession(page);
-  await protocol.send("Page.enable");
-  protocol.on("Page.frameRequestedNavigation", (event) => asked.push(event.url));
+  // Opening "Mail it to myself" unfolds the backup email and optional ZIP password panel
   await button(page, "Mail it to myself").click();
-  await expect.poll(() => asked.length).toBe(1);
-  const mail = new URL(asked[0] ?? "");
-  expect(mail.protocol).toBe("mailto:");
-  expect(decodeURIComponent(mail.pathname)).toBe(ADDRESS);
-  expect(mail.searchParams.get("subject")).toBe("My Baylee recovery code");
-  expect(mail.searchParams.get("body")).toBe(FILE.replaceAll("\n", "\r\n"));
-  expect(await page.content()).not.toContain("mailto:");
-  await expect(page).toHaveURL(/\/en\/register$/);
-  await expect(section).toBeVisible();
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-expanded", "true");
+  await expect(button(page, "Mail it to myself")).toHaveAttribute("aria-pressed", "true");
+  await expect(field(page)).toBeVisible();
+  await expect(field(page)).toBeFocused();
+  await expect(field(page)).toHaveAttribute("type", "email");
+  await expect(field(page)).toHaveAttribute("autocomplete", "email");
+  await expect(field(page)).not.toHaveAttribute("name", /.*/);
+  await expect(section.locator("label[for=code-email]")).toHaveText("E-mail address");
+  await expect(field(page)).toHaveAccessibleDescription(
+    "Whoever can read this mailbox can reset your sign-in. Your encrypted data survives a reset only with your recovery code.",
+  );
+  await expect(page.locator("#keep-zip-password")).toBeVisible();
+  await expect(section.locator(".keep-zip-warn")).toHaveText("Without a password, the ZIP archive will be sent unencrypted.");
+  await sound(page);
+  await button(page, "Mail it to myself").click();
+  await expect(field(page)).toBeHidden();
 
   // The file: made on the click, saved, and its link gone again.
   const [download] = await Promise.all([page.waitForEvent("download"), button(page, "Save as a text file").click()]);
@@ -319,10 +321,10 @@ test("the code step offers every way to keep the code, each made only when it is
   );
   expect(await page.evaluate(() => Reflect.get(window, "storedCredentials"))).toEqual([{ id: "Baylee recovery code (erika)", password: CODE }]);
 
-  // Copying, as before.
+  // Copying: inline button inside the secret frame.
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await button(page, "Copy").click();
-  await expect(section.getByRole("status").filter({ hasText: "Copied." })).toBeVisible();
+  await button(page, "Copy recovery code").click();
+  await expect(button(page, "Recovery code copied")).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(CODE);
 
   // The print: the sheet is drawn, and a print shows it and nothing else.
@@ -355,63 +357,50 @@ test("the code step offers every way to keep the code, each made only when it is
   expect(problems).toEqual([]);
 });
 
-test("an address typed beside the code is named after it, without the password, and confirmed on the next step", async ({ page }) => {
+test("an address typed beside the code mails an encrypted ZIP backup cleanly on Continue", async ({ page }) => {
   const { seen, problems } = await open(page, world());
   await register(page);
+  await button(page, "Mail it to myself").click();
   await field(page).fill(ADDRESS);
+  await page.locator("#keep-zip-password").fill("zip-harbour-secret");
+  await expect(step(page).locator(".keep-zip-warn")).toHaveCount(0);
   // the box first
   await button(page, "Continue").click();
   await expect(step(page).getByRole("alert")).toHaveText("Save the code first, then confirm it.");
   expect(emails(seen)).toEqual(["status"]);
+  expect(seen.map((b) => b.operation)).not.toContain("send_recovery_backup_mail");
   await page.locator("#code-kept").check();
-  const signedIn = seen.length;
   await button(page, "Continue").click();
 
-  const card = page.locator("section[aria-labelledby=email-title]");
-  await expect(card.getByRole("heading", { name: "Confirm your e-mail address" })).toBeVisible();
-  await expect(card).toContainText("Enter the code from the mail here, or later on your account's security page.");
-  await expect(card).toContainText(`We sent a code to ${ADDRESS}. It is valid for 15 minutes.`);
-  // the registration's sign-in is fresh: no password asked, no sign-in once more
-  const operations = seen.slice(signedIn).map((body) => body.operation);
-  expect(operations).not.toContain("login_start");
-  expect(seen.find((body) => body.request?.action === "set")).toEqual({ operation: "email", request: { action: "set", address: ADDRESS, lang: "en" } });
-  await expect(page.locator("#email-code")).toBeFocused();
-  await sound(page);
-  await tabs(page, page.locator("#email-code"), [
-    card.getByRole("button", { name: "Confirm", exact: true }),
-    card.getByRole("button", { name: "Send again", exact: true }),
-    card.getByRole("button", { name: "Use another address", exact: true }),
-    card.getByRole("button", { name: "Continue to your account", exact: true }),
-  ]);
-
-  await page.locator("#email-code").fill(MAILED.toLowerCase());
-  await card.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(page.locator("#email-said")).toHaveText("Your e-mail address is confirmed.");
-  await expect(card.locator("dl.facts dd").first()).toHaveText(ADDRESS);
-  expect(emails(seen)).toEqual(["status", "set", "confirm"]);
-  await sound(page);
-  await card.getByRole("button", { name: "Continue to your account", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/account$/);
+  const sent = seen.find((body) => body.operation === "send_recovery_backup_mail");
+  expect(sent).toBeTruthy();
+  expect(sent).toMatchObject({ operation: "send_recovery_backup_mail", email: ADDRESS, encrypted: true, lang: "en" });
+  const zipBytes = Buffer.from(sent?.attachment_base64 ?? "", "base64");
+  expect(zipBytes.subarray(0, 4).toString("latin1")).toBe("PK\u0003\u0004");
   expect(JSON.stringify(seen)).not.toContain(PASSWORD);
+  expect(JSON.stringify(seen)).not.toContain(CODE);
   expect(problems).toEqual([]);
 });
 
 for (const mail of [true, false]) {
-  test(`skipping the address is one click${mail ? "" : ", and where Central sends no mail there is no field"}`, async ({ page }) => {
+  test(`skipping the backup mail is one click${mail ? "" : " even when mail is disabled"}`, async ({ page }) => {
     const { seen } = await open(page, world({ mail }));
     await register(page);
-    await expect(field(page)).toHaveCount(mail ? 1 : 0);
+    await expect(field(page)).toBeHidden();
     await page.locator("#code-kept").check();
     await button(page, "Continue").click();
     await expect(page).toHaveURL(/\/en\/account$/);
-    // nothing about an address but the look whether one can be named
+    // nothing about a backup email when the option was not picked
     expect(emails(seen)).toEqual(["status"]);
+    expect(seen.map((body) => body.operation)).not.toContain("send_recovery_backup_mail");
   });
 }
 
-test("where Central's terms are in force the address is named once they are accepted", async ({ page }) => {
+test("where Central's terms are in force the backup mail is still sent before terms are shown", async ({ page }) => {
   const { seen } = await open(page, world({}, { terms: true }));
   await register(page);
+  await button(page, "Mail it to myself").click();
   await field(page).fill(ADDRESS);
   await page.locator("#code-kept").check();
   await button(page, "Continue").click();
@@ -420,61 +409,47 @@ test("where Central's terms are in force the address is named once they are acce
   // the short text fits its box, so it is read as it stands: accepting works
   await expect(page.locator("#terms-read-hint")).toHaveText("Read to the end.");
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(page.locator("#email-code")).toBeFocused();
-  const order = seen.map((body) => body.operation === "email" ? `email ${body.request?.action}` : body.operation);
-  expect(order.indexOf("accept_terms")).toBeGreaterThan(0);
-  expect(order.indexOf("email set")).toBeGreaterThan(order.indexOf("accept_terms"));
+  await expect(page).toHaveURL(/\/en\/account$/);
+  const order = seen.map((body) => body.operation);
+  expect(order.indexOf("send_recovery_backup_mail")).toBeGreaterThan(0);
+  expect(order.indexOf("accept_terms")).toBeGreaterThan(order.indexOf("send_recovery_backup_mail"));
 });
 
 test("an address Central would not mail to is refused before anything is sent", async ({ page }) => {
   const { seen } = await open(page, world());
   await register(page);
+  await button(page, "Mail it to myself").click();
   await page.locator("#code-kept").check();
   for (const bad of ["erika", "erika@localhost", "jürgen@example.org"]) {
     await field(page).fill(bad);
     await button(page, "Continue").click();
     await expect(step(page).getByRole("alert")).toHaveText(
-      "We cannot write to this address. Enter one plain address such as name@example.org; accented letters and umlauts do not work.",
+      "We cannot write to this address. Enter one plain address such as name@example.org (accented letters and umlauts do not work).",
     );
     await expect(field(page)).toBeFocused();
   }
   expect(emails(seen)).toEqual(["status"]);
   expect(seen.map((body) => body.operation)).not.toContain("terms_status");
-  // the mail to oneself then goes to nobody yet: the mail program asks
-  const asked: string[] = [];
-  const protocol = await page.context().newCDPSession(page);
-  await protocol.send("Page.enable");
-  protocol.on("Page.frameRequestedNavigation", (event) => asked.push(event.url));
-  await button(page, "Mail it to myself").click();
-  await expect.poll(() => asked.length).toBe(1);
-  expect(asked[0]).toMatch(/^mailto:\?subject=My%20Baylee%20recovery%20code&body=Baylee%20recovery%20code%0D%0A/);
+  expect(seen.map((body) => body.operation)).not.toContain("send_recovery_backup_mail");
 });
 
-test("a sign-in older than Central takes: the step asks for the password, then names the address", async ({ page }) => {
+test("when sending the backup email fails, the page stays on the code step and says so", async ({ page }) => {
   const { seen } = await open(page, world({}, { stale: true }));
   await register(page);
+  await button(page, "Mail it to myself").click();
   await field(page).fill(ADDRESS);
   await page.locator("#code-kept").check();
   await button(page, "Continue").click();
-  const card = page.locator("section[aria-labelledby=email-title]");
-  await expect(page.locator("#email-said")).toHaveText("To send the code, enter your password once more.");
-  await expect(page.locator("#email-password")).toBeFocused();
-  await expect(page.locator("#email-address")).toHaveValue(ADDRESS);
-  await expect(card.locator("#email-error")).toBeEmpty();
-  await sound(page);
-  const asked = seen.length;
-  await page.locator("#email-password").fill(PASSWORD);
-  await card.getByRole("button", { name: "Send confirmation code", exact: true }).click();
-  // the sign-in once more runs in a fresh Worker
-  await expect(card).toContainText(`We sent a code to ${ADDRESS}. It is valid for 15 minutes.`, { timeout: 15_000 });
-  expect(seen.slice(asked).map((body) => body.operation)).toEqual(["account_summary", "login_start", "login_finish", "email"]);
+  await expect(step(page).getByRole("alert")).toHaveText("Could not send the backup email. Check your address and try again.");
+  await expect(step(page)).toBeVisible();
+  expect(seen.map((body) => body.operation)).toContain("send_recovery_backup_mail");
   expect(JSON.stringify(seen)).not.toContain(PASSWORD);
 });
 
 test("without PasswordCredential, as in Firefox and Safari, there is no password manager's button", async ({ page }) => {
   await open(page, world(), { manager: false });
   await register(page);
-  await expect(button(page, "Copy")).toBeVisible();
+  await expect(button(page, "Copy recovery code")).toBeVisible();
   await expect(button(page, "Print")).toBeVisible();
   await expect(step(page).getByRole("button", { name: "Save in password manager" })).toHaveCount(0);
   expect(await page.evaluate(() => "PasswordCredential" in window)).toBe(false);
@@ -548,14 +523,13 @@ for (const where of ["page", "dialog"] as const) {
     await card.getByRole("button", { name: "Account anlegen" }).click();
     await expect(card.locator("#code-title")).toBeVisible({ timeout: 30_000 });
     await expect(card.getByRole("button", { name: "Im Passwortmanager speichern" })).toBeVisible();
+    await card.getByRole("button", { name: "An mich mailen" }).click();
     await card.locator("#code-email").fill(ADDRESS);
     expect(await overflow(card)).toEqual({ beyond: [], scroll: 0 });
     expect(await narrow(page)).toBe(0);
     expect(await targets(page)).toEqual([]);
     await card.locator("#code-kept").check();
     await card.getByRole("button", { name: "Weiter", exact: true }).click();
-    await expect(page.locator("#email-code")).toBeFocused();
-    expect(await overflow(card)).toEqual({ beyond: [], scroll: 0 });
-    expect(await narrow(page)).toBe(0);
+    await expect(page).toHaveURL(/\/de\/account$/);
   });
 }

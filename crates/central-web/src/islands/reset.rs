@@ -21,7 +21,7 @@ use central_api::wire::{Discovery, Identity, Request, ResetVault, Response};
 use leptos::prelude::*;
 use serde_json::{Value, json};
 
-use super::auth::{Problem, problem_text};
+use super::auth::{Problem, auth_alert, problem_text};
 use super::central::{Failure, call, uuid_v7, valid_username};
 use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
@@ -449,7 +449,7 @@ fn mail_view(
         <p>{words::reset_mail_lead(lang)}</p>
         <form class="form" method="post" novalidate=true on:submit=submit>
             {field::labelled(lang, name, move || mail.name.get(), move |value| mail.name.set(value))}
-            <p class="error" role="alert">{move || mail.error.get()}</p>
+            {auth_alert(mail.error)}
             <button type="submit" class="button quiet" aria-disabled=move || mail.busy.get().then_some("true")>
                 {glyph::glyph(glyph::MAIL)}
                 <span>{words::reset_mail_submit(lang)}</span>
@@ -521,7 +521,7 @@ fn form_view(
             </div>
             {text(spec("reset-password", words::password_new(lang), Some(words::register_password_hint(lang)), glyph::LOCK, "new-password", "1024"), form.password)}
             {text(spec("reset-repeat", words::password_new_repeat(lang), Some(words::register_repeat_hint(lang)), glyph::LOCK_KEYHOLE, "new-password", "1024"), form.repeat)}
-            <p class="error" role="alert">{move || error.get()}</p>
+            {auth_alert(error)}
             <button type="submit" class="button primary">{words::reset_submit(lang)}</button>
         </form>
     }
@@ -546,14 +546,13 @@ fn code_view(lang: Lang, code: String, name: &str, sure: bool, signin: String) -
     let unsure = (!sure).then(|| view! { <p class="notice">{words::reset_unsure_code(lang)}</p> });
     view! {
         {unsure}
-        <p class="eyebrow">{words::code_shown_once(lang)}</p>
-        <p class="secret" translate="no"><code>{code}</code></p>
+        {keep::secret_frame(lang, code)}
         {ways}
         <div class="check">
             <input id="reset-code-kept" type="checkbox" on:change=move |ev| kept.set(event_target_checked(&ev)) />
             <label for="reset-code-kept">{words::code_kept(lang)}</label>
         </div>
-        <p class="error" role="alert">{move || error.get()}</p>
+        {auth_alert(error)}
         <p class="actions">
             <button type="button" class="button primary" on:click=go_on>{words::reset_to_signin(lang)}</button>
         </p>

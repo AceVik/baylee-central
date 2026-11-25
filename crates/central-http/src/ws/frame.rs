@@ -43,6 +43,8 @@ impl Code {
 /// What a client sent.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Frame {
+    /// A bounded UTF-8 text frame accepted on browser push sockets.
+    Text(String),
     /// A ping, with its payload, which the pong returns.
     Ping(Vec<u8>),
     Pong,
@@ -64,6 +66,7 @@ pub(crate) enum Ended {
 pub(crate) struct Reader {
     buffer: [u8; LONGEST],
     filled: usize,
+    allow_text: bool,
 }
 
 impl Reader {
@@ -71,6 +74,15 @@ impl Reader {
         Self {
             buffer: [0; LONGEST],
             filled: 0,
+            allow_text: false,
+        }
+    }
+
+    pub(crate) const fn browser() -> Self {
+        Self {
+            buffer: [0; LONGEST],
+            filled: 0,
+            allow_text: true,
         }
     }
 
@@ -114,15 +126,21 @@ impl Reader {
             return Err(Ended::Refused(Code::PROTOCOL));
         }
         match opcode {
-            // continuation, text, binary
-            0x0..=0x2 => return Err(Ended::Refused(Code::UNSUPPORTED)),
-            0x8..=0xa => {}
+            // continuation and binary are always rejected; text is accepted
+            // only on browser sockets (`allow_text`).
+            0x0 | 0x2 => return Err(Ended::Refused(Code::UNSUPPORTED)),
+            0x1 if !self.allow_text => return Err(Ended::Refused(Code::UNSUPPORTED)),
+            0x1 | 0x8..=0xa => {}
             _ => return Err(Ended::Refused(Code::PROTOCOL)),
         }
-        // A control frame is whole and short (§ 5.5), which also rules out
-        // 126 and 127.
+        // A control frame is whole and short (§ 5.5), and browser client text
+        // commands stay within the same unextended 125-byte envelope.
         if !fin || length > 125 {
-            return Err(Ended::Refused(Code::PROTOCOL));
+            return Err(Ended::Refused(if opcode == 0x1 {
+                Code::UNSUPPORTED
+            } else {
+                Code::PROTOCOL
+            }));
         }
         let whole = 2 + 4 + length;
         if self.filled < whole {
@@ -140,11 +158,15 @@ impl Reader {
         }
         self.buffer.copy_within(whole..self.filled, 0);
         self.filled -= whole;
-        Ok(Some(match opcode {
+        let frame = match opcode {
+            0x1 => Frame::Text(
+                String::from_utf8(payload).map_err(|_| Ended::Refused(Code::INVALID_DATA))?,
+            ),
             0x8 => Frame::Close(closing(&payload)?),
             0x9 => Frame::Ping(payload),
             _ => Frame::Pong,
-        }))
+        };
+        Ok(Some(frame))
     }
 }
 

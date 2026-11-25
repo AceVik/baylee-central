@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { request, createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { join } from "node:path";
+import type { Duplex } from "node:stream";
 
 function arg(name: string, fallback: string): string {
   const at = process.argv.indexOf(`--${name}`);
@@ -37,12 +38,24 @@ if (!(site > 0)) {
 }
 
 const origin = tls ? "https://baylee.app" : `http://127.0.0.1:${port}`;
+function forwardedHeaders(req: IncomingMessage) {
+  return {
+    ...req.headers,
+    "x-forwarded-for": req.socket.remoteAddress ?? "",
+    "x-forwarded-proto": tls ? "https" : "http",
+    "x-forwarded-host": req.headers.host ?? "",
+  };
+}
+
 const handle = (req: IncomingMessage, res: ServerResponse) => {
   const url = new URL(req.url ?? "/", origin);
   if (url.pathname.startsWith("/api/")) {
-    // request_body max_size 64KiB (9MiB for a picture's upload), then
-    // reverse_proxy 127.0.0.1:<listener>
-    const limit = req.method === "PUT" && url.pathname === "/api/v1/picture" ? PICTURE_LIMIT : LIMIT;
+    // request_body max_size 64KiB (9MiB for a profile or group picture upload),
+    // then reverse_proxy 127.0.0.1:<listener>
+    const isPictureUpload =
+      req.method === "PUT" &&
+      (url.pathname === "/api/v1/picture" || /^\/api\/v1\/groups\/[^/]+\/picture$/.test(url.pathname));
+    const limit = isPictureUpload ? PICTURE_LIMIT : LIMIT;
     const chunks: Buffer[] = [];
     let size = 0;
     req.on("data", (chunk: Buffer) => {
@@ -56,11 +69,8 @@ const handle = (req: IncomingMessage, res: ServerResponse) => {
       }
       const body = Buffer.concat(chunks);
       const headers = {
-        ...req.headers,
+        ...forwardedHeaders(req),
         "content-length": String(body.length),
-        "x-forwarded-for": req.socket.remoteAddress ?? "",
-        "x-forwarded-proto": tls ? "https" : "http",
-        "x-forwarded-host": req.headers.host ?? "",
       };
       const upstream = request({ host: "127.0.0.1", port: listener, method: req.method, path: req.url, headers }, (answer) => {
         // the operation and the status only: never a body, a cookie or a key
@@ -98,6 +108,74 @@ const handle = (req: IncomingMessage, res: ServerResponse) => {
 const server = tls
   ? createHttpsServer({ key: readFileSync(join(tls, "key.pem")), cert: readFileSync(join(tls, "cert.pem")) }, handle)
   : createHttpServer(handle);
+
+function formatRawHeaders(rawHeaders: string[]): string {
+  const lines: string[] = [];
+  for (let i = 0; i + 1 < rawHeaders.length; i += 2) {
+    lines.push(`${rawHeaders[i]}: ${rawHeaders[i + 1]}`);
+  }
+  return lines.join("\r\n");
+}
+
+server.on("upgrade", (req: IncomingMessage, clientSocket: Duplex, head: Buffer) => {
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", origin);
+  } catch {
+    clientSocket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+    return;
+  }
+  if (!url.pathname.startsWith("/api/")) {
+    clientSocket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+    return;
+  }
+  const upstream = request({
+    host: "127.0.0.1",
+    port: listener,
+    method: req.method ?? "GET",
+    path: req.url ?? "/",
+    headers: forwardedHeaders(req),
+  });
+  upstream.setNoDelay(true);
+  let settled = false;
+  clientSocket.on("error", () => {
+    if (!settled) upstream.destroy();
+  });
+  upstream.on("error", () => {
+    if (!settled && clientSocket.writable) {
+      clientSocket.end("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n");
+    }
+    clientSocket.destroy();
+  });
+  upstream.on("upgrade", (upstreamRes, upstreamSocket, upstreamHead) => {
+    settled = true;
+    process.stdout.write(`${req.method ?? "GET"} ${url.pathname} ws -> ${upstreamRes.statusCode ?? 101}\n`);
+    const statusLine = `HTTP/${upstreamRes.httpVersion} ${upstreamRes.statusCode ?? 101} ${upstreamRes.statusMessage ?? "Switching Protocols"}`;
+    const headBlock = formatRawHeaders(upstreamRes.rawHeaders);
+    clientSocket.write(headBlock ? `${statusLine}\r\n${headBlock}\r\n\r\n` : `${statusLine}\r\n\r\n`);
+    if (upstreamHead.length > 0) clientSocket.write(upstreamHead);
+    if (head.length > 0) upstreamSocket.write(head);
+    upstreamSocket.pipe(clientSocket);
+    clientSocket.pipe(upstreamSocket);
+    const closeBoth = () => {
+      upstreamSocket.destroy();
+      clientSocket.destroy();
+    };
+    upstreamSocket.on("error", closeBoth);
+    clientSocket.on("error", closeBoth);
+    upstreamSocket.on("close", () => clientSocket.destroy());
+    clientSocket.on("close", () => upstreamSocket.destroy());
+  });
+  upstream.on("response", (upstreamRes) => {
+    settled = true;
+    process.stdout.write(`${req.method ?? "GET"} ${url.pathname} ws -> ${upstreamRes.statusCode ?? 502}\n`);
+    const statusLine = `HTTP/${upstreamRes.httpVersion} ${upstreamRes.statusCode ?? 502} ${upstreamRes.statusMessage ?? ""}`;
+    const headBlock = formatRawHeaders(upstreamRes.rawHeaders);
+    clientSocket.write(headBlock ? `${statusLine}\r\n${headBlock}\r\n\r\n` : `${statusLine}\r\n\r\n`);
+    upstreamRes.pipe(clientSocket);
+  });
+  upstream.end();
+});
 
 server.listen(port, "127.0.0.1", () => {
   process.stdout.write(`${origin} at 127.0.0.1:${port}, /api/* to 127.0.0.1:${listener}\n`);

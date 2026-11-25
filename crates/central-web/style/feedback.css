@@ -428,14 +428,13 @@
   max-inline-size: 100%;
 }
 
+.fb-bulk-field .inset {
+  inline-size: min(15rem, 100%);
+}
+
 .fb-bulk-field select {
   inline-size: auto;
   max-inline-size: 15rem;
-}
-
-.fb-bulk-field input[type="text"] {
-  inline-size: 10rem;
-  flex: 1 1 8rem;
 }
 
 .fb-inline {

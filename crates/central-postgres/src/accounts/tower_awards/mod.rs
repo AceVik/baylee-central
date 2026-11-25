@@ -52,7 +52,10 @@ async fn issuer(
     get(&row, "id")
 }
 
-async fn totals(db: &impl ConnectionTrait, account: Uuid) -> Result<Progress, Error> {
+pub(in crate::accounts) async fn totals(
+    db: &impl ConnectionTrait,
+    account: Uuid,
+) -> Result<Progress, Error> {
     let row = db.query_one_raw(statement(
         "SELECT duels,victories,clears,flawless FROM central_identity.tower_award_progress WHERE account_id=$1",
         vec![account.into()],

@@ -827,12 +827,27 @@ fn facts(lang: Lang, row: &Row, recovery: Option<bool>) -> impl IntoView + use<>
     }
 }
 
-/// An account's name with the role's pill.
+/// An account's handle with an inline copy button, or its sign-in name until
+/// it has one. Never use inside another interactive `<button>` or `<a>`.
+fn handle_view(lang: Lang, row: &Row) -> AnyView {
+    match (&row.display_name, row.tag) {
+        (Some(name), Some(tag)) => super::ui::copy_handle::handle_with_copy(
+            lang,
+            name.clone(),
+            central_api::profile::tag_text(tag),
+            false,
+        ),
+        _ => view! { <bdi translate="no">{row.name()}</bdi> }.into_any(),
+    }
+}
+
+/// An account's name (with inline copy button when it has a handle) and the
+/// role's pill.
 fn title(lang: Lang, row: &Row) -> impl IntoView + use<> {
     let pill = row
         .admin
         .then(|| view! { <span class="pill info">{words::admin_pill(lang)}</span> });
-    view! { <bdi translate="no">{row.name()}</bdi>{pill} }
+    view! { {handle_view(lang, row)}{pill} }
 }
 
 fn row_view(a: Admin, row: &Row) -> impl IntoView + use<> {
@@ -904,11 +919,19 @@ fn list_view(a: Admin) -> impl IntoView {
                 <form class="form admin-search" method="post" novalidate=true on:submit=move |event| a.search(&event)>
                     <div class="field">
                         <label for="admin-search">{words::admin_search(lang)}</label>
-                        <div class="with-tool">
+                        <div class="inset">
+                            {field::mark(glyph::SEARCH)}
                             <input id="admin-search" type="search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="64"
                                 aria-describedby="admin-search-hint"
                                 on:input=move |ev| a.typed.set(event_target_value(&ev)) prop:value=move || a.typed.get() />
-                            <button type="submit" class="button">{glyph::glyph(glyph::SEARCH)}<span>{words::admin_search_submit(lang)}</span></button>
+                            <button
+                                type="submit"
+                                class="inset-end"
+                                title=words::admin_search_submit(lang)
+                                aria-label=words::admin_search_submit(lang)
+                            >
+                                {glyph::glyph(glyph::SEARCH)}
+                            </button>
                         </div>
                         <p class="hint" id="admin-search-hint">{words::admin_search_hint(lang)}</p>
                     </div>
@@ -1001,13 +1024,12 @@ fn account_view(a: Admin, opened: &Opened) -> AnyView {
 
 fn warning_view(a: Admin, opened: &Opened) -> AnyView {
     let lang = a.lang;
-    let name = opened.row.name();
     let on = opened.clone();
     let off = opened.clone();
     view! {
         <section class="card step" aria-labelledby="admin-warning-title">
             <h2 id="admin-warning-title" tabindex="-1">{words::admin_warning_title(lang)}</h2>
-            <p class="meta"><bdi translate="no">{name}</bdi></p>
+            <p class="meta">{handle_view(lang, &opened.row)}</p>
             <p class="notice">{words::admin_warning_who(lang)}</p>
             <ul class="admin-warning">
                 <li>{words::admin_warning_ends(lang)}</li>
@@ -1038,13 +1060,13 @@ fn password_view(a: Admin, opened: Opened) -> AnyView {
         auto: "current-password",
         max: "1024",
     };
-    let name = opened.row.name();
+    let who = handle_view(lang, &opened.row);
     let sent = opened.clone();
     let off = opened;
     view! {
         <section class="card step" aria-labelledby="admin-password-title">
             <h2 id="admin-password-title">{words::admin_make(lang)}</h2>
-            <p class="meta"><bdi translate="no">{name}</bdi></p>
+            <p class="meta">{who}</p>
             <form class="form" method="post" novalidate=true on:submit=move |event| a.make(&event, sent.clone())>
                 // for a password manager: whose password this is
                 <input type="text" autocomplete="username" readonly=true hidden=true value=a.username.get_value() />
@@ -1072,7 +1094,7 @@ fn code_view(a: Admin, made: &Arc<Made>) -> AnyView {
     view! {
         <section class="card step secret-box" aria-labelledby="admin-code-title">
             <h2 id="admin-code-title" tabindex="-1">{words::admin_code_title(lang)}</h2>
-            <p class="meta"><bdi translate="no">{made.row.name()}</bdi></p>
+            <p class="meta">{handle_view(lang, &made.row)}</p>
             <p class="eyebrow">{words::code_shown_once(lang)}</p>
             <p class="secret" translate="no"><code>{code}</code></p>
             <p>{words::admin_code_until(lang, &when(lang, made.expires_at))}</p>
@@ -1097,7 +1119,7 @@ fn step_view(a: Admin) -> AnyView {
         Step::Password(opened) => password_view(a, opened),
         Step::Working(opened) => view! {
             <section class="card step" aria-labelledby="admin-working-title">
-                <h2 id="admin-working-title"><bdi translate="no">{opened.row.name()}</bdi></h2>
+                <h2 id="admin-working-title">{handle_view(lang, &opened.row)}</h2>
                 <p class="working" role="status" tabindex="-1" id="admin-working">{words::signin_working(lang)}</p>
             </section>
         }

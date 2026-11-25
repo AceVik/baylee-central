@@ -104,7 +104,7 @@ impl Lists {
                      WHERE p.gateway_id = g.id) AS approved,
                  floor(extract(epoch FROM g.created_at))::bigint AS created_at,
                  floor(extract(epoch FROM g.last_seen))::bigint AS last_seen
-             FROM central_identity.gateways g WHERE g.owner_id = $1 ORDER BY g.id LIMIT $2",
+             FROM central_identity.gateways g WHERE g.owner_id = $1 AND g.deleted_at IS NULL ORDER BY g.id LIMIT $2",
             account.clone(),
             |row| {
                 Ok(ExportedGateway {

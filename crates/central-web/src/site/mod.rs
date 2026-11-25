@@ -13,6 +13,7 @@ use crate::words::Lang;
 pub mod icons;
 mod pages;
 mod shell;
+mod strip;
 
 /// A page of the site, by its path under the language prefix.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -47,6 +48,10 @@ pub enum Page {
     Reset,
     /// `/{lang}/account…`: the signed-in area.
     Account(Section),
+    /// `/{lang}/player/{handle}`: a public player profile.
+    Player,
+    /// `/{lang}/invite/{code}`: a personal friend invitation.
+    Invite,
     /// Any path the site does not have (404).
     NotFound,
     /// A path the site had and removed for good (410).
@@ -97,7 +102,38 @@ impl Page {
             Page::Privacy => "privacy",
             Page::Terms => "terms",
             Page::FanContent => "fan-content",
+            Page::Player => "player",
+            Page::Invite => "invite",
         }
+    }
+
+    /// Whether `slug` matches a public player profile path `player/{name}-{4..8 hex}`.
+    fn is_player_slug(slug: &str) -> bool {
+        let Some(handle) = slug.strip_prefix("player/") else {
+            return false;
+        };
+        if handle.is_empty() || handle.contains('/') {
+            return false;
+        }
+        let Some((name, tag)) = handle.rsplit_once('-') else {
+            return false;
+        };
+        !name.is_empty()
+            && (4..=8).contains(&tag.len())
+            && tag.bytes().all(|b| b.is_ascii_hexdigit())
+    }
+
+    /// Whether `slug` matches a friend invitation path `invite/{code}`.
+    fn is_invite_slug(slug: &str) -> bool {
+        let Some(code) = slug.strip_prefix("invite/") else {
+            return false;
+        };
+        !code.is_empty()
+            && !code.contains('/')
+            && code.len() <= 64
+            && code
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
     }
 
     /// The page at a slug.
@@ -111,6 +147,12 @@ impl Page {
             })
         {
             return Some(Page::Account(Section::Report));
+        }
+        if Self::is_player_slug(slug) {
+            return Some(Page::Player);
+        }
+        if Self::is_invite_slug(slug) {
+            return Some(Page::Invite);
         }
         if Page::REMOVED.contains(&slug) {
             return Some(Page::Gone);
@@ -137,6 +179,8 @@ impl Page {
                 | Page::Register
                 | Page::Reset
                 | Page::Account(_)
+                | Page::Player
+                | Page::Invite
         )
     }
 
@@ -177,10 +221,14 @@ impl Page {
 
     /// Whether the server keeps the page once rendered: every page but one
     /// account's in the administration, whose address the visitor chooses
-    /// (a kept page per id would let requests fill the table).
+    /// (a kept page per id would let requests fill the table), and public
+    /// player profiles.
     #[must_use]
     pub const fn kept(self) -> bool {
-        !matches!(self, Page::Account(Section::AdminUser(_)))
+        !matches!(
+            self,
+            Page::Account(Section::AdminUser(_)) | Page::Player | Page::Invite
+        )
     }
 }
 

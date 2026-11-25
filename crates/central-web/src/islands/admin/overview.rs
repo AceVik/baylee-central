@@ -9,12 +9,15 @@
 
 use central_api::admin::{AdminAnswer, AdminOverview, AdminRequest};
 use central_api::reports::{ReportFacets, ReportFilter, ReportKind, ReportStatus};
+use central_api::wire::{Request, Response};
 use leptos::prelude::*;
 
 use super::common::{self, Cx};
 use crate::data::Section;
-use crate::islands::account::day;
+use crate::islands::account::{day, reauth};
 use crate::islands::auth::{Problem, problem_text};
+use crate::islands::central::{Failure, call};
+use crate::islands::focus;
 use crate::words::{self, Lang};
 
 /// The reports at a glance, from the facets under "new": the statuses are
@@ -117,6 +120,7 @@ pub fn page(cx: Cx) -> impl IntoView {
             }
         });
     });
+    let worker = cx.worker.get_value();
     view! {
         <p class="admin-lead">{words::admin_ov_lead(lang)}</p>
         {move || match counts.get() {
@@ -133,7 +137,86 @@ pub fn page(cx: Cx) -> impl IntoView {
             .into_any(),
             Counts::Ready(overview) => tiles(lang, &overview, legacy, reports).into_any(),
         }}
+        {registration_switch(lang, worker)}
     }
+}
+
+/// Open registration's brake (`docs/registration-abuse.md`), for
+/// administrators: closed during an attack, opened again by hand; a change
+/// needs a sign-in under 30 minutes old, so a stale one signs in again here.
+fn registration_switch(lang: Lang, worker: String) -> AnyView {
+    let open = RwSignal::new(None::<bool>);
+    let busy = RwSignal::new(false);
+    let again = RwSignal::new(false);
+    let failed = RwSignal::new(false);
+    let read = move || {
+        leptos::task::spawn_local(async move {
+            let request = Request::Admin {
+                request: AdminRequest::Registration,
+            };
+            match call(&request).await {
+                Ok(Response::Admin {
+                    answer: AdminAnswer::Registration { open: now, .. },
+                }) => open.set(Some(now)),
+                _ => failed.set(true),
+            }
+        });
+    };
+    Effect::new(move |_| read());
+    let change = move || {
+        let Some(now) = open.get_untracked() else {
+            return;
+        };
+        busy.set(true);
+        failed.set(false);
+        leptos::task::spawn_local(async move {
+            let request = Request::Admin {
+                request: AdminRequest::SetRegistration { open: !now },
+            };
+            match call(&request).await {
+                Ok(Response::Done) => open.set(Some(!now)),
+                Err(Failure::Rejected) => again.set(true),
+                _ => failed.set(true),
+            }
+            busy.set(false);
+        });
+    };
+    let signed_again = Callback::new(move |()| {
+        again.set(false);
+        focus::after_render("#registration-switch");
+        change();
+    });
+    view! {
+        <section class="card" aria-labelledby="registration-title">
+            <h2 id="registration-title">{words::admin_registration(lang)}</h2>
+            <p role="status">{move || match open.get() {
+                Some(true) => words::admin_registration_open(lang),
+                Some(false) => words::admin_registration_closed(lang),
+                None => words::account_loading(lang),
+            }}</p>
+            <p class="meta">{words::admin_registration_lead(lang)}</p>
+            <p class="hint">{words::admin_registration_invite_note(lang)}</p>
+            {move || failed.get().then(|| view! { <p class="error" role="alert">{words::push_failed(lang)}</p> })}
+            {move || {
+                if again.get() {
+                    reauth(lang, worker.clone(), signed_again).into_any()
+                } else {
+                    // the label follows the state; the button stays, and the focus on it
+                    let label = move || if open.get() == Some(false) {
+                        words::admin_registration_reopen(lang)
+                    } else {
+                        words::admin_registration_close(lang)
+                    };
+                    view! {
+                        <p><button type="button" class="button button-ghost" id="registration-switch" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
+                            on:click=move |_| if !busy.get_untracked() { change() }>{label}</button></p>
+                    }
+                    .into_any()
+                }
+            }}
+        </section>
+    }
+    .into_any()
 }
 
 /// The tiles for the counts `overview`, with those of the reports and the

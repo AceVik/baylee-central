@@ -30,7 +30,7 @@ test("the accounts, page by page, as a table that names and links each", async (
   const first = rows(page).first();
   await expect(first.locator("th a")).toHaveText("Erika#1a2b");
   await expect(first.locator("th a")).toHaveAttribute("href", userPath(ID.erika));
-  await expect(first.locator("td")).toHaveText(["erika", "Registered on this site", /2026, \d\d:\d\d UTC$/, /2026/]);
+  await expect(first.locator("td")).toHaveText(["erika", "Registered on this site", /2026, \d{1,2}:\d\d/, /2026/]);
   await expect(rows(page).nth(1).locator("td").nth(1)).toHaveText("Moved from the official gateway");
   await expect(rows(page).nth(2).locator(".pill")).toHaveText("Administrator");
   await sound(page);
@@ -127,7 +127,7 @@ test("an account, its facts, its gateways and its audit events; copying its sign
   await sound(page);
   await tabs(page, page.getByRole("button", { name: "Copy Sign-in name" }), [
     page.getByRole("button", { name: "Copy Id" }), page.locator("#admin-reset-link"), page.locator("#admin-tag-field"),
-    button(page, "Set the tag"), button(page, "Make administrator"),
+    button(page, "Save tag"), button(page, "Make administrator"),
   ]);
   await page.getByRole("button", { name: "Copy Id" }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(hex(ID.erika));
@@ -166,7 +166,7 @@ test("a tag is checked, confirmed, sent once and read again; a taken one is refu
   // a tag Central would refuse: said, nothing asked
   for (const bad of ["", "#", "#0", "#80000000", "#xyz"]) {
     await field.fill(bad);
-    await button(page, "Set the tag").click();
+    await button(page, "Save tag").click();
     await expect(page.locator("section[aria-labelledby=admin-tag-title] [role=alert]")).toHaveText(
       "A tag is one to eight hex digits, from #1 to #7fffffff.",
     );
@@ -186,7 +186,7 @@ test("a tag is checked, confirmed, sent once and read again; a taken one is refu
   expect(seen.slice(from)).toEqual([]);
 
   // confirmed: the session's standing, the one change, the account read again
-  await button(page, "Set the tag").click();
+  await button(page, "Save tag").click();
   from = seen.length;
   await page.locator("#admin-confirm").dblclick();
   await expect(done(page)).toHaveText("The tag is set.");
@@ -199,7 +199,7 @@ test("a tag is checked, confirmed, sent once and read again; a taken one is refu
 
   // taken by another account: refused in words, and the account read again
   await field.fill("#4d5e");
-  await button(page, "Set the tag").click();
+  await button(page, "Save tag").click();
   from = seen.length;
   await page.locator("#admin-confirm").click();
   await expect(note(page)).toHaveText(
@@ -308,7 +308,7 @@ test("Central's refusals are explained by what it holds afterwards", async ({ pa
   await button(page, "Make administrator").click();
   w.next = 429;
   await button(confirm(page), "Make administrator").click();
-  await expect(note(page)).toHaveText("Too many attempts. Try again later; after several wrong passwords this can take an hour, at most a day.");
+  await expect(note(page)).toHaveText("Too many attempts. Try again later — after several wrong passwords this can take an hour, at most a day.");
   await sound(page);
   // another browser tab signed in as someone else: nothing is sent
   await button(page, "Make administrator").click();
@@ -394,7 +394,7 @@ test("German, and the longest names, hold at 320 px", async ({ page }) => {
   await expect(page.locator("#admin-user-title")).toHaveText("Wolkenkratzer_99#7fffffff");
   await sound(page);
   await page.locator("#admin-tag-field").fill("#1");
-  await button(page, "Tag setzen").click();
+  await button(page, "Tag speichern").click();
   await expect(page.locator("#admin-confirm-title")).toHaveText("Wolkenkratzer_99#7fffffff den Tag #0001 geben?");
   await sound(page);
   await page.locator("#admin-confirm").click();

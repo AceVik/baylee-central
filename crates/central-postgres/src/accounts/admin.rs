@@ -410,7 +410,7 @@ impl AccountStore {
             .query_all_raw(statement(
                 "SELECT g.id, g.origin, EXISTS (SELECT 1 FROM central_identity.gateway_approvals p
                      WHERE p.gateway_id = g.id) AS approved
-                 FROM central_identity.gateways g WHERE g.owner_id = $1 ORDER BY g.id DESC LIMIT $2",
+                 FROM central_identity.gateways g WHERE g.owner_id = $1 AND g.deleted_at IS NULL ORDER BY g.id DESC LIMIT $2",
                 vec![target.into(), limit(ACCOUNT_LIST)],
             ))
             .await
@@ -585,7 +585,7 @@ impl AccountStore {
                          (SELECT count(*) FROM central_identity.gateway_tokens t
                           WHERE t.gateway_id = g.id AND {LIVE_TOKEN})::bigint AS live_tokens
                      FROM {GATEWAY_FROM}
-                     WHERE ($1::text IS NULL OR {STATE} = $1) AND ($2::uuid IS NULL OR g.id < $2)
+                     WHERE g.deleted_at IS NULL AND ($1::text IS NULL OR {STATE} = $1) AND ($2::uuid IS NULL OR g.id < $2)
                      ORDER BY g.id DESC LIMIT $3"
                 ),
                 vec![
@@ -621,7 +621,7 @@ impl AccountStore {
                     "SELECT {GATEWAY_COLUMNS},
                          (SELECT count(*) FROM central_identity.gateway_tokens t
                           WHERE t.gateway_id = g.id AND {LIVE_TOKEN})::bigint AS live_tokens
-                     FROM {GATEWAY_FROM} WHERE g.id = $1"
+                     FROM {GATEWAY_FROM} WHERE g.id = $1 AND g.deleted_at IS NULL"
                 ),
                 vec![gateway.into()],
             ))
@@ -665,7 +665,7 @@ impl AccountStore {
         let (tx, actor) = self.acting_administrator(browser).await?;
         let gateway = Uuid::from_bytes(gateway);
         tx.query_one_raw(statement(
-            "SELECT id FROM central_identity.gateways WHERE id = $1 FOR UPDATE",
+            "SELECT id FROM central_identity.gateways WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
             vec![gateway.into()],
         ))
         .await
@@ -717,7 +717,7 @@ impl AccountStore {
         let (tx, actor) = self.acting_administrator(browser).await?;
         let gateway = Uuid::from_bytes(gateway);
         tx.query_one_raw(statement(
-            "SELECT id FROM central_identity.gateways WHERE id = $1 FOR UPDATE",
+            "SELECT id FROM central_identity.gateways WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
             vec![gateway.into()],
         ))
         .await

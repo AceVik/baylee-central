@@ -101,8 +101,8 @@ test("the overview counts, leads to the work, and says what waits", async ({ pag
     "/en/account/admin/users", "/en/account/admin/gateways#state=pending", "/en/account/admin/feedback",
     "/en/account/admin/gateways#state=approved", "/en/account/admin/audit", "/en/account/admin/legacy",
   ]);
-  // three reads, and nothing that changes
-  expect(asked(seen).map((r) => r?.action).sort()).toEqual(["legacy_accounts", "overview", "report_facets"]);
+  // four reads, and nothing that changes
+  expect(asked(seen).map((r) => r?.action).sort()).toEqual(["legacy_accounts", "overview", "registration", "report_facets"]);
   expect(asked(seen).find((r) => r?.action === "report_facets")?.filter).toMatchObject({ statuses: ["new"] });
   await sound(page);
   await tabs(page, nav(page).getByRole("link", { name: "Reset a login" }), [...(await go.all())]);

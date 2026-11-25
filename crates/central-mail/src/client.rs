@@ -105,6 +105,14 @@ fn loopback(endpoint: &str) -> Result<SocketAddr, Error> {
     Ok(address)
 }
 
+/// An attachment in the mailer's JSON body (`base64`-encoded bytes).
+#[derive(Serialize)]
+struct Attachment<'a> {
+    filename: &'static str,
+    content_type: &'static str,
+    content_base64: &'a str,
+}
+
 /// The request's body, as the mailer's `API.md` names its fields. The
 /// idempotency key travels in its header only.
 #[derive(Serialize)]
@@ -122,6 +130,9 @@ struct Send<'a> {
     /// without it refuses the field.
     #[serde(skip_serializing_if = "Option::is_none")]
     inline: Option<[&'static str; 1]>,
+    /// Optional archive attachment, present on recovery-code backup mails.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attachments: Option<[Attachment<'a>; 1]>,
 }
 
 /// A refusal's body; only its code is read.
@@ -236,6 +247,13 @@ impl Mailer for Client {
             ttl_secs: mail.ttl_secs(),
             limit_key: &format!("account:{}", hex(&mail.account())),
             inline: self.logo.then_some([LOGO]),
+            attachments: mail.attachment().map(|content_base64| {
+                [Attachment {
+                    filename: "baylee-recovery-code.zip",
+                    content_type: "application/zip",
+                    content_base64,
+                }]
+            }),
         })
         .map(Zeroizing::new);
         let Ok(body) = body else {

@@ -11,6 +11,7 @@ mod read;
 
 pub(super) use finish::complete;
 pub(super) use host::dispatch as publish;
+pub(in crate::accounts) use read::rewards as tower_badges;
 
 fn json(bytes: Vec<u8>) -> Result<String, Error> {
     String::from_utf8(bytes).map_err(unavailable)

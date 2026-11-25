@@ -60,3 +60,22 @@ issued-not-you = Если вы его не просили, войдите и с�
 
 # The confirmation mail's button, which opens the security page with the code filled in.
 confirm-link = Подтвердить адрес
+
+recovery-backup-subject = Резервная копия кода восстановления Baylee
+recovery-backup-title = Резервная копия кода восстановления
+recovery-backup-intro = Во вложении находится резервная копия кода восстановления для аккаунта Baylee { $name }.
+recovery-backup-encrypted = Архив baylee-recovery-code.zip зашифрован выбранным вами паролем.
+recovery-backup-plain = Архив baylee-recovery-code.zip отправлен без шифрования паролем. Сохраните его в надёжном месте и удалите это письмо.
+recovery-backup-fact-file = Храните архив в безопасном месте отдельно от этого почтового ящика.
+recovery-backup-fact-reset = Тот, кто получит код и доступ к сбросу через эту почту, сможет открыть зашифрованные данные.
+recovery-backup-warning = Если вы не запрашивали эту копию, проигнорируйте письмо или проверьте настройки аккаунта.
+recovery-backup-link = Открыть аккаунт
+invite-subject = Приглашение в друзья в Baylee
+invite-title = Приглашение в друзья
+invite-intro = { $name } приглашает вас стать друзьями в Baylee.
+invite-note-label = Сообщение:
+invite-fact-friend = Приняв эту одноразовую ссылку, вы станете друзьями в Baylee.
+invite-valid-one = Ссылка-приглашение действует 1 день.
+invite-valid = Срок действия ссылки-приглашения: { $days } дн.
+invite-warning = Если вы не ожидали это приглашение, просто проигнорируйте это письмо.
+invite-link = Открыть приглашение

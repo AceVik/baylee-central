@@ -68,3 +68,26 @@ issued-title = An administrator made a reset code
 issued-body = A Baylee administrator made a reset code for the Baylee account of this address. With it, a new password can be set for the account.
 issued-valid = The code works once, for { $hours } hours. Until it is used, your password works as it did.
 issued-not-you = If you did not ask for it, sign in and change your password on the security page: that ends the code. Then tell an administrator.
+
+# Recovery code backup ZIP attachment. `name` is the account's public handle or sign-in name.
+recovery-backup-subject = Your Baylee recovery code backup
+recovery-backup-title = Your recovery code backup
+recovery-backup-intro = Attached you will find the recovery code backup for the Baylee account { $name }.
+recovery-backup-encrypted = The archive baylee-recovery-code.zip is encrypted with the password you set.
+recovery-backup-plain = The archive baylee-recovery-code.zip was sent without password encryption. Keep it safe and delete this mail once backed up offline.
+recovery-backup-fact-file = Store the archive in a safe place separate from this mailbox.
+recovery-backup-fact-reset = Together with a password reset sent to this address, anyone who reads your recovery code can open your encrypted data.
+recovery-backup-warning = If you did not request this backup, ignore this mail or review your account settings.
+recovery-backup-link = Open your account
+
+# A player invited the recipient to Baylee as a friend. `name` is the
+# inviter's public handle; `days` is how long the invite link stays active.
+invite-subject = Baylee friend invitation
+invite-title = Friend invitation
+invite-intro = { $name } invited you to become friends on Baylee.
+invite-note-label = Message:
+invite-fact-friend = Accepting this single-use link adds you as mutual friends on Baylee.
+invite-valid-one = The invitation link stays valid for 1 day.
+invite-valid = The invitation link stays valid for { $days } days.
+invite-warning = If you were not expecting this invitation, you can ignore this message.
+invite-link = Open invitation

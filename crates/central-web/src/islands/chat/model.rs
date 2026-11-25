@@ -411,9 +411,13 @@ mod tests {
         let group = Group {
             id: "0190f3a0-0000-7000-8000-000000000001".into(),
             name: "Table".into(),
+            description: String::new(),
+            picture_key: None,
+            picture_moving: false,
             members: vec![Member {
                 person: person(own, "Me"),
                 owner: true,
+                admin: true,
             }],
             invited: Vec::new(),
         };

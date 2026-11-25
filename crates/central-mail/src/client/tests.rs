@@ -573,3 +573,30 @@ fn with_the_logo_every_mail_asks_the_mailer_to_attach_it() {
     // Debug says nothing of it either
     assert_eq!(format!("{client:?}"), "Client([REDACTED])");
 }
+
+#[test]
+fn recovery_backup_mail_carries_its_zip_attachment() {
+    let queued = r#"{"id":"2","status":"queued"}"#;
+    let mailer = Standin::start(vec![Script::Answer(answer("202 Accepted", queued))]);
+    let client = mailer.client();
+    let backup = Mail::recovery_backup(
+        "player@example.org",
+        [0xab; 16],
+        "de",
+        "player#1234",
+        true,
+        Zeroizing::new("UEsDBA==".to_owned()),
+    );
+    assert_eq!(client.send(&backup), Outcome::Sent);
+    let seen = mailer.stop();
+    assert_eq!(seen.len(), 1);
+    let body = seen[0].json();
+    assert_eq!(
+        body["attachments"],
+        serde_json::json!([{
+            "filename": "baylee-recovery-code.zip",
+            "content_type": "application/zip",
+            "content_base64": "UEsDBA==",
+        }])
+    );
+}

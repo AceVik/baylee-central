@@ -112,6 +112,7 @@ interface World {
   contactsWait?: number;
   contactsFail?: number;
   people?: Named[];
+  pushWs?: () => void;
 }
 
 /** The names the stand-in gives each tag's keys. */
@@ -166,6 +167,12 @@ function central(held: World) {
       pictures.push(r.tags);
       return social({ kind: "pictures", pictures: r.tags.includes(BEA) ? [{ tag: BEA, key: BEA_KEY, moving: true }] : [] });
     }
+    if (r.action === "friend_invites") {
+      return social({ kind: "friend_invites", invites: [], active_limit: 10, mail_available: true, recruiter_badge: null });
+    }
+    if (r.action === "ranks") {
+      return social({ kind: "ranks", ranks: [] });
+    }
     if (r.action !== "chat") return route.fulfill({ status: 401, body: "rejected\n" });
     const c = r.request;
     switch (c.command) {
@@ -205,6 +212,12 @@ async function open(page: Page, changed: string[] = [], held: World = world(hist
   });
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
   await page.route("**/api/v1", stand.handle);
+  await page.routeWebSocket("**/api/v1/ws", (ws) => {
+    ws.send(JSON.stringify({ event: "ready", presence: { online: [], states: "", me: "online" } }));
+    held.pushWs = () => {
+      ws.send(JSON.stringify({ event: "chat" }));
+    };
+  });
   await page.route("**/api/v1/pictures/*", (route: Route) => route.fulfill({ status: 200, contentType: "image/avif", body: AVIF }));
   await page.route("**/assets/crypto-worker.*.js", (route) => route.fulfill({ contentType: "text/javascript", body: worker(changed, opens) }));
   return { stand, problems };
@@ -454,6 +467,7 @@ function empty(): World {
 /** Bea writes to the group now, after the page read its inbox: unread. */
 function arrive(held: World, text: string) {
   held.inbox.push(delivery(held.inbox.length + 1, BEA, "Bea", text, Date.now(), GROUP_CONV));
+  held.pushWs?.();
 }
 
 // ---- Screens for a person to look at (CHAT_SHOTS=<folder>) ----------------
@@ -631,8 +645,8 @@ test("a new account: each empty place says so in a line and shows the way on", a
   expect(await targets(page)).toEqual([]);
   expect(await narrow(page)).toBe(0);
   // or give one's own handle away
-  await none.getByRole("button", { name: "Copy your handle" }).click();
-  await expect(none.getByRole("status")).toHaveText("Copied.");
+  await page.locator(".msgr-me").getByRole("button", { name: "Copy handle" }).click();
+  await expect(page.locator(".msgr-me").getByRole("button", { name: "Copied" })).toBeVisible();
   if (info.project.name === "desktop") expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Erika#1a2b");
   // in German, written by hand, and still whole at 320 px
   await page.goto("/de/account/chat");
@@ -750,14 +764,50 @@ async function stops(page: Page): Promise<string[]> {
 }
 
 const TOP = ['a "Chats"', 'a "Contacts1 requests"'];
-const LIST = [...TOP, "input#chat-search", 'button "New group"', 'button "Accept"', 'button "Decline"', "a#conv-dm-1a2b-2c3d"];
-const OPEN = ['button#conv-details-toggle "Details"', 'region "Messages"', "textarea#composer-text", 'button "Send"'];
+const LIST = [
+  ...TOP,
+  "input#chat-search",
+  'a "Bea#2c3d"',
+  'button "Copy handle"',
+  'button "Accept"',
+  'button "Decline"',
+  "a#conv-dm-1a2b-2c3d",
+];
+const OPEN = [
+  'a "Bea#2c3d"',
+  'button "Copy handle"',
+  'button#chat-card-previews-toggle "Card previews on (click to hide)"',
+  'button#conv-details-toggle "Details"',
+  'region "Messages"',
+  "textarea#composer-text",
+  'button "Send"',
+];
 const CONTACTS = [
-  ...TOP, "input#contact-find", 'button "Find"',
-  'button "Accept"', 'button "Decline"', 'button "Block"',
-  'a "Write"', 'button "Remove"', 'button "Block"',
-  'a "Write"', 'button "Remove"', 'button "Block"',
-  'button "Withdraw"', 'button "Unblock"',
+  ...TOP,
+  'button#people-invite-btn "Invite friends"',
+  "input#invite-redeem-input",
+  'button "Redeem"',
+  'input#contact-find "Add a contact by their handle"',
+  'button "Find player by handle"',
+  'a "Dora#4a5b"',
+  'button "Copy handle"',
+  'button "Accept"',
+  'button "Decline"',
+  'button "More actions"',
+  'a "Bea#2c3d"',
+  'button "Copy handle"',
+  'a "Write"',
+  'button "More actions"',
+  'a "Cid#3e4f"',
+  'button "Copy handle"',
+  'a "Write"',
+  'button "More actions"',
+  'a "Finnegan-Whitley#5c6d"',
+  'button "Copy handle"',
+  'button "Withdraw"',
+  'a "Gus#6e7f"',
+  'button "Copy handle"',
+  'button "Unblock"',
 ];
 
 test("the keyboard meets the same stops in the same order", async ({ page }, info) => {
@@ -816,7 +866,7 @@ test("a person found by handle, and a group's details as its owner", async ({ pa
 
   await page.goto("/en/account/contacts");
   await page.getByLabel("Add a contact by their handle").fill("Ella#7a8b");
-  await page.getByRole("button", { name: "Find", exact: true }).click();
+  await page.getByRole("button", { name: "Find player by handle" }).click();
   const found = page.locator(".person.found");
   await expect(found.getByText("Ella#7a8b")).toBeVisible({ timeout: 15_000 });
   const request = found.getByRole("button", { name: "Send a contact request" });
@@ -833,7 +883,7 @@ test("a person found by handle, and a group's details as its owner", async ({ pa
   const details = page.locator("#conv-details");
   await expect(details.getByLabel("Group name")).toHaveValue("Tuesday table");
   await expect(details.getByRole("button", { name: "Make owner" })).toHaveCount(2);
-  await expect(details.getByLabel("Invite a contact")).toBeVisible();
+  await expect(details.getByLabel("Invite a player")).toBeVisible();
   const withdraw = details.getByRole("button", { name: "Withdraw" });
   await expect(withdraw).toBeVisible();
   expect(await padding(withdraw)).toBeGreaterThan(8);

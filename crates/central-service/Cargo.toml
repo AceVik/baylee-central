@@ -26,6 +26,7 @@ serde_json = "=1.0.154"
 zeroize = { version = "=1.9.2", features = ["alloc", "derive"] }
 central-policy = { path = "../central-policy", version = "=0.1.0" }
 central-http = { path = "../central-http", version = "=0.1.0" }
+flate2 = "=1.1.11"
 tokio = { version = "=1.54.1", default-features = false, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 
 [dev-dependencies]

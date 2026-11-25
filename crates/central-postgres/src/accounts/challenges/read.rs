@@ -103,11 +103,10 @@ fn standing(row: &QueryResult) -> Result<api::Standing, Error> {
     })
 }
 
-pub(super) async fn progress(
+pub(in crate::accounts) async fn account_badges(
     db: &impl ConnectionTrait,
     me: Uuid,
-    host: &str,
-) -> Result<Response, Error> {
+) -> Result<Vec<api::Badge>, Error> {
     let row = db.query_one_raw(statement(
         "WITH earned AS (SELECT * FROM central_identity.challenge_completions WHERE account_id=$1),
          weeks AS (SELECT live_week FROM earned WHERE live_week IS NOT NULL GROUP BY live_week
@@ -119,14 +118,22 @@ pub(super) async fn progress(
            (SELECT count(*) FROM weeks) AS regular FROM earned",
         vec![me.into()],
     )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
-    let badges = api::BadgeKind::ALL
+    api::BadgeKind::ALL
         .into_iter()
         .zip(["daily", "weekly", "tactician", "first_try", "regular"])
         .map(|(kind, column)| {
             let count: i64 = row.try_get("", column).map_err(unavailable)?;
             Ok(kind.progress(u32::try_from(count).map_err(unavailable)?))
         })
-        .collect::<Result<_, Error>>()?;
+        .collect::<Result<Vec<_>, Error>>()
+}
+
+pub(super) async fn progress(
+    db: &impl ConnectionTrait,
+    me: Uuid,
+    host: &str,
+) -> Result<Response, Error> {
+    let badges = account_badges(db, me).await?;
     let rows = db
         .query_all_raw(statement(
             "SELECT * FROM central_identity.challenge_attempts WHERE account_id=$1

@@ -104,7 +104,7 @@ type Section = (
 );
 
 /// The privacy notice's contents, in the order its parts stand.
-const PRIVACY_PARTS: [Part; 24] = [
+const PRIVACY_PARTS: [Part; 25] = [
     ("controller", words::privacy_controller_title),
     ("short", words::privacy_short_title),
     ("hosting", words::privacy_hosting_title),
@@ -120,6 +120,7 @@ const PRIVACY_PARTS: [Part; 24] = [
     ("picture", words::privacy_picture_title),
     ("cookie", words::privacy_cookie_title),
     ("chat", words::privacy_chat_title),
+    ("cards", words::privacy_cards_title),
     ("push", words::privacy_push_title),
     ("counters", words::privacy_counters_title),
     ("contact", words::privacy_contact_title),
@@ -129,6 +130,37 @@ const PRIVACY_PARTS: [Part; 24] = [
     ("recipients", words::privacy_recipients_title),
     ("rights", words::privacy_rights_title),
     ("objection", words::privacy_objection_title),
+];
+
+const PRIVACY_SIMPLE: [Section; 8] = [
+    (
+        "hosting",
+        words::privacy_hosting_title,
+        words::privacy_hosting,
+    ),
+    ("github", words::privacy_github_title, words::privacy_github),
+    (
+        "directory",
+        words::privacy_directory_title,
+        words::privacy_directory,
+    ),
+    ("cards", words::privacy_cards_title, words::privacy_cards),
+    ("push", words::privacy_push_title, words::privacy_push),
+    (
+        "counters",
+        words::privacy_counters_title,
+        words::privacy_counters,
+    ),
+    (
+        "contact",
+        words::privacy_contact_title,
+        words::privacy_contact,
+    ),
+    (
+        "impressum",
+        words::privacy_impressum_title,
+        words::privacy_impressum,
+    ),
 ];
 
 pub fn privacy(cx: &Context<'_>) -> Built {
@@ -141,35 +173,6 @@ pub fn privacy(cx: &Context<'_>) -> Built {
     meta.trail
         .push((words::privacy_title(lang).to_owned(), Page::Privacy));
     let impressum = Page::Impressum.path(lang);
-    let simple: [Section; 7] = [
-        (
-            "hosting",
-            words::privacy_hosting_title,
-            words::privacy_hosting,
-        ),
-        ("github", words::privacy_github_title, words::privacy_github),
-        (
-            "directory",
-            words::privacy_directory_title,
-            words::privacy_directory,
-        ),
-        ("push", words::privacy_push_title, words::privacy_push),
-        (
-            "counters",
-            words::privacy_counters_title,
-            words::privacy_counters,
-        ),
-        (
-            "contact",
-            words::privacy_contact_title,
-            words::privacy_contact,
-        ),
-        (
-            "impressum",
-            words::privacy_impressum_title,
-            words::privacy_impressum,
-        ),
-    ];
     let section = |id: &'static str, title: &'static str, body: AnyView| {
         view! {
             <section class="legal-part" aria-labelledby=id>
@@ -192,8 +195,16 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             words::privacy_views(lang).into_any(),
         )
     });
-    let [hosting, github, directory, push, counters, contact, puzzle] =
-        simple.map(|(id, title, text)| section(id, title(lang), text(lang).into_any()));
+    let [
+        hosting,
+        github,
+        directory,
+        cards,
+        push,
+        counters,
+        contact,
+        puzzle,
+    ] = PRIVACY_SIMPLE.map(|(id, title, text)| section(id, title(lang), text(lang).into_any()));
     let body = view! {
         {head(words::privacy_eyebrow(lang), words::privacy_title(lang), words::privacy_lead(lang))}
         <div class="wrap reading prose">
@@ -221,6 +232,7 @@ pub fn privacy(cx: &Context<'_>) -> Built {
             {section("picture", words::privacy_picture_title(lang), words::privacy_picture(lang).into_any())}
             {section("cookie", words::privacy_cookie_title(lang), plain(words::privacy_cookie(lang)))}
             {section("chat", words::privacy_chat_title(lang), plain(words::privacy_chat(lang)))}
+            {cards}
             {push}
             {counters}
             {contact}
@@ -264,9 +276,10 @@ pub fn terms(cx: &Context<'_>) -> Built {
     let state = if version == "draft" {
         view! { <p class="notice" role="note">{words::terms_draft(lang)}</p> }.into_any()
     } else {
+        let effective = format::date(lang, version);
         let updated =
             header(text, "updated").map_or_else(String::new, |date| format::date(lang, date));
-        view! { <p class="meta">{words::terms_version(lang, version, &updated)}</p> }.into_any()
+        view! { <p class="meta">{words::terms_version(lang, &effective, &updated)}</p> }.into_any()
     };
     let body = view! {
         {head(words::terms_eyebrow(lang), words::terms_title(lang), "")}

@@ -70,3 +70,26 @@ issued-title = Ein Administrator hat einen Reset-Code ausgestellt
 issued-body = Ein Administrator von Baylee hat für den Baylee-Account dieser Adresse einen Reset-Code ausgestellt. Mit ihm lässt sich ein neues Passwort für den Account setzen.
 issued-valid = Der Code gilt einmal, { $hours } Stunden lang. Bis er benutzt wird, gilt dein Passwort wie bisher.
 issued-not-you = Wenn du ihn nicht angefordert hast, melde dich an und ändere dein Passwort auf der Sicherheitsseite: Damit endet der Code. Sag danach einem Administrator Bescheid.
+
+# Sicherung des Wiederherstellungscodes als ZIP-Anhang. `name` ist das Handle oder der Anmeldename.
+recovery-backup-subject = Deine Sicherung des Baylee-Wiederherstellungscodes
+recovery-backup-title = Sicherung deines Wiederherstellungscodes
+recovery-backup-intro = Im Anhang findest du die Sicherung des Wiederherstellungscodes für das Baylee-Konto { $name }.
+recovery-backup-encrypted = Das Archiv baylee-recovery-code.zip ist mit dem von dir gewählten Passwort verschlüsselt.
+recovery-backup-plain = Das Archiv baylee-recovery-code.zip wurde unverschlüsselt versendet. Bewahre es sicher auf und lösche diese Mail nach einer Offline-Sicherung.
+recovery-backup-fact-file = Bewahre das Archiv an einem sicheren Ort getrennt von diesem Postfach auf.
+recovery-backup-fact-reset = Wer sowohl diesen Code als auch ein Passwort-Reset an diese Adresse nutzt, kann deine verschlüsselten Daten öffnen.
+recovery-backup-warning = Wenn du diese Sicherung nicht angefordert hast, ignoriere diese Mail oder prüfe deine Kontoeinstellungen.
+recovery-backup-link = Konto öffnen
+
+# Ein Spieler hat den Empfänger auf Baylee als Freund eingeladen. `name` ist
+# der öffentliche Name des Einladenden; `days` ist, wie viele Tage der Link gilt.
+invite-subject = Baylee-Freundschaftseinladung
+invite-title = Freundschaftseinladung
+invite-intro = { $name } hat dich auf Baylee als Freund eingeladen.
+invite-note-label = Nachricht:
+invite-fact-friend = Wenn du diesen Einmal-Link annimmst, werdet ihr auf Baylee befreundet.
+invite-valid-one = Der Einladungslink ist 1 Tag lang gültig.
+invite-valid = Der Einladungslink ist { $days } Tage lang gültig.
+invite-warning = Falls du diese Einladung nicht erwartet hast, kannst du diese Mail ignorieren.
+invite-link = Einladung öffnen

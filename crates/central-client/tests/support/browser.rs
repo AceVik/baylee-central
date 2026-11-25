@@ -33,8 +33,11 @@ const PASSWORD: &str = "synthetic browser password";
 const GATEWAY: &str = "http://127.0.0.1:28766";
 /// The initial account document of `docs/web-accounts.md`, with this fixture's gateway.
 const DOCUMENT: &[u8] = br#"{"version":1,"gateways":["http://127.0.0.1:28766"],"preferences":{},"legacy":null,"chat":{"devices":[],"installations":[]}}"#;
-const SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200";
+const SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=900";
+const REFRESH_SET: &str = "; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=259200";
 const CLEARED: &str = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
+const REFRESH_CLEARED: &str =
+    "__Host-central-refresh=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
 
 /// A registration's proof of work, asked for on `browser`'s listener and
 /// solved here: the nonce and the counters `Register` carries.
@@ -69,11 +72,20 @@ pub(crate) struct Browser {
     pub(crate) client: &'static str,
 }
 
-/// A raw answer: status, `Set-Cookie` and body.
+/// A raw answer: status, `Set-Cookie` lines and body.
 struct Answer {
     status: u16,
-    cookie: Option<String>,
+    cookies: Vec<String>,
     body: Vec<u8>,
+}
+
+impl Answer {
+    fn cookie(&self, prefix: &str) -> Option<&str> {
+        self.cookies
+            .iter()
+            .find(|line| line.starts_with(prefix))
+            .map(String::as_str)
+    }
 }
 
 impl Browser {
@@ -120,10 +132,10 @@ impl Browser {
             .filter(|(name, _)| name.eq_ignore_ascii_case("set-cookie"))
             .map(|(_, value)| value.trim())
             .collect();
-        assert!(cookies.len() <= 1);
+        assert!(cookies.len() <= 2);
         Answer {
             status,
-            cookie: cookies.first().map(|value| (*value).to_owned()),
+            cookies: cookies.into_iter().map(str::to_owned).collect(),
             body: response[split + 4..].to_vec(),
         }
     }
@@ -142,16 +154,20 @@ impl Browser {
         );
         if logout {
             assert_eq!(
-                answer.cookie.as_deref(),
-                Some(CLEARED),
-                "signing out clears the cookie"
+                answer.cookies,
+                vec![CLEARED.to_owned(), REFRESH_CLEARED.to_owned()],
+                "signing out clears the cookies"
             );
         }
         if deletion {
+            let expected = if answer.status == 200 {
+                vec![CLEARED.to_owned(), REFRESH_CLEARED.to_owned()]
+            } else {
+                Vec::new()
+            };
             assert_eq!(
-                answer.cookie.as_deref(),
-                (answer.status == 200).then_some(CLEARED),
-                "a deletion clears the cookie once it is done, and only then"
+                answer.cookies, expected,
+                "a deletion clears the cookies once it is done, and only then"
             );
         }
         match answer.status {
@@ -163,20 +179,29 @@ impl Browser {
             _ => return Err(Error::Rejected),
         }
         let response = central_api::decode(&answer.body)?;
-        let session = match answer.cookie {
-            Some(cookie) if !logout && !deletion => {
-                let value = cookie.strip_prefix("__Host-central=").unwrap();
-                let value = value
-                    .strip_suffix(SET)
-                    .expect("the cookie's exact attributes");
-                let token = Token::from_hex(value).unwrap();
-                // The token is in the cookie and nowhere in the body.
-                assert!(!String::from_utf8_lossy(&answer.body).contains(value));
-                Some(token)
-            }
-            _ => None,
+        let parse_cookie = |prefix: &str, suffix: &str| {
+            answer
+                .cookie(prefix)
+                .filter(|_| !logout && !deletion)
+                .map(|cookie| {
+                    let value = cookie.strip_prefix(prefix).unwrap();
+                    let value = value
+                        .strip_suffix(suffix)
+                        .expect("the cookie's exact attributes");
+                    let token = Token::from_hex(value).unwrap();
+                    // The token is in the cookie and nowhere in the body.
+                    assert!(!String::from_utf8_lossy(&answer.body).contains(value));
+                    token
+                })
         };
-        Ok(BrowserReply { response, session })
+        let session = parse_cookie("__Host-central=", SET);
+        let refresh = parse_cookie("__Host-central-refresh=", REFRESH_SET);
+        Ok(BrowserReply {
+            response,
+            session,
+            refresh,
+            clear_cookies: false,
+        })
     }
 
     /// The listener's own refusal: 403 before any account operation.
@@ -186,7 +211,9 @@ impl Browser {
             &central_api::encode(request).unwrap(),
             cookie,
         );
-        answer.status == 403 && answer.body == b"request not permitted\n" && answer.cookie.is_none()
+        answer.status == 403
+            && answer.body == b"request not permitted\n"
+            && answer.cookies.is_empty()
     }
 
     /// The answer to a request without a session that also sends `headers`
@@ -203,7 +230,7 @@ impl Browser {
         }
         let body = central_api::encode(request)?;
         let answer = self.send("https://baylee.app", headers, &body, None);
-        assert!(answer.cookie.is_none());
+        assert_eq!(answer.cookies, [] as [String; 0]);
         match answer.status {
             200 => central_api::decode(&answer.body),
             409 => Err(Error::Conflict),
@@ -243,6 +270,7 @@ pub(crate) fn run(
             display_name: Some(display_name.into()),
             nonce,
             counters,
+            invite_code: None,
         }
     };
     let register = |name: &str| named(name, "Web_Player");
@@ -397,7 +425,7 @@ fn summary(
     assert_eq!(display_name, "Web_Player");
     super::ranked::public(http, identity.account, &display_name, tag);
     assert!((REGISTERED_TAG_FLOOR..=0xffff).contains(&tag), "{tag}");
-    assert_eq!(expires_at - signed_in_at, 1800, "issued at the sign-in");
+    assert_eq!(expires_at - signed_in_at, 900, "issued at the sign-in");
     assert_eq!(
         browser.answer(&Request::AccountSummary, None).err(),
         Some(Error::Rejected)
@@ -564,6 +592,7 @@ fn budgets(browser: &Browser) {
             display_name: None,
             nonce,
             counters,
+            invite_code: None,
         }
     };
     for _ in 0..3 {
@@ -579,6 +608,7 @@ fn budgets(browser: &Browser) {
             display_name: None,
             nonce,
             counters,
+            invite_code: None,
         }
     };
     assert_eq!(

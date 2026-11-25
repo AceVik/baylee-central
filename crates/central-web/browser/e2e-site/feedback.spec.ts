@@ -226,7 +226,7 @@ test("a selection: one request for all of it, the trash with Undo, opened marks,
   await expect.poll(() => asked(o.seen).at(-1)).toEqual({ action: "set_reports_seen", reports: two, seen: true });
   await button(page, "Copy the ids").click();
   await expect(page.locator(".fb-notice").last()).toHaveText(/Ids copied: 2/);
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${hex(id(10))}\n${hex(id(15))}`);
+  expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n")).toBe(`${hex(id(10))}\n${hex(id(15))}`);
   const download = page.waitForEvent("download");
   await button(page, "Export as CSV (2)").click();
   const file = await download;
@@ -321,7 +321,7 @@ test("deleting for good: Central's refusal and an answer that never came are sai
   await page.locator("#fb-purge-go").click();
   await expect(page.locator("#fb-purge-password")).toBeFocused();
   await expect(page.locator(".fb-confirm [role=alert]")).toHaveText(
-    "Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.",
+    "Baylee Central counts your sign-in as older than 30 minutes. Try again, as you enter your password once more.",
   );
   expect(actions(o.seen, from)).toEqual(["reports_bulk", "report"]);
   await page.locator(".fb-confirm").getByRole("button", { name: "Cancel" }).click();

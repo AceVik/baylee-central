@@ -261,6 +261,60 @@ pub mod browser {
             && get(&g, "isSecureContext").as_bool() == Some(true)
     }
 
+    /// Whether `Notification` is exposed on the global object.
+    #[must_use]
+    pub fn has_notification_api() -> bool {
+        !get(&global(), "Notification").is_undefined()
+    }
+
+    /// Whether `PushManager` is exposed on the global object.
+    #[must_use]
+    fn has_push_manager() -> bool {
+        !get(&global(), "PushManager").is_undefined()
+    }
+
+    /// Whether the page is running as an installed standalone app.
+    #[must_use]
+    pub fn is_standalone() -> bool {
+        let g = global();
+        let navigator = get(&g, "navigator");
+        if get(&navigator, "standalone").as_bool() == Some(true) {
+            return true;
+        }
+        call(
+            &g,
+            "matchMedia",
+            &[JsValue::from_str(
+                "(display-mode: standalone), (display-mode: minimal-ui), (display-mode: window-controls-overlay)",
+            )],
+        )
+        .is_some_and(|mq| get(&mq, "matches").as_bool() == Some(true))
+    }
+
+    /// Whether the browser requires installing the site as a standalone app
+    /// before exposing notifications and Web Push.
+    #[must_use]
+    pub fn requires_install() -> bool {
+        let g = global();
+        get(&g, "isSecureContext").as_bool() == Some(true)
+            && !is_standalone()
+            && (!has_notification_api() || !has_push_manager())
+    }
+
+    /// Subscribes to `baylee:pwa` custom events (`{ detail: { canInstall, installed } }`)
+    /// until the current Leptos owner is disposed.
+    pub fn on_pwa_change(callback: impl Fn(bool, bool) + 'static) {
+        let listener = leptos::prelude::window_event_listener_untyped("baylee:pwa", move |event| {
+            let detail = get(event.as_ref(), "detail");
+            let can_install = get(&detail, "canInstall").as_bool().unwrap_or(false);
+            let installed = get(&detail, "installed")
+                .as_bool()
+                .unwrap_or_else(is_standalone);
+            callback(can_install, installed);
+        });
+        leptos::prelude::on_cleanup(move || listener.remove());
+    }
+
     /// `Notification.permission`.
     pub fn permission() -> String {
         get(&get(&global(), "Notification"), "permission")
@@ -405,6 +459,27 @@ pub mod browser {
     pub fn supported() -> bool {
         false
     }
+
+    /// Never on the server.
+    #[must_use]
+    pub fn has_notification_api() -> bool {
+        false
+    }
+
+    /// Never on the server.
+    #[must_use]
+    pub fn is_standalone() -> bool {
+        false
+    }
+
+    /// Never on the server.
+    #[must_use]
+    pub fn requires_install() -> bool {
+        false
+    }
+
+    /// Never on the server.
+    pub fn on_pwa_change(_callback: impl Fn(bool, bool) + 'static) {}
 
     /// Never on the server.
     pub fn permission() -> String {

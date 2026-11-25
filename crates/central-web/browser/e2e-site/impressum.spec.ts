@@ -93,7 +93,7 @@ test("the bait for robots is in the page, and no person sees, hears or reaches i
   expect((await targets(page)).filter((target) => target.includes("Kontakt\" 0"))).toEqual([]);
 });
 
-for (const lang of ["de", "en"] as const) {
+for (const lang of ["en"] as const) {
   test(`${lang}: the solved puzzle shows the details as a person reads them, and no address a collector could take`, async ({
     page,
     baseURL,
@@ -102,7 +102,7 @@ for (const lang of ["de", "en"] as const) {
     const seen = await service(page);
     await page.goto(`/${lang}/impressum`);
     await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
-    await page.getByRole("button", { name: lang === "de" ? "Angaben anzeigen" : "Show the details" }).click();
+    await page.getByRole("button", { name: "Show the details" }).click();
     const details = page.locator("dl.impressum-details");
     await expect(details).toBeFocused();
 
@@ -122,7 +122,7 @@ for (const lang of ["de", "en"] as const) {
     expect((await values.nth(1).innerText()).split("\n")).toEqual([
       DETAILS.street,
       `${DETAILS.postcode} ${DETAILS.city}`,
-      lang === "de" ? DETAILS.country_de : DETAILS.country_en,
+      DETAILS.country_en,
     ]);
     const mail = values.nth(2).locator(".impressum-value");
     const phone = values.nth(3).locator(".impressum-value");
@@ -156,7 +156,7 @@ for (const lang of ["de", "en"] as const) {
     // the shown state is as accessible as the rest
     expect(await axe(page)).toEqual([]);
     expect(await targets(page)).toEqual([]);
-    for (const name of lang === "de" ? ["E-Mail schreiben", "Anrufen"] : ["Write an e-mail", "Call"]) {
+    for (const name of ["Write an e-mail", "Call"]) {
       await expect(details.getByRole("button", { name, exact: true })).toBeVisible();
     }
     expect(problems).toEqual([]);

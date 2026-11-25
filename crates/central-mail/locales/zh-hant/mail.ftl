@@ -60,3 +60,22 @@ issued-not-you = 如果不是你要求的，請登入並在安全頁面變更你
 
 # The confirmation mail's button, which opens the security page with the code filled in.
 confirm-link = 確認地址
+
+recovery-backup-subject = 你的 Baylee 復原碼備份
+recovery-backup-title = 復原碼備份
+recovery-backup-intro = 附件包含 Baylee 帳號 { $name } 的復原碼備份。
+recovery-backup-encrypted = 壓縮檔 baylee-recovery-code.zip 已使用你設定的密碼加密。
+recovery-backup-plain = 壓縮檔 baylee-recovery-code.zip 未設定密碼保護。請在妥善保存後刪除此郵件。
+recovery-backup-fact-file = 請將此壓縮檔保存在與此信箱分開的安全位置。
+recovery-backup-fact-reset = 任何同時掌握復原碼與此信箱重設權限的人都能開啟你的加密資料。
+recovery-backup-warning = 如果不是你本人請求的備份，請忽略此郵件或檢查帳號設定。
+recovery-backup-link = 開啟你的帳號
+invite-subject = Baylee 好友邀請
+invite-title = 好友邀請
+invite-intro = { $name } 邀請你在 Baylee 上成為好友。
+invite-note-label = 留言：
+invite-fact-friend = 接受此一次性連結後，你們將在 Baylee 上成為彼此的好友。
+invite-valid-one = 邀請連結有效期限為 1 天。
+invite-valid = 邀請連結有效期限為 { $days } 天。
+invite-warning = 如果你並未預期收到此邀請，可以忽略這封郵件。
+invite-link = 開啟邀請

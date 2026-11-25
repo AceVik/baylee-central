@@ -287,11 +287,18 @@ pub fn download_block(cx: &Context<'_>, on_page: bool) -> impl IntoView + use<> 
                                 <span class="dl-date">{format::date(lang, &release.date)}</span>
                             </p>
                         </div>
-                        <ul class="menu-groups">{items}</ul>
+                        <div class="menu-scroll">
+                            <ul class="menu-groups">{items}</ul>
+                        </div>
                         <p class="menu-foot">
-                            <a href=others.clone()>{words::dl_others(lang)}</a>
-                            {sep()}
-                            <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::dl_notes(lang)}</a>
+                            <a href=others.clone()>
+                                {icon(icons::DOWNLOAD)}
+                                <span>{words::dl_others(lang)}</span>
+                            </a>
+                            <a href=release.page.clone() target="_blank" rel="noopener noreferrer">
+                                {icon(icons::FILE_TEXT)}
+                                <span>{words::dl_notes(lang)}</span>
+                            </a>
                         </p>
                     </div>
                 </details>
@@ -316,6 +323,7 @@ pub fn software(cx: &Context<'_>) -> Value {
         "license": "https://www.gnu.org/licenses/agpl-3.0.html",
         "isAccessibleForFree": true,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
+        "inLanguage": cx.lang.tag(),
         "description": words::desc_home(cx.lang),
     });
     if let Some(release) = &cx.data.release {
@@ -363,21 +371,35 @@ fn install(lang: Lang) -> impl IntoView + use<> {
                 <p class="eyebrow">{words::install_eyebrow(lang)}</p>
                 <h2 id="install-title">{words::install_title(lang)}</h2>
                 <div class="two-col">
-                    <div class="reveal">
-                        <h3>{words::install_first_title(lang)}</h3>
+                    <div class="card glass install-card reveal">
+                        <div class="about-arch-head install-card-head">
+                            <span class="feat-icon" aria-hidden="true">{icon(icons::PLAY)}</span>
+                            <h3>{words::install_first_title(lang)}</h3>
+                        </div>
                         <p>{plain(words::install_first(lang))}</p>
-                        <h3>{words::install_check_title(lang)}</h3>
+                        <div class="about-arch-head install-card-head install-card-sub">
+                            <span class="feat-icon" aria-hidden="true">{icon(icons::SHIELD_CHECK)}</span>
+                            <h3>{words::install_check_title(lang)}</h3>
+                        </div>
                         <p>{plain(words::install_check(lang))}</p>
                     </div>
-                    <div class="reveal">
-                        <h3>{words::install_needs_title(lang)}</h3>
+                    <div class="card glass install-card reveal">
+                        <div class="about-arch-head install-card-head">
+                            <span class="feat-icon" aria-hidden="true">{icon(icons::CPU)}</span>
+                            <h3>{words::install_needs_title(lang)}</h3>
+                        </div>
                         <ul class="plain">
                             <li>{plain(words::install_windows(lang))}</li>
                             <li>{plain(words::install_mac(lang))}</li>
                             <li>{plain(words::install_linux(lang))}</li>
                             <li>{plain(words::install_cpu(lang))}</li>
                         </ul>
-                        <p><a class="more-link" href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">{words::install_releases(lang)}</a></p>
+                        <p class="install-card-foot">
+                            <a class="button button-ghost button-sm" href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">
+                                {icon(icons::HARD_DRIVE_DOWNLOAD)}
+                                <span>{words::install_releases(lang)}</span>
+                            </a>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -540,13 +562,22 @@ fn platforms(cx: &Context<'_>, release: &Release) -> impl IntoView + use<> {
             <div class="wrap">
                 <p class="eyebrow">{words::dl_page_files_eyebrow(lang)}</p>
                 <h2 id="platforms-title">{words::dl_page_files_title(lang)}</h2>
-                <p class="release-head">
+                <div class="release-head">
                     <span class="ver" translate="no">{release.tag.clone()}</span>
                     {prerelease}
-                    <span>{format::date(lang, &release.date)}</span>
-                    <a href=release.page.clone() target="_blank" rel="noopener noreferrer">{words::release_notes(lang)}</a>
-                    <a href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">{words::release_all(lang)}</a>
-                </p>
+                    <span class="pill release-date">
+                        {icon(icons::CLOCK)}
+                        <span class="dl-date">{format::date(lang, &release.date)}</span>
+                    </span>
+                    <a class="button button-ghost button-sm" href=release.page.clone() target="_blank" rel="noopener noreferrer">
+                        {icon(icons::FILE_TEXT)}
+                        <span>{words::release_notes(lang)}</span>
+                    </a>
+                    <a class="button button-ghost button-sm" href=format!("{REPOSITORY}/releases") target="_blank" rel="noopener noreferrer">
+                        {icon(icons::HARD_DRIVE_DOWNLOAD)}
+                        <span>{words::release_all(lang)}</span>
+                    </a>
+                </div>
                 <ul class="platforms stagger">{cards}</ul>
                 {soon(lang)}
             </div>

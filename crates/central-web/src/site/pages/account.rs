@@ -5,9 +5,7 @@
 use leptos::prelude::*;
 
 use super::Built;
-use super::home::{gateway_totals, stat_tile};
 use crate::data::Section;
-use crate::format;
 use crate::islands::{Account, Administration, Messenger};
 use crate::rich::icon;
 use crate::site::icons;
@@ -79,76 +77,6 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
 /// everyone and so rendered here: where to go on playing (the start page's
 /// download for the visitor's machine, and the gateways), and every part of
 /// the account as a tile.
-/// Baylee in numbers, for a signed-in reader (owner, 18.11.2026): the
-/// directory's four, and Central's accounts, the playable cards of all and
-/// the site's visits. They are the public figures the site holds, the same
-/// for every reader: the server does not know who is signed in, and none
-/// of them is about a person. Only what a source reported is a tile, and
-/// without any the part is left out.
-fn numbers(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
-    let lang = cx.lang;
-    let data = cx.data;
-    let number = |n: u64| words::number(lang, n);
-    let mut more: Vec<AnyView> = Vec::with_capacity(3);
-    if let Some(accounts) = data.accounts {
-        more.push(
-            stat_tile(
-                icons::USER_CHECK,
-                words::strip_accounts(lang),
-                number(accounts),
-                None,
-            )
-            .into_any(),
-        );
-    }
-    if let Some(status) = data.cards.as_ref() {
-        let s = status.stats;
-        let playable = s
-            .implemented
-            .saturating_add(s.generated)
-            .saturating_add(s.partial);
-        more.push(
-            stat_tile(
-                icons::LAYERS,
-                words::stat_cards(lang),
-                number(playable),
-                Some(number(s.total)),
-            )
-            .into_any(),
-        );
-    }
-    if let Some(views) = data.views.as_ref() {
-        more.push(
-            stat_tile(
-                icons::EYE,
-                &words::strip_views(lang, &format::date(lang, &views.since)),
-                number(views.count),
-                None,
-            )
-            .into_any(),
-        );
-    }
-    let directory = data
-        .gateways
-        .as_deref()
-        .map(|all| gateway_totals(lang, all));
-    if directory.is_none() && more.is_empty() {
-        return None;
-    }
-    let count = more.len().to_string();
-    let more = (!more.is_empty()).then(|| {
-        view! { <dl class="dir-stats" data-count=count aria-label=words::status_label(lang)>{more}</dl> }
-    });
-    Some(view! {
-        <section class="in-numbers" aria-labelledby="numbers-title">
-            <h2 id="numbers-title">{words::status_label(lang)}</h2>
-            <p class="small in-numbers-lead">{words::account_numbers_lead(lang)}</p>
-            {directory}
-            {more}
-        </section>
-    })
-}
-
 fn home_extras(cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let tiles = [
@@ -174,49 +102,52 @@ fn home_extras(cx: &Context<'_>) -> impl IntoView + use<> {
         }
     });
     view! {
-        <section class="card play-card" aria-labelledby="play-title">
+        <section class="card play-card acc-play" aria-labelledby="play-title">
             <div class="play-text">
                 <h2 id="play-title">{words::account_play_title(lang)}</h2>
                 <p>{words::account_play_lead(lang)}</p>
                 <p class="actions">
-                    <a class="button button-ghost" href=Page::Gateways.path(lang)>{icon(icons::SERVER)}<span>{words::nav_gateways(lang)}</span></a>
+                    <a class="button button-ghost" href=Page::Gateways.path(lang)>
+                        {icon(icons::SERVER)}
+                        <span>{words::nav_gateways(lang)}</span>
+                    </a>
+                    <a class="button button-ghost" href=Page::Account(Section::Gateways).path(lang)>
+                        {icon(icons::KEY_ROUND)}
+                        <span>{words::account_gateways(lang)}</span>
+                    </a>
                 </p>
             </div>
             {super::download::download_block(cx, false)}
         </section>
         <ul class="tiles">{tiles}</ul>
-        {numbers(cx)}
     }
 }
 
-pub fn area(cx: &Context<'_>, section: Section) -> Built {
-    let lang = cx.lang;
-    let (title, _) = section_name(lang, section);
-    let mut meta = Meta::new(
-        format!("{title} – Baylee"),
-        words::account_lead(lang),
-        "img/og.jpg",
-    );
-    meta.islands = true;
-    // The navigation in two groups: the account itself, and playing. The
-    // contacts are a tab of the messenger (their own address still opens
-    // it there), so the chat's entry stands for both. The administration
-    // is in no navigation: the overview leads an administrator to it.
+/// The signed-in area's sidebar navigation in three rubrics: the account
+/// itself, social playing (chat/contacts), and gateways/operations. The
+/// administration is in no navigation: the overview leads an administrator
+/// to it.
+fn nav_sidebar(lang: Lang, section: Section) -> impl IntoView + use<> {
     let link = |item: Section| {
         let (name, glyph) = section_name(lang, item);
         let here = item == section || (item == Section::Chat && section == Section::Contacts);
         view! {
             <li>
-                <a href=Page::Account(item).path(lang) aria-current=here.then_some("page")>
+                <a
+                    href=Page::Account(item).path(lang)
+                    aria-current=here.then_some("page")
+                    title=name
+                    data-tip=name
+                >
                     {icon(glyph)}
-                    <span>{name}</span>
+                    <span class="frame-nav-label">{name}</span>
                 </a>
             </li>
         }
     };
     let group = |name: &'static str, items: &[Section]| {
         view! {
-            <li class="frame-group">
+            <li class="frame-group acc-nav-group">
                 <p class="frame-nav-head">{name}</p>
                 <ul>{items.iter().copied().map(link).collect_view()}</ul>
             </li>
@@ -232,10 +163,56 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
             Section::Notifications,
         ],
     );
-    let play = group(
-        words::account_play_title(lang),
-        &[Section::Chat, Section::Gateways],
+    let play = group(words::account_play_title(lang), &[Section::Chat]);
+    let ops = group(words::account_nav_ops(lang), &[Section::Gateways]);
+    view! {
+        <nav class="frame-nav" aria-label=words::account_nav(lang)>
+            <div class="frame-nav-bar">
+                <button
+                    type="button"
+                    class="frame-nav-toggle"
+                    data-nav-toggle=""
+                    data-collapse=words::account_nav_collapse(lang)
+                    data-expand=words::account_nav_expand(lang)
+                    aria-expanded="true"
+                    aria-controls="frame-nav-groups"
+                    aria-label=words::account_nav_collapse(lang)
+                    title=words::account_nav_collapse(lang)
+                >
+                    {icon(icons::PANEL_LEFT_CLOSE)}
+                </button>
+            </div>
+            <ul class="frame-groups" id="frame-nav-groups">{own}{play}{ops}</ul>
+            // shown by pwa.js where the browser offers to install the app
+            <div class="install" data-install-box="" hidden>
+                <button
+                    type="button"
+                    class="button"
+                    data-install=""
+                    data-pwa-install=""
+                    title=words::pwa_install_tooltip(lang)
+                    data-tip=words::pwa_install_tooltip(lang)
+                >
+                    {icon(icons::DOWNLOAD)}
+                    <span>{words::install_app(lang)}</span>
+                </button>
+                <p class="small install-hint">{words::pwa_install_tooltip(lang)}</p>
+            </div>
+        </nav>
+    }
+}
+
+/// Renders the signed-in account area (`/{lang}/account/*`) with sidebar
+/// navigation and the active Leptos island.
+pub fn area(cx: &Context<'_>, section: Section) -> Built {
+    let lang = cx.lang;
+    let (title, _) = section_name(lang, section);
+    let mut meta = Meta::new(
+        format!("{title} – Baylee"),
+        words::account_lead(lang),
+        "img/og.jpg",
     );
+    meta.islands = true;
     let extras = (section == Section::Home).then(|| home_extras(cx));
     let worker = cx.assets.url("crypto-worker.js");
     let messenger = matches!(section, Section::Chat | Section::Contacts);
@@ -250,15 +227,7 @@ pub fn area(cx: &Context<'_>, section: Section) -> Built {
     };
     let body = view! {
         <div class="frame" class:frame-messenger=messenger>
-            <nav class="frame-nav" aria-label=words::account_nav(lang)>
-                <ul class="frame-groups">{own}{play}</ul>
-                // shown by pwa.js where the browser offers to install the app
-                <p class="install" data-install-box hidden>
-                    <button type="button" class="button" data-install>
-                        {icon(icons::DOWNLOAD)}<span>{words::install_app(lang)}</span>
-                    </button>
-                </p>
-            </nav>
+            {nav_sidebar(lang, section)}
             <div class="frame-main">
                 <header class="frame-head" class:visually-hidden=messenger>
                     <p class="eyebrow">{words::acct_eyebrow(lang)}</p>

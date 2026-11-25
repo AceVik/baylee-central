@@ -114,6 +114,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::TowerToken {}
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::SetProfileDetails { .. }
             | Request::ChangePasswordStart { .. }
             | Request::Admin { .. }
             // A move's export and close wait for the terms, as gateway tokens (`docs/native-login.md` §"Legacy login").
@@ -123,11 +124,13 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::LegacyLink { .. }
     ) || matches!(
         // An account's own area: making something needs the terms; reading
-        // its sessions and gateways, ending a session and revoking a token
-        // stay open to a person who will not accept new ones.
+        // its sessions and gateways, ending a session, deleting a gateway and
+        // revoking a token stay open to a person who will not accept new ones.
         request,
         Request::Owner {
-            request: OwnerRequest::AddGateway { .. } | OwnerRequest::CreateToken { .. }
+            request: OwnerRequest::AddGateway { .. }
+                | OwnerRequest::UpdateGateway { .. }
+                | OwnerRequest::CreateToken { .. }
         }
     ) || matches!(
         // An account's address (`docs/email.md`): naming and confirming one
@@ -312,60 +315,7 @@ mod tests {
         assert!(needs_acceptance(&Request::SetRecovery {
             recovery: vec![1; 73]
         }));
-        for free in [
-            Request::SessionStatus,
-            Request::AccountSummary,
-            Request::RenewSession,
-            Request::Logout,
-            Request::Terms,
-            Request::Notifications {
-                request: central_api::notifications::NotificationRequest::Read { endpoint: None },
-            },
-            Request::Notifications {
-                request: central_api::notifications::NotificationRequest::Unsubscribe {
-                    endpoint: "https://fcm.googleapis.com/test".into(),
-                },
-            },
-            Request::Notifications {
-                request: central_api::notifications::NotificationRequest::Set {
-                    category: central_api::notifications::Category::Chat,
-                    enabled: false,
-                },
-            },
-            Request::TermsStatus,
-            Request::ReadDocument,
-            Request::ConfirmRestore { revision: 1 },
-            Request::ListObjects { after: None },
-            // A person who will not accept new terms may still see their data and leave.
-            Request::AccountExport,
-            Request::DeleteAccountStart { login: vec![] },
-            Request::DeleteAccountFinish {
-                attempt: Token::generate().unwrap(),
-                proof: vec![],
-            },
-            Request::Owner {
-                request: OwnerRequest::Sessions,
-            },
-            Request::Owner {
-                request: OwnerRequest::EndClientSession,
-            },
-            Request::Owner {
-                request: OwnerRequest::Gateways,
-            },
-            Request::Owner {
-                request: OwnerRequest::RevokeToken { token: [0; 16] },
-            },
-            // An address can be read and taken away without them.
-            Request::Email {
-                request: EmailRequest::Status,
-            },
-            Request::Email {
-                request: EmailRequest::Withdraw,
-            },
-            Request::Email {
-                request: EmailRequest::Remove,
-            },
-        ] {
+        for free in free_while_pending_terms() {
             assert!(!needs_acceptance(&free));
         }
         for named in [
@@ -400,5 +350,75 @@ mod tests {
                 days: 30,
             },
         }));
+    }
+
+    fn free_while_pending_terms() -> Vec<Request> {
+        vec![
+            Request::SessionStatus,
+            Request::AccountSummary,
+            Request::RenewSession,
+            Request::Logout,
+            Request::Terms,
+            Request::Notifications {
+                request: central_api::notifications::NotificationRequest::Read { endpoint: None },
+            },
+            Request::Notifications {
+                request: central_api::notifications::NotificationRequest::Unsubscribe {
+                    endpoint: "https://fcm.googleapis.com/test".into(),
+                },
+            },
+            Request::Notifications {
+                request: central_api::notifications::NotificationRequest::Set {
+                    category: central_api::notifications::Category::Chat,
+                    enabled: false,
+                },
+            },
+            Request::TermsStatus,
+            Request::ReadDocument,
+            Request::ConfirmRestore { revision: 1 },
+            Request::ListObjects { after: None },
+            // A person who will not accept new terms may still see their data and leave.
+            Request::AccountExport,
+            Request::ExportProfileDetails,
+            Request::RefreshSession,
+            Request::ProfileDetails,
+            Request::OwnBadges,
+            Request::PublicProfile {
+                handle: "Synthetic-0001".into(),
+            },
+            Request::SendRecoveryBackupMail {
+                email: "player@example.org".into(),
+                attachment_base64: String::new(),
+                encrypted: false,
+                lang: "en".into(),
+            },
+            Request::DeleteAccountStart { login: vec![] },
+            Request::DeleteAccountFinish {
+                attempt: Token::generate().unwrap(),
+                proof: vec![],
+            },
+            Request::Owner {
+                request: OwnerRequest::Sessions,
+            },
+            Request::Owner {
+                request: OwnerRequest::EndClientSession,
+            },
+            Request::Owner {
+                request: OwnerRequest::Gateways,
+            },
+            Request::Owner {
+                request: OwnerRequest::RevokeToken { token: [0; 16] },
+            },
+            // An address can be read and taken away without them.
+            Request::Email {
+                request: EmailRequest::Status,
+            },
+            Request::Email {
+                request: EmailRequest::Withdraw,
+            },
+            Request::Email {
+                request: EmailRequest::Remove,
+            },
+        ]
     }
 }

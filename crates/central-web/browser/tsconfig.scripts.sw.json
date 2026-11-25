@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2024", "webworker"],
+    "module": "preserve",
+    "moduleDetection": "legacy",
+    "types": [],
+    "skipLibCheck": true,
+    "newLine": "lf",
+    "removeComments": false,
+    "rootDir": "../ts",
+    "outDir": "../js",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": true
+  },
+  "include": [
+    "../ts/sw.ts"
+  ]
+}

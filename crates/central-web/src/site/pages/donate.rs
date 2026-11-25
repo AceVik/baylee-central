@@ -283,7 +283,7 @@ pub fn page(cx: &Context<'_>) -> Built {
             <ul class="ways">{ways}</ul>
             <p class="small give-privacy">
                 {words::donate_privacy(lang)}{" "}
-                <a href=format!("{}#donate", Page::Privacy.path(lang))>{words::privacy_title(lang)}</a>
+                <a href=format!("{}#donate", Page::Privacy.path(lang)) target="_blank" rel="noopener noreferrer">{words::privacy_title(lang)}</a>
             </p>
         </section>
         <section class="wrap give-notes">

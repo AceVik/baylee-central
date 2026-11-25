@@ -18,6 +18,7 @@
 //!   material and so never enter this repository.
 
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -52,7 +53,7 @@ pub const STYLES: [&str; 18] = [
 ];
 
 /// The scripts served under hashed names.
-const SCRIPTS: [&str; 8] = [
+const SCRIPTS: [&str; 10] = [
     "boot.js",
     "nav.js",
     "pwa.js",
@@ -61,6 +62,8 @@ const SCRIPTS: [&str; 8] = [
     "pow-worker.js",
     "home.js",
     "directory.js",
+    "badges.js",
+    "security.js",
 ];
 
 const TARGET: &str = "wasm32-unknown-unknown";
@@ -105,6 +108,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     let web = root.join(WEB);
     copy_tree(&mut site, &web.join("assets/fonts"), "fonts")?;
     copy_tree(&mut site, &web.join("assets/img"), "img")?;
+    copy_tree(&mut site, &web.join("assets/ranks"), "ranks")?;
     if let Some(baylee) = std::env::var_os("BAYLEE_SRC") {
         content(&mut site, Path::new(&baylee))?;
     }
@@ -143,6 +147,7 @@ pub(crate) fn run(root: &Path) -> Result<()> {
     fs::write(out.join("sw.js"), worker).or_fail("sw.js could not be written")?;
     fs::write(out.join("notices.txt"), notices(root)?)
         .or_fail("notices.txt could not be written")?;
+    stage_security_audio(&web, &out, &languages)?;
     compress(&out)?;
     let manifest = json!({ "files": site.files, "build": build(root, &site.files) });
     fs::write(out.join("manifest.json"), format!("{manifest:#}\n"))
@@ -312,14 +317,47 @@ fn service_worker(
     Ok(stamped)
 }
 
+/// Reads every `*.ftl` file in a locale folder sorted by file name and joins
+/// them with blank lines.
+fn read_locale_dir(dir: &Path) -> Result<String> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir).or_fail("a language's words are missing")? {
+        let path = entry
+            .or_fail("a language's words could not be read")?
+            .path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "ftl") {
+            files.push(path);
+        }
+    }
+    files.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    if files.is_empty() {
+        return Err(Fail::new("a language's words are missing"));
+    }
+    let mut parts = Vec::with_capacity(files.len());
+    for file in files {
+        parts.push(fs::read_to_string(&file).or_fail("a language's words are missing")?);
+    }
+    Ok(parts.join("\n\n"))
+}
+
 /// The site's languages: the folders of its words
-/// (`crates/central-web/locales/<code>/site.ftl`, which `central-web`'s
+/// (`crates/central-web/locales/<code>/*.ftl`, which `central-web`'s
 /// build script holds to its own list), English first.
 fn languages(web: &Path) -> Result<Vec<String>> {
     let mut codes = Vec::new();
     for entry in fs::read_dir(web.join("locales")).or_fail("the words' folders are missing")? {
         let entry = entry.or_fail("a words' folder could not be read")?;
-        if entry.path().join("site.ftl").is_file() {
+        let path = entry.path();
+        let has_ftl = path.is_dir()
+            && fs::read_dir(&path).is_ok_and(|mut entries| {
+                entries.any(|file| {
+                    file.is_ok_and(|file| {
+                        let file = file.path();
+                        file.is_file() && file.extension().is_some_and(|ext| ext == "ftl")
+                    })
+                })
+            });
+        if has_ftl {
             codes.push(
                 entry
                     .file_name()
@@ -358,8 +396,7 @@ fn language_tag(code: &str) -> String {
 /// stylesheet's string: nothing a string or a message could be closed or
 /// opened with.
 fn word(web: &Path, code: &str, id: &str) -> Result<String> {
-    let text = fs::read_to_string(web.join("locales").join(code).join("site.ftl"))
-        .or_fail("a language's words are missing")?;
+    let text = read_locale_dir(&web.join("locales").join(code))?;
     text.lines()
         .find_map(|line| {
             let value = line.strip_prefix(id)?.trim_start().strip_prefix('=')?;
@@ -588,6 +625,81 @@ fn bootstrap(template: &str, glue_url: &str, wasm_url: &str) -> Result<String> {
     Ok(boot)
 }
 
+/// `CARGO_ENCODED_RUSTFLAGS` for `central-web-islands`: remaps local paths and
+/// enables baseline browser WebAssembly features (`simd128`, `bulk-memory`,
+/// `mutable-globals`, `nontrapping-fptoint`, `sign-ext`). Kept separate from
+/// `central-web-crypto` so `cargo xtask wasm --check` stays byte-locked.
+fn islands_rustflags(root: &Path, home: &Path) -> OsString {
+    let mut flags = wasm::remap_flags(root, home);
+    flags.push("\u{1f}-C\u{1f}target-feature=+simd128,+bulk-memory,+mutable-globals,+nontrapping-fptoint,+sign-ext");
+    flags
+}
+
+/// Binaryen `wasm-opt` arguments for maximum size + runtime convergence.
+fn wasm_opt_args(input: &Path, output: &Path) -> Vec<OsString> {
+    let mut args: Vec<OsString> = [
+        "-Oz",
+        "--converge",
+        "--enable-bulk-memory",
+        "--enable-mutable-globals",
+        "--enable-nontrapping-float-to-int",
+        "--enable-sign-ext",
+        "--enable-reference-types",
+        "--enable-simd",
+        "--strip-debug",
+        "--strip-producers",
+        "--strip-dwarf",
+        "-o",
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .collect();
+    args.push(output.as_os_str().to_os_string());
+    args.push(input.as_os_str().to_os_string());
+    args
+}
+
+/// Runs `wasm-opt` when installed (mandatory if `CENTRAL_REQUIRE_WASM_OPT=1`).
+fn optimize_wasm(name: &str, path: &Path) -> Result<()> {
+    let required = std::env::var("CENTRAL_REQUIRE_WASM_OPT").is_ok_and(|v| v == "1");
+    let available = Command::new("wasm-opt")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success());
+    if !available {
+        if required {
+            return Err(Fail::new(
+                "wasm-opt is required (CENTRAL_REQUIRE_WASM_OPT=1) but missing from PATH",
+            ));
+        }
+        return Ok(());
+    }
+    let before = fs::metadata(path)
+        .or_fail("the islands' module is missing")?
+        .len();
+    let optimized = path.with_extension("opt.wasm");
+    process::succeed(
+        Command::new("wasm-opt").args(wasm_opt_args(path, &optimized)),
+        "wasm-opt failed for the islands",
+    )?;
+    fs::rename(&optimized, path)
+        .or_fail("optimized islands module could not be moved into place")?;
+    let after = fs::metadata(path)
+        .or_fail("optimized islands module missing")?
+        .len();
+    let pct = if before > 0 && after <= before {
+        ((before - after) * 100) / before
+    } else {
+        0
+    };
+    println!(
+        "wasm-opt {name}: {} KiB -> {} KiB (-{pct}%)",
+        before / 1024,
+        after / 1024
+    );
+    Ok(())
+}
+
 /// `central-web-islands` built with `features` in a cargo run of its own,
 /// then through wasm-bindgen as `name`: the module and its glue.
 fn module(
@@ -612,7 +724,7 @@ fn module(
                 PROFILE,
             ])
             .args(features)
-            .env("CARGO_ENCODED_RUSTFLAGS", wasm::remap_flags(root, home))
+            .env("CARGO_ENCODED_RUSTFLAGS", islands_rustflags(root, home))
             .current_dir(root),
         "the islands' WebAssembly build failed",
     )?;
@@ -640,8 +752,9 @@ fn module(
             .arg(&built),
         "wasm-bindgen failed for the islands",
     )?;
-    let module =
-        fs::read(glue.join(format!("{name}_bg.wasm"))).or_fail("the islands' module is missing")?;
+    let wasm_path = glue.join(format!("{name}_bg.wasm"));
+    optimize_wasm(name, &wasm_path)?;
+    let module = fs::read(&wasm_path).or_fail("the islands' module is missing")?;
     for local in [root, home] {
         if wasm::contains(&module, local.to_string_lossy().as_bytes()) {
             return Err(Fail::new(format!("{name}.wasm names a local path")));
@@ -786,6 +899,44 @@ fn loopback_dev_origin(value: &str) -> Option<String> {
         return None;
     }
     Some(format!("http://{address}"))
+}
+
+/// Copies generated `/static/audio/security/{lang}/*` assets into `target/site`
+/// and writes lightweight `available: false` `cues.json` stubs where audio has
+/// not been synthesized yet so browsers never receive 404 console errors.
+fn stage_security_audio(web: &Path, out: &Path, languages: &[String]) -> Result<()> {
+    let source_root = web.join("static/audio/security");
+    let target_root = out.join("static/audio/security");
+    for code in languages {
+        let lang_target = target_root.join(code);
+        fs::create_dir_all(&lang_target)
+            .or_fail("target/site/static/audio/security could not be made")?;
+        let lang_source = source_root.join(code);
+        if lang_source.is_dir() {
+            for entry in fs::read_dir(&lang_source)
+                .or_fail("static/audio/security could not be read")?
+                .flatten()
+            {
+                let path = entry.path();
+                if path.is_file()
+                    && let Some(name) = path.file_name().and_then(|n| n.to_str())
+                    && (name == "cues.json"
+                        || Path::new(name)
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("mp3")))
+                {
+                    fs::copy(&path, lang_target.join(name))
+                        .or_fail("a security audio file could not be copied")?;
+                }
+            }
+        }
+        let cues_target = lang_target.join("cues.json");
+        if !cues_target.exists() {
+            fs::write(&cues_target, b"{\"available\":false,\"parts\":{}}\n")
+                .or_fail("placeholder cues.json could not be written")?;
+        }
+    }
+    Ok(())
 }
 
 /// Brotli and gzip copies of the text files, where the tools exist; a
@@ -982,7 +1133,7 @@ mod tests {
 
     use super::{
         ADMIN_ONLY, BIMI, BIMI_SHA256, MODULES, WEB, bootstrap, language_tag, languages, lean_css,
-        new_tab_rules, word,
+        new_tab_rules, read_locale_dir, word,
     };
     use crate::{random, workspace};
 
@@ -1138,8 +1289,7 @@ mod tests {
     fn no_language_is_english_under_another_name() {
         let web = workspace::root().expect("root").join(WEB);
         let read = |code: &str| {
-            std::fs::read_to_string(web.join("locales").join(code).join("site.ftl"))
-                .expect("a language's words")
+            read_locale_dir(&web.join("locales").join(code)).expect("a language's words")
         };
         let english = read("en");
         let english: std::collections::BTreeSet<&str> = english
@@ -1195,5 +1345,38 @@ mod tests {
         ] {
             assert_eq!(super::loopback_dev_origin(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn islands_rustflags_append_simd_features_without_breaking_remap() {
+        let flags = super::islands_rustflags(
+            std::path::Path::new("/work/repo"),
+            std::path::Path::new("/work/home"),
+        )
+        .to_string_lossy()
+        .into_owned();
+        let parts: Vec<&str> = flags.split('\u{1f}').collect();
+        assert_eq!(parts[0], "--remap-path-prefix=/work/home=/cargo");
+        assert_eq!(parts[1], "--remap-path-prefix=/work/repo=/central");
+        assert_eq!(parts[2], "-C");
+        assert!(parts[3].contains("target-feature=+simd128"));
+        assert!(parts[3].contains("bulk-memory"));
+    }
+
+    #[test]
+    fn wasm_opt_args_enable_size_convergence_simd_and_stripping() {
+        let args = super::wasm_opt_args(
+            std::path::Path::new("in.wasm"),
+            std::path::Path::new("out.wasm"),
+        );
+        let strs: Vec<String> = args
+            .iter()
+            .map(|s| s.to_string_lossy().into_owned())
+            .collect();
+        assert!(strs.contains(&"-Oz".to_owned()));
+        assert!(strs.contains(&"--converge".to_owned()));
+        assert!(strs.contains(&"--enable-simd".to_owned()));
+        assert!(strs.contains(&"--strip-debug".to_owned()));
+        assert_eq!(strs.last().map(String::as_str), Some("in.wasm"));
     }
 }

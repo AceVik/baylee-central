@@ -60,3 +60,22 @@ issued-not-you = 如果不是你要求的，请登录并在安全页面更改你
 
 # The confirmation mail's button, which opens the security page with the code filled in.
 confirm-link = 确认地址
+
+recovery-backup-subject = 你的 Baylee 恢复码备份
+recovery-backup-title = 恢复码备份
+recovery-backup-intro = 附件包含 Baylee 账号 { $name } 的恢复码备份。
+recovery-backup-encrypted = 压缩包 baylee-recovery-code.zip 已使用你设置的密码加密。
+recovery-backup-plain = 压缩包 baylee-recovery-code.zip 未设置密码保护。请在妥善保存后删除此邮件。
+recovery-backup-fact-file = 请将此压缩包保存在与此邮箱分开的安全位置。
+recovery-backup-fact-reset = 任何同时掌握恢复码和此邮箱重置权限的人都可以打开你的加密数据。
+recovery-backup-warning = 如果不是你本人请求的备份，请忽略此邮件或检查账号设置。
+recovery-backup-link = 打开你的账号
+invite-subject = Baylee 好友邀请
+invite-title = 好友邀请
+invite-intro = { $name } 邀请你在 Baylee 上成为好友。
+invite-note-label = 留言：
+invite-fact-friend = 接受此一次性链接后，你们将在 Baylee 上成为彼此的好友。
+invite-valid-one = 邀请链接有效期为 1 天。
+invite-valid = 邀请链接有效期为 { $days } 天。
+invite-warning = 如果你并未预期收到此邀请，可以忽略这封邮件。
+invite-link = 打开邀请

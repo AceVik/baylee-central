@@ -158,8 +158,14 @@ pub struct MyGateway {
     pub metadata: GatewayMetadata,
     /// Whether an administrator approved it.
     pub state: GatewayState,
+    /// Whether an administrator verified it for ranked hosting.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ranked_verified: bool,
     /// A heartbeat arrived in the last 90 seconds.
     pub online: bool,
+    /// Live activity counts last reported by the gateway within 90 seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<crate::gateway::GatewayActivity>,
     /// Its last heartbeat, in Unix seconds, if any.
     pub last_seen: Option<i64>,
     /// When it was registered, in Unix seconds.
@@ -192,6 +198,20 @@ pub enum OwnerRequest {
         origin: String,
         /// Its public name until its first heartbeat sends one.
         name: String,
+    },
+    /// Update the public display name of an owned non-official gateway.
+    UpdateGateway {
+        /// The gateway's id.
+        gateway: [u8; 16],
+        /// Its updated public name (1..=80 `shown_char`s, trimmed).
+        name: String,
+    },
+    /// Soft-delete an owned non-official gateway, revoking its tokens and
+    /// active sessions at it while preserving audit history. Requires a
+    /// password sign-in less than 30 minutes old.
+    DeleteGateway {
+        /// The gateway's id.
+        gateway: [u8; 16],
     },
     /// Mint a token for an owned gateway: a change, so it needs a password
     /// sign-in less than 30 minutes old. Answered with
@@ -226,8 +246,16 @@ impl OwnerRequest {
             | Self::EndClientSession
             | Self::Gateways
             | Self::AddGateway { .. }
+            | Self::UpdateGateway { .. }
+            | Self::DeleteGateway { .. }
             | Self::RevokeToken { .. } => false,
         }
+    }
+
+    /// Whether the request needs a password sign-in less than 30 minutes old.
+    #[must_use]
+    pub const fn requires_fresh_proof(&self) -> bool {
+        matches!(self, Self::CreateToken { .. } | Self::DeleteGateway { .. })
     }
 }
 

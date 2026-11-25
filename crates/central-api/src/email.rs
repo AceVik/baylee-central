@@ -9,6 +9,10 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Longest address taken.
 pub const MAX_ADDRESS: usize = 254;
+/// Longest ZIP backup attachment in raw bytes (32 KiB).
+pub const MAX_BACKUP_ATTACHMENT_BYTES: usize = 32 * 1024;
+/// Longest base64-encoded ZIP backup attachment accepted on the wire (48 KiB).
+pub const MAX_BACKUP_ATTACHMENT_B64: usize = 48 * 1024;
 /// Longest text read as a code; longer input is refused before decoding.
 pub const MAX_MAIL_CODE_TEXT: usize = 32;
 /// Crockford's base32 alphabet: no I, L, O or U.
@@ -256,6 +260,69 @@ pub struct EmailState {
     pub pending: Option<String>,
     /// When that code ends.
     pub pending_until: Option<i64>,
+}
+
+/// Validate a base64-encoded ZIP backup attachment for recovery mail delivery:
+/// standard padded RFC 4648 base64, within [`MAX_BACKUP_ATTACHMENT_B64`] and
+/// [`MAX_BACKUP_ATTACHMENT_BYTES`], beginning with a ZIP local-file header
+/// (`PK\x03\x04`).
+///
+/// # Errors
+/// `Rejected` for invalid base64, oversized payload or non-ZIP bytes.
+pub fn validate_backup_zip_base64(encoded: &str) -> Result<(), Error> {
+    if encoded.len() > MAX_BACKUP_ATTACHMENT_B64
+        || encoded.is_empty()
+        || !encoded.len().is_multiple_of(4)
+    {
+        return Err(Error::Rejected);
+    }
+    let bytes = encoded.as_bytes();
+    let pad = if bytes.ends_with(b"==") {
+        2
+    } else {
+        usize::from(bytes.ends_with(b"="))
+    };
+    let mut decoded_len = (bytes.len() / 4) * 3 - pad;
+    if !(22..=MAX_BACKUP_ATTACHMENT_BYTES).contains(&decoded_len) {
+        return Err(Error::Rejected);
+    }
+    let val = |b: u8| -> Result<u8, Error> {
+        match b {
+            b'A'..=b'Z' => Ok(b - b'A'),
+            b'a'..=b'z' => Ok(b - b'a' + 26),
+            b'0'..=b'9' => Ok(b - b'0' + 52),
+            b'+' => Ok(62),
+            b'/' => Ok(63),
+            _ => Err(Error::Rejected),
+        }
+    };
+    for (i, &b) in bytes[..bytes.len() - pad].iter().enumerate() {
+        let v = val(b)?;
+        // Enforce canonical trailing zero bits on padded final quantum.
+        if pad > 0 && i + 1 == bytes.len() - pad {
+            let unused_bits = if pad == 2 { 4 } else { 2 };
+            if v & ((1 << unused_bits) - 1) != 0 {
+                return Err(Error::Rejected);
+            }
+        }
+    }
+    // Check first 4 decoded bytes match ZIP local file header `PK\x03\x04`.
+    let q0 = [
+        val(bytes[0])?,
+        val(bytes[1])?,
+        val(bytes[2])?,
+        val(bytes[3])?,
+    ];
+    let b0 = (q0[0] << 2) | (q0[1] >> 4);
+    let b1 = ((q0[1] & 0x0f) << 4) | (q0[2] >> 2);
+    let b2 = ((q0[2] & 0x03) << 6) | q0[3];
+    let q1 = [val(bytes[4])?, val(bytes[5])?];
+    let b3 = (q1[0] << 2) | (q1[1] >> 4);
+    let _ = &mut decoded_len;
+    if [b0, b1, b2, b3] != *b"PK\x03\x04" {
+        return Err(Error::Rejected);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

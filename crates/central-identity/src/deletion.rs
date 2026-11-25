@@ -31,6 +31,12 @@ impl IdentityService {
                     export: Box::new(export),
                 })
             }
+            Request::ExportProfileDetails => {
+                surface.session(bearer)?;
+                let token = bearer.ok_or(Error::Rejected)?;
+                let details = self.store.export_profile_details(token).await?;
+                Ok(Response::ProfileDetails { details })
+            }
             Request::DeleteAccountStart { login } => {
                 self.delete_start(login, bearer, surface, place).await
             }

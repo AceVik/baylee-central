@@ -383,21 +383,26 @@ pub fn section(lang: Lang, worker: String) -> impl IntoView {
     };
     view! {
         <section class="card" aria-labelledby="admin-pictures-title">
-            <h2 id="admin-pictures-title">{words::admin_pictures_title(lang)}</h2>
+            <h2 id="admin-pictures-title" class="visually-hidden">{words::admin_pictures_title(lang)}</h2>
             <p>{words::admin_pictures_lead(lang)}</p>
             <div class="actions" role="group">
-                <button type="button" class="button" aria-pressed=move || (s.state.get() == PictureReportState::Open).to_string()
+                <button type="button" class="chip-btn" aria-pressed=move || (s.state.get() == PictureReportState::Open).to_string()
                     on:click=move |_| show(PictureReportState::Open)>{words::admin_pictures_open(lang)}</button>
-                <button type="button" class="button" aria-pressed=move || (s.state.get() == PictureReportState::Removed).to_string()
+                <button type="button" class="chip-btn" aria-pressed=move || (s.state.get() == PictureReportState::Removed).to_string()
                     on:click=move |_| show(PictureReportState::Removed)>{words::admin_pictures_removed(lang)}</button>
             </div>
-            <div class="field">
-                <label for="admin-pictures-password">{words::admin_pictures_password(lang)}</label>
-                <input id="admin-pictures-password" type="password" autocomplete="current-password"
-                    aria-describedby="admin-pictures-password-hint"
-                    prop:value=move || s.password.get() on:input=move |ev| s.password.set(event_target_value(&ev)) />
-                <p class="hint" id="admin-pictures-password-hint">{words::admin_pictures_password_hint(lang)}</p>
-            </div>
+            <form class="form" method="post" novalidate=true on:submit=|ev: leptos::ev::SubmitEvent| ev.prevent_default()>
+                {super::field::password_box(
+                    lang,
+                    "admin-pictures-password",
+                    words::admin_pictures_password(lang),
+                    "current-password",
+                    s.password,
+                    None,
+                    Some(view! { {words::admin_pictures_password_hint(lang)} }.into_any()),
+                    "1024",
+                )}
+            </form>
             <p class="meta" role="status">{move || s.said.get()}</p>
             {move || case_view(s)}
             {list}

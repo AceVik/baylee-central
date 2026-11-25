@@ -119,6 +119,7 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::LegacyLink { .. }
         | Request::RegisterChallenge
         | Request::RegisterChallengeFor { .. }
+        | Request::RegisterInviteChallenge { .. }
         | Request::Register { .. }
         | Request::EnrollmentStart { .. }
         | Request::EnrollmentFinish { .. }
@@ -144,6 +145,14 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::Owner { .. }
         | Request::Picture { .. }
         | Request::Admin { .. }
+        | Request::RefreshSession
+        | Request::ProfileDetails
+        | Request::SetProfileDetails { .. }
+        | Request::ExportProfileDetails
+        | Request::OwnBadges
+        | Request::PublicProfile { .. }
+        | Request::FriendInviteInfo { .. }
+        | Request::SendRecoveryBackupMail { .. }
         | Request::AccountExport
         | Request::DeleteAccountStart { .. }
         | Request::DeleteAccountFinish { .. }
@@ -468,6 +477,13 @@ mod tests {
             Request::GatewayToken {
                 gateway: "https://gateway.invalid".into(),
                 purpose: GatewayPurpose::Admit,
+            },
+            Request::FriendInviteInfo {
+                code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+            },
+            Request::RegisterInviteChallenge {
+                signals: 0,
+                invite_code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
             },
         ] {
             assert!(!credential_operation(&request));

@@ -1,0 +1,135 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # Stage website static assets once so the PGO trainer reuses them directly.
+  site:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-site
+          save-if: false
+      - run: cargo fetch --locked
+      - name: Install WASM optimizer and Brotli precompressor
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends binaryen brotli
+      - env:
+          CENTRAL_REQUIRE_WASM_OPT: "1"
+        run: cargo xtask site
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: central-site
+          path: target/site
+          retention-days: 3
+          if-no-files-found: error
+
+  build-pgo:
+    needs: [site]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Assert runner supports x86-64-v3 (AVX2, BMI2, FMA)
+        shell: bash
+        run: |
+          grep -qw avx2 /proc/cpuinfo
+          grep -qw bmi2 /proc/cpuinfo
+          grep -qw fma /proc/cpuinfo
+      - name: Install pinned toolchain with llvm-tools for PGO
+        run: rustup toolchain install 1.99.0 --profile minimal --component llvm-tools --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-pgo
+          cache-on-failure: true
+          save-if: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
+      - run: cargo fetch --locked
+      - name: Native Web Push crypto and picture codec build tools
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm ffmpeg
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: central-site
+          path: target/site
+      - name: Automated PGO profile collection and FatLTO x86-64-v3 build
+        run: cargo xtask pgo --out target/pgo-release --target-cpu x86-64-v3
+      - name: Verify PGO central-service passes HTTP boundary and signal smoke test
+        shell: bash
+        run: |
+          mkdir -p target/release
+          cp target/pgo-release/dist/central-service target/release/central-service
+          cargo xtask smoke
+      - name: Package release bundle
+        id: pkg
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            version="0.1.0-dev.${GITHUB_SHA::10}"
+          fi
+          archive="baylee-central-${version}-linux-x86_64-v3.tar.gz"
+          stage="target/pgo-release/bundle"
+          rm -rf "$stage"
+          mkdir -p "$stage/bin" "$stage/ops"
+          cp target/pgo-release/dist/central-service "$stage/bin/"
+          cp target/pgo-release/dist/central-web "$stage/bin/"
+          cp target/pgo-release/dist/central-picture-worker "$stage/bin/"
+          cp target/pgo-release/dist/SHA256SUMS.txt "$stage/"
+          cp -R target/site "$stage/site"
+          cp ops/grants.sql "$stage/ops/grants.sql"
+          tar -C "$stage" -czf "target/pgo-release/${archive}" .
+          (cd target/pgo-release && sha256sum "$archive" > "${archive}.sha256")
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: baylee-central-linux-x86_64-v3
+          path: |
+            target/pgo-release/${{ steps.pkg.outputs.archive }}
+            target/pgo-release/${{ steps.pkg.outputs.archive }}.sha256
+            target/pgo-release/dist/SHA256SUMS.txt
+            target/pgo-release/central.profdata
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    needs: [build-pgo]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: baylee-central-linux-x86_64-v3
+          path: release-out
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --title "Baylee Central $TAG" \
+            --generate-notes \
+            release-out/*.tar.gz release-out/*.sha256 release-out/SHA256SUMS.txt

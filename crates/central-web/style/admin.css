@@ -4,24 +4,41 @@
 
 /* ---- Its own navigation, under the page's title ------------------------- */
 
+.admin-nav {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
 .admin-nav ul {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  flex-wrap: nowrap;
+  gap: 0.3rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-nav ul::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-nav li {
+  flex: none;
 }
 
 .admin-nav a {
   display: inline-flex;
   align-items: center;
   min-block-size: var(--target);
-  padding-inline: 1em;
+  padding: 0.38em 0.54em;
   border: 1px solid var(--edge-soft);
   border-radius: var(--pill);
   color: var(--ink-soft);
-  font: 500 0.92rem var(--sans);
+  font: 500 0.8rem var(--sans);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
   text-decoration: none;
   transition:
     background-color var(--dur-fast) ease,
@@ -85,6 +102,23 @@
 .admin-list {
   display: grid;
   gap: var(--space-5);
+}
+
+.admin-search .with-tool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-search .inset {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+  inline-size: 100%;
+}
+
+.admin-search .inset:has(.inset-end, button) input {
+  padding-inline: 2.75rem 3rem;
 }
 
 .admin-search .with-tool .button {
@@ -177,8 +211,9 @@
 }
 
 .admin-table :is(th, td) {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0.65rem;
   border-block-end: var(--hairline) solid var(--edge-soft);
+  font-size: 0.84rem;
   text-align: start;
   vertical-align: middle;
 }
@@ -238,6 +273,26 @@
 
 .admin-table .pill + .pill {
   margin-inline-start: var(--space-1);
+}
+
+@media (min-width: 64rem) {
+  .admin-table td {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  .admin-table td.num {
+    white-space: nowrap;
+  }
+
+  .admin-table td code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-table th[scope="row"] {
+    overflow-wrap: break-word;
+  }
 }
 
 @media (max-width: 37.5rem) {
@@ -302,6 +357,10 @@
 
 .admin-gw {
   container-type: inline-size;
+}
+
+.admin-gw .facts {
+  align-items: center;
 }
 
 .admin-gw-head {

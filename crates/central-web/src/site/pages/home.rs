@@ -80,7 +80,7 @@ pub fn page(cx: &Context<'_>) -> Built {
         "@type": "WebSite",
         "name": "Baylee",
         "url": format!("{}{}", cx.origin, Page::Home.path(lang)),
-        "inLanguage": lang.code(),
+        "inLanguage": lang.tag(),
     }));
     meta.data.push(json!({
         "@context": "https://schema.org",
@@ -93,7 +93,6 @@ pub fn page(cx: &Context<'_>) -> Built {
     meta.data.push(super::download::software(cx));
     meta.islands = true;
     let body = view! {
-        {strip(cx)}
         {hero(cx)}
         {gateways(cx)}
         {screens(cx)}
@@ -189,120 +188,6 @@ fn hero(cx: &Context<'_>) -> impl IntoView + use<> {
             // Wizards' Fan Content notice, in the hero where a visitor
             // sees it (owner, 11.11.2026); the footer carries it on every page
             <p class="hero-fan">{solid::icon(solid::SHIELD)}<span>{fan}</span></p>
-        </section>
-    }
-}
-
-/// One of the strip's figures, a cell of its own: the term is a glyph with
-/// a short label, the value stands apart so that the stylesheet can set it
-/// above the label or between glyph and label. `title` says the figure in
-/// full under the pointer.
-fn strip_cell(title: &str, glyph: &'static str, label: &'static str, value: AnyView) -> AnyView {
-    view! {
-        <div class="strip-cell" title=title.to_owned()>
-            <dt>{icon(glyph)}<span class="strip-label">{label}</span></dt>
-            <dd class="num">{value}</dd>
-        </div>
-    }
-    .into_any()
-}
-
-/// The strip under the bar: Baylee in numbers, the six the owner named
-/// (18.11.2026) and in his order. What the online gateways say is
-/// happening on them, added up (players, running games, open tables), the
-/// gateways online of all that are listed, Central's accounts, and how
-/// often the site's pages were opened. Only what a source said is shown: a
-/// number nobody reported is left out, never drawn as a zero, and while
-/// the directory has not answered the strip links to it instead. Nothing
-/// here is GitHub's (owner, 12.11.2026), and the cards' numbers stand in
-/// their own section. The server counts the cells (`data-count`), and the
-/// stylesheet lays that many out in even lines at every width
-/// (`header.css`).
-fn strip(cx: &Context<'_>) -> impl IntoView + use<> {
-    let lang = cx.lang;
-    let number = |n: u64| words::number(lang, n);
-    let mut cells: Vec<AnyView> = Vec::with_capacity(6);
-    // the gateways' own counts: their claim, as the tooltip says
-    if let Some((players, _, tables, games)) =
-        cx.data.gateways.as_deref().and_then(data::activity_of)
-    {
-        let live = words::strip_live(lang);
-        cells.push(strip_cell(
-            live,
-            icons::USERS,
-            words::strip_l_players(lang),
-            view! { <span class="dot ok live" aria-hidden="true"></span>{number(players)} }
-                .into_any(),
-        ));
-        cells.push(strip_cell(
-            live,
-            icons::SWORDS,
-            words::strip_l_games(lang),
-            number(games).into_any(),
-        ));
-        cells.push(strip_cell(
-            live,
-            icons::LAYOUT_DASHBOARD,
-            words::strip_l_tables(lang),
-            number(tables).into_any(),
-        ));
-    }
-    let gateways = words::strip_gateways(lang);
-    cells.push(match cx.data.gateways.as_deref() {
-        Some(all) => {
-            let online = all.iter().filter(|g| g.online).count();
-            let count = |n: usize| number(u64::try_from(n).unwrap_or(u64::MAX));
-            let title = format!(
-                "{gateways}: {} {}, {} {}",
-                count(online),
-                words::strip_online(lang),
-                count(all.len() - online),
-                words::strip_offline(lang),
-            );
-            strip_cell(
-                &title,
-                icons::SERVER,
-                gateways,
-                view! {
-                    <a href="#gateways">
-                        <span>{count(online)}</span>
-                        <span class="strip-of">{format!("/ {}", count(all.len()))}</span>
-                    </a>
-                }
-                .into_any(),
-            )
-        }
-        None => strip_cell(
-            gateways,
-            icons::SERVER,
-            gateways,
-            view! { <a class="strip-way" href=Page::Gateways.path(lang)>{words::strip_directory(lang)}</a> }
-                .into_any(),
-        ),
-    });
-    if let Some(accounts) = cx.data.accounts {
-        cells.push(strip_cell(
-            words::strip_accounts(lang),
-            icons::USER_CHECK,
-            words::strip_l_accounts(lang),
-            number(accounts).into_any(),
-        ));
-    }
-    // how often the site's pages were opened, where the deployment counts it
-    if let Some(views) = cx.data.views.as_ref() {
-        cells.push(strip_cell(
-            &words::strip_views(lang, &format::date(lang, &views.since)),
-            icons::EYE,
-            words::strip_l_views(lang),
-            number(views.count).into_any(),
-        ));
-    }
-    let count = cells.len().to_string();
-    view! {
-        <section class="strip" aria-label=words::status_label(lang)>
-            <div class="strip-inner">
-                <dl class="strip-list" data-count=count>{cells}</dl>
-            </div>
         </section>
     }
 }
@@ -437,7 +322,7 @@ fn screens(cx: &Context<'_>) -> Option<impl IntoView + use<>> {
                 <button type="button" class="round-btn lightbox-prev" data-shot-step="-1" aria-label=words::shots_previous(lang)>{solid::icon(solid::PREV)}</button>
                 <button type="button" class="round-btn lightbox-next" data-shot-step="1" aria-label=words::shots_next(lang)>{solid::icon(solid::NEXT)}</button>
                 <form method="dialog">
-                    <button type="submit" class="round-btn lightbox-close" aria-label=words::shots_close(lang)>{solid::icon(solid::CLOSE)}</button>
+                    <button type="submit" class="round-btn dialog-close lightbox-close" aria-label=words::shots_close(lang) title=words::shots_close(lang)>{solid::icon(solid::CLOSE)}</button>
                 </form>
             </dialog>
         </section>
@@ -1202,8 +1087,8 @@ fn album(cx: &Context<'_>) -> impl IntoView + use<> {
                     <p class="album-dates">{words::baylee_together(lang)}</p>
                 </div>
                 <form method="dialog">
-                    <button type="submit" class="round-btn album-dismiss" aria-label=words::baylee_close(lang)>
-                        <span aria-hidden="true">"×"</span>
+                    <button type="submit" class="round-btn dialog-close album-dismiss" aria-label=words::baylee_close(lang) title=words::baylee_close(lang)>
+                        {icon(icons::X)}
                     </button>
                 </form>
             </header>
@@ -1303,8 +1188,8 @@ fn viewer(lang: Lang, full: String) -> impl IntoView + use<> {
             <header class="photo-viewer-header">
                 <p data-viewer-caption="">{words::baylee_photo1(lang)}</p>
                 <form method="dialog">
-                    <button type="submit" class="round-btn" aria-label=words::baylee_photo_close(lang)>
-                        <span aria-hidden="true">"×"</span>
+                    <button type="submit" class="round-btn dialog-close" aria-label=words::baylee_photo_close(lang) title=words::baylee_photo_close(lang)>
+                        {icon(icons::X)}
                     </button>
                 </form>
             </header>

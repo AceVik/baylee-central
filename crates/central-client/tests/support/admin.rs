@@ -180,7 +180,9 @@ fn stale(
     let admin = |request: AdminRequest| Request::Admin { request };
     runtime
         .block_on(operator.execute_unprepared(&format!(
-            "UPDATE central_identity.sessions SET created_at = created_at - interval '31 minutes'
+            "UPDATE central_identity.sessions
+             SET created_at = created_at - interval '31 minutes',
+                 absolute_expires_at = absolute_expires_at - interval '31 minutes'
              WHERE account_id = '{}' AND kind = 'browser'",
             sea_orm::prelude::Uuid::from_bytes(identity.account)
         )))

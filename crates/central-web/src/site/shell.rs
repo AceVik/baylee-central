@@ -185,13 +185,8 @@ pub fn titled(title: &str) -> String {
 }
 
 /// Everything in `<head>`.
-fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
-    let lang = cx.lang;
-    let origin = cx.origin.to_owned();
-    let assets = cx.assets;
-    let canonical = format!("{origin}{}", page.path(lang));
-    let listed = Page::LISTED.contains(&page);
-    let alternates = listed.then(|| {
+fn head_alternates(listed: bool, page: Page, origin: &str) -> Option<impl IntoView + use<>> {
+    listed.then(|| {
         let mut links: Vec<(&'static str, String)> = Lang::ALL
             .into_iter()
             .map(|other| (other.tag(), format!("{origin}{}", page.path(other))))
@@ -201,8 +196,54 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             .into_iter()
             .map(|(code, href)| view! { <link rel="alternate" hreflang=code href=href /> })
             .collect_view()
-    });
+    })
+}
+
+/// Sharing metadata (`OpenGraph` and Twitter/X cards) in `<head>`.
+fn head_social(
+    lang: Lang,
+    listed: bool,
+    canonical: &str,
+    image: &str,
+    meta: &Meta,
+) -> impl IntoView + use<> {
+    let canonical = listed.then(|| canonical.to_owned());
+    let others = Lang::ALL
+        .into_iter()
+        .filter(|other| *other != lang)
+        .map(|other| {
+            view! { <meta {..custom_attribute("property", "og:locale:alternate")} content=other.locale() /> }
+        })
+        .collect_view();
+    view! {
+        <meta {..custom_attribute("property", "og:type")} content="website" />
+        <meta {..custom_attribute("property", "og:site_name")} content="Baylee" />
+        <meta {..custom_attribute("property", "og:title")} content=meta.title.clone() />
+        <meta {..custom_attribute("property", "og:description")} content=meta.description.clone() />
+        {canonical.map(|url| view! { <meta {..custom_attribute("property", "og:url")} content=url /> })}
+        <meta {..custom_attribute("property", "og:image")} content=image.to_owned() />
+        <meta {..custom_attribute("property", "og:image:width")} content="1200" />
+        <meta {..custom_attribute("property", "og:image:height")} content="630" />
+        <meta {..custom_attribute("property", "og:image:alt")} content=meta.title.clone() />
+        <meta {..custom_attribute("property", "og:locale")} content=lang.locale() />
+        {others}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content=meta.title.clone() />
+        <meta name="twitter:description" content=meta.description.clone() />
+        <meta name="twitter:image" content=image.to_owned() />
+        <meta name="twitter:image:alt" content=meta.title.clone() />
+    }
+}
+
+fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
+    let lang = cx.lang;
+    let origin = cx.origin.to_owned();
+    let assets = cx.assets;
+    let canonical = format!("{origin}{}", page.path(lang));
+    let listed = Page::LISTED.contains(&page);
+    let alternates = head_alternates(listed, page, &origin);
     let image = format!("{origin}{}", assets.url(meta.image));
+    let social = head_social(lang, listed, &canonical, &image, meta);
     let structured = meta
         .data
         .iter()
@@ -210,16 +251,20 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
         .chain(breadcrumb_data(cx, &meta.trail))
         .map(|value| view! { <script type="application/ld+json" inner_html=ld_json(&value)></script> })
         .collect_view();
-    let robots = (!page.indexed())
-        .then(|| view! { <meta name="robots" content="noindex, noarchive, nosnippet" /> });
+    let robots = if page.indexed() {
+        "index, follow, max-image-preview:large, max-snippet:-1"
+    } else {
+        "noindex, noarchive, nosnippet"
+    };
     let verification = cx
         .verification
         .map(|value| view! { <meta name="google-site-verification" content=value.to_owned() /> });
     // a page's own script: the start page's album and screenshots, the
-    // gateway directory's finding
+    // gateway directory's finding, the security page's guided audio tour
     let own = match page {
         page if page.start() => Some("home.js"),
         Page::Gateways => Some("directory.js"),
+        Page::Security => Some("security.js"),
         _ => None,
     }
     .map(|name| view! { <script type="module" src=assets.url(name) integrity=assets.integrity(name)></script> });
@@ -234,11 +279,12 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
         let name = islands_script(page);
         view! { <script type="module" src=assets.url(name) integrity=assets.integrity(name) fetchpriority="low"></script> }
     });
-    let others = Lang::ALL
-        .into_iter()
-        .filter(|other| *other != lang)
-        .map(|other| view! { <meta {..custom_attribute("property", "og:locale:alternate")} content=other.locale() /> })
-        .collect_view();
+    let rank_urls: std::collections::BTreeMap<&str, &str> = assets
+        .files
+        .iter()
+        .filter_map(|(k, v)| k.strip_prefix("ranks/").map(|name| (name, v.url.as_str())))
+        .collect();
+    let rank_urls_json = serde_json::to_string(&rank_urls).unwrap_or_else(|_| "{}".to_owned());
     view! {
         <head>
             <meta charset="utf-8" />
@@ -248,20 +294,22 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             />
             <title>{titled(&meta.title)}</title>
             <meta name="description" content=meta.description.clone() />
-            {listed.then(|| view! { <link rel="canonical" href=canonical.clone() /> })}
+            {listed.then(|| view! { <link rel="canonical" href=canonical /> })}
             {alternates}
-            {robots}
+            <meta name="robots" content=robots />
             <meta name="color-scheme" content="light dark" />
             <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f2e9" />
             <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1b2d" />
             <meta name="referrer" content="no-referrer" />
             <meta name="tdm-reservation" content="1" />
+            <meta name="baylee-ranks" content=rank_urls_json />
             {preloads(page, lang, assets)}
             <link rel="stylesheet" href=assets.url("site.css") integrity=assets.integrity("site.css") />
             <script src=assets.url("boot.js") integrity=assets.integrity("boot.js")></script>
             <script type="module" src=assets.url("pwa.js") integrity=assets.integrity("pwa.js")></script>
             <script type="module" src=assets.url("nav.js") integrity=assets.integrity("nav.js")></script>
             <script type="module" src=assets.url("hint.js") integrity=assets.integrity("hint.js") fetchpriority="low"></script>
+            <script type="module" src=assets.url("badges.js") integrity=assets.integrity("badges.js") fetchpriority="low"></script>
             {own}
             {sky}
             {islands}
@@ -270,18 +318,7 @@ fn head(page: Page, cx: &Context<'_>, meta: &Meta) -> impl IntoView + use<> {
             <link rel="icon" href=assets.url("img/icon-192.webp") type="image/webp" sizes="192x192" />
             <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
             <link rel="manifest" href=format!("/{}/manifest.webmanifest", lang.code()) />
-            <meta {..custom_attribute("property", "og:type")} content="website" />
-            <meta {..custom_attribute("property", "og:site_name")} content="Baylee" />
-            <meta {..custom_attribute("property", "og:title")} content=meta.title.clone() />
-            <meta {..custom_attribute("property", "og:description")} content=meta.description.clone() />
-            {listed.then(|| view! { <meta {..custom_attribute("property", "og:url")} content=canonical.clone() /> })}
-            <meta {..custom_attribute("property", "og:image")} content=image />
-            <meta {..custom_attribute("property", "og:image:width")} content="1200" />
-            <meta {..custom_attribute("property", "og:image:height")} content="630" />
-            <meta {..custom_attribute("property", "og:image:alt")} content=meta.title.clone() />
-            <meta {..custom_attribute("property", "og:locale")} content=lang.locale() />
-            {others}
-            <meta name="twitter:card" content="summary_large_image" />
+            {social}
             {verification}
             {structured}
         </head>
@@ -293,6 +330,8 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
     let lang = cx.lang;
     // the start page has the world in its hero; every other one behind it
     let world = (!page.start()).then(|| world(cx));
+    let strip = (!matches!(page, Page::NotFound | Page::Gone | Page::Offline))
+        .then(|| super::strip::strip(cx));
     view! {
         <html lang=lang.tag() dir="ltr" data-auth=page.form()>
             {head(page, cx, meta)}
@@ -300,6 +339,7 @@ pub fn document(page: Page, cx: &Context<'_>, meta: &Meta, body: AnyView) -> imp
                 <a class="skip" href="#main">{words::skip(lang)}</a>
                 {world}
                 {bar(page, cx)}
+                {strip}
                 <div class="page">
                     <main id="main" tabindex="-1">
                         {auth_noscript(page, lang)}
@@ -358,7 +398,7 @@ fn auth_dialog(
                 {more}
                 // last in the card, so the dialog opens with the keyboard
                 // in its first field; drawn in the card's corner
-                <button type="button" class="round-btn auth-close" data-auth-close aria-label=words::dialog_close(lang) title=words::dialog_close(lang)>
+                <button type="button" class="round-btn dialog-close auth-close" data-auth-close aria-label=words::dialog_close(lang) title=words::dialog_close(lang)>
                     {icon(icons::X)}
                 </button>
             </div>
@@ -425,7 +465,9 @@ fn auth_noscript(page: Page, lang: Lang) -> Option<impl IntoView + use<>> {
 /// The address of the same page in `lang`.
 fn translated(page: Page, lang: Lang) -> String {
     match page {
-        Page::NotFound | Page::Gone | Page::Offline => Page::Home.path(lang),
+        Page::NotFound | Page::Gone | Page::Offline | Page::Player | Page::Invite => {
+            Page::Home.path(lang)
+        }
         _ => page.path(lang),
     }
 }
@@ -596,7 +638,7 @@ fn languages(page: Page, lang: Lang) -> impl IntoView + use<> {
         })
         .collect_view();
     view! {
-        <details class="lang" data-menu="">
+        <details class="lang" data-menu="" translate="no">
             <summary>
                 <span class="visually-hidden">{words::lang_label(lang)}": "</span>
                 <span class="lang-main">
@@ -652,10 +694,20 @@ fn bar(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                     {theme_switch(lang, true)}
                 </nav>
                 <div class="top-tools">
+                    <a
+                        class="round-btn give-in-bar"
+                        href=Page::Donate.path(lang)
+                        aria-current=(page == Page::Donate).then_some("page")
+                        aria-label=words::nav_donate(lang)
+                        title=words::nav_donate(lang)
+                    >
+                        {icon(icons::HEART)}
+                    </a>
                     {theme_switch(lang, false)}
                     {languages(page, lang)}
                 </div>
             </div>
+            <div class="nav-progress" aria-hidden="true"></div>
         </header>
     }
 }
@@ -690,6 +742,56 @@ fn foot_logo(lang: Lang, assets: &Assets) -> impl IntoView + use<> {
     }
 }
 
+fn foot_internal_link(
+    lang: Lang,
+    page: Page,
+    target: Page,
+    glyph: &'static str,
+    label: &'static str,
+) -> impl IntoView + use<> {
+    view! {
+        <li>
+            <a href=target.path(lang) aria-current=(target == page).then_some("page")>
+                {icon(glyph)}
+                <span>{label}</span>
+            </a>
+        </li>
+    }
+}
+
+fn foot_legal_link(
+    lang: Lang,
+    page: Page,
+    target: Page,
+    glyph: &'static str,
+    label: &'static str,
+) -> impl IntoView + use<> {
+    view! {
+        <li>
+            <a
+                href=target.path(lang)
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-current=(target == page).then_some("page")
+            >
+                {icon(glyph)}
+                <span>{label}</span>
+            </a>
+        </li>
+    }
+}
+
+fn foot_external_link(href: String, glyph: AnyView, label: &'static str) -> impl IntoView + use<> {
+    view! {
+        <li>
+            <a href=href target="_blank" rel="noopener noreferrer">
+                {glyph}
+                <span>{label}</span>
+            </a>
+        </li>
+    }
+}
+
 fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
     let lang = cx.lang;
     let assets = cx.assets;
@@ -708,12 +810,13 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         });
         view! { <p class="machine-note">{note}</p> }
     });
-    let link = |target: Page, label: &'static str| {
-        view! { <li><a href=target.path(lang) aria-current=(target == page).then_some("page")>{label}</a></li> }
+    let link = |target: Page, glyph: &'static str, label: &'static str| {
+        foot_internal_link(lang, page, target, glyph, label)
     };
-    let away = |href: String, label: &'static str| {
-        view! { <li><a href=href target="_blank" rel="noopener noreferrer">{label}</a></li> }
+    let legal = |target: Page, glyph: &'static str, label: &'static str| {
+        foot_legal_link(lang, page, target, glyph, label)
     };
+    let away = foot_external_link;
     view! {
         <footer class="foot">
             <div class="foot-inner">
@@ -732,33 +835,33 @@ fn footer(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
                         <div class="foot-col">
                             <h2 class="foot-head" id="foot-play">{words::foot_play(lang)}</h2>
                             <ul class="foot-list" aria-labelledby="foot-play">
-                                {link(Page::Download, words::nav_download(lang))}
-                                {link(Page::Gateways, words::nav_gateways(lang))}
-                                {link(Page::Faq, words::nav_faq(lang))}
-                                {link(Page::Security, words::nav_security(lang))}
-                                {away(DISCORD.to_owned(), words::foot_discord(lang))}
-                                {away(WHATSAPP.to_owned(), words::hero_whatsapp(lang))}
-                                {link(Page::Contact, words::nav_contact(lang))}
+                                {link(Page::Download, icons::DOWNLOAD, words::nav_download(lang))}
+                                {link(Page::Gateways, icons::SERVER, words::nav_gateways(lang))}
+                                {link(Page::Faq, icons::CIRCLE_HELP, words::nav_faq(lang))}
+                                {link(Page::Security, icons::SHIELD, words::nav_security(lang))}
+                                {away(DISCORD.to_owned(), solid::icon(solid::DISCORD).into_any(), words::foot_discord(lang))}
+                                {away(WHATSAPP.to_owned(), solid::icon(solid::WHATSAPP).into_any(), words::hero_whatsapp(lang))}
+                                {link(Page::Contact, icons::MAIL, words::nav_contact(lang))}
                             </ul>
                         </div>
                         <div class="foot-col">
                             <h2 class="foot-head" id="foot-project">{words::foot_project(lang)}</h2>
                             <ul class="foot-list" aria-labelledby="foot-project">
-                                {away(REPOSITORY.to_owned(), words::foot_source(lang))}
-                                {away(CENTRAL_REPOSITORY.to_owned(), words::foot_central(lang))}
-                                {away(format!("{CENTRAL_REPOSITORY}/tree/main/crates/central-web"), words::foot_central_source(lang))}
-                                {away(format!("{REPOSITORY}/releases"), words::foot_releases(lang))}
-                                {away(format!("{REPOSITORY}/issues"), words::foot_issues(lang))}
-                                {link(Page::Donate, words::nav_donate(lang))}
+                                {away(REPOSITORY.to_owned(), solid::icon(solid::GITHUB).into_any(), words::foot_source(lang))}
+                                {away(CENTRAL_REPOSITORY.to_owned(), icon(icons::CLOUD).into_any(), words::foot_central(lang))}
+                                {away(format!("{CENTRAL_REPOSITORY}/tree/main/crates/central-web"), icon(icons::GLOBE).into_any(), words::foot_central_source(lang))}
+                                {away(format!("{REPOSITORY}/releases"), icon(icons::HARD_DRIVE_DOWNLOAD).into_any(), words::foot_releases(lang))}
+                                {away(format!("{REPOSITORY}/issues"), icon(icons::FLAG).into_any(), words::foot_issues(lang))}
+                                {link(Page::Donate, icons::HEART, words::nav_donate(lang))}
                             </ul>
                         </div>
                         <div class="foot-col">
                             <h2 class="foot-head" id="foot-legal">{words::foot_legal(lang)}</h2>
                             <ul class="foot-list" aria-labelledby="foot-legal">
-                                {link(Page::Terms, words::title_terms(lang))}
-                                {link(Page::Privacy, words::title_privacy(lang))}
-                                {link(Page::Impressum, words::title_impressum(lang))}
-                                {link(Page::FanContent, words::title_fan_content(lang))}
+                                {legal(Page::Terms, icons::FILE_TEXT, words::title_terms(lang))}
+                                {legal(Page::Privacy, icons::LOCK, words::title_privacy(lang))}
+                                {legal(Page::Impressum, icons::BOOK_OPEN, words::title_impressum(lang))}
+                                {legal(Page::FanContent, icons::SCALE, words::title_fan_content(lang))}
                             </ul>
                         </div>
                     </nav>

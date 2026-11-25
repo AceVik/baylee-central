@@ -1,15 +1,197 @@
 /* The security page: four charts in steps, each beside the same steps in
    words (crates/central-web/src/site/pages/security.rs).
 
-   No script moves anything here. Six radio buttons stand before each chart:
-   the first plays the steps in turn, the others stop at one step. The rules
-   below read which one is checked. Whoever asked for stillness gets the
-   whole chart at rest, and a chosen step is then only lit, never moved.
+   Without script, six radio buttons before each chart pick "play" or one
+   step, and the rules below drive everything. With `security.js`, the audio
+   or guided tour bar synchronizes `data-step` and the radio switches in step.
+   Whoever asked for stillness gets the whole chart at rest, and a chosen step
+   is then only lit, never moved.
 
    A chart holds no sentence, only its actors' names and the steps' numbers:
    the page is read in many languages and SVG text does not wrap. What a
    step sends and means is HTML in the list, under the same number and the
    same sign as in the chart. */
+
+/* intro audio tour card under the page lead */
+.sec-intro-card {
+  max-inline-size: 46rem;
+  margin: var(--space-5) auto 0;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  text-align: start;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sec-intro-title {
+  margin: 0;
+  color: var(--title);
+  font: 700 1.12rem/1.3 var(--sans);
+}
+
+.sec-intro-lead {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.96rem;
+  line-height: 1.54;
+  text-wrap: pretty;
+}
+
+.sec-intro-card[hidden],
+.sec-audio[hidden],
+.sec-audio-mute[hidden],
+.sec-audio-track[hidden] {
+  display: none;
+}
+
+/* compact audio / guided tour control strip */
+.sec-audio {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel-2) 72%, transparent);
+}
+
+.sec-stage .sec-audio {
+  margin-block-end: var(--space-2);
+}
+
+.sec-audio-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.7rem;
+}
+
+.sec-audio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sec-audio-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  min-inline-size: var(--target);
+  min-block-size: var(--target);
+  padding: 0 0.95rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--pill);
+  background-color: var(--panel);
+  color: var(--title);
+  font: 700 0.92rem/1.2 var(--sans);
+}
+
+.sec-audio-play:hover {
+  border-color: var(--gold);
+  color: var(--title);
+}
+
+.sec-audio[data-playing="true"] .sec-audio-play {
+  border-color: var(--gold);
+  background-color: var(--gold);
+  color: var(--gold-ink);
+}
+
+.sec-audio[data-playing="true"] .sec-audio-ico-play {
+  display: none;
+}
+
+.sec-audio:not([data-playing="true"]) .sec-audio-ico-pause {
+  display: none;
+}
+
+.sec-audio[data-muted="true"] .sec-audio-ico-vol {
+  display: none;
+}
+
+.sec-audio:not([data-muted="true"]) .sec-audio-ico-muted {
+  display: none;
+}
+
+.sec-audio-step-btn,
+.sec-audio-mute {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--target);
+  block-size: var(--target);
+  min-inline-size: var(--target);
+  min-block-size: var(--target);
+  padding: 0;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--pill);
+  color: var(--ink-soft);
+}
+
+.sec-audio-step-btn:hover,
+.sec-audio-mute:hover {
+  border-color: var(--gold);
+  color: var(--title);
+}
+
+.sec-audio-actions .icon {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+
+.sec-audio-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  min-inline-size: 0;
+  font: 600 var(--text-xs) / 1.35 var(--sans);
+}
+
+.sec-audio-mode {
+  color: var(--ink-faint);
+}
+
+.sec-audio-status {
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--pill);
+  background-color: var(--violet-soft);
+  color: var(--title);
+  font-variant-numeric: lining-nums;
+}
+
+.sec-audio-track {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.sec-audio-range {
+  flex: 1 1 auto;
+  min-inline-size: 6rem;
+  block-size: var(--target);
+  min-block-size: var(--target);
+  margin: 0;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.sec-audio-time {
+  flex: none;
+  min-inline-size: 4.5rem;
+  text-align: end;
+  color: var(--ink-soft);
+  font: 600 var(--text-xs) / 1 var(--sans);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.sec-audio :is(button, input):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 
 /* what the page holds, as links under its head */
 .sec-toc ol {
@@ -40,9 +222,15 @@
     color var(--dur) ease;
 }
 
-.sec-toc a:hover {
+.sec-toc a:hover,
+.sec-toc a[aria-current="step"] {
   border-color: var(--gold);
   color: var(--title);
+}
+
+.sec-toc a[aria-current="step"] .num {
+  background: var(--gold);
+  color: var(--gold-ink);
 }
 
 .sec-toc .num {
@@ -84,7 +272,15 @@
 
 .sec-stage {
   min-inline-size: 0;
-  padding: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, var(--sheen), transparent 4.5rem),
+    color-mix(in srgb, var(--panel) 84%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--sheen),
+    var(--shadow);
 }
 
 /* beside a longer list the chart stays in view while its steps are read */
@@ -108,10 +304,10 @@
   margin-block-end: var(--space-2);
 }
 
-/* the five steps stay in one row: where the switch needs two, play has the
-   first to itself */
 .sec-steps {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.4rem;
 }
 
@@ -122,6 +318,7 @@
   gap: 0.4rem;
   min-inline-size: var(--target);
   min-block-size: var(--target);
+  max-inline-size: 100%;
   padding-inline: 0.5rem;
   border: 1px solid var(--edge-soft);
   border-radius: var(--pill);
@@ -180,6 +377,7 @@
   color: var(--ink-faint);
   font: 400 var(--text-sm) / 1.35 var(--sans);
   text-align: center;
+  text-wrap: pretty;
 }
 
 .sec-frame-note {
@@ -193,7 +391,9 @@
 
 /* the chart: its sizes are its own units, 320 across */
 .sec-chart {
+  display: block;
   inline-size: 100%;
+  block-size: auto;
   font-family: var(--sans);
 }
 
@@ -378,7 +578,8 @@
 /* the same steps in words */
 .sec-list {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.5rem;
+  min-inline-size: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -388,21 +589,37 @@
 .sec-list li {
   position: relative;
   display: grid;
-  gap: 0.2rem;
-  padding: 0.65rem 0.85rem 0.7rem 3.15rem;
-  border: 1px solid transparent;
+  gap: 0.25rem;
+  min-inline-size: 0;
+  padding: 0.78rem 0.95rem 0.84rem 3.2rem;
+  border: 1px solid var(--edge-soft);
   border-radius: var(--radius-md);
-  color: var(--ink-soft);
+  background-color: color-mix(in srgb, var(--panel) 52%, transparent);
+  color: var(--ink);
+  line-height: 1.56;
+  overflow-wrap: break-word;
   counter-increment: sec-step;
   transition:
     background-color var(--dur-slow) ease,
     border-color var(--dur-slow) ease;
 }
 
+.sec-list li[data-sec-step] {
+  cursor: pointer;
+}
+
+.sec-list li[data-sec-step]:hover {
+  border-color: var(--gold);
+}
+
+.sec-list li code {
+  overflow-wrap: anywhere;
+}
+
 .sec-list li::before {
   content: counter(sec-step);
   position: absolute;
-  inset-block-start: 0.6rem;
+  inset-block-start: 0.65rem;
   inset-inline-start: 0.75rem;
   display: grid;
   place-items: center;
@@ -426,16 +643,18 @@
   align-items: center;
   gap: 0.5rem;
   min-block-size: 1.75rem;
+  min-inline-size: 0;
+  color: var(--title);
   font: 700 0.88rem/1.25 var(--sans);
   letter-spacing: 0.01em;
 }
 
 .sec-list strong {
   color: var(--title);
-  font: 700 1.06rem/1.3 var(--sans);
+  font: 700 1.05rem/1.32 var(--sans);
 }
 
-/* one step chosen: its row and its sentence are lit, the others stand back */
+/* one step chosen (by radio or synced data-step): its row and sentence light up */
 .sec-p1:checked ~ .sec-stage .sec-row:not(.sec-r1) .sec-art,
 .sec-p2:checked ~ .sec-stage .sec-row:not(.sec-r2) .sec-art,
 .sec-p3:checked ~ .sec-stage .sec-row:not(.sec-r3) .sec-art,
@@ -466,8 +685,8 @@
 .sec-p3:checked ~ .sec-list .sec-s3,
 .sec-p4:checked ~ .sec-list .sec-s4,
 .sec-p5:checked ~ .sec-list .sec-s5 {
-  border-color: var(--edge);
-  background-color: var(--violet-soft);
+  border-color: var(--gold);
+  background-color: color-mix(in srgb, var(--violet-soft) 90%, var(--panel-solid));
 }
 
 .sec-p1:checked ~ .sec-list .sec-s1::before,
@@ -480,61 +699,138 @@
   color: var(--gold-ink);
 }
 
-/* A flow's notes: what else holds, and where it ends. Plain text under the
-   chart, each note behind a thin rule; a limit is a note like the others,
-   told apart by its rule and its first words, not by a box that warns. */
+/* Reassuring flow notes underneath the diagram */
 .sec-notes {
   display: grid;
-  gap: var(--space-4);
-  max-inline-size: 52rem;
+  gap: var(--space-3);
+  max-inline-size: 54rem;
   margin: var(--space-6) auto 0;
 }
 
 .sec-note {
   margin: 0;
-  padding-inline-start: var(--space-4);
-  border-inline-start: 2px solid var(--edge);
-  color: var(--ink-soft);
-  font-size: 0.97rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--edge-soft);
+  border-inline-start: 3px solid var(--gold);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: var(--ink);
+  font-size: 0.96rem;
+  line-height: 1.56;
+  overflow-wrap: break-word;
   text-wrap: pretty;
-}
-
-.sec-limit {
-  border-inline-start-color: var(--gold);
 }
 
 .sec-note strong,
 .sec-status strong,
-.sec-limits strong {
+.sec-good strong {
   color: var(--title);
   font-family: var(--sans);
 }
 
-/* what a reader has to know before a chart stands above it */
+/* calm rollout context displayed above a diagram when applicable */
 .sec-status {
   max-inline-size: 52rem;
   margin: 0 auto var(--space-5);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel) 65%, transparent);
   color: var(--ink-soft);
-  font-size: 0.97rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
   text-align: center;
   text-wrap: pretty;
 }
 
-.sec-limits {
+/* Good to know & Open Source bottom grid */
+.sec-good-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
   margin-block-start: var(--space-5);
 }
 
-.sec-limits li {
-  margin-block-end: 1em;
+@media (min-width: 52rem) {
+  .sec-good-grid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    align-items: start;
+  }
 }
 
-.sec-docs-title {
-  margin-block-start: var(--space-6);
+.sec-good-card,
+.sec-docs-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(1.3rem, 2.6vw, 1.8rem);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.sec-good-card + .sec-docs-card {
+  margin-block-start: var(--space-4);
+}
+
+.sec-good-grid > .sec-good-card + .sec-docs-card,
+.two-col > .sec-good-card + .sec-docs-card {
+  margin-block-start: 0;
+}
+
+.sec-good-card:hover,
+.sec-docs-card:hover {
+  border-color: var(--gold);
+  box-shadow: var(--shadow-lift);
+}
+
+:is(.sec-good-card, .sec-docs-card):hover .feat-icon {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 1.1rem -0.2rem color-mix(in srgb, var(--gold) 55%, transparent);
+}
+
+.sec-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.sec-good-card :is(h2, h3),
+.sec-docs-card :is(h2, h3) {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  color: var(--title);
+  font-size: 1.2rem;
+}
+
+.sec-good-card :is(h2, h3) .icon,
+.sec-docs-card :is(h2, h3) .icon,
+.sec-card-head .icon {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  color: var(--gold);
+}
+
+.sec-good {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.sec-good li {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.58;
+  overflow-wrap: break-word;
 }
 
 .sec-docs {
   margin: 0;
   color: var(--ink-soft);
+  line-height: 1.62;
+  overflow-wrap: break-word;
 }
 
 /* one column where two would be cramped; the chart first */
@@ -559,15 +855,15 @@
 
 @media (max-width: 400px) {
   .sec-stage {
-    padding: var(--space-2);
+    padding: var(--space-3);
   }
 
   .sec-list li {
-    padding-inline: 2.85rem 0.5rem;
+    padding-inline: 2.85rem 0.65rem;
   }
 
   .sec-list li::before {
-    inset-inline-start: 0.5rem;
+    inset-inline-start: 0.55rem;
   }
 }
 
@@ -870,19 +1166,19 @@
 @keyframes sec-say {
   0%,
   18% {
-    border-color: var(--edge);
-    background-color: var(--violet-soft);
+    border-color: var(--gold);
+    background-color: color-mix(in srgb, var(--violet-soft) 90%, var(--panel-solid));
   }
 
   21%,
   97% {
-    border-color: transparent;
-    background-color: transparent;
+    border-color: var(--edge-soft);
+    background-color: color-mix(in srgb, var(--panel) 52%, transparent);
   }
 
   100% {
-    border-color: var(--edge);
-    background-color: var(--violet-soft);
+    border-color: var(--gold);
+    background-color: color-mix(in srgb, var(--violet-soft) 90%, var(--panel-solid));
   }
 }
 
@@ -963,7 +1259,8 @@
   .sec-p2:checked ~ .sec-stage .sec-l2,
   .sec-p3:checked ~ .sec-stage .sec-l3,
   .sec-p4:checked ~ .sec-stage .sec-l4,
-  .sec-p5:checked ~ .sec-stage .sec-l5 {
+  .sec-p5:checked ~ .sec-stage .sec-l5,
+  .sec-audio[data-playing="true"] .sec-audio-play {
     border-color: Highlight;
     background-color: Highlight;
     color: HighlightText;
@@ -971,7 +1268,18 @@
   }
 
   .sec-l,
-  .sec-toc a {
+  .sec-toc a,
+  .sec-stage,
+  .sec-note,
+  .sec-status,
+  .sec-intro-card,
+  .sec-audio,
+  .sec-audio-play,
+  .sec-audio-step-btn,
+  .sec-audio-mute,
+  .sec-audio-status,
+  .sec-good-card,
+  .sec-docs-card {
     border: 1px solid CanvasText;
   }
 }
@@ -1047,10 +1355,9 @@
   overflow-wrap: break-word;
 }
 
-.sec-way:hover .sec-way-title {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+.sec-way:hover,
+.sec-way:hover * {
+  text-decoration: none;
 }
 
 .sec-ways-more {

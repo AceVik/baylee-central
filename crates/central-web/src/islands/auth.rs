@@ -5,6 +5,8 @@
 
 use central_api::Token;
 use central_api::email::EmailRequest;
+use central_api::profile::tag_text;
+use central_api::social::{FriendInvitePreview, FriendInviteStatus, valid_friend_invite_code};
 use central_api::terms::{TermsDocument, TermsSubject, TermsText, TermsVersion, digest};
 use central_api::wire::{AccountSource, Discovery, Identity, Request, Response};
 use leptos::prelude::*;
@@ -13,7 +15,7 @@ use serde_json::json;
 use super::central::{Failure, call, uuid_v7, valid_username};
 use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
-use super::email::Begin;
+use super::invite::{normalize_invite_code, percent_encode_component, person_handle, query_param};
 use super::{field, session};
 use crate::markdown;
 use crate::rich::rich;
@@ -299,18 +301,17 @@ struct Who {
     handle: Option<String>,
     /// The sign-in name.
     username: String,
-    /// An address typed at the code's step, named once the code is kept
-    /// and the terms are accepted.
-    address: Option<String>,
+    /// True when an invite-linked email confirmation mail was dispatched during signup.
+    email_linked: bool,
 }
 
 impl Who {
-    /// Who a sign-in signed in, before any address was typed.
+    /// Who a sign-in signed in.
     fn of(done: SignedIn) -> Self {
         Self {
             handle: done.handle,
             username: done.username,
-            address: None,
+            email_linked: false,
         }
     }
 }
@@ -322,15 +323,24 @@ enum Step {
     Working,
     Code(NewCode, Who),
     Terms(TermsDocument, Option<NewCode>, Who),
-    /// The address to name, and the sign-in name of the account.
-    Email(String, String),
     Failed(Problem),
+}
+
+fn safe_next_target() -> Option<String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        query_param("next").filter(|dest| session::local(dest) && !session::form_address(dest))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        None
+    }
 }
 
 /// After a sign-in: a new account's code first (it is stored already, and
 /// declining the terms must not lose it); otherwise the terms first (storing
 /// a moved account's new code needs them), then the code, then the account.
-async fn after_sign_in(lang: Lang, done: SignedIn) -> Step {
+async fn after_sign_in(lang: Lang, done: SignedIn, next: Option<&str>) -> Step {
     let new_code = done.new_code.clone();
     let who = Who::of(done);
     if let Some(code) = new_code.as_ref().filter(|code| !code.optional) {
@@ -340,94 +350,163 @@ async fn after_sign_in(lang: Lang, done: SignedIn) -> Step {
         Ok(Some(document)) => Step::Terms(document, new_code, who),
         Ok(None) => match new_code {
             Some(code) => Step::Code(code, who),
-            None => onward(lang, who),
+            None => onward(lang, next),
         },
         Err(problem) => Step::Failed(problem),
     }
 }
 
-/// Past the code and the terms: an address typed at the code's step is
-/// named now, on a step of its own; otherwise the account area.
-fn onward(lang: Lang, who: Who) -> Step {
-    if let Some(address) = who.address {
-        Step::Email(address, who.username)
-    } else {
-        session::go(&format!("/{}/account", lang.code()));
-        Step::Working
-    }
+/// Past the code and the terms: send the browser to `next` (when safe & local)
+/// or to the account area.
+fn onward(lang: Lang, next: Option<&str>) -> Step {
+    let fallback = format!("/{}/account", lang.code());
+    let dest = next.filter(|p| !p.is_empty()).unwrap_or(&fallback);
+    session::go(dest);
+    Step::Working
 }
 
-/// Whether this Central mails, for an account that has no address yet:
-/// only then does the code's step offer to name one.
-async fn mails_here() -> bool {
+/// Confirmed e-mail address already on the account, if any (used to prefill
+/// the recovery backup mail address for migrating accounts).
+async fn confirmed_email() -> Option<String> {
     let request = Request::Email {
         request: EmailRequest::Status,
     };
-    matches!(
-        call(&request).await,
-        Ok(Response::Email { state }) if state.mail && state.address.is_none() && state.pending.is_none()
-    )
+    match call(&request).await {
+        Ok(Response::Email { state }) => state.address,
+        _ => None,
+    }
 }
 
-/// The handle a new account got, its name and its tag told apart.
+/// The handle a new account got, with an inline copy button.
 fn handle_line(lang: Lang, handle: String) -> impl IntoView + use<> {
-    let (name, tag) = match handle.rsplit_once('#') {
-        Some((name, tag)) => (name.to_owned(), format!("#{tag}")),
-        None => (handle, String::new()),
+    let shown: AnyView = match handle.rsplit_once('#') {
+        Some((name, tag)) => {
+            super::ui::copy_handle::handle_with_copy(lang, name.to_owned(), tag.to_owned(), false)
+        }
+        None => view! { <span class="who-name" translate="no">{handle}</span> }.into_any(),
     };
     view! {
         <p class="who">
             <span class="who-label">{words::code_handle_label(lang)}</span>
-            <span class="who-handle" translate="no">
-                <span class="who-name">{name}</span>
-                <span class="who-tag">{tag}</span>
-            </span>
+            <span class="who-handle">{shown}</span>
         </p>
     }
 }
 
-/// The code step's field for an address, where this Central mails: what is
-/// typed goes to `typed`, and what naming a mailbox means unfolds once one
-/// is being named.
-fn code_email(lang: Lang, typed: RwSignal<String>) -> impl IntoView + use<> {
-    view! {
-        <div class="field">
-            <label for="code-email">{words::code_email_label(lang)}</label>
-            <div class="inset">
-                {field::mark(glyph::MAIL)}
-                <input id="code-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254"
-                    aria-describedby="code-email-hint code-email-warning"
-                    on:input=move |ev| typed.set(event_target_value(&ev)) prop:value=move || typed.get() />
-            </div>
-            <p class="hint" id="code-email-hint">{words::code_email_hint(lang)}</p>
-            <div class="unfold" class:open=move || !typed.get().trim().is_empty()>
-                <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
-            </div>
-        </div>
+/// Inline form error alert rendered with an alert icon whenever `error` is set.
+pub(super) fn auth_alert(error: RwSignal<Option<&'static str>>) -> impl IntoView {
+    move || {
+        error.get().map(|msg| {
+            view! {
+                <p class="error auth-alert" role="alert">
+                    {glyph::glyph(glyph::SHIELD_ALERT)}
+                    <span>{msg}</span>
+                </p>
+            }
+        })
     }
 }
 
-/// The code step: shown once, with the ways to keep it (`keep.rs`), and
-/// left only once the person says it is kept. After a registration, where
-/// this Central mails, it also takes an address for the account. Naming one
-/// needs Central's terms accepted, and a new account meets them after its
-/// code: the address is checked here and named after the terms
-/// (`Step::Email`), in the same sign-in.
-fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl IntoView + use<> {
-    let kept = RwSignal::new(false);
-    let error = RwSignal::new(None::<&'static str>);
-    let typed = RwSignal::new(String::new());
-    let mails = RwSignal::new(false);
-    let optional = code.optional;
-    if !optional {
-        // Effects run in the browser only.
-        Effect::new(move |_| {
-            leptos::task::spawn_local(async move { mails.set(mails_here().await) });
-        });
+struct CodeSubmit {
+    lang: Lang,
+    optional: bool,
+    recovery: Vec<u8>,
+    mail: Option<(String, String, String)>,
+    who: Who,
+    next: Option<String>,
+}
+
+async fn finish_code(submit: CodeSubmit) -> Result<Step, &'static str> {
+    let CodeSubmit {
+        lang,
+        optional,
+        recovery,
+        mail,
+        who,
+        next,
+    } = submit;
+    if optional {
+        match call(&Request::SetRecovery { recovery }).await {
+            Ok(_) | Err(Failure::Conflict) => {}
+            Err(failure) => return Err(problem_text(lang, failure.into())),
+        }
     }
-    let ways = super::keep::ways(lang, &code.code, &who.username, typed);
+    if let Some((email, sheet, zip_pw)) = mail {
+        let Ok((b64, encrypted)) = super::zip::recovery_zip_base64(&sheet, &zip_pw).await else {
+            return Err(words::keep_mail_send_error(lang));
+        };
+        if super::central::send_recovery_backup_mail(&email, &b64, encrypted, lang.code())
+            .await
+            .is_err()
+        {
+            return Err(words::keep_mail_send_error(lang));
+        }
+    }
+    match terms_due().await {
+        Ok(Some(document)) => Ok(Step::Terms(document, None, who)),
+        Ok(None) => Ok(onward(lang, next.as_deref())),
+        Err(problem) => Err(problem_text(lang, problem)),
+    }
+}
+
+fn prefill_confirmed_email(email: RwSignal<String>) {
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            if let Some(addr) = confirmed_email().await
+                && email.get_untracked().trim().is_empty()
+            {
+                email.set(addr);
+            }
+        });
+    });
+}
+
+fn submit_code_step(
+    step: RwSignal<Step>,
+    busy: RwSignal<bool>,
+    error: RwSignal<Option<&'static str>>,
+    job: CodeSubmit,
+) {
+    error.set(None);
+    busy.set(true);
+    leptos::task::spawn_local(async move {
+        match finish_code(job).await {
+            Ok(next) => {
+                busy.set(false);
+                step.set(next);
+            }
+            Err(msg) => {
+                busy.set(false);
+                error.set(Some(msg));
+            }
+        }
+    });
+}
+
+/// The code step: shown once, with the ways to keep it (`keep.rs`), and
+/// left only once the person says it is kept. Selecting "Mail it to myself"
+/// unfolds an e-mail input (saved to the account on send) and an optional
+/// ZIP password input to mail `baylee-recovery-code.zip` before advancing.
+fn code_view(
+    lang: Lang,
+    step: RwSignal<Step>,
+    code: &NewCode,
+    who: Who,
+    next_dest: StoredValue<Option<String>>,
+) -> impl IntoView + use<> {
+    let kept = RwSignal::new(false);
+    let busy = RwSignal::new(false);
+    let error = RwSignal::new(None::<&'static str>);
+    let mail = super::keep::MailBackup {
+        chosen: RwSignal::new(false),
+        email: RwSignal::new(String::new()),
+        zip_pw: RwSignal::new(String::new()),
+    };
+    let optional = code.optional;
+    let email_linked = who.email_linked;
+    prefill_confirmed_email(mail.email);
+    let ways = super::keep::ways_onboarding(lang, &code.code, &who.username, mail);
     let handle_line = who.handle.clone().map(|handle| handle_line(lang, handle));
-    // a registration's step says first that the account is there
     let created = (!optional).then(|| {
         view! {
             <p class="step-badge">
@@ -436,47 +515,39 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
             </p>
         }
     });
+    let sheet = StoredValue::new(super::keep::sheet_text(lang, &code.code, &who.username));
     let recovery = code.recovery.clone();
     let go_on = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
         if !kept.get_untracked() {
             error.set(Some(words::code_not_kept(lang)));
             return;
         }
-        let named = typed.get_untracked().trim().to_owned();
-        if !named.is_empty() && central_api::email::address(&named).is_err() {
+        let chosen = mail.chosen.get_untracked();
+        let named = mail.email.get_untracked().trim().to_owned();
+        if chosen && central_api::email::address(&named).is_err() {
             error.set(Some(words::email_error_address(lang)));
             super::focus::after_render("#code-email");
             return;
         }
-        error.set(None);
-        let who = Who {
-            address: (!named.is_empty()).then_some(named),
-            ..who.clone()
+        let job = CodeSubmit {
+            lang,
+            optional,
+            recovery: recovery.clone(),
+            mail: chosen.then(|| (named, sheet.get_value(), mail.zip_pw.get_untracked())),
+            who: who.clone(),
+            next: next_dest.get_value(),
         };
-        let recovery = recovery.clone();
-        leptos::task::spawn_local(async move {
-            if optional {
-                match call(&Request::SetRecovery { recovery }).await {
-                    Ok(_) | Err(Failure::Conflict) => {}
-                    Err(failure) => {
-                        error.set(Some(problem_text(lang, failure.into())));
-                        return;
-                    }
-                }
-            }
-            // a new account meets Central's terms after its code
-            match terms_due().await {
-                Ok(Some(document)) => step.set(Step::Terms(document, None, who)),
-                Ok(None) => step.set(onward(lang, who)),
-                Err(problem) => error.set(Some(problem_text(lang, problem))),
-            }
-        });
+        submit_code_step(step, busy, error, job);
     };
     let later = optional.then(|| {
-        let skip = move |_| session::go(&format!("/{}/account", lang.code()));
+        let skip = move |_| {
+            let _ = onward(lang, next_dest.get_value().as_deref());
+        };
         view! { <button type="button" class="button quiet" on:click=skip>{words::code_later(lang)}</button> }
     });
-    let email = move || mails.get().then(|| code_email(lang, typed));
     view! {
         <section class="card step step-code" aria-labelledby="code-title">
             <header class="step-head">
@@ -485,25 +556,63 @@ fn code_view(lang: Lang, step: RwSignal<Step>, code: &NewCode, who: Who) -> impl
                 {handle_line}
             </header>
             <p class="step-lead">{words::code_lead(lang)}</p>
-            <div class="secret-frame">
-                <p class="eyebrow">{words::code_shown_once(lang)}</p>
-                <p class="secret" translate="no"><code>{code.code.clone()}</code></p>
-            </div>
+            {email_linked.then(|| view! {
+                <p class="notice" role="status">{words::invite_page_email_pending_ok(lang)}</p>
+            })}
+            {super::keep::secret_frame(lang, code.code.clone())}
             {ways}
-            {email}
             <div class="check">
                 <input id="code-kept" type="checkbox" on:change=move |ev| kept.set(event_target_checked(&ev)) />
                 <label for="code-kept">{words::code_kept(lang)}</label>
             </div>
-            <p class="error" role="alert">{move || error.get()}</p>
+            {auth_alert(error)}
             <div class="step-actions">
-                <button type="button" class="button primary step-go" on:click=go_on>
+                <button type="button" class="button primary step-go" aria-disabled=move || busy.get().then_some("true") on:click=go_on>
                     <span>{words::code_continue(lang)}</span>
                     {glyph::glyph(glyph::FORWARD)}
                 </button>
                 {later}
             </div>
         </section>
+    }
+}
+
+fn terms_details(lang: Lang, document: &TermsDocument) -> (Option<AnyView>, String, TermsVersion) {
+    let found = text_in(document, lang);
+    let updated = found
+        .and_then(|t| t.updated.as_deref())
+        .map(|d| crate::format::date(lang, d));
+    let text = found.map(|text| markdown::render(&text.markdown));
+    let version_info = document.version.clone();
+    let version_display = crate::format::date(lang, &version_info.version);
+    let named = match updated {
+        Some(ref date) => words::terms_version(lang, &version_display, date),
+        None => words::terms_step_version(lang, &version_display),
+    };
+    (text, named, version_info)
+}
+
+fn measure_terms_scroll(
+    seen: RwSignal<u8>,
+    read: RwSignal<bool>,
+    top: f64,
+    shown: f64,
+    whole: f64,
+) {
+    let rest = whole - shown;
+    let share = if rest <= 4.0 {
+        1.0
+    } else {
+        (top / rest).clamp(0.0, 1.0)
+    };
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a share of one, in eighths"
+    )]
+    seen.set((share * 8.0).floor() as u8);
+    if rest - top <= 4.0 {
+        read.set(true);
     }
 }
 
@@ -514,47 +623,28 @@ fn terms_view(
     document: &TermsDocument,
     code: Option<NewCode>,
     who: Who,
+    next_dest: StoredValue<Option<String>>,
 ) -> impl IntoView + use<> {
-    let text = text_in(document, lang).map(|text| markdown::render(&text.markdown));
-    let TermsVersion { version, digest } = document.version.clone();
-    let named = words::terms_step_version(lang, &version);
-    // Accepting follows reading, as in the game client: the button works
-    // once the text was read to its end (or fits its box without
-    // scrolling). `read` never goes back, and `seen` is how far down the
-    // reader is, for the line under the text.
+    let (text, named, TermsVersion { version, digest }) = terms_details(lang, document);
     let read = RwSignal::new(false);
     let seen = RwSignal::new(0_u8);
     let pressed = RwSignal::new(false);
-    let measure = move |top: f64, shown: f64, whole: f64| {
-        let rest = whole - shown;
-        let share = if rest <= 4.0 {
-            1.0
-        } else {
-            (top / rest).clamp(0.0, 1.0)
-        };
-        #[expect(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "a share of one, in eighths"
-        )]
-        seen.set((share * 8.0).floor() as u8);
-        if rest - top <= 4.0 {
-            read.set(true);
-        }
-    };
     let scrolled = move |event: leptos::ev::Event| {
         let target = event_target::<leptos::web_sys::Element>(&event);
-        measure(
+        measure_terms_scroll(
+            seen,
+            read,
             f64::from(target.scroll_top()),
             f64::from(target.client_height()),
             f64::from(target.scroll_height()),
         );
     };
     let text_box = NodeRef::<leptos::html::Div>::new();
-    // a text that fits its box is read as it stands
     Effect::new(move |_| {
         if let Some(text_box) = text_box.get() {
-            measure(
+            measure_terms_scroll(
+                seen,
+                read,
                 f64::from(text_box.scroll_top()),
                 f64::from(text_box.client_height()),
                 f64::from(text_box.scroll_height()),
@@ -563,7 +653,6 @@ fn terms_view(
     });
     let accept = move |_| {
         if !read.get_untracked() {
-            // the button stays reachable so it can say why it does nothing
             pressed.set(true);
             return;
         }
@@ -578,7 +667,7 @@ fn terms_view(
             .await;
             step.set(match (accepted, code) {
                 (Ok(_), Some(code)) => Step::Code(code, who),
-                (Ok(_), None) => onward(lang, who),
+                (Ok(_), None) => onward(lang, next_dest.get_value().as_deref()),
                 (Err(failure), _) => Step::Failed(failure.into()),
             });
         });
@@ -624,10 +713,10 @@ fn steps_view(
     lang: Lang,
     id: &'static str,
     step: RwSignal<Step>,
-    worker: String,
+    solving: Option<RwSignal<Solving>>,
+    next_dest: StoredValue<Option<String>>,
     form: impl Fn() -> AnyView + Send + Sync + 'static,
 ) -> impl IntoView {
-    let worker = StoredValue::new(worker);
     // A new step replaces the old one's elements, focus among them: it
     // takes the focus where it begins, so the keyboard and a screen reader
     // go on there and not at the page's end. The first render leaves the
@@ -641,40 +730,49 @@ fn steps_view(
     });
     let steps = move || {
         match step.get() {
-        Step::Form => form(),
-        Step::Working => view! { <p class="working" role="status" tabindex="-1" data-step-focus>{words::signin_working(lang)}</p> }.into_any(),
-        Step::Code(code, who) => code_view(lang, step, &code, who).into_any(),
-        Step::Terms(document, code, who) => terms_view(lang, step, &document, code, who).into_any(),
-        Step::Email(address, username) => super::email::section(
-            lang,
-            worker.get_value(),
-            username,
-            Begin::Name(address),
-            Callback::new(|()| {}),
-            Callback::new(move |()| session::go(&format!("/{}/signin", lang.code()))),
-            // a registration's step is reached by no mail's link
-            StoredValue::new(None),
-        )
-        .into_any(),
-        Step::Failed(problem) => view! {
-            <p class="error" role="alert">{problem_text(lang, problem)}</p>
-            <p><button type="button" class="button" data-step-focus on:click=move |_| step.set(Step::Form)>{words::error_again(lang)}</button></p>
+            Step::Form => form(),
+            Step::Working => view! {
+                <div class="working-step">
+                    <p class="working" role="status" tabindex="-1" data-step-focus>{words::signin_working(lang)}</p>
+                </div>
+            }
+            .into_any(),
+            Step::Code(code, who) => code_view(lang, step, &code, who, next_dest).into_any(),
+            Step::Terms(document, code, who) => {
+                terms_view(lang, step, &document, code, who, next_dest).into_any()
+            }
+            Step::Failed(problem) => view! {
+                <section class="card step auth-failed" aria-labelledby="auth-failed-title">
+                    <div class="step-head">
+                        <span class="auth-failed-icon" aria-hidden="true">{glyph::glyph(glyph::SHIELD_ALERT)}</span>
+                        <h2 id="auth-failed-title" tabindex="-1">{words::signin_failed_title(lang)}</h2>
+                        <p class="auth-failed-msg" role="alert">{problem_text(lang, problem)}</p>
+                        <p class="step-lead">{words::signin_failed_hint(lang)}</p>
+                    </div>
+                    <div class="step-actions">
+                        <button type="button" class="button primary step-go" data-step-focus on:click=move |_| step.set(Step::Form)>
+                            {glyph::glyph(glyph::REFRESH_CW)}
+                            <span>{words::error_again(lang)}</span>
+                        </button>
+                    </div>
+                </section>
+            }
+            .into_any(),
         }
-        .into_any(),
-    }
     };
-    view! { <div id=id class="steps">{steps}</div> }
+    let progress = solving.map(|s| solving_view(lang, s));
+    view! { <div id=id class="steps">{steps}{progress}</div> }
 }
 
 #[island]
 pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
     let step = RwSignal::new(Step::Form);
-    let steps_worker = worker.clone();
     // what was typed before the islands ran stays (`early`)
     let name = RwSignal::new(super::early::typed("signin-name"));
     let password = RwSignal::new(super::early::typed("signin-password"));
     let shown = RwSignal::new(false);
     let error = RwSignal::new(None::<&'static str>);
+    let next_dest = StoredValue::new(safe_next_target());
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         let (username, secret) = (name.get_untracked(), password.get_untracked());
@@ -692,13 +790,27 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
             // another account's notifications never reach this one
             let _ = super::push::disable().await;
             let next = match sign_in(&worker, &username, secret).await {
-                Ok(done) => after_sign_in(lang, done).await,
+                Ok(done) => after_sign_in(lang, done, next_dest.get_value().as_deref()).await,
                 Err(problem) => Step::Failed(problem),
             };
             step.set(next);
         });
     };
-    let register = format!("/{}/register", lang.code());
+    let invite_prefix = format!("/{}/invite/", lang.code());
+    let register = next_dest
+        .get_value()
+        .and_then(|dest| {
+            dest.strip_prefix(&invite_prefix)
+                .filter(|code| !code.is_empty() && !code.contains('/'))
+                .map(|code| {
+                    format!(
+                        "/{}/register?invite={}",
+                        lang.code(),
+                        percent_encode_component(code)
+                    )
+                })
+        })
+        .unwrap_or_else(|| format!("/{}/register", lang.code()));
     // a page of its own, in the dialog as on the page: a plain link
     let reset = format!("/{}/reset", lang.code());
     let form = move || {
@@ -723,7 +835,7 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
                         {field::eye(lang, shown, "signin-password")}
                     </div>
                 </div>
-                <p class="error" role="alert">{move || error.get()}</p>
+                {auth_alert(error)}
                 <button type="submit" class="button primary">{words::signin_submit(lang)}</button>
                 <div class="hints">
                     <p class="hint">{rich(words::signin_forgot(lang), move |tag| (tag == "reset").then(|| reset.clone()))}</p>
@@ -733,7 +845,7 @@ pub fn SignIn(lang: Lang, worker: String) -> impl IntoView {
         }
         .into_any()
     };
-    steps_view(lang, "signin-steps", step, steps_worker, form)
+    steps_view(lang, "signin-steps", step, None, next_dest, form)
 }
 
 /// The registration form's checks, as Central would refuse (`docs/web-accounts.md`).
@@ -773,6 +885,8 @@ struct RegisterFields {
     repeat: String,
     age: bool,
     consent: bool,
+    invite_code: Option<String>,
+    link_email: Option<String>,
 }
 
 impl RegisterFields {
@@ -786,6 +900,8 @@ impl RegisterFields {
             repeat: super::early::typed("register-repeat"),
             age: super::early::ticked("register-age"),
             consent: super::early::ticked("register-consent"),
+            invite_code: None,
+            link_email: None,
         }
     }
 }
@@ -862,16 +978,25 @@ enum Challenge {
 ///
 /// # Errors
 /// The problem, tagged `closed` while an administrator closed registration.
-async fn challenge() -> Result<Challenge, (Problem, Option<&'static str>)> {
+async fn challenge(
+    invite_code: Option<&str>,
+) -> Result<Challenge, (Problem, Option<&'static str>)> {
     use central_api::register::{MAX_DIFFICULTY, PARTS, valid_nonce, work_acceptable};
 
-    let reported = Request::RegisterChallengeFor {
-        signals: super::pow::browser_signals(),
-    };
-    let answer = match call(&reported).await {
-        // a Central from before the page reported its browser
-        Err(Failure::Rejected) => call(&Request::RegisterChallenge).await,
-        answer => answer,
+    let signals = super::pow::browser_signals();
+    let answer = if let Some(code) = invite_code {
+        call(&Request::RegisterInviteChallenge {
+            signals,
+            invite_code: code.to_owned(),
+        })
+        .await
+    } else {
+        let reported = Request::RegisterChallengeFor { signals };
+        match call(&reported).await {
+            // a Central from before the page reported its browser
+            Err(Failure::Rejected) => call(&Request::RegisterChallenge).await,
+            answer => answer,
+        }
     };
     let challenge = match answer.map_err(|failure| (Problem::from(failure), None))? {
         Response::RegisterWork {
@@ -903,7 +1028,14 @@ async fn challenge() -> Result<Challenge, (Problem, Option<&'static str>)> {
                 difficulty,
             }
         }
-        Response::RegistrationClosed => return Err((Problem::Failed, Some("closed"))),
+        Response::RegistrationClosed => {
+            let tag = if invite_code.is_some() {
+                "invite_invalid"
+            } else {
+                "closed"
+            };
+            return Err((Problem::Failed, Some(tag)));
+        }
         _ => return Err((Problem::Failed, None)),
     };
     Ok(challenge)
@@ -965,9 +1097,10 @@ async fn work(
 async fn proof(
     crypto: &Crypto,
     pow: &str,
+    invite_code: Option<&str>,
     solving: RwSignal<Solving>,
 ) -> Result<(String, Vec<u64>), (Problem, Option<&'static str>)> {
-    let challenge = challenge().await?;
+    let challenge = challenge(invite_code).await?;
     let answered = super::pow::now_ms();
     solving.set(Solving::Quiet(0));
     leptos::task::spawn_local(async move {
@@ -1020,54 +1153,17 @@ async fn proof(
 /// Central answered with `Busy`, in milliseconds.
 const BUSY_MS: u32 = 1_500;
 
-/// Registers an account and signs it in: `Register`, the OPAQUE enrolment
-/// with a new master key and recovery code in the Worker, then a sign-in
-/// with the same password, which is let go after it.
-async fn register(
-    worker: &str,
-    pow: &str,
-    f: RegisterFields,
-    solving: RwSignal<Solving>,
-) -> Result<(NewCode, SignedIn), (Problem, Option<&'static str>)> {
-    let username = f.username.trim().to_ascii_lowercase();
-    // The proof has a Worker of its own, ended before the password's is
-    // started. A Worker's memory never shrinks, so one Worker for both
-    // would hold the proof's 16 MiB and the password's 64 MiB at once.
-    let (nonce, counters) = {
-        let proving = Crypto::start(worker).ok_or((Problem::Failed, None))?;
-        proof(&proving, pow, solving).await?
-    };
-    let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
-    let request = Request::Register {
-        username: username.clone(),
-        display_name: Some(f.display.clone()),
-        nonce,
-        counters,
-    };
-    let answer = match call(&request).await {
-        // Central had no worker free to check the proof and kept the
-        // challenge for it: the same solution once more, a moment later.
-        Err(Failure::Busy) => {
-            super::pow::wait(BUSY_MS).await;
-            call(&request).await
-        }
-        answer => answer,
-    };
-    let (identity, ticket): (Identity, [u8; 32]) = match answer {
-        Ok(Response::Enrollment { identity, ticket }) if uuid_v7(&identity.account) => {
-            (identity, token_bytes(&ticket))
-        }
-        Ok(_) => return Err((Problem::Failed, None)),
-        // the proof expired, or registration closed meanwhile
-        Err(Failure::Rejected) => return Err((Problem::Failed, Some("refused"))),
-        Err(Failure::Conflict) => return Err((Problem::Failed, Some("taken"))),
-        Err(failure) => return Err((failure.into(), None)),
-    };
+async fn complete_enrollment(
+    crypto: Crypto,
+    identity: Identity,
+    ticket: [u8; 32],
+    password: &str,
+) -> Result<(String, Vec<u8>), (Problem, Option<&'static str>)> {
     let fail = |failure: Failure| (Problem::from(failure), None);
     let start = crypto
         .ask(
             "enrollment_start",
-            json!({ "password": f.password, "account": identity.account, "epoch": identity.epoch }),
+            json!({ "password": password, "account": identity.account, "epoch": identity.epoch }),
         )
         .await
         .map_err(fail)?;
@@ -1104,9 +1200,76 @@ async fn register(
     })
     .await
     .map_err(fail)?;
+    Ok((code, recovery))
+}
+
+/// Registers an account and signs it in: `Register`, the OPAQUE enrolment
+/// with a new master key and recovery code in the Worker, then a sign-in
+/// with the same password, which is let go after it.
+async fn register(
+    worker: &str,
+    pow: &str,
+    lang: Lang,
+    f: RegisterFields,
+    solving: RwSignal<Solving>,
+) -> Result<(NewCode, SignedIn, bool), (Problem, Option<&'static str>)> {
+    let username = f.username.trim().to_ascii_lowercase();
+    let (nonce, counters) = {
+        let proving = Crypto::start(worker).ok_or((Problem::Failed, None))?;
+        proof(&proving, pow, f.invite_code.as_deref(), solving).await?
+    };
+    let crypto = Crypto::start(worker).ok_or((Problem::Failed, None))?;
+    let request = Request::Register {
+        username: username.clone(),
+        display_name: Some(f.display.clone()),
+        nonce,
+        counters,
+        invite_code: f.invite_code.clone(),
+    };
+    let answer = match call(&request).await {
+        Err(Failure::Busy) => {
+            super::pow::wait(BUSY_MS).await;
+            call(&request).await
+        }
+        answer => answer,
+    };
+    let (identity, ticket): (Identity, [u8; 32]) = match answer {
+        Ok(Response::Enrollment { identity, ticket }) if uuid_v7(&identity.account) => {
+            (identity, token_bytes(&ticket))
+        }
+        Ok(_) => return Err((Problem::Failed, None)),
+        Err(Failure::Rejected) => {
+            if let Some(code) = f.invite_code.as_deref()
+                && !matches!(
+                    call(&Request::FriendInviteInfo { code: code.to_owned() }).await,
+                    Ok(Response::FriendInviteInfo { invite }) if invite.status == FriendInviteStatus::Active
+                )
+            {
+                return Err((Problem::Failed, Some("invite_invalid")));
+            }
+            return Err((Problem::Failed, Some("refused")));
+        }
+        Err(Failure::Conflict) => return Err((Problem::Failed, Some("taken"))),
+        Err(failure) => return Err((failure.into(), None)),
+    };
+    let (code, recovery) = complete_enrollment(crypto, identity, ticket, &f.password).await?;
     let signed = sign_in(worker, &username, f.password)
         .await
         .map_err(|problem| (problem, None))?;
+    let email_linked = if let Some(address) = f.link_email {
+        matches!(
+            call(&Request::Email {
+                request: EmailRequest::Set {
+                    address,
+                    lang: lang.code().to_owned(),
+                },
+            })
+            .await,
+            Ok(Response::Email { .. })
+        )
+    } else {
+        false
+    };
     Ok((
         NewCode {
             code,
@@ -1114,7 +1277,149 @@ async fn register(
             optional: false,
         },
         signed,
+        email_linked,
     ))
+}
+
+fn invite_banner_view(
+    lang: Lang,
+    invite_preview: RwSignal<Option<Result<FriendInvitePreview, ()>>>,
+) -> impl IntoView {
+    move || {
+        let Some(Ok(preview)) = invite_preview.get() else {
+            return None;
+        };
+        let handle = person_handle(&preview.inviter);
+        let note = preview.note.filter(|n| !n.trim().is_empty());
+        Some(view! {
+            <div class="invite-banner" role="status">
+                <div class="invite-banner-head">
+                    {glyph::glyph(glyph::USER_PLUS)}
+                    <strong>{words::invite_page_banner(lang, &handle)}</strong>
+                </div>
+                {note.map(|text| view! { <p class="invite-banner-note"><bdi>{text}</bdi></p> })}
+            </div>
+        })
+    }
+}
+
+fn invite_code_field(
+    lang: Lang,
+    invite_input: RwSignal<String>,
+    invite_preview: RwSignal<Option<Result<FriendInvitePreview, ()>>>,
+    registration_closed: RwSignal<bool>,
+) -> impl IntoView {
+    view! {
+        <div class="field">
+            <label for="register-invite-code">
+                {move || if registration_closed.get() {
+                    words::register_invite_code_required(lang)
+                } else {
+                    words::register_invite_code(lang)
+                }}
+            </label>
+            <div class="inset">
+                {field::mark(glyph::KEY)}
+                <input
+                    id="register-invite-code"
+                    type="text"
+                    autocomplete="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    maxlength="256"
+                    aria-describedby="register-invite-hint"
+                    prop:value=move || invite_input.get()
+                    on:input=move |ev| invite_input.set(event_target_value(&ev))
+                />
+            </div>
+            {move || if matches!(invite_preview.get(), Some(Err(()))) {
+                view! { <p class="hint auth-invite-invalid" id="register-invite-hint" role="alert">{words::register_invite_invalid(lang)}</p> }.into_any()
+            } else {
+                view! { <p class="hint" id="register-invite-hint">{words::register_invite_code_hint(lang)}</p> }.into_any()
+            }}
+        </div>
+    }
+}
+
+fn invite_email_optin_view(
+    lang: Lang,
+    invite_preview: RwSignal<Option<Result<FriendInvitePreview, ()>>>,
+    link_email: RwSignal<bool>,
+) -> impl IntoView {
+    move || {
+        let Some(Ok(preview)) = invite_preview.get() else {
+            return None;
+        };
+        let addr = preview.invited_email?;
+        Some(view! {
+            <div class="invite-email-optin">
+                <div class="check">
+                    <input
+                        id="register-link-email"
+                        type="checkbox"
+                        prop:checked=move || link_email.get()
+                        on:change=move |ev| link_email.set(event_target_checked(&ev))
+                    />
+                    <label for="register-link-email">{words::invite_page_link_email_new(lang, &addr)}</label>
+                </div>
+                <p class="hint">{words::invite_page_email_verify_hint(lang)}</p>
+            </div>
+        })
+    }
+}
+
+fn bind_invite_preview(
+    lang: Lang,
+    invite_input: RwSignal<String>,
+    invite_preview: RwSignal<Option<Result<FriendInvitePreview, ()>>>,
+    link_email: RwSignal<bool>,
+    registration_closed: RwSignal<bool>,
+    next_dest: StoredValue<Option<String>>,
+) {
+    Effect::new(move |_| {
+        let raw = invite_input.get();
+        let code = normalize_invite_code(&raw);
+        link_email.set(false);
+        next_dest.set_value(None);
+        if code.is_empty() {
+            invite_preview.set(None);
+            return;
+        }
+        if !valid_friend_invite_code(&code) {
+            invite_preview.set(Some(Err(())));
+            return;
+        }
+        let expected = code.clone();
+        leptos::task::spawn_local(async move {
+            let outcome = call(&Request::FriendInviteInfo {
+                code: expected.clone(),
+            })
+            .await;
+            if normalize_invite_code(&invite_input.get_untracked()) != expected {
+                return;
+            }
+            match outcome {
+                Ok(Response::FriendInviteInfo { invite }) => {
+                    if invite.invite_only {
+                        registration_closed.set(true);
+                    }
+                    if invite.status == FriendInviteStatus::Active {
+                        let chat = format!(
+                            "/{}/account/chat?with={}",
+                            lang.code(),
+                            tag_text(invite.inviter.tag)
+                        );
+                        next_dest.set_value(Some(chat));
+                        invite_preview.set(Some(Ok(invite)));
+                    } else {
+                        invite_preview.set(Some(Err(())));
+                    }
+                }
+                Err(Failure::Rejected) => invite_preview.set(Some(Err(()))),
+                _ => invite_preview.set(None),
+            }
+        });
+    });
 }
 
 /// What the registration asks to be ticked, and the field no person sees
@@ -1147,115 +1452,210 @@ fn register_checks(
     }
 }
 
+#[derive(Clone, Copy)]
+struct RegisterTextField {
+    id: &'static str,
+    label: &'static str,
+    hint: &'static str,
+    mark: &'static [glyph::Shape],
+    auto: &'static str,
+    set: fn(&mut RegisterFields, String),
+}
+
+fn register_text_field(
+    lang: Lang,
+    spec: RegisterTextField,
+    fields: RwSignal<RegisterFields>,
+) -> impl IntoView {
+    let hint_id = format!("{}-hint", spec.id);
+    let secret = spec.auto == "new-password";
+    let shown = RwSignal::new(!secret);
+    let eye = secret.then(|| field::eye(lang, shown, spec.id));
+    let set = spec.set;
+    view! {
+        <div class="field">
+            <label for=spec.id>{spec.label}</label>
+            <div class="inset">
+                {field::mark(spec.mark)}
+                <input id=spec.id autocomplete=spec.auto autocapitalize="none" spellcheck="false" maxlength="1024" aria-describedby=hint_id.clone()
+                    type=move || if shown.get() { "text" } else { "password" }
+                    on:input=move |ev| { let value = event_target_value(&ev); fields.update(|f| set(f, value)); } />
+                {eye}
+            </div>
+            <p class="hint" id=hint_id>{spec.hint}</p>
+        </div>
+    }
+}
+
+#[derive(Clone, Copy)]
+struct RegisterState {
+    lang: Lang,
+    step: RwSignal<Step>,
+    fields: RwSignal<RegisterFields>,
+    error: RwSignal<Option<&'static str>>,
+    invite_input: RwSignal<String>,
+    invite_preview: RwSignal<Option<Result<FriendInvitePreview, ()>>>,
+    link_email: RwSignal<bool>,
+    registration_closed: RwSignal<bool>,
+    shown: StoredValue<u64>,
+    solving: RwSignal<Solving>,
+    honey: RwSignal<String>,
+}
+
+fn submit_registration(state: RegisterState, worker: &str, pow: &str) {
+    let lang = state.lang;
+    let mut f = state.fields.get_untracked();
+    if let Some(problem) = register_problem(lang, &f) {
+        state.error.set(Some(problem));
+        return;
+    }
+    let code = normalize_invite_code(&state.invite_input.get_untracked());
+    if !code.is_empty() && !valid_friend_invite_code(&code) {
+        state.error.set(Some(words::register_invite_invalid(lang)));
+        return;
+    }
+    if code.is_empty() && state.registration_closed.get_untracked() {
+        state.error.set(Some(words::register_closed(lang)));
+        return;
+    }
+    let quick = super::pow::now_ms().saturating_sub(state.shown.get_value()) < 3_000;
+    if quick || !state.honey.with_untracked(String::is_empty) {
+        state.error.set(Some(words::register_refused(lang)));
+        return;
+    }
+    f.invite_code = (!code.is_empty()).then_some(code);
+    f.link_email = state
+        .link_email
+        .get_untracked()
+        .then(|| {
+            state
+                .invite_preview
+                .get_untracked()
+                .and_then(Result::ok)
+                .and_then(|p| p.invited_email)
+        })
+        .flatten();
+    state.fields.update(|cur| {
+        cur.password.clear();
+        cur.repeat.clear();
+    });
+    state.error.set(None);
+    state.step.set(Step::Working);
+    let (worker, pow) = (worker.to_owned(), pow.to_owned());
+    leptos::task::spawn_local(async move {
+        let _ = super::push::disable().await;
+        match register(&worker, &pow, lang, f, state.solving).await {
+            Ok((code, signed, email_linked)) => {
+                let mut who = Who::of(signed);
+                who.email_linked = email_linked;
+                state.step.set(Step::Code(code, who));
+            }
+            Err((_, Some("closed"))) => {
+                state.registration_closed.set(true);
+                state.error.set(Some(words::register_closed(lang)));
+                state.step.set(Step::Form);
+            }
+            Err((_, Some("invite_invalid"))) => {
+                state.error.set(Some(words::register_invite_invalid(lang)));
+                state.step.set(Step::Form);
+            }
+            Err((_, Some("refused"))) => {
+                state.error.set(Some(words::register_refused(lang)));
+                state.step.set(Step::Form);
+            }
+            Err((_, Some("taken"))) => {
+                state.error.set(Some(words::register_error_taken(lang)));
+                state.step.set(Step::Form);
+            }
+            Err((problem, _)) => state.step.set(Step::Failed(problem)),
+        }
+    });
+}
+
 #[island]
 pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
-    let step = RwSignal::new(Step::Form);
-    let steps_worker = worker.clone();
-    let fields = RwSignal::new(RegisterFields::early());
-    let error = RwSignal::new(None::<&'static str>);
-    // A form filled in faster than a person types, or one whose hidden
-    // field (invisible to people, filled by form robots) has text, is
-    // never sent (`docs/registration-abuse.md`).
-    let shown = StoredValue::new(0u64);
-    let solving = RwSignal::new(Solving::Idle);
-    let honey = RwSignal::new(super::early::typed("register-website"));
-    Effect::new(move |_| shown.set_value(super::pow::now_ms()));
-    let submit = move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        let f = fields.get_untracked();
-        if let Some(problem) = register_problem(lang, &f) {
-            error.set(Some(problem));
-            return;
-        }
-        let quick = super::pow::now_ms().saturating_sub(shown.get_value()) < 3_000;
-        if quick || !honey.with_untracked(String::is_empty) {
-            error.set(Some(words::register_refused(lang)));
-            return;
-        }
-        fields.update(|f| {
-            f.password.clear();
-            f.repeat.clear();
-        });
-        error.set(None);
-        step.set(Step::Working);
-        let (worker, pow) = (worker.clone(), pow.clone());
-        leptos::task::spawn_local(async move {
-            let _ = super::push::disable().await;
-            match register(&worker, &pow, f, solving).await {
-                Ok((code, signed)) => {
-                    // The code first: it is shown once, before anything
-                    // else; Central's terms follow it (`code_view`).
-                    step.set(Step::Code(code, Who::of(signed)));
-                }
-                Err((_, Some("closed"))) => {
-                    error.set(Some(words::register_closed(lang)));
-                    step.set(Step::Form);
-                }
-                Err((_, Some("refused"))) => {
-                    error.set(Some(words::register_refused(lang)));
-                    step.set(Step::Form);
-                }
-                Err((_, Some("taken"))) => {
-                    error.set(Some(words::register_error_taken(lang)));
-                    step.set(Step::Form);
-                }
-                Err((problem, _)) => step.set(Step::Failed(problem)),
-            }
-        });
+    let initial_invite = query_param("invite")
+        .map(|raw| normalize_invite_code(&raw))
+        .unwrap_or_default();
+    let state = RegisterState {
+        lang,
+        step: RwSignal::new(Step::Form),
+        fields: RwSignal::new(RegisterFields::early()),
+        error: RwSignal::new(None),
+        invite_input: RwSignal::new(initial_invite),
+        invite_preview: RwSignal::new(None),
+        link_email: RwSignal::new(false),
+        registration_closed: RwSignal::new(false),
+        shown: StoredValue::new(0u64),
+        solving: RwSignal::new(Solving::Idle),
+        honey: RwSignal::new(super::early::typed("register-website")),
     };
+    let next_dest = StoredValue::new(None::<String>);
+    bind_invite_preview(
+        lang,
+        state.invite_input,
+        state.invite_preview,
+        state.link_email,
+        state.registration_closed,
+        next_dest,
+    );
+    Effect::new(move |_| state.shown.set_value(super::pow::now_ms()));
+
     let terms = format!("/{}/terms", lang.code());
     let privacy = format!("/{}/privacy", lang.code());
-    let text_field = move |id: &'static str,
-                           label: &'static str,
-                           hint: &'static str,
-                           mark: &'static [glyph::Shape],
-                           auto: &'static str,
-                           set: fn(&mut RegisterFields, String)| {
-        let hint_id = format!("{id}-hint");
-        // a password's field has the eye; any other is text for good
-        let secret = auto == "new-password";
-        let shown = RwSignal::new(!secret);
-        let eye = secret.then(|| field::eye(lang, shown, id));
-        view! {
-            <div class="field">
-                <label for=id>{label}</label>
-                <div class="inset">
-                    {field::mark(mark)}
-                    <input id=id autocomplete=auto autocapitalize="none" spellcheck="false" maxlength="1024" aria-describedby=hint_id.clone()
-                        type=move || if shown.get() { "text" } else { "password" }
-                        on:input=move |ev| { let value = event_target_value(&ev); fields.update(|f| set(f, value)); } />
-                    {eye}
-                </div>
-                <p class="hint" id=hint_id>{hint}</p>
-            </div>
-        }
-    };
-    let signin = format!("/{}/signin", lang.code());
     let form = move || {
-        let (terms, privacy, signin) = (terms.clone(), privacy.clone(), signin.clone());
+        let (terms, privacy, worker, pow) =
+            (terms.clone(), privacy.clone(), worker.clone(), pow.clone());
+        let signin = move || {
+            let code = normalize_invite_code(&state.invite_input.get());
+            if !code.is_empty() && valid_friend_invite_code(&code) {
+                let target = format!("/{}/invite/{code}", lang.code());
+                format!(
+                    "/{}/signin?next={}",
+                    lang.code(),
+                    percent_encode_component(&target)
+                )
+            } else {
+                format!("/{}/signin", lang.code())
+            }
+        };
         view! {
-            <form class="form" method="post" novalidate=true on:submit=submit.clone()>
-                {text_field("register-name", words::register_name(lang), words::register_name_hint(lang), glyph::USER, "username", |f, v| f.username = v)}
-                {text_field("register-display", words::register_display(lang), words::register_display_hint(lang), glyph::ID_CARD, "nickname", |f, v| f.display = v)}
-                {text_field("register-password", words::register_password(lang), words::register_password_hint(lang), glyph::LOCK, "new-password", |f, v| f.password = v)}
-                {text_field("register-repeat", words::register_repeat(lang), words::register_repeat_hint(lang), glyph::LOCK_KEYHOLE, "new-password", |f, v| f.repeat = v)}
-                {register_checks(lang, fields, honey, terms, privacy)}
-                <p class="error" role="alert">{move || error.get()}</p>
+            <form class="form" method="post" novalidate=true on:submit=move |event| {
+                event.prevent_default();
+                submit_registration(state, &worker, &pow);
+            }>
+                {invite_banner_view(lang, state.invite_preview)}
+                {move || state.registration_closed.get().then(|| view! {
+                    <p class="notice" role="status">{words::invite_page_invite_only_note(lang)}</p>
+                })}
+                {register_text_field(lang, RegisterTextField { id: "register-name", label: words::register_name(lang), hint: words::register_name_hint(lang), mark: glyph::USER, auto: "username", set: |f, v| f.username = v }, state.fields)}
+                {register_text_field(lang, RegisterTextField { id: "register-display", label: words::register_display(lang), hint: words::register_display_hint(lang), mark: glyph::ID_CARD, auto: "nickname", set: |f, v| f.display = v }, state.fields)}
+                {register_text_field(lang, RegisterTextField { id: "register-password", label: words::register_password(lang), hint: words::register_password_hint(lang), mark: glyph::LOCK, auto: "new-password", set: |f, v| f.password = v }, state.fields)}
+                {register_text_field(lang, RegisterTextField { id: "register-repeat", label: words::register_repeat(lang), hint: words::register_repeat_hint(lang), mark: glyph::LOCK_KEYHOLE, auto: "new-password", set: |f, v| f.repeat = v }, state.fields)}
+                {invite_code_field(lang, state.invite_input, state.invite_preview, state.registration_closed)}
+                {invite_email_optin_view(lang, state.invite_preview, state.link_email)}
+                {register_checks(lang, state.fields, state.honey, terms, privacy)}
+                {auth_alert(state.error)}
                 <button type="submit" class="button primary">{words::register_submit(lang)}</button>
-                <p class="hint">{rich(words::register_have_account(lang), move |tag| (tag == "signin").then(|| signin.clone()))}</p>
+                <p class="hint">{move || rich(words::register_have_account(lang), |tag| (tag == "signin").then(signin))}</p>
             </form>
         }
         .into_any()
     };
-    (
-        steps_view(lang, "register-steps", step, steps_worker, form),
-        solving_view(lang, solving),
+    steps_view(
+        lang,
+        "register-steps",
+        state.step,
+        Some(state.solving),
+        next_dest,
+        form,
     )
 }
 
-/// The proof of work's progress under the step that is working, once it
-/// takes long: the share done in words and as a bar, said politely where a
-/// screen reader hears it. Empty, and without room, the rest of the time.
+/// The proof of work's progress inside `Step::Working`, once it takes long:
+/// the share done in words and as a bar, said politely where a screen reader
+/// hears it. Always mounted during `Step::Working` so CSS `min-block-size`
+/// reserves space and prevents vertical jumps when the bar appears or clears.
 fn solving_view(lang: Lang, solving: RwSignal<Solving>) -> impl IntoView {
     let progress = move || match solving.get() {
         Solving::Shown(percent) => Some(view! {
@@ -1268,7 +1668,11 @@ fn solving_view(lang: Lang, solving: RwSignal<Solving>) -> impl IntoView {
         }),
         Solving::Idle | Solving::Quiet(_) => None,
     };
-    view! { <div class="solving" aria-live="polite">{progress}</div> }
+    view! {
+        <div class="solving" aria-live="polite" hidden=move || !matches!(solving.get(), Solving::Shown(_))>
+            {progress}
+        </div>
+    }
 }
 
 #[cfg(test)]
@@ -1302,6 +1706,8 @@ mod tests {
             repeat: "long enough".into(),
             age: true,
             consent: true,
+            invite_code: None,
+            link_email: None,
         }
     }
 

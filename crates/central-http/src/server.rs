@@ -155,12 +155,15 @@ impl DevelopmentServer {
                 "browser listener requires its fixed body capacity",
             ));
         }
+        let sockets = Sockets::new();
+        sockets.check(Arc::clone(&identity));
         // A picture's upload may take its body's and its conversion's time.
-        self.run_router(
+        Box::pin(self.serve(
             super::browser::router(identity, site),
             super::browser::PICTURE_UPLOAD_TIME + CONNECTION,
+            Some(sockets),
             shutdown,
-        )
+        ))
         .await
     }
 
@@ -485,28 +488,28 @@ mod tests {
     /// A route at `/v1/ws` that upgrades, as `ws.rs` does, when its
     /// connection asked for it and the request says so, into a socket that
     /// echoes until the sockets stop; and refuses otherwise.
+    async fn echo_upgrade(mut request: axum::extract::Request) -> axum::response::Response {
+        use axum::{http::StatusCode, response::IntoResponse};
+        let Some(upgrades) = request.extensions().get::<Upgrades>().cloned() else {
+            return (StatusCode::BAD_REQUEST, "no upgrade here\n").into_response();
+        };
+        if !request.headers().contains_key("upgrade") {
+            return (StatusCode::UNAUTHORIZED, "refused\n").into_response();
+        }
+        let on_upgrade = hyper::upgrade::on(&mut request);
+        upgrades.echo(on_upgrade);
+        let mut response = axum::response::Response::new(axum::body::Body::empty());
+        *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
+        let headers = response.headers_mut();
+        headers.insert("upgrade", HeaderValue::from_static("websocket"));
+        headers.insert("connection", HeaderValue::from_static("upgrade"));
+        response
+    }
+
     fn upgrading() -> axum::Router {
-        use axum::{extract::Request, http::StatusCode, response::IntoResponse};
         axum::Router::new()
-            .route(
-                "/v1/ws",
-                axum::routing::get(|mut request: Request| async move {
-                    let Some(upgrades) = request.extensions().get::<Upgrades>().cloned() else {
-                        return (StatusCode::BAD_REQUEST, "no upgrade here\n").into_response();
-                    };
-                    if !request.headers().contains_key("upgrade") {
-                        return (StatusCode::UNAUTHORIZED, "refused\n").into_response();
-                    }
-                    let on_upgrade = hyper::upgrade::on(&mut request);
-                    upgrades.echo(on_upgrade);
-                    let mut response = axum::response::Response::new(axum::body::Body::empty());
-                    *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
-                    let headers = response.headers_mut();
-                    headers.insert("upgrade", HeaderValue::from_static("websocket"));
-                    headers.insert("connection", HeaderValue::from_static("upgrade"));
-                    response
-                }),
-            )
+            .route("/v1/ws", axum::routing::get(echo_upgrade))
+            .route("/api/v1/ws", axum::routing::get(echo_upgrade))
             .route("/health/live", axum::routing::get(|| async { "alive\n" }))
     }
 
@@ -645,6 +648,45 @@ mod tests {
         assert!(
             std::net::TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn browser_ws_route_asks_for_and_receives_upgrades() {
+        let bound = server().await;
+        let address = bound.local_addr();
+        let (stop, stopped) = oneshot::channel();
+        let running =
+            tokio::spawn(
+                bound.serve(upgrading(), CONNECTION, Some(Sockets::new()), async {
+                    let _ = stopped.await;
+                }),
+            );
+        let head = "Host: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n";
+        let echoed = tokio::task::spawn_blocking(move || {
+            let mut socket =
+                std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2)).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(4)))
+                .unwrap();
+            write!(socket, "GET /api/v1/ws HTTP/1.1\r\n{head}").unwrap();
+            let mut answer = [0_u8; 256];
+            let read = socket.read(&mut answer).unwrap();
+            let head = String::from_utf8_lossy(&answer[..read]).into_owned();
+            assert!(head.starts_with("HTTP/1.1 101"), "{head}");
+            socket.write_all(b"ping").unwrap();
+            let mut back = [0_u8; 4];
+            socket.read_exact(&mut back).unwrap();
+            back
+        })
+        .await
+        .unwrap();
+        assert_eq!(&echoed, b"ping");
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(4), running)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
     }
 
     #[tokio::test]

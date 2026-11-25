@@ -20,7 +20,7 @@ use central_api::email::address;
 use leptos::prelude::*;
 
 use super::chat::glyph::{self, Shape};
-use super::{clip, session};
+use super::{clip, field, focus, session};
 use crate::words::{self, Lang};
 
 /// The file's name.
@@ -221,17 +221,156 @@ fn sheet(lang: Lang, code: &str, name: &str) -> impl IntoView + use<> {
     }
 }
 
+/// Onboarding mail-backup fields when the user picks "Mail it to myself".
+#[derive(Clone, Copy)]
+pub struct MailBackup {
+    /// Whether the user selected the mail-backup choice.
+    pub chosen: RwSignal<bool>,
+    /// E-mail address entered by the user (saved to the account when sending).
+    pub email: RwSignal<String>,
+    /// Optional ZIP encryption password; empty sends an unencrypted ZIP.
+    pub zip_pw: RwSignal<String>,
+}
+
+#[derive(Clone, Copy)]
+enum MailWay {
+    Draft(RwSignal<String>),
+    Backup(MailBackup),
+}
+
+/// The one-time recovery code inside its dashed frame, paired with an inline
+/// copy-to-clipboard icon button whose tooltip and icon reflect copy state.
+pub fn secret_frame(lang: Lang, code: String) -> impl IntoView + use<> {
+    let copied = RwSignal::new(false);
+    let failed = RwSignal::new(false);
+    let copy_code = code.clone();
+    let on_copy = move |_| {
+        let text = copy_code.clone();
+        leptos::task::spawn_local(async move {
+            if clip::write(&text).await {
+                copied.set(true);
+                failed.set(false);
+            } else {
+                copied.set(false);
+                failed.set(true);
+            }
+        });
+    };
+    view! {
+        <div class="secret-frame">
+            <p class="eyebrow">{words::code_shown_once(lang)}</p>
+            <div class="secret-row">
+                <p class="secret"><code translate="no">{code}</code></p>
+                <button
+                    type="button"
+                    class="secret-copy-btn"
+                    data-copied=move || copied.get().then_some("true")
+                    title=move || if copied.get() { words::code_copied_tooltip(lang) } else { words::code_copy_tooltip(lang) }
+                    aria-label=move || if copied.get() { words::code_copied_tooltip(lang) } else { words::code_copy_tooltip(lang) }
+                    on:click=on_copy
+                >
+                    {move || if copied.get() { glyph::glyph(glyph::CHECK) } else { glyph::glyph(glyph::COPY) }}
+                </button>
+            </div>
+            <Show when=move || failed.get()>
+                <p class="meta" role="status">{words::code_copy_failed(lang)}</p>
+            </Show>
+        </div>
+    }
+}
+
 /// The ways to keep `code`, the recovery code of the account `name` signs
-/// in with: copy, file, print and, where the browser has one, its password
+/// in with: file, print and, where the browser has one, its password
 /// manager; then the mail to oneself, to the address in `to` where it
 /// holds one, with its warning beside it.
 pub fn ways(lang: Lang, code: &str, name: &str, to: RwSignal<String>) -> impl IntoView + use<> {
+    ways_inner(lang, code, name, MailWay::Draft(to))
+}
+
+/// The onboarding ways to keep `code`, where selecting "Mail it to myself"
+/// unfolds the account e-mail input and optional ZIP password input so
+/// Central mails `baylee-recovery-code.zip` on continue.
+pub fn ways_onboarding(
+    lang: Lang,
+    code: &str,
+    name: &str,
+    mail: MailBackup,
+) -> impl IntoView + use<> {
+    ways_inner(lang, code, name, MailWay::Backup(mail))
+}
+
+fn choice_button(
+    shapes: &'static [Shape],
+    label: &'static str,
+    on_click: impl Fn(leptos::ev::MouseEvent) + 'static,
+) -> impl IntoView {
+    view! {
+        <button type="button" class="button keep-choice" on:click=on_click>
+            {glyph::glyph(shapes)}
+            <span>{label}</span>
+        </button>
+    }
+}
+
+fn mail_backup_panel(lang: Lang, backup: MailBackup) -> AnyView {
+    let zip_warn =
+        (move || {
+            backup.zip_pw.get().is_empty().then(
+                || view! { <span class="keep-zip-warn">{words::keep_zip_pw_warn(lang)}</span> },
+            )
+        })
+        .into_any();
+    view! {
+        <div class="form" id="code-mail-panel">
+            <div class="field">
+                <label for="code-email">{words::email_title(lang)}</label>
+                <div class="inset">
+                    {field::mark(glyph::MAIL)}
+                    <input
+                        id="code-email"
+                        type="email"
+                        inputmode="email"
+                        autocomplete="email"
+                        autocapitalize="none"
+                        spellcheck="false"
+                        maxlength="254"
+                        aria-describedby="code-email-warning"
+                        on:input=move |ev| backup.email.set(event_target_value(&ev))
+                        prop:value=move || backup.email.get()
+                    />
+                </div>
+                <p class="hint" id="code-email-warning">{words::email_warning(lang)}</p>
+            </div>
+            {field::password_box(
+                lang,
+                "keep-zip-password",
+                words::keep_zip_pw_label(lang),
+                "new-password",
+                backup.zip_pw,
+                Some(words::keep_zip_pw_placeholder(lang)),
+                Some(zip_warn),
+                "128",
+            )}
+        </div>
+    }
+    .into_any()
+}
+
+fn mail_draft_panel(lang: Lang) -> AnyView {
+    view! {
+        <div class="keep-warning" id="code-mail-warning" role="note">
+            {glyph::glyph(glyph::SHIELD_ALERT)}
+            <p>{words::code_mail_warning(lang)}</p>
+        </div>
+    }
+    .into_any()
+}
+
+fn ways_inner(lang: Lang, code: &str, name: &str, way: MailWay) -> impl IntoView + use<> {
     let said = RwSignal::new(None::<&'static str>);
     let printing = RwSignal::new(false);
     let manager = RwSignal::new(false);
-    // only a browser can say what it has
     Effect::new(move |_| manager.set(browser::manager_offered()));
-    let (copy, copied) = clip::copier(lang, code.to_owned());
     let text = StoredValue::new(sheet_text(lang, code, name));
     let id = StoredValue::new(words::code_manager_id(lang, name));
     let secret = StoredValue::new(code.to_owned());
@@ -243,70 +382,70 @@ pub fn ways(lang: Lang, code: &str, name: &str, to: RwSignal<String>) -> impl In
     let offer = move |_| {
         let (id, secret) = (id.get_value(), secret.get_value());
         leptos::task::spawn_local(async move {
-            let taken = browser::offer(&id, &secret).await;
-            said.set(Some(if taken {
+            let msg = if browser::offer(&id, &secret).await {
                 words::code_manager_offered(lang)
             } else {
                 words::code_manager_failed(lang)
-            }));
+            };
+            said.set(Some(msg));
         });
     };
-    // The mail to oneself puts the code in a mailbox, and says so first:
-    // its warning unfolds at the first press, or as soon as an address
-    // stands in `to`, and only a press with the warning on screen hands the
-    // draft to the mail program. A browser does not tell a page whether a
-    // mail program took it, so the step says what should have happened and
-    // what to do if nothing did.
+    // In standalone password reset (`Draft`), mail opens the browser's mail
+    // program after warning first. In registration onboarding (`Backup`), the
+    // choice unfolds the account e-mail and optional ZIP-password fields.
     let asked = RwSignal::new(false);
-    let warned = Memo::new(move |_| asked.get() || !to.get().trim().is_empty());
-    let send = move || {
-        session::open(&mailto(
-            &to.get_untracked(),
-            words::code_mail_subject(lang),
-            &text.read_value(),
-        ));
-        said.set(Some(words::code_mail_opened(lang)));
-    };
-    let mail = move |_| {
-        if warned.get_untracked() {
-            send();
-        } else {
-            asked.set(true);
+    let expanded = Signal::derive(move || match way {
+        MailWay::Draft(to) => asked.get() || !to.get().trim().is_empty(),
+        MailWay::Backup(backup) => backup.chosen.get(),
+    });
+    let mail = move |_| match way {
+        MailWay::Draft(to) => {
+            if expanded.get_untracked() {
+                session::open(&mailto(
+                    &to.get_untracked(),
+                    words::code_mail_subject(lang),
+                    &text.read_value(),
+                ));
+                said.set(Some(words::code_mail_opened(lang)));
+            } else {
+                asked.set(true);
+            }
         }
+        MailWay::Backup(backup) => {
+            let next = !backup.chosen.get_untracked();
+            backup.chosen.set(next);
+            if next {
+                focus::after_render("#code-email");
+            }
+        }
+    };
+    let (panel_id, mail_unfold) = match way {
+        MailWay::Draft(_) => ("code-mail-warning", mail_draft_panel(lang)),
+        MailWay::Backup(backup) => ("code-mail-panel", mail_backup_panel(lang, backup)),
     };
     let (code, name) = (code.to_owned(), name.to_owned());
     view! {
         <div class="keep">
             <p class="keep-title">{words::code_keep_title(lang)}</p>
             <div class="keep-ways">
-                {copy}
-                <button type="button" class="button" on:click=save>
-                    {glyph::glyph(DOWNLOAD)}
-                    <span>{words::code_download(lang)}</span>
-                </button>
-                <button type="button" class="button" on:click=print>
-                    {glyph::glyph(PRINTER)}
-                    <span>{words::code_print(lang)}</span>
-                </button>
-                {move || manager.get().then(|| view! {
-                    <button type="button" class="button" on:click=offer>
-                        {glyph::glyph(glyph::KEY)}
-                        <span>{words::code_manager(lang)}</span>
-                    </button>
-                })}
-                <button type="button" class="button" aria-controls="code-mail-warning"
-                    aria-expanded=move || if warned.get() { "true" } else { "false" } on:click=mail>
+                {choice_button(DOWNLOAD, words::code_download(lang), save)}
+                {choice_button(PRINTER, words::code_print(lang), print)}
+                {move || manager.get().then(|| choice_button(glyph::KEY, words::code_manager(lang), offer))}
+                <button
+                    type="button"
+                    class="button keep-choice"
+                    aria-controls=panel_id
+                    aria-expanded=move || if expanded.get() { "true" } else { "false" }
+                    aria-pressed=move || matches!(way, MailWay::Backup(_)).then(|| if expanded.get() { "true" } else { "false" })
+                    on:click=mail
+                >
                     {glyph::glyph(glyph::MAIL)}
                     <span>{words::code_mail(lang)}</span>
                 </button>
             </div>
-            <div class="unfold" class:open=move || warned.get()>
-                <div class="keep-warning" id="code-mail-warning" role="note">
-                    {glyph::glyph(glyph::SHIELD_ALERT)}
-                    <p>{words::code_mail_warning(lang)}</p>
-                </div>
+            <div class="unfold" class:open=move || expanded.get()>
+                {mail_unfold}
             </div>
-            {copied}
             <p class="meta" role="status">{move || said.get()}</p>
         </div>
         {move || printing.get().then(|| sheet(lang, &code, &name))}

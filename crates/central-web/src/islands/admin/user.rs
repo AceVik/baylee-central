@@ -15,6 +15,7 @@ use crate::data::id_hex;
 use crate::islands::account::when;
 use crate::islands::auth::{Problem, problem_text};
 use crate::islands::chat::glyph;
+use crate::islands::field;
 use crate::islands::focus;
 use crate::words::{self, Lang};
 
@@ -236,11 +237,19 @@ fn tag_card(a: &Account, row: &Row) -> impl IntoView + use<> {
             <form class="form admin-search" method="post" novalidate=true on:submit=move |event| a.tag(&event, &name)>
                 <div class="field">
                     <label for="admin-tag-field">{words::admin_tag(lang)}</label>
-                    <div class="with-tool">
+                    <div class="inset">
+                        {field::mark(glyph::ID_CARD)}
                         <input id="admin-tag-field" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="9"
                             placeholder=shown translate="no"
                             on:input=move |ev| a.typed.set(event_target_value(&ev)) prop:value=move || a.typed.get() />
-                        <button type="submit" class="button">{words::admin_tag_set(lang)}</button>
+                        <button
+                            type="submit"
+                            class="inset-end"
+                            title=words::admin_tag_save(lang)
+                            aria-label=words::admin_tag_save(lang)
+                        >
+                            {glyph::glyph(glyph::CHECK)}
+                        </button>
                     </div>
                 </div>
                 <p class="error" role="alert">{move || a.tag_error.get()}</p>

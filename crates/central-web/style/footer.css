@@ -4,7 +4,7 @@
 
 .foot {
   position: relative;
-  padding: clamp(2.8rem, 5vw, 4.2rem) 0 clamp(2.2rem, 4vw, 3.2rem);
+  padding: clamp(2.8rem, 5vw, 4.2rem) 0 5px;
   border-top: 1px solid var(--edge);
   background:
     radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--gold) 6%, transparent), transparent 70%),
@@ -22,9 +22,9 @@
 
 .foot-top {
   display: grid;
-  grid-template-columns: minmax(17rem, 1.15fr) 2fr;
+  grid-template-columns: minmax(14rem, 0.78fr) minmax(0, 2.42fr);
   align-items: start;
-  gap: clamp(2rem, 4.5vw, 4rem);
+  gap: clamp(1.5rem, 3vw, 2.6rem);
 }
 
 .foot-brand {
@@ -43,11 +43,12 @@
   transition: opacity 200ms ease;
 }
 
-/* The BIMI mark (`/bimi/baylee.svg`), as it is: no clip, no filter. */
+/* The BIMI mark (`/bimi/baylee.svg`), rounded cleanly to match badges/cards. */
 .foot-mark {
   flex: none;
   width: 4.5rem;
   height: 4.5rem;
+  border-radius: 6px;
 }
 
 .foot-logo-link:hover {
@@ -68,7 +69,7 @@
 }
 
 .foot-summary {
-  max-width: 26rem;
+  max-width: 22rem;
   margin: 0;
   color: var(--ink-soft);
   font: 0.9rem / 1.5 var(--sans);
@@ -107,6 +108,7 @@
 }
 
 .social-pill .icon {
+  flex: none;
   width: 1.05rem;
   height: 1.05rem;
   color: var(--gold);
@@ -144,6 +146,7 @@
 .foot-list a {
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
   max-inline-size: 100%;
   min-inline-size: var(--target);
   min-height: var(--target);
@@ -156,6 +159,24 @@
   transition:
     color 160ms ease,
     background-color 160ms ease;
+}
+
+.foot-list a .icon {
+  flex: none;
+  inline-size: 1rem;
+  block-size: 1rem;
+  color: var(--ink-faint);
+  transition: color 160ms ease;
+}
+
+.foot-list a:hover .icon,
+.foot-list a[aria-current="page"] .icon {
+  color: var(--gold);
+}
+
+.foot-list a[target="_blank"]::after {
+  margin-inline-start: -0.22rem;
+  opacity: 0.75;
 }
 
 .foot-list a:hover {
@@ -240,7 +261,7 @@
   gap: 0.15rem 0.55rem;
   margin: 0;
   color: var(--ink-faint);
-  font: 0.72rem / 1.6 var(--font-mono);
+  font: 0.72rem / 1.3 var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   opacity: 0.8;
@@ -268,7 +289,19 @@
   text-decoration: underline;
 }
 
-@media (max-width: 900px) {
+@media (min-width: 1024px) {
+  .foot-map {
+    grid-template-columns: repeat(3, minmax(max-content, 1fr));
+    gap: var(--space-4) clamp(1rem, 2vw, 2rem);
+  }
+
+  .foot-list a {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1023.98px) {
   .foot-top {
     grid-template-columns: 1fr;
     gap: 2rem;

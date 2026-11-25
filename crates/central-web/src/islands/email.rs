@@ -1,5 +1,5 @@
 //! An account's optional e-mail address (`central_api::email`) in the
-//! account area's security section: naming one, confirming it with the code
+//! account area's profile section: naming one, confirming it with the code
 //! Central mails to it, changing it and removing it. Whoever reads that
 //! mailbox can reset the sign-in, so naming an address proves the current
 //! password first: the form signs in once more as the password's change
@@ -22,7 +22,7 @@ use super::auth::{Problem, problem_text};
 use super::central::{Failure, call};
 use super::chat::glyph;
 use super::crypto::Crypto;
-use super::field::{self, Labelled};
+use super::field;
 use super::password::{Trouble, sign_in_again};
 use super::{focus, session};
 use crate::rich::rich;
@@ -316,19 +316,6 @@ pub async fn for_export() -> Option<EmailState> {
     read().await.ok()
 }
 
-/// How the section begins.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Begin {
-    /// In the account area: it reads what Central holds.
-    Read,
-    /// As a step of a registration that just ended, whose sign-in is
-    /// fresh: it names this address at once, without asking for the
-    /// password again (Central takes that within five minutes of a
-    /// password sign-in, `docs/email.md`). Where Central refuses, the form
-    /// asks for the password, as in the account area.
-    Name(String),
-}
-
 /// The section's signals and what it was given. All of it is `Copy`, so
 /// every handler takes the whole.
 #[derive(Clone, Copy)]
@@ -518,36 +505,6 @@ impl Section {
         });
     }
 
-    /// Names `typed` at once, without signing in again: for a session whose
-    /// password sign-in is fresh. Where Central refuses that (the sign-in
-    /// is older than it takes), the form comes with the address in it and
-    /// asks for the password; whatever else came back, the form says it.
-    fn name_fresh(self, typed: String) {
-        self.typed.set(typed.clone());
-        self.busy.set(true);
-        let request = EmailRequest::Set {
-            address: typed,
-            lang: self.lang.code().to_owned(),
-        };
-        leptos::task::spawn_local(async move {
-            let outcome = act(Action::Set, request).await;
-            self.busy.set(false);
-            match outcome {
-                Outcome::Said(Said::Other(_), Some(state)) => {
-                    if self.held.try_set(Held::Ready(state)).is_none() {
-                        self.note.set(Some(words::email_again(self.lang)));
-                        focus::after_render("#email-password");
-                    }
-                }
-                Outcome::Said(said, None) => {
-                    self.load();
-                    self.error.set(Some(said_text(self.lang, said)));
-                }
-                outcome => self.settle(Action::Set, outcome),
-            }
-        });
-    }
-
     /// Nobody was signed in again: nothing was sent about the address.
     fn unsigned(self, back: Mode, trouble: Trouble) {
         let (said, field) = match trouble {
@@ -638,19 +595,22 @@ fn no_mail_view(s: Section, state: &EmailState) -> AnyView {
         s.button(
             "button danger",
             Some("email-remove"),
-            words::email_remove(lang),
+            words::profile_email_remove_btn(lang),
             |s| s.step(Mode::Removing, "#email-remove-ask"),
         )
     });
     let withdraw = state.pending.is_some().then(|| {
-        s.button("button quiet", None, words::email_withdraw(lang), |s| {
-            s.ask(Action::Withdraw, EmailRequest::Withdraw);
-        })
+        s.button(
+            "button quiet",
+            None,
+            words::profile_email_withdraw_btn(lang),
+            |s| s.ask(Action::Withdraw, EmailRequest::Withdraw),
+        )
     });
     let actions = (remove.is_some() || withdraw.is_some())
         .then(|| view! { <p class="actions">{remove}{withdraw}</p> });
     view! {
-        <p>{words::email_no_mail(lang)}</p>
+        <p class="meta">{words::profile_email_unavailable(lang)}</p>
         {facts(lang, state, true)}
         {s.alert()}
         {actions}
@@ -670,31 +630,42 @@ fn form_view(s: Section, state: &EmailState) -> AnyView {
             |s| s.step(Mode::Rest, "#email-change"),
         )
     });
-    let password = Labelled {
-        id: "email-password",
-        label: words::privacy_delete_password(lang),
-        hint: Some(words::email_password_hint(lang)),
-        mark: glyph::LOCK,
-        auto: "current-password",
-        max: "1024",
-    };
     view! {
-        <p>{words::email_lead(lang)}</p>
+        <p class="meta">{words::email_lead(lang)}</p>
         <p class="notice">{words::email_warning(lang)}</p>
         {facts(lang, state, false)}
         {stays}
         <form class="form" method="post" novalidate=true on:submit=move |event| s.name(&event)>
             <div class="field">
-                <label for="email-address">{words::email_title(lang)}</label>
+                <label for="email-address">{words::profile_email_field(lang)}</label>
                 <div class="inset">
                     {field::mark(glyph::MAIL)}
-                    <input id="email-address" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254"
-                        on:input=move |ev| s.typed.set(event_target_value(&ev)) prop:value=move || s.typed.get() />
+                    <input
+                        id="email-address"
+                        type="email"
+                        inputmode="email"
+                        autocomplete="email"
+                        autocapitalize="none"
+                        spellcheck="false"
+                        maxlength="254"
+                        placeholder=words::profile_email_placeholder(lang)
+                        on:input=move |ev| s.typed.set(event_target_value(&ev))
+                        prop:value=move || s.typed.get()
+                    />
                 </div>
             </div>
             // for a password manager: whose password this is (not the address's)
             <input type="text" autocomplete="username" readonly=true hidden=true value=s.username.get_value() />
-            {field::labelled(lang, password, move || s.password.get(), move |value| s.password.set(value))}
+            {field::password_box(
+                lang,
+                "email-password",
+                words::profile_email_password(lang),
+                "current-password",
+                s.password,
+                None,
+                Some(view! { {words::profile_email_password_hint(lang)} }.into_any()),
+                "1024",
+            )}
             {s.alert()}
             <p class="actions">
                 <button type="submit" class="button primary">{words::email_submit(lang)}</button>
@@ -713,24 +684,47 @@ fn pending_view(s: Section, state: &EmailState) -> AnyView {
     });
     view! {
         <p>{rich(words::email_pending(lang, &waits), |_| None)}</p>
+        <p class="hint">{words::profile_email_code_sent(lang)}</p>
         {keeps}
         <form class="form" method="post" novalidate=true on:submit=move |event| s.confirm(&event)>
             <div class="field">
-                <label for="email-code">{words::email_code(lang)}</label>
+                <label for="email-code">{words::profile_email_verify_code(lang)}</label>
                 <div class="inset">
                     {field::mark(glyph::KEY)}
-                    <input id="email-code" class="code-entry" type="text" inputmode="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="32" aria-describedby="email-code-hint"
-                        on:input=move |ev| s.code.set(event_target_value(&ev)) prop:value=move || s.code.get() />
+                    <input
+                        id="email-code"
+                        class="code-entry"
+                        type="text"
+                        inputmode="text"
+                        autocomplete="one-time-code"
+                        autocapitalize="characters"
+                        spellcheck="false"
+                        maxlength="32"
+                        aria-describedby="email-code-hint"
+                        on:input=move |ev| s.code.set(event_target_value(&ev))
+                        prop:value=move || s.code.get()
+                    />
+                    <button
+                        type="submit"
+                        class="inset-end"
+                        title=words::profile_email_verify_btn(lang)
+                        aria-label=words::profile_email_verify_btn(lang)
+                        aria-disabled=move || s.busy.get().then_some("true")
+                    >
+                        {glyph::glyph(glyph::CHECK)}
+                    </button>
                 </div>
                 <p class="hint" id="email-code-hint">{words::email_code_hint(lang)}</p>
             </div>
             {s.alert()}
             <p class="actions">
-                <button type="submit" class="button primary" aria-disabled=move || s.busy.get().then_some("true")>{words::email_confirm(lang)}</button>
-                {s.button("button quiet", None, words::email_resend(lang), move |s| {
+                <button type="submit" class="button primary" aria-disabled=move || s.busy.get().then_some("true")>
+                    {words::profile_email_verify_btn(lang)}
+                </button>
+                {s.button("button quiet", None, words::profile_email_resend_btn(lang), move |s| {
                     s.ask(Action::Resend, EmailRequest::Resend { lang: lang.code().to_owned() });
                 })}
-                {s.button("button quiet", None, words::email_other(lang), |s| {
+                {s.button("button quiet", None, words::profile_email_withdraw_btn(lang), |s| {
                     s.ask(Action::Withdraw, EmailRequest::Withdraw);
                 })}
             </p>
@@ -748,7 +742,7 @@ fn confirmed_view(s: Section, state: &EmailState) -> AnyView {
             {s.button("button", Some("email-change"), words::email_change(lang), |s| {
                 s.step(Mode::Changing, "#email-address");
             })}
-            {s.button("button danger", Some("email-remove"), words::email_remove(lang), |s| {
+            {s.button("button danger", Some("email-remove"), words::profile_email_remove_btn(lang), |s| {
                 s.step(Mode::Removing, "#email-remove-ask");
             })}
         </p>
@@ -786,7 +780,7 @@ fn draw(s: Section) -> AnyView {
     let lang = s.lang;
     match s.held.get() {
         Held::Loading => {
-            view! { <p role="status" class="meta">{words::account_loading(lang)}</p> }.into_any()
+            view! { <p class="working" role="status">{words::account_loading(lang)}</p> }.into_any()
         }
         Held::Unread(problem) => unread_view(s, problem),
         Held::Ready(state) => match face(&state, s.mode.get()) {
@@ -803,20 +797,42 @@ fn draw(s: Section) -> AnyView {
     }
 }
 
-/// The section in the account area's security page, or (`Begin::Name`)
-/// the step of a registration that names the address typed beside the
-/// recovery code: there it is a step with a heading of its own and a way
-/// on to the account, whether the address is confirmed now or later in the
-/// account area. `signed_again` runs after the form signed in once more
-/// (the sessions listed beside it are others now), `signed_out` when this
-/// browser turns out not to be signed in. `handed` holds the code the
-/// confirmation mail's link handed to the security page, which the first
-/// read takes (`Section::load`); a registration's step has none.
+fn status_badge(s: Section) -> impl IntoView {
+    let lang = s.lang;
+    move || match s.held.get() {
+        Held::Ready(state) if state.pending.is_some() => Some(
+            view! {
+                <span class="pill warn">
+                    {glyph::glyph(glyph::MAIL)}
+                    <span>{words::profile_email_pending_badge(lang)}</span>
+                </span>
+            }
+            .into_any(),
+        ),
+        Held::Ready(state) if state.address.is_some() => Some(
+            view! {
+                <span class="pill ok">
+                    {glyph::glyph(glyph::CIRCLE_CHECK)}
+                    <span>{words::profile_email_confirmed_badge(lang)}</span>
+                </span>
+            }
+            .into_any(),
+        ),
+        _ => None,
+    }
+}
+
+/// The embedded e-mail address controls rendered inside the profile's
+/// "Personal data and e-mail" card (`account::profile_personal_card`).
+/// `signed_again` runs after the form signed in once more (the sessions
+/// listed in security are others now), `signed_out` when this browser
+/// turns out not to be signed in. `handed` holds the code the
+/// confirmation mail's link handed to the profile page, which the first
+/// read takes (`Section::load`).
 pub fn section(
     lang: Lang,
     worker: String,
     username: String,
-    begin: Begin,
     signed_again: Callback<()>,
     signed_out: Callback<()>,
     handed: StoredValue<Option<MailCode>>,
@@ -837,35 +853,17 @@ pub fn section(
         signed_out,
         handed,
     };
-    let step = matches!(begin, Begin::Name(_));
     // Effects run in the browser only.
-    Effect::new(move |_| match begin.clone() {
-        Begin::Read => s.load(),
-        Begin::Name(typed) => s.name_fresh(typed),
-    });
-    let (class, title) = if step {
-        ("card step", words::code_email_step_title(lang))
-    } else {
-        ("card", words::email_title(lang))
-    };
-    let lead = step.then(|| view! { <p>{words::code_email_step_lead(lang)}</p> });
-    let onward = step.then(|| {
-        let account = format!("/{}/account", lang.code());
-        view! {
-            <p class="actions">
-                <button type="button" class="button" on:click=move |_| session::go(&account)>{words::code_email_step_done(lang)}</button>
-            </p>
-        }
-    });
+    Effect::new(move |_| s.load());
     view! {
-        <section class=class aria-labelledby="email-title">
-            // a step's heading takes the focus when the step begins
-            <h2 id="email-title" tabindex=step.then_some("-1") data-step-focus=step.then_some("")>{title}</h2>
-            {lead}
+        <div class="profile-email-block" aria-labelledby="email-title">
+            <div class="profile-email-head">
+                <h3 id="email-title">{words::email_title(lang)}</h3>
+                {status_badge(s)}
+            </div>
             <p class="meta" role="status" id="email-said" tabindex="-1">{move || s.note.get()}</p>
             {move || draw(s)}
-            {onward}
-        </section>
+        </div>
     }
 }
 

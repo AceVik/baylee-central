@@ -129,6 +129,40 @@ impl AccountStore {
             Ok(account.into_bytes())
         }
     }
+
+    /// Account UUID bytes and public tag bound to a live enrolled session, if any.
+    ///
+    /// # Errors
+    /// Reports unavailable storage if PostgreSQL cannot be reached.
+    pub async fn session_account_tag<'a>(
+        &self,
+        session: impl Into<Session<'a>>,
+    ) -> Result<Option<([u8; 16], u32)>, Error> {
+        let session = session.into();
+        let digest = session.digest();
+        let kind = session.kind();
+        let Some(row) = self
+            .db
+            .query_one_raw(statement(
+                "SELECT a.id, a.tag
+                 FROM central_identity.sessions s
+                 JOIN central_identity.accounts a ON a.id = s.account_id
+                 WHERE s.digest = $1 AND s.kind = $2
+                 AND s.credential_revision = a.credential_revision
+                 AND a.credential IS NOT NULL AND a.tag IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp()",
+                vec![digest.to_vec().into(), kind.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+        else {
+            return Ok(None);
+        };
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        let tag: i32 = row.try_get("", "tag").map_err(|_| Error::Unavailable)?;
+        let tag = u32::try_from(tag).map_err(|_| Error::Unavailable)?;
+        Ok(Some((account.into_bytes(), tag)))
+    }
 }
 
 /// One row more than an account can hold, so that too many show.
@@ -150,13 +184,41 @@ pub struct Concerns {
     /// read again if they hold a socket. Never set by a request, or by a block
     /// or its lifting between accounts that were no friends.
     pub pair: Option<([u8; 16], [u8; 16])>,
+    /// Mutual friendship accepted via a friend invite: `(inviter_id, inviter_tag, invitee_id, invitee_tag)`.
+    pub(super) friend_accept_invite: Option<([u8; 16], u32, [u8; 16], u32)>,
 }
+
+/// Two accounts paired as `(account_id, tag)` when a friend invite is accepted.
+pub type AcceptedInvitePair = (([u8; 16], u32), ([u8; 16], u32));
 
 impl Concerns {
     pub(super) fn social_of(accounts: impl IntoIterator<Item = Uuid>) -> Self {
         Self {
             social: accounts.into_iter().map(Uuid::into_bytes).collect(),
             ..Self::default()
+        }
+    }
+
+    /// Social and live-presence notifications for two accounts that became
+    /// mutual friends by redeeming a friend invite.
+    #[must_use]
+    pub fn friend_accept_invite(inviter: ([u8; 16], u32), peer: ([u8; 16], u32)) -> Self {
+        Self {
+            social: BTreeSet::from([inviter.0, peer.0]),
+            pair: Some((inviter.0, peer.0)),
+            friend_accept_invite: Some((inviter.0, inviter.1, peer.0, peer.1)),
+            ..Self::default()
+        }
+    }
+
+    /// Inviter and invitee `(account_id, tag)` recorded for an accepted friend invite.
+    #[must_use]
+    pub const fn invite_accepted(&self) -> Option<AcceptedInvitePair> {
+        match self.friend_accept_invite {
+            Some((inviter, inviter_tag, peer, peer_tag)) => {
+                Some(((inviter, inviter_tag), (peer, peer_tag)))
+            }
+            None => None,
         }
     }
 }

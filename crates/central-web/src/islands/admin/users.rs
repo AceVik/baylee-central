@@ -17,6 +17,7 @@ use super::{Listing, Row, query};
 use crate::islands::account::when;
 use crate::islands::auth::{Problem, problem_text};
 use crate::islands::chat::glyph;
+use crate::islands::field;
 use crate::islands::focus;
 use crate::words;
 
@@ -235,7 +236,8 @@ fn results(u: Users) -> impl IntoView {
                 let more = u.more.get().then(|| {
                     view! {
                         <p class="actions">
-                            <button type="button" class="button" aria-disabled=move || u.adding.get().then_some("true")
+                            <button type="button" class="button"
+                                aria-disabled=move || u.adding.get().then_some("true")
                                 on:click=move |_| u.more()>{words::admin_more(lang)}</button>
                         </p>
                     }
@@ -302,12 +304,20 @@ pub fn page(cx: Cx) -> impl IntoView {
             <form class="form admin-search" role="search" method="post" novalidate=true on:submit=move |event| u.search(&event)>
                 <div class="field">
                     <label for="admin-users-search">{words::admin_search(lang)}</label>
-                    <div class="with-tool">
+                    <div class="inset">
+                        {field::mark(glyph::SEARCH)}
                         <input id="admin-users-search" type="search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="64"
                             aria-describedby="admin-users-search-hint" aria-keyshortcuts="Control+K Meta+K"
                             on:input=move |ev| u.typed(event_target_value(&ev)) on:keydown=move |ev| u.escape(&ev)
                             prop:value=move || u.typed.get() />
-                        <button type="submit" class="button">{glyph::glyph(glyph::SEARCH)}<span>{words::admin_search_submit(lang)}</span></button>
+                        <button
+                            type="submit"
+                            class="inset-end"
+                            title=words::admin_search_submit(lang)
+                            aria-label=words::admin_search_submit(lang)
+                        >
+                            {glyph::glyph(glyph::SEARCH)}
+                        </button>
                     </div>
                     <p class="hint" id="admin-users-search-hint">{words::admin_search_hint(lang)}</p>
                 </div>

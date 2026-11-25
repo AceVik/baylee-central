@@ -60,3 +60,22 @@ issued-not-you = Se non l'hai chiesto tu, accedi e cambia la password nella pagi
 
 # The confirmation mail's button, which opens the security page with the code filled in.
 confirm-link = Conferma indirizzo
+
+recovery-backup-subject = Il backup del tuo codice di recupero Baylee
+recovery-backup-title = Backup del codice di recupero
+recovery-backup-intro = In allegato trovi il backup del codice di recupero per l'account Baylee { $name }.
+recovery-backup-encrypted = L'archivio baylee-recovery-code.zip è cifrato con la password che hai impostato.
+recovery-backup-plain = L'archivio baylee-recovery-code.zip è stato inviato senza cifratura. Conservalo al sicuro ed elimina questa mail dopo il salvataggio.
+recovery-backup-fact-file = Conserva l'archivio in un luogo sicuro separato da questa casella.
+recovery-backup-fact-reset = Chi legge il codice insieme a un ripristino su questa casella può aprire i tuoi dati cifrati.
+recovery-backup-warning = Se non hai richiesto questo backup, ignora questa email o controlla le impostazioni del tuo account.
+recovery-backup-link = Apri il tuo account
+invite-subject = Invito di amicizia su Baylee
+invite-title = Invito di amicizia
+invite-intro = { $name } ti ha invitato a diventare amici su Baylee.
+invite-note-label = Messaggio:
+invite-fact-friend = Accettando questo link monouso diventerete amici su Baylee.
+invite-valid-one = Il link di invito è valido per 1 giorno.
+invite-valid = Il link di invito è valido per { $days } giorni.
+invite-warning = Se non ti aspettavi questo invito, puoi ignorare questo messaggio.
+invite-link = Apri invito

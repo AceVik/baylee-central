@@ -9,7 +9,9 @@ pub(super) use publication::{champion_place, deck_champion_place, publish};
 use super::{column, statement, unavailable, uuid};
 use central_api::{
     Error, profile,
-    ranked::{self as api, Award, AwardKind, Id, League, ProfileTarget, Rank, Season, Track},
+    ranked::{
+        self as api, Award, AwardKind, Id, League, ProfileTarget, Rank, Season, Standing, Track,
+    },
 };
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
@@ -223,22 +225,7 @@ pub(super) async fn read(
             };
             let id: Uuid = column(&identity, "id")?;
             let (name, tag) = super::super::profiles::columns(&identity)?;
-            let formats = standings::profile(db, season_id, id).await?;
-            let mut awards = collection(db, id, season_id).await?;
-            if finalized {
-                awards.extend(
-                    formats
-                        .iter()
-                        .filter(|s| s.games > 0 && s.rank.league != League::Unranked)
-                        .map(|s| Award {
-                            kind: AwardKind::SeasonFinish,
-                            format: s.format,
-                            track: s.track,
-                            season: season.id,
-                            rank: s.rank,
-                        }),
-                );
-            }
+            let (formats, awards) = season_profile(db, season_id, &season, id, finalized).await?;
             Ok(api::Response::Profile {
                 season,
                 account: *id.as_bytes(),
@@ -250,6 +237,142 @@ pub(super) async fn read(
         }
         _ => Err(Error::Rejected),
     }
+}
+
+async fn season_profile(
+    db: &DatabaseTransaction,
+    season_id: Uuid,
+    season: &Season,
+    account: Uuid,
+    finalized: bool,
+) -> Result<(Vec<Standing>, Vec<Award>), Error> {
+    let formats = standings::profile(db, season_id, account).await?;
+    let mut awards = collection(db, account, season_id).await?;
+    if finalized {
+        awards.extend(
+            formats
+                .iter()
+                .filter(|s| s.games > 0 && s.rank.league != League::Unranked)
+                .map(|s| Award {
+                    kind: AwardKind::SeasonFinish,
+                    format: s.format,
+                    track: s.track,
+                    season: season.id,
+                    rank: s.rank,
+                }),
+        );
+    }
+    Ok((formats, awards))
+}
+
+/// Active season metadata, standings across formats/tracks, and career awards
+/// for `account` (returning `(None, vec![], vec![])` if no ranked season has started).
+pub(in crate::accounts) async fn account_ranked_badges(
+    db: &DatabaseTransaction,
+    account: Uuid,
+) -> Result<(Option<Season>, Vec<Standing>, Vec<Award>), Error> {
+    let Some(row) = db
+        .query_one_raw(statement(
+            &format!(
+                "{SEASONS} AND (s.ends_at IS NULL OR s.ends_at > transaction_timestamp())
+                 ORDER BY s.starts_at DESC LIMIT 1"
+            ),
+            vec![],
+        ))
+        .await
+        .map_err(unavailable)?
+    else {
+        return Ok((None, Vec::new(), Vec::new()));
+    };
+    let season = season(&row)?;
+    let season_id = uuid(season.id);
+    let finalized = publication::visible(db, season_id).await?;
+    let (formats, awards) = season_profile(db, season_id, &season, account, finalized).await?;
+    Ok((Some(season), formats, awards))
+}
+
+/// Current-season best `Track::Player` rank per tag (`games > 0`), reusing the
+/// same season projection and inactive elite clamp as boards.
+pub(in crate::accounts) async fn peer_best_ranks(
+    db: &DatabaseTransaction,
+    accounts: &[(Uuid, u32)],
+) -> Result<Vec<central_api::social::TaggedRank>, Error> {
+    if accounts.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Some(row) = db
+        .query_one_raw(statement(
+            &format!(
+                "{SEASONS} AND (s.ends_at IS NULL OR s.ends_at > transaction_timestamp())
+                 ORDER BY s.starts_at DESC LIMIT 1"
+            ),
+            vec![],
+        ))
+        .await
+        .map_err(unavailable)?
+    else {
+        return Ok(Vec::new());
+    };
+    let season_id: Uuid = column(&row, "id")?;
+    let ids: Vec<Uuid> = accounts.iter().map(|(id, _)| *id).collect();
+    let idle = super::rules::ELITE_IDLE_DAYS + 1;
+    let rows = db
+        .query_all_raw(statement(
+            &format!(
+                "SELECT r.account_id, r.games, c.place,
+                     CASE WHEN c.place IS NOT NULL THEN 10
+                          WHEN r.games < 10 THEN -1
+                          WHEN r.league >= 8 AND r.last_at <= LEAST(transaction_timestamp(), s.ends_at)
+                              - interval '24 hours' * {idle} THEN 7
+                          ELSE r.league END::smallint AS public_league,
+                     CASE WHEN c.place IS NOT NULL OR r.games < 10 THEN 0
+                          WHEN r.league >= 8 AND r.last_at <= LEAST(transaction_timestamp(), s.ends_at)
+                              - interval '24 hours' * {idle} THEN 1
+                          ELSE r.division END::smallint AS public_division
+                 FROM central_identity.ranked_ratings r
+                 JOIN central_identity.ranked_seasons s ON s.id = $1
+                 LEFT JOIN central_identity.ranked_champions c
+                     ON c.season_id = s.id AND c.account_id = r.account_id AND c.player_format = r.format
+                 WHERE r.season_id = $1 AND r.account_id = ANY($2) AND r.games > 0"
+            ),
+            vec![season_id.into(), ids.into()],
+        ))
+        .await
+        .map_err(unavailable)?;
+    let mut by_account: std::collections::BTreeMap<Uuid, Rank> = std::collections::BTreeMap::new();
+    for r in &rows {
+        let account_id: Uuid = column(r, "account_id")?;
+        let games: i32 = column(r, "games")?;
+        let place = column::<Option<i16>>(r, "place")?
+            .map(u8::try_from)
+            .transpose()
+            .map_err(unavailable)?;
+        let rank = wire_rank(
+            column(r, "public_league")?,
+            column(r, "public_division")?,
+            games,
+            place,
+        )?;
+        by_account
+            .entry(account_id)
+            .and_modify(|current| {
+                if central_api::ranked::rank_key(rank) > central_api::ranked::rank_key(*current) {
+                    *current = rank;
+                }
+            })
+            .or_insert(rank);
+    }
+    Ok(accounts
+        .iter()
+        .filter_map(|(id, tag)| {
+            by_account
+                .get(id)
+                .map(|rank| central_api::social::TaggedRank {
+                    tag: *tag,
+                    rank: *rank,
+                })
+        })
+        .collect())
 }
 
 #[cfg(test)]

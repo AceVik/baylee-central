@@ -295,7 +295,7 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   // the block that asks for a code went with the form
   await expect(mail(page)).toBeHidden();
 
-  expect(operations(seen)).toEqual(["discover", "reset_start", "reset_finish", "account_summary"]);
+  expect(operations(seen).filter((op) => op !== "refresh_session")).toEqual(["discover", "reset_start", "reset_finish", "account_summary"]);
   const finish = seen[2] as { attempt: number[]; record: number[]; wrapped_master: number[]; vault: { kind: string; document: number[]; recovery: number[] } };
   expect(Object.keys(finish).sort()).toEqual(["attempt", "operation", "record", "vault", "wrapped_master"]);
   expect(finish.attempt).toEqual(Array(32).fill(7));
@@ -319,15 +319,15 @@ test("a new vault: its recovery code is shown once, copied or saved, and kept be
   // the registration's ways to keep it (keep.rs), each made only when it is asked for
   const steps = page.locator("#reset-steps");
   const way = (name: string) => steps.getByRole("button", { name, exact: true });
-  for (const name of ["Copy", "Save as a text file", "Print", "Mail it to myself"]) await expect(way(name)).toBeVisible();
+  for (const name of ["Copy recovery code", "Save as a text file", "Print", "Mail it to myself"]) await expect(way(name)).toBeVisible();
   const before = await page.content();
   expect(before.split(shown)).toHaveLength(2);
   expect(before).not.toContain("data:text");
   expect(before).not.toContain("mailto:");
   await expect(page.locator("a[download], a[href^='mailto:'], .code-sheet")).toHaveCount(0);
 
-  await way("Copy").click();
-  await expect(steps.locator("[role=status]").filter({ hasText: "Copied." })).toHaveCount(1);
+  await way("Copy recovery code").click();
+  await expect(way("Recovery code copied")).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
   // the file names the account the reset was for, and its link is gone again
   const [download] = await Promise.all([page.waitForEvent("download"), way("Save as a text file").click()]);
@@ -452,7 +452,7 @@ test("a finish that Central refuses changes nothing and shows no code", async ({
   await open(page);
   await fill(page);
   await submit(page).click();
-  await expect(page.getByRole("alert")).toHaveText("Something went wrong. Try again; if it keeps happening, tell us.", { timeout: 60_000 });
+  await expect(page.getByRole("alert")).toHaveText("Something went wrong. Try again, and if it keeps happening, tell us.", { timeout: 60_000 });
   await expect(page.locator(".secret")).toHaveCount(0);
   await expect(form(page).getByLabel("Reset code")).toHaveValue(CODE);
   expect(operations(seen)).toEqual(["discover", "reset_start", "reset_finish"]);
@@ -576,7 +576,7 @@ test("the sign-in form leads to it by a plain link, on its address and over anot
   await expect(answer.getByRole("link", { name: "on this page" })).toHaveAttribute("href", "/en/reset");
   await expect(answer).not.toContainText("cannot be redeemed");
   // the answer names the mail, and the administrator for an account without an address
-  await expect(answer).toContainText("If your account has a confirmed e-mail address, you can have the code sent to it there; otherwise an administrator gives you one.");
+  await expect(answer).toContainText("If your account has a confirmed e-mail address, you can have the code sent to it there. Otherwise, an administrator gives you one.");
   const menu = page.locator(".menu-btn");
   if (await menu.isVisible()) await menu.click();
   await page.locator("a.nav-account").click();

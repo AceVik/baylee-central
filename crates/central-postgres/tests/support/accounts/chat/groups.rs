@@ -172,14 +172,18 @@ pub(super) async fn run(store: &AccountStore, tokens: [&Token; 3], keys: [&Devic
     let id = create(store, a).await;
     let conv = format!("grp:{id}");
     assert_eq!(list(store, a).await.groups[0].members.len(), 1);
+    assert!(list(store, a).await.groups[0].members[0].admin);
     assert_eq!(list(store, b).await.groups.len(), 0);
     assert!(change(store, b, &id, Change::Join).await.is_err());
     assert!(change(store, c, &id, Change::Delete).await.is_err());
+    // Blocked players cannot be invited; non-blocked non-contacts can.
+    contact(store, c, A, ContactAction::Block).await;
     assert!(
         change(store, a, &id, Change::Invite { tag: C })
             .await
             .is_err()
     );
+    contact(store, c, A, ContactAction::Unblock).await;
     post(store, a, &conv, message(&conv, ak, A, &[ak], 100))
         .await
         .unwrap();
@@ -211,11 +215,15 @@ pub(super) async fn run(store: &AccountStore, tokens: [&Token; 3], keys: [&Devic
         .await
         .is_err()
     );
-    contact(store, a, C, ContactAction::Request).await;
-    contact(store, c, A, ContactAction::Request).await;
+    admin_and_description(store, a, b, &id).await;
+    // Non-contact enrolled player C can be invited directly without prior friendship.
     change(store, a, &id, Change::Invite { tag: C })
         .await
         .unwrap();
+    assert_eq!(
+        list(store, c).await.invites[0].description,
+        "Weekly Commander"
+    );
     // Invitation does not grant directory access to non-friend group members.
     assert!(
         matches!(call(store, c, ChatRequest::Keys { tags: vec![B] }).await.unwrap(), ChatResponse::Keys { keys } if keys.is_empty())
@@ -231,6 +239,70 @@ pub(super) async fn run(store: &AccountStore, tokens: [&Token; 3], keys: [&Devic
     assert_eq!(history(store, c, &ck, &conv).await.len(), 1);
     block_and_departure(store, tokens, [ak, bk, &ck], &id).await;
     quotas_and_labels(store, a).await;
+}
+
+async fn admin_and_description(store: &AccountStore, a: &Token, b: &Token, id: &str) {
+    change(
+        store,
+        a,
+        id,
+        Change::SetAdmin {
+            tag: B,
+            admin: true,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        change(
+            store,
+            b,
+            id,
+            Change::SetAdmin {
+                tag: A,
+                admin: false,
+            }
+        )
+        .await
+        .is_err()
+    );
+    change(
+        store,
+        b,
+        id,
+        Change::SetDescription {
+            description: "Weekly Commander".into(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        list(store, a).await.groups[0].description,
+        "Weekly Commander"
+    );
+    change(
+        store,
+        a,
+        id,
+        Change::SetAdmin {
+            tag: B,
+            admin: false,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        change(
+            store,
+            b,
+            id,
+            Change::SetDescription {
+                description: "nope".into(),
+            }
+        )
+        .await
+        .is_err()
+    );
 }
 
 async fn block_and_departure(

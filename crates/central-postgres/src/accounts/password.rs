@@ -67,6 +67,37 @@ impl AccountStore {
         wrapped: &[u8],
         next: Session<'_>,
     ) -> Result<(Issued, Option<Told>), Error> {
+        self.change_password_inner(current, credential, record, wrapped, next, None)
+            .await
+    }
+
+    /// Variant of [`Self::change_password`] that pairs a new browser session
+    /// with a rotating 3-day refresh token capped at 30 days.
+    ///
+    /// # Errors
+    /// Same as [`Self::change_password`].
+    pub async fn change_password_with_refresh(
+        &self,
+        current: Session<'_>,
+        credential: &Credential,
+        record: &[u8],
+        wrapped: &[u8],
+        next: Session<'_>,
+        next_refresh: Option<&super::Token>,
+    ) -> Result<(Issued, Option<Told>), Error> {
+        self.change_password_inner(current, credential, record, wrapped, next, next_refresh)
+            .await
+    }
+
+    async fn change_password_inner(
+        &self,
+        current: Session<'_>,
+        credential: &Credential,
+        record: &[u8],
+        wrapped: &[u8],
+        next: Session<'_>,
+        next_refresh: Option<&super::Token>,
+    ) -> Result<(Issued, Option<Told>), Error> {
         ServerKeys::enrollment_record(record).map_err(|_| Error::Rejected)?;
         WrappedMasterKey::from_bytes(wrapped).map_err(|_| Error::Rejected)?;
         if current.kind() != next.kind() {
@@ -143,15 +174,8 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
-        let inserted = tx.query_one_raw(statement(
-            "INSERT INTO central_identity.sessions (digest, account_id, credential_revision, kind, created_at, expires_at)
-             SELECT $1, $2, $3, $4, t, t + interval '30 minutes' FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
-             RETURNING floor(extract(epoch FROM expires_at))::bigint AS expires_at",
-            vec![next.digest().to_vec().into(), account.into(), revision.into(), next.kind().into()],
-        )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Unavailable)?;
-        let expires_at = inserted
-            .try_get("", "expires_at")
-            .map_err(|_| Error::Unavailable)?;
+        let expires_at =
+            insert_reset_session_tx(&tx, account, revision, next, next_refresh).await?;
         // Under the account's row lock, which every write of its address
         // takes first.
         let told = confirmed(&tx, account).await?;
@@ -165,4 +189,48 @@ impl AccountStore {
             told,
         ))
     }
+}
+
+async fn insert_reset_session_tx(
+    tx: &impl sea_orm::ConnectionTrait,
+    account: sea_orm::sqlx::types::Uuid,
+    revision: i64,
+    next: Session<'_>,
+    next_refresh: Option<&super::Token>,
+) -> Result<i64, Error> {
+    let access_mins: i32 = if matches!(next, Session::Browser(_)) && next_refresh.is_some() {
+        15
+    } else {
+        30
+    };
+    let refresh_digest: Option<Vec<u8>> = if matches!(next, Session::Browser(_)) {
+        next_refresh.map(|token| Session::refresh_digest(token).to_vec())
+    } else {
+        None
+    };
+    let inserted = tx
+        .query_one_raw(statement(
+            "INSERT INTO central_identity.sessions
+             (digest, account_id, credential_revision, kind, created_at, expires_at,
+              refresh_digest, refresh_expires_at, absolute_expires_at)
+         SELECT $1, $2, $3, $4, t, t + pg_catalog.make_interval(mins => $5), $6,
+                CASE WHEN $6::bytea IS NULL THEN NULL ELSE t + interval '3 days' END,
+                CASE WHEN $6::bytea IS NULL THEN NULL ELSE t + interval '30 days' END
+         FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
+         RETURNING floor(extract(epoch FROM expires_at))::bigint AS expires_at",
+            vec![
+                next.digest().to_vec().into(),
+                account.into(),
+                revision.into(),
+                next.kind().into(),
+                access_mins.into(),
+                refresh_digest.into(),
+            ],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Unavailable)?;
+    inserted
+        .try_get("", "expires_at")
+        .map_err(|_| Error::Unavailable)
 }

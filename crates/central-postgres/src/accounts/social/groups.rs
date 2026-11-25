@@ -12,10 +12,11 @@ mod snapshot;
 pub(super) struct Membership {
     account: Uuid,
     accepted: bool,
+    admin: bool,
     inviter: Uuid,
 }
 
-pub(super) struct Locked {
+pub(in crate::accounts) struct Locked {
     id: Uuid,
     owner: Uuid,
     members: Vec<Membership>,
@@ -30,12 +31,23 @@ impl Locked {
         self.member(account).is_some_and(|member| member.accepted)
     }
 
+    pub(in crate::accounts) fn is_admin(&self, account: Uuid) -> bool {
+        self.owner == account
+            || self
+                .member(account)
+                .is_some_and(|member| member.accepted && member.admin)
+    }
+
     pub(super) fn accounts(&self) -> Vec<Uuid> {
         self.members
             .iter()
             .filter(|member| member.accepted)
             .map(|member| member.account)
             .collect()
+    }
+
+    pub(in crate::accounts) fn everyone(&self) -> Vec<Uuid> {
+        self.members.iter().map(|member| member.account).collect()
     }
 }
 
@@ -47,7 +59,11 @@ pub(super) fn id(text: &str) -> Result<Uuid, Error> {
     Ok(id)
 }
 
-pub(super) async fn lock(db: &impl ConnectionTrait, id: Uuid, me: Uuid) -> Result<Locked, Error> {
+pub(in crate::accounts) async fn lock(
+    db: &impl ConnectionTrait,
+    id: Uuid,
+    me: Uuid,
+) -> Result<Locked, Error> {
     let row = db
         .query_one_raw(statement(
             "SELECT owner FROM central_identity.chat_groups WHERE id = $1 FOR UPDATE",
@@ -57,15 +73,23 @@ pub(super) async fn lock(db: &impl ConnectionTrait, id: Uuid, me: Uuid) -> Resul
         .map_err(unavailable)?
         .ok_or(Error::Rejected)?;
     let owner = row.try_get("", "owner").map_err(unavailable)?;
-    let rows = db.query_all_raw(statement(
-        "SELECT account_id, accepted, inviter FROM central_identity.chat_members WHERE group_id = $1 ORDER BY account_id", vec![id.into()],
-    )).await.map_err(unavailable)?;
+    let rows = db
+        .query_all_raw(statement(
+            "SELECT account_id, accepted, admin, inviter
+             FROM central_identity.chat_members
+             WHERE group_id = $1
+             ORDER BY account_id",
+            vec![id.into()],
+        ))
+        .await
+        .map_err(unavailable)?;
     let members = rows
         .iter()
         .map(|row| {
             Ok(Membership {
                 account: row.try_get("", "account_id").map_err(unavailable)?,
                 accepted: row.try_get("", "accepted").map_err(unavailable)?,
+                admin: row.try_get("", "admin").map_err(unavailable)?,
                 inviter: row.try_get("", "inviter").map_err(unavailable)?,
             })
         })
@@ -112,14 +136,19 @@ pub(super) async fn dispatch(
                 Change::Invite { tag }
                 | Change::Withdraw { tag }
                 | Change::Remove { tag }
-                | Change::Transfer { tag } => Some(
+                | Change::Transfer { tag }
+                | Change::SetAdmin { tag, .. } => Some(
                     by_tag(db, *tag)
                         .await?
                         .ok_or(Error::Rejected)?
                         .try_get::<Uuid>("", "id")
                         .map_err(unavailable)?,
                 ),
-                Change::Rename { .. } | Change::Join | Change::Delete => None,
+                Change::Rename { .. }
+                | Change::SetDescription { .. }
+                | Change::RemovePicture
+                | Change::Join
+                | Change::Delete => None,
             };
             let mut accounts: Vec<Uuid> =
                 group.members.iter().map(|member| member.account).collect();
@@ -174,7 +203,11 @@ async fn create(
         .try_get("", "id")
         .map_err(unavailable)?;
     db.query_one_raw(statement(
-        "INSERT INTO central_identity.chat_members (group_id, account_id, accepted, inviter) VALUES ($1, $2, true, $2) RETURNING id", vec![id.into(), me.into()],
-    )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
+        "INSERT INTO central_identity.chat_members (group_id, account_id, accepted, admin, inviter) VALUES ($1, $2, true, true, $2) RETURNING id",
+        vec![id.into(), me.into()],
+    ))
+    .await
+    .map_err(unavailable)?
+    .ok_or(Error::Unavailable)?;
     Ok(GroupResponse::Created { id: id.to_string() })
 }

@@ -33,7 +33,7 @@ impl AccountStore {
                                count(*) FILTER (WHERE g.last_seen > pg_catalog.clock_timestamp() - interval '90 seconds') AS online
                            FROM central_identity.gateways g
                            LEFT JOIN central_identity.gateway_approvals p ON p.gateway_id = g.id
-                           WHERE NOT g.official) g,
+                           WHERE NOT g.official AND g.deleted_at IS NULL) g,
                           (SELECT count(*) AS live_tokens FROM central_identity.gateway_tokens t WHERE {LIVE_TOKEN}) t"
                 ),
                 vec![],

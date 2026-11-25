@@ -19,7 +19,7 @@
 //! existence is confirmed. The answers carry their own headers: a sandbox
 //! CSP, `nosniff`, CORP same-origin and at most an hour in any cache.
 use super::super::boundary::{UPLOAD_PACE, paced};
-use super::super::in_flight::forwarded;
+use super::super::in_flight::{Permit, forwarded};
 use super::{
     Accounts, Browser, IN_FLIGHT, MINUTE, Peer, Refusal, cookie, exactly, failure, refused,
     timed_out,
@@ -30,7 +30,7 @@ use axum::{
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header, request::Parts},
     response::{IntoResponse, Response},
 };
-use central_api::picture::parse_key;
+use central_api::{Token, picture::parse_key};
 use central_identity::{PictureEncoding, UploadRefusal};
 use central_picture::Format;
 use std::{
@@ -126,31 +126,86 @@ fn refusal(refusal: UploadRefusal) -> Response {
     }
 }
 
+/// Canonical lowercase hyphenated `UUIDv7` as Central writes group IDs.
+pub(super) fn parse_group_id(text: &str) -> Option<[u8; 16]> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 36 {
+        return None;
+    }
+    let mut hex = [0_u8; 32];
+    let mut out = 0;
+    for (idx, &byte) in bytes.iter().enumerate() {
+        match idx {
+            8 | 13 | 18 | 23 => {
+                if byte != b'-' {
+                    return None;
+                }
+            }
+            _ => {
+                if !matches!(byte, b'0'..=b'9' | b'a'..=b'f') {
+                    return None;
+                }
+                hex[out] = byte;
+                out += 1;
+            }
+        }
+    }
+    let hex_str = std::str::from_utf8(&hex).ok()?;
+    let id = parse_key(hex_str)?;
+    (id[6] >> 4 == 7 && id[8] >> 6 == 2).then_some(id)
+}
+
+fn prepare_upload<'a, A>(
+    state: &'a Browser<A>,
+    parts: &Parts,
+) -> Result<(Permit<'a>, Format, usize, Token), Box<Response>> {
+    let Some(format) = format(&parts.headers) else {
+        return Err(Box::new(refused()));
+    };
+    if !permitted(parts, &state.site) {
+        return Err(Box::new(refused()));
+    }
+    let Some(client) = forwarded(&parts.headers) else {
+        return Err(Box::new(Refusal::NoClient.into_response()));
+    };
+    let Some(permit) = state.in_flight.admit(client, IN_FLIGHT) else {
+        return Err(Box::new(Refusal::Busy.into_response()));
+    };
+    let Some(length) = length(&parts.headers) else {
+        return Err(Box::new(
+            (StatusCode::LENGTH_REQUIRED, "request rejected\n").into_response(),
+        ));
+    };
+    if length > format.max_bytes() {
+        return Err(Box::new(
+            (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response(),
+        ));
+    }
+    let Some(cookie) = cookie(&parts.headers) else {
+        return Err(Box::new(failure(central_api::Error::Rejected)));
+    };
+    Ok((permit, format, length, cookie))
+}
+
+async fn read_upload_body(body: Body, length: usize) -> Result<Vec<u8>, Box<Response>> {
+    match tokio::time::timeout(BODY_TIME, paced(body, length, UPLOAD_PACE)).await {
+        Ok(Ok(bytes)) if bytes.len() == length => Ok(bytes.to_vec()),
+        Ok(Ok(_)) => Err(Box::new(
+            (StatusCode::BAD_REQUEST, "request rejected\n").into_response(),
+        )),
+        Ok(Err(status)) => Err(Box::new((status, "request rejected\n").into_response())),
+        Err(_) => Err(Box::new(timed_out())),
+    }
+}
+
 pub(super) async fn upload<A: Accounts>(
     State(state): State<Arc<Browser<A>>>,
     request: HttpRequest,
 ) -> Response {
     let (parts, body) = request.into_parts();
-    let Some(format) = format(&parts.headers) else {
-        return refused();
-    };
-    if !permitted(&parts, &state.site) {
-        return refused();
-    }
-    let Some(client) = forwarded(&parts.headers) else {
-        return Refusal::NoClient.into_response();
-    };
-    let Some(_permit) = state.in_flight.admit(client, IN_FLIGHT) else {
-        return Refusal::Busy.into_response();
-    };
-    let Some(length) = length(&parts.headers) else {
-        return (StatusCode::LENGTH_REQUIRED, "request rejected\n").into_response();
-    };
-    if length > format.max_bytes() {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "request rejected\n").into_response();
-    }
-    let Some(cookie) = cookie(&parts.headers) else {
-        return failure(central_api::Error::Rejected);
+    let (_permit, format, length, cookie) = match prepare_upload(&state, &parts) {
+        Ok(prepared) => prepared,
+        Err(response) => return *response,
     };
     // The account, its terms, its block, its budget and a slot: all before
     // the body is read.
@@ -158,21 +213,56 @@ pub(super) async fn upload<A: Accounts>(
         Ok(admitted) => admitted,
         Err(error) => return refusal(error),
     };
-    let bytes = match tokio::time::timeout(BODY_TIME, paced(body, length, UPLOAD_PACE)).await {
-        Ok(Ok(bytes)) if bytes.len() == length => bytes,
-        Ok(Ok(_)) => return (StatusCode::BAD_REQUEST, "request rejected\n").into_response(),
-        Ok(Err(status)) => return (status, "request rejected\n").into_response(),
-        Err(_) => return timed_out(),
+    let bytes = match read_upload_body(body, length).await {
+        Ok(bytes) => bytes,
+        Err(response) => return *response,
     };
     match state
         .accounts
-        .store_picture(admitted, &cookie, format, bytes.to_vec())
+        .store_picture(admitted, &cookie, format, bytes)
         .await
     {
         Ok(response) => match central_api::encode(&response) {
             Ok(bytes) => ([(header::CONTENT_TYPE, "application/json")], bytes).into_response(),
             Err(error) => failure(error),
         },
+        Err(error) => refusal(error),
+    }
+}
+
+pub(super) async fn upload_group<A: Accounts>(
+    State(state): State<Arc<Browser<A>>>,
+    Path(group): Path<String>,
+    request: HttpRequest,
+) -> Response {
+    let (parts, body) = request.into_parts();
+    let (_permit, format, length, cookie) = match prepare_upload(&state, &parts) {
+        Ok(prepared) => prepared,
+        Err(response) => return *response,
+    };
+    let Some(group) = parse_group_id(&group) else {
+        return failure(central_api::Error::Rejected);
+    };
+    let admitted = match state.accounts.admit_group_picture(&cookie, group).await {
+        Ok(admitted) => admitted,
+        Err(error) => return refusal(error),
+    };
+    let bytes = match read_upload_body(body, length).await {
+        Ok(bytes) => bytes,
+        Err(response) => return *response,
+    };
+    match state
+        .accounts
+        .store_group_picture(admitted, &cookie, format, bytes)
+        .await
+    {
+        Ok((key, moving)) => json(
+            StatusCode::OK,
+            format!(
+                r#"{{"key":"{}","moving":{moving}}}"#,
+                central_api::picture::key_hex(&key)
+            ),
+        ),
         Err(error) => refusal(error),
     }
 }

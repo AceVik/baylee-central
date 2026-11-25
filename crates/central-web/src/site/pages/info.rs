@@ -36,6 +36,19 @@ pub fn gateways(cx: &Context<'_>) -> Built {
     );
     meta.trail
         .push((words::gws_title(lang).to_owned(), Page::Gateways));
+    meta.data.push(json!({
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": words::title_gateways(lang),
+        "description": words::desc_gateways(lang),
+        "url": format!("{}{}", cx.origin, Page::Gateways.path(lang)),
+        "inLanguage": lang.tag(),
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "Baylee",
+            "url": format!("{}{}", cx.origin, Page::Home.path(lang)),
+        },
+    }));
     let body = view! {
         <section class="page-head wrap" aria-labelledby="gateways-title">
             <p class="eyebrow">{words::gw_eyebrow(lang)}</p>
@@ -83,11 +96,13 @@ fn directory_tools(lang: Lang, all: &[Gateway], newest: Option<&str>) -> impl In
         <div class="dir-tools glass" hidden=true data-find-bar="">
             <div class="dir-row">
                 <div class="dir-search">
-                    <span class="dir-search-mark">{icon(icons::SEARCH)}</span>
                     <label class="visually-hidden" for="dir-find">{words::gw_find(lang)}</label>
-                    <input id="dir-find" type="search" placeholder=words::gw_find_hint(lang) maxlength="80"
-                        autocomplete="off" spellcheck="false" aria-keyshortcuts="Control+K Meta+K" />
-                    <kbd class="dir-key" aria-hidden="true" data-key="">"Ctrl K"</kbd>
+                    <div class="inset">
+                        <span class="inset-mark" aria-hidden="true">{icon(icons::SEARCH)}</span>
+                        <input id="dir-find" type="search" placeholder=words::gw_find_hint(lang) maxlength="80"
+                            autocomplete="off" spellcheck="false" aria-keyshortcuts="Control+K Meta+K" />
+                        <kbd class="dir-key" aria-hidden="true" data-key="">"Ctrl K"</kbd>
+                    </div>
                 </div>
                 <div class="dir-sort">
                     <label for="dir-sort">{icon(icons::ARROW_UP_DOWN)}<span class="visually-hidden">{words::gw_sort(lang)}</span></label>

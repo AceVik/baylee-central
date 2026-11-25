@@ -7,6 +7,7 @@
 //! cookie.
 #![forbid(unsafe_code)]
 
+pub mod cards;
 pub mod config;
 pub mod fetch;
 pub mod files;

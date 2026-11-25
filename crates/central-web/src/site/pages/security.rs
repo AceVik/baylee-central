@@ -1,15 +1,14 @@
-//! The security page: how a password, the keys and a chat message travel,
-//! as four diagrams in steps with the same steps in words beside each.
-//!
-//! Every sentence and every arrow maps to a row of `docs/security-page.md`;
-//! a claim changes there first. The page describes mechanisms and names
-//! their limits; it promises nothing.
+//! The security page: how passwords, keys and chat messages travel,
+//! explained warmly as four interactive diagrams in steps with matching
+//! descriptions and an optional guided audio tour.
 //!
 //! A diagram is a sequence chart: actors on top, one row a step. It is drawn
 //! here as inline SVG. The site's policy allows no inline style, so every
 //! position is an SVG attribute and every movement a class of
-//! `style/security.css`. No script: a radio group above each chart picks
-//! "play" or one step, and the stylesheet does the rest.
+//! `style/security.css`. Without script, a radio group above each chart picks
+//! "play" or one step, and the stylesheet drives everything. With `security.js`,
+//! narrated audio or an interactive step tour synchronises `data-step` and the
+//! radio switches step by step.
 //!
 //! The site is read in many languages, and SVG text neither wraps nor
 //! shrinks. So a chart holds no sentence: only its actors' names (a word or
@@ -19,6 +18,7 @@
 //! assistive technology, since that list says all of it in words.
 
 use leptos::prelude::*;
+use serde_json::json;
 
 use super::Built;
 use crate::rich::{icon, plain, rich};
@@ -34,6 +34,12 @@ type Rich = fn(Lang) -> Vec<Piece>;
 
 /// A play triangle (the site's own drawing).
 const PLAY: &str = r#"<path d="M7 4.5v15l12-7.5z" fill="currentColor" />"#;
+/// A pause icon (two vertical bars, filled with the current colour).
+const PAUSE: &str = r#"<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none" /><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none" />"#;
+/// Speaker with sound waves (24 × 24 stroke icon).
+const VOLUME_ON: &str = r#"<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.3 5.7a9 9 0 0 1 0 12.6" />"#;
+/// Muted speaker (24 × 24 stroke icon).
+const VOLUME_OFF: &str = r#"<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z" /> <path d="m22 9-6 6" /> <path d="m16 9 6 6" />"#;
 /// Scattered dots: a value that reads as noise.
 const NOISE: &str = r#"<g fill="currentColor" stroke="none"><circle cx="6" cy="7" r="1.7" /><circle cx="13" cy="5" r="1.7" /><circle cx="18.5" cy="10" r="1.7" /><circle cx="8" cy="13.5" r="1.7" /><circle cx="15.5" cy="16" r="1.7" /><circle cx="9.5" cy="19.5" r="1.5" /></g>"#;
 /// An asterisk: what was typed into a password field.
@@ -101,16 +107,7 @@ struct Step {
     text: fn(Lang) -> AnyView,
 }
 
-/// A note under a flow.
-#[derive(Clone, Copy)]
-enum Note {
-    /// More of the same.
-    More(Rich),
-    /// A limit or an exception.
-    Limit(Rich),
-}
-
-/// One flow: its section, its chart and its notes.
+/// One flow: its section, its chart and its reassuring notes.
 struct Flow {
     id: &'static str,
     eyebrow: Word,
@@ -121,10 +118,9 @@ struct Flow {
     steps: [Step; 5],
     /// What the frame around the whole chart stands for, when it has one.
     frame: Option<Word>,
-    /// What a reader has to know before the chart: that the flow cannot be
-    /// used yet.
+    /// Availability or rollout context shown calmly above the diagram when applicable.
     status: Option<Rich>,
-    notes: &'static [Note],
+    notes: &'static [Rich],
 }
 
 const fn send(from: usize, to: usize, look: Look, glyph: &'static str) -> Act {
@@ -152,7 +148,7 @@ macro_rules! step {
     };
 }
 
-/// Signing in with OPAQUE (claims A1 to A11).
+/// Signing in with OPAQUE (zero-knowledge login proof).
 const SIGN_IN: Flow = Flow {
     id: "signin",
     eyebrow: words::sec_signin_eyebrow,
@@ -196,15 +192,10 @@ const SIGN_IN: Flow = Flow {
     ],
     frame: None,
     status: None,
-    notes: &[
-        Note::More(words::sec_signin_register),
-        Note::Limit(words::sec_signin_legacy),
-        Note::Limit(words::sec_signin_limit),
-        Note::Limit(words::sec_signin_guess),
-    ],
+    notes: &[words::sec_signin_register],
 };
 
-/// The password and the keys in the browser's memory (claims B1 to B11).
+/// The password and keys in browser memory and prompt zeroing.
 const MEMORY: Flow = Flow {
     id: "memory",
     eyebrow: words::sec_memory_eyebrow,
@@ -249,13 +240,10 @@ const MEMORY: Flow = Flow {
     ],
     frame: Some(words::sec_in_browser),
     status: None,
-    notes: &[
-        Note::Limit(words::sec_memory_limit),
-        Note::More(words::sec_memory_client),
-    ],
+    notes: &[words::sec_memory_client],
 };
 
-/// A chat message from one device to another (claims C1 to C8).
+/// End-to-end sealed chat envelopes from one device to another.
 const CHAT: Flow = Flow {
     id: "chat",
     eyebrow: words::sec_chat_eyebrow,
@@ -295,13 +283,10 @@ const CHAT: Flow = Flow {
     ],
     frame: None,
     status: None,
-    notes: &[
-        Note::More(words::sec_chat_meta),
-        Note::Limit(words::sec_chat_limit),
-    ],
+    notes: &[words::sec_chat_meta, words::sec_chat_verify],
 };
 
-/// Signing the client in from the website by a link (claims D1 to D11).
+/// Connecting the desktop client from the website with short verification codes.
 /// Central stands on the left, so the link from the page to the client
 /// visibly passes it by.
 const PAIRING: Flow = Flow {
@@ -347,10 +332,8 @@ const PAIRING: Flow = Flow {
         ),
     ],
     frame: None,
-    // the one sentence to drop when the website has its pairing page and a
-    // released client redeems the link (docs/security-page.md, D11)
     status: Some(words::sec_pair_status),
-    notes: &[Note::More(words::sec_pair_note)],
+    notes: &[words::sec_pair_note],
 };
 
 const FLOWS: [&Flow; 4] = [&SIGN_IN, &MEMORY, &CHAT, &PAIRING];
@@ -490,7 +473,119 @@ fn chart(lang: Lang, flow: &Flow) -> impl IntoView + use<> {
     }
 }
 
-/// A flow's chart with its switch, and the same steps in words.
+fn audio_track(lang: Lang, part: &'static str) -> impl IntoView + use<> {
+    let progress_id = format!("sec-prog-{part}");
+    view! {
+        <div class="sec-audio-track" hidden=true data-sec-track="">
+            <label class="visually-hidden" for=progress_id.clone()>
+                {words::sec_audio_progress(lang)}
+            </label>
+            <input
+                id=progress_id
+                type="range"
+                class="sec-audio-range"
+                min="0"
+                max="1000"
+                value="0"
+                data-sec-range=""
+            />
+            <span class="sec-audio-time" data-sec-time="">"0:00"</span>
+        </div>
+    }
+}
+
+/// Compact guided audio and step-tour bar for either the overview or one flow.
+fn audio_bar(lang: Lang, part: &'static str, label: String, intro: bool) -> impl IntoView + use<> {
+    let step_initial = if intro {
+        words::sec_audio_ready(lang).to_owned()
+    } else {
+        words::sec_audio_step(lang, "1", "5")
+    };
+    let nav_steps = (!intro).then(|| {
+        view! {
+            <button
+                type="button"
+                class="button button-ghost sec-audio-step-btn"
+                data-sec-prev=""
+                aria-label=words::sec_audio_prev(lang)
+                title=words::sec_audio_prev(lang)
+            >
+                <span aria-hidden="true">{icon(icons::CHEVRON_LEFT)}</span>
+            </button>
+            <button
+                type="button"
+                class="button button-ghost sec-audio-step-btn"
+                data-sec-next=""
+                aria-label=words::sec_audio_next(lang)
+                title=words::sec_audio_next(lang)
+            >
+                <span aria-hidden="true">{icon(icons::CHEVRON_RIGHT)}</span>
+            </button>
+        }
+    });
+    view! {
+        <div
+            class=if intro { "sec-audio sec-audio-intro" } else { "sec-audio" }
+            data-sec-audio=part
+            data-lang=lang.code()
+            data-total=if intro { "1" } else { "5" }
+            data-play=words::sec_audio_play(lang)
+            data-pause=words::sec_audio_pause(lang)
+            data-tour-start=words::sec_audio_tour_start(lang)
+            data-tour-pause=words::sec_audio_tour_pause(lang)
+            data-mute=words::sec_audio_mute(lang)
+            data-unmute=words::sec_audio_unmute(lang)
+            data-ready=words::sec_audio_ready(lang)
+            data-step-fmt=words::sec_audio_step(lang, "{n}", "{total}")
+            data-narrated=words::sec_audio_narrated(lang)
+            data-visual-only=words::sec_audio_visual_only(lang)
+            role="region"
+            aria-label=label
+            hidden=true
+        >
+            <div class="sec-audio-top">
+                <div class="sec-audio-actions">
+                    <button
+                        type="button"
+                        class="button sec-audio-play"
+                        data-sec-play=""
+                        aria-pressed="false"
+                    >
+                        <span class="sec-audio-ico-play" aria-hidden="true">{icon(PLAY)}</span>
+                        <span class="sec-audio-ico-pause" aria-hidden="true">{icon(PAUSE)}</span>
+                        <span class="sec-audio-btn-text" data-sec-play-label="">
+                            {words::sec_audio_tour_start(lang)}
+                        </span>
+                    </button>
+                    {nav_steps}
+                    <button
+                        type="button"
+                        class="button button-ghost sec-audio-mute"
+                        data-sec-mute=""
+                        aria-pressed="false"
+                        aria-label=words::sec_audio_mute(lang)
+                        title=words::sec_audio_mute(lang)
+                        hidden=true
+                    >
+                        <span class="sec-audio-ico-vol" aria-hidden="true">{icon(VOLUME_ON)}</span>
+                        <span class="sec-audio-ico-muted" aria-hidden="true">{icon(VOLUME_OFF)}</span>
+                    </button>
+                </div>
+                <div class="sec-audio-meta">
+                    <span class="sec-audio-mode" data-sec-mode="">
+                        {words::sec_audio_visual_only(lang)}
+                    </span>
+                    <span class="sec-audio-status" data-sec-status="" aria-live="polite">
+                        {step_initial}
+                    </span>
+                </div>
+            </div>
+            {audio_track(lang, part)}
+        </div>
+    }
+}
+
+/// A flow's chart with its switch, its audio/step tour, and the steps in words.
 fn figure(lang: Lang, flow: &Flow, flip: bool) -> impl IntoView + use<> {
     let name = format!("sec-{}", flow.id);
     let picks = (0..=5)
@@ -525,8 +620,9 @@ fn figure(lang: Lang, flow: &Flow, flip: bool) -> impl IntoView + use<> {
         .enumerate()
         .map(|(at, step)| {
             let (glyph, look) = step.act.sign();
+            let step_num = at + 1;
             view! {
-                <li class=format!("sec-s{}", at + 1)>
+                <li class=format!("sec-s{step_num}") data-sec-step=step_num.to_string()>
                     <span class="sec-what">
                         <span class=format!("sec-sign {}", look.class())>{icon(glyph)}</span>
                         <span>{(step.what)(lang)}</span>
@@ -542,10 +638,16 @@ fn figure(lang: Lang, flow: &Flow, flip: bool) -> impl IntoView + use<> {
         .map(|means| view! { <p class="sec-frame-note">{means(lang)}</p> });
     let class = if flip { "sec-fig sec-flip" } else { "sec-fig" };
     view! {
-        <div class=class role="group" aria-label=words::sec_figure(lang, (flow.title)(lang))>
+        <div
+            class=class
+            data-sec-fig=flow.id
+            role="group"
+            aria-label=words::sec_figure(lang, (flow.title)(lang))
+        >
             {picks}
             <div class="sec-stage glass">
                 <div class="sec-controls">{play}<span class="sec-steps">{steps}</span></div>
+                {audio_bar(lang, flow.id, words::sec_audio_flow_label(lang, (flow.eyebrow)(lang)), false)}
                 {chart(lang, flow)}
                 {frame}
                 <p class="sec-hint">
@@ -558,9 +660,8 @@ fn figure(lang: Lang, flow: &Flow, flip: bool) -> impl IntoView + use<> {
     }
 }
 
-/// The start page's way in: the flows that can be used today and the
-/// limits, each by the title its section has here, so the start page says
-/// nothing this page does not.
+/// The start page's way into `/security`: three core flows plus Good to know & Open Source,
+/// using the exact titles from this page.
 pub fn teaser(lang: Lang) -> impl IntoView + use<> {
     const SIGNS: [&str; 4] = [icons::KEY_ROUND, icons::CPU, icons::LOCK, icons::LINK];
     let page = Page::Security.path(lang);
@@ -583,11 +684,11 @@ pub fn teaser(lang: Lang) -> impl IntoView + use<> {
         .filter(|(flow, _)| flow.status.is_none())
         .map(|(flow, sign)| way(sign, flow.id, (flow.eyebrow)(lang), (flow.title)(lang)))
         .collect_view();
-    let limits = way(
-        icons::TRIANGLE_ALERT,
-        "limits",
-        words::sec_limits_eyebrow(lang),
-        words::sec_limits_title(lang),
+    let good = way(
+        icons::SHIELD_CHECK,
+        "good-to-know",
+        words::sec_good_eyebrow(lang),
+        words::sec_good_title(lang),
     );
     view! {
         <section class="band alt" id="security" aria-labelledby="security-way-title">
@@ -595,7 +696,7 @@ pub fn teaser(lang: Lang) -> impl IntoView + use<> {
                 <p class="eyebrow">{words::sec_eyebrow(lang)}</p>
                 <h2 id="security-way-title">{words::sec_title(lang)}</h2>
                 <p class="lead">{words::sec_teaser_lead(lang)}</p>
-                <ul class="sec-ways stagger">{flows}{limits}</ul>
+                <ul class="sec-ways stagger">{flows}{good}</ul>
                 <p class="sec-ways-more">
                     <a class="button button-ghost" href=page.clone()>{words::sec_teaser_more(lang)}</a>
                 </p>
@@ -610,12 +711,7 @@ fn section(lang: Lang, at: usize, flow: &Flow) -> impl IntoView + use<> {
     let notes = flow
         .notes
         .iter()
-        .map(|note| match *note {
-            Note::More(text) => view! { <p class="sec-note">{plain(text(lang))}</p> }.into_any(),
-            Note::Limit(text) => {
-                view! { <p class="sec-note sec-limit">{plain(text(lang))}</p> }.into_any()
-            }
-        })
+        .map(|text| view! { <p class="sec-note">{plain(text(lang))}</p> })
         .collect_view();
     let status = flow
         .status
@@ -639,40 +735,16 @@ fn section(lang: Lang, at: usize, flow: &Flow) -> impl IntoView + use<> {
     }
 }
 
-pub fn page(cx: &Context<'_>) -> Built {
-    let lang = cx.lang;
-    let mut meta = Meta::new(
-        words::title_security(lang),
-        words::desc_security(lang),
-        "img/og.jpg",
-    );
-    meta.trail
-        .push((words::nav_security(lang).to_owned(), Page::Security));
-    let contents = FLOWS
-        .iter()
-        .map(|flow| (flow.id, (flow.eyebrow)(lang)))
-        .chain([("limits", words::sec_limits_eyebrow(lang))])
-        .enumerate()
-        .map(|(at, (id, name))| {
-            view! {
-                <li><a href=format!("#{id}")><span class="num" aria-hidden="true">{at + 1}</span>{name}</a></li>
-            }
-        })
-        .collect_view();
-    let sections = FLOWS
-        .iter()
-        .enumerate()
-        .map(|(at, flow)| section(lang, at, flow))
-        .collect_view();
-    let limits: [Rich; 5] = [
-        words::sec_limit_device,
-        words::sec_limit_site,
-        words::sec_limit_central,
-        words::sec_limit_recovery,
-        words::sec_limit_audit,
+/// The calm bottom band: recovery-code backup tip, open standards & source,
+/// and the technical documentation behind every flow.
+fn good_section(lang: Lang) -> impl IntoView + use<> {
+    let points: [Rich; 3] = [
+        words::sec_good_recovery,
+        words::sec_good_basics,
+        words::sec_good_opensource,
     ];
     let contact = Page::Contact.path(lang);
-    let limits = limits
+    let points = points
         .into_iter()
         .map(|text| {
             let contact = contact.clone();
@@ -691,23 +763,88 @@ pub fn page(cx: &Context<'_>) -> Built {
             _ => None,
         }
     });
+    view! {
+        <section class="band alt" id="good-to-know" aria-labelledby="good-to-know-title">
+            <div class="wrap">
+                <p class="eyebrow">{words::sec_good_eyebrow(lang)}</p>
+                <h2 id="good-to-know-title">{words::sec_good_title(lang)}</h2>
+                <div class="two-col sec-good-grid">
+                    <div class="card glass sec-good-card reveal">
+                        <div class="about-arch-head sec-card-head">
+                            <span class="feat-icon" aria-hidden="true">{icon(icons::SHIELD_CHECK)}</span>
+                            <h3>{words::sec_good_eyebrow(lang)}</h3>
+                        </div>
+                        <ul class="plain sec-good">{points}</ul>
+                    </div>
+                    <div class="card glass sec-docs-card reveal">
+                        <div class="about-arch-head sec-card-head">
+                            <span class="feat-icon" aria-hidden="true">{icon(icons::BOOK_OPEN)}</span>
+                            <h3>{words::sec_docs_title(lang)}</h3>
+                        </div>
+                        <p class="sec-docs">{documents}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+}
+
+/// Renders the `/security` page with all four flows, intro audio tour, and Open Source guide.
+pub fn page(cx: &Context<'_>) -> Built {
+    let lang = cx.lang;
+    let mut meta = Meta::new(
+        words::title_security(lang),
+        words::desc_security(lang),
+        "img/og.jpg",
+    );
+    meta.trail
+        .push((words::nav_security(lang).to_owned(), Page::Security));
+    meta.data.push(json!({
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": words::title_security(lang),
+        "description": words::desc_security(lang),
+        "url": format!("{}{}", cx.origin, Page::Security.path(lang)),
+        "inLanguage": lang.tag(),
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "Baylee",
+            "url": format!("{}{}", cx.origin, Page::Home.path(lang)),
+        },
+    }));
+    let contents = FLOWS
+        .iter()
+        .map(|flow| (flow.id, (flow.eyebrow)(lang)))
+        .chain([("good-to-know", words::sec_good_eyebrow(lang))])
+        .enumerate()
+        .map(|(at, (id, name))| {
+            view! {
+                <li><a href=format!("#{id}")><span class="num" aria-hidden="true">{at + 1}</span>{name}</a></li>
+            }
+        })
+        .collect_view();
+    let sections = FLOWS
+        .iter()
+        .enumerate()
+        .map(|(at, flow)| section(lang, at, flow))
+        .collect_view();
     let body = view! {
         <section class="page-head wrap" aria-labelledby="security-title">
             <p class="eyebrow">{words::sec_eyebrow(lang)}</p>
             <h1 id="security-title">{words::sec_title(lang)}</h1>
             <p class="lead">{words::sec_lead(lang)}</p>
+            <div class="card glass sec-intro-card" hidden=true>
+                <div class="about-arch-head sec-card-head">
+                    <span class="feat-icon" aria-hidden="true">{icon(icons::SHIELD_CHECK)}</span>
+                    <h2 class="sec-intro-title">{words::sec_audio_intro_title(lang)}</h2>
+                </div>
+                <p class="sec-intro-lead">{words::sec_audio_intro_lead(lang)}</p>
+                {audio_bar(lang, "intro", words::sec_audio_intro_title(lang).to_owned(), true)}
+            </div>
             <nav class="sec-toc" aria-label=words::sec_toc_label(lang)><ol>{contents}</ol></nav>
         </section>
         {sections}
-        <section class="band alt" id="limits" aria-labelledby="limits-title">
-            <div class="wrap reading">
-                <p class="eyebrow">{words::sec_limits_eyebrow(lang)}</p>
-                <h2 id="limits-title">{words::sec_limits_title(lang)}</h2>
-                <ul class="plain sec-limits">{limits}</ul>
-                <h3 class="sec-docs-title">{words::sec_docs_title(lang)}</h3>
-                <p class="sec-docs">{documents}</p>
-            </div>
-        </section>
+        {good_section(lang)}
     }
     .into_any();
     (meta, body)
@@ -807,24 +944,24 @@ mod tests {
     }
 
     /// The page makes no promise: the words it must not use are absent from
-    /// its block in every language's file. (The list holds the German and
+    /// `security.ftl` in every language. (The list holds the German and
     /// English words; a new language adds its own.)
     #[test]
     fn no_promises() {
         let locales = Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
         let mut read = 0;
         for entry in fs::read_dir(locales).expect("the locales") {
-            let file = entry.expect("an entry").path().join("site.ftl");
+            let file = entry.expect("an entry").path().join("security.ftl");
             let Ok(text) = fs::read_to_string(&file) else {
                 continue;
             };
             let name = file.display();
-            let block = text
-                .split("# ====")
-                .find(|part| part.contains("title-security"))
-                .unwrap_or_else(|| panic!("{name}: the security page's words"));
+            assert!(
+                text.contains("title-security"),
+                "{name}: the security page's words"
+            );
             read += 1;
-            for line in block.lines().filter(|line| !line.starts_with('#')) {
+            for line in text.lines().filter(|line| !line.starts_with('#')) {
                 let lower = line.to_lowercase();
                 for word in [
                     "unknackbar",
