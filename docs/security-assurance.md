@@ -8707,3 +8707,83 @@ run in CI on the pull request. What was not done: no source audit of the moved p
 on a Mac of what only builds there beyond the workspace's own tests.
 
 These passes are by the implementing agent and are not an independent audit.
+
+## Report tokens, 25 November 2026
+
+The owner asked for tokens that administrators hand out for the report API, with levels: only post,
+only read, read and edit, everything. The design, the routes and the numbers are in
+[reports](reports.md) §"Report tokens".
+
+Design pass. Assets: reports' words, screenshots and records, the triage and its history, the
+store's room and its four connections, the tokens. Callers: a stranger, the holder of a revoked,
+expired or lesser token, one who presents another kind of credential or a token where another kind
+belongs, an administrator whose role is gone, a stolen cookie, a script that repeats itself, a page.
+Invariants: exactly the rights, on the report routes alone; what makes a token good is asked by the
+statement that authenticates it, every time, and again in the transaction of a change; no token
+outlives its maker's role; one refusal for every cause; a token is never taken for a gateway or an
+administrator, nor the other way round; shown once, stored as a digest, in no log; no body before
+its credential; a gateway's bounds for each token.
+
+Implementation pass. A report token and a gateway's credential are told apart by the header's form
+and looked for in their own tables alone. The right follows from the route, so it is asked before
+the body, which the boundary leaves unread for these routes; a selection's purge has a route of its
+own for that. The store's report functions take an actor, an administrator's session or a token,
+checked in their transaction; a token's change holds its row (`FOR SHARE`), so a revocation and a
+change wait for each other, and a filing asks again when its body has come. The rights' needs are
+the type's, the form's and the table's. The runtime may insert a token's own columns and set only
+when it was revoked, by whom and last used; the startup check holds it to that both ways. No package
+was added and no manifest changed.
+
+Adversarial pass, what it found and what changed. A field for the token in the audit's events would
+have reached the account export, which the released client decodes field by field: every
+administrator's client would have lost its name after sign-in (the frozen copy's test refused to
+compile; the page names the tokens beside its events instead). A search reads every report's words,
+and a few at once could hold the store's four connections against everyone's sign-in: two calls at
+once for all tokens, one for each. A download holds up to 64 MiB until it is sent: slots of their
+own, held until then. Nothing bounded a report's notes together or the history read with it, so a
+script could make one report's page larger than the wire answers: bounded. A selection of two
+hundred cost one request of the hour and wrote two hundred histories: it costs twenty. A refused
+part's checks were counted with the credential's refusals: apart now. Refused before its body was
+read, a sender saw its connection reset instead of its answer (found over real TCP): a refused
+request's small body is thrown away first, for a quarter of a second at most, after the credential
+was asked. A token could have filed a record as a gateway's own, which the triage shows as written
+by a gateway: refused by the type and by the table.
+
+Review pass, by a second agent at `468c561b`, the same model as the implementer, without the
+implementer's notes. Nothing high. Middle: (1) a caller who hung up gave the call's slot back while
+the store still worked on the statement, so hanging up again and again held more than the two
+connections meant for tokens; a call and a download now run to their end in a task that keeps the
+slot, and a test that had asked for the opposite asks for this. (2) A report that became a duplicate
+handed its own duplicates on, a row and a line of history for each, unpaid and as often as asked; a
+token's request hands on 50, counted over a selection before anything is written. Small: a note of
+one letter was weighed as one byte (256 more now); a slot was held while a body was on its way
+(taken after it now); the end of the maker's role waited for nothing and a change that had waited
+for a lock did not see it (the removal locks the tokens first, the change asks again in a statement
+of its own); a token's report could name a gateway's name, address and build (refused by the type and
+the table, and the page and the CSV call a token a token); the labels' facet had no bound (200); two
+tokens of one name looked alike in the history (the id's end stands beside it, and the runbook
+revokes by id); an administration tab from before the deployment cannot read what a token filed (in
+the runbook). Two comments promised more than the code did and are corrected; `HEAD` of a part is
+`405`; the operator's level query named a filer on the line for all.
+
+Tested as [reports](reports.md) §"Pass 3: as built" lists. On this Mac (Apple Silicon), at `e30a32c0`:
+`cargo xtask gate` (format, policy, Clippy, 1,367 tests in 64 suites, the release build),
+`cargo xtask postgres` (PostgreSQL 18.6 in its container, all four suites), `cargo xtask smoke`,
+`cargo xtask secrets` (the tree and 559 commits), `cargo xtask crypto-scope`, `cargo audit --deny
+warnings` (0.22.2, CI pins 0.23.0) and `cargo deny check` (0.20.2, CI pins a newer one), each without
+a finding. Before the review's changes the same suites passed on a PostgreSQL 18.7 of its own,
+since Docker's disk was read-only then; one run there with them failed in the chat suite, which this
+work does not touch, at its statement's five seconds on a loaded machine (load 27), after the report
+suite had passed, and the container's run above is the later one. The islands' administration module
+was built for `wasm32-unknown-unknown`; the crypto module built from `main` and from this branch on
+this Mac is byte for byte the same, so the committed one stands.
+
+Not run here: `cargo xtask wasm --check` (its canonical build is Linux), `cargo xtask site`, and the
+browser specs, which were written or changed without npm packages to run them with; CI runs all
+three on the pull request.
+
+What was not done: nothing ran on the server; the migration has not run on production, which has its
+own gate; the memory of downloads and the time of a search over a full store are by reading the code;
+the translations besides English and German are by a cheaper agent, as the owner set for `.ftl`
+files, and were not read by a speaker; the privacy notice is unchanged and the owner's to decide.
+These passes are by the implementing agent and are not an independent audit.

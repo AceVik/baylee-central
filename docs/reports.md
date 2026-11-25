@@ -648,7 +648,10 @@ in it.
 - **A change holds the token's row** (`FOR SHARE`) until it commits. A
   revocation therefore waits for a change that is being written, and a
   change that comes while a revocation is being written waits and is refused
-  by it: once a revocation is answered, nothing the token began commits. A
+  by it: once a revocation is answered, nothing the token began commits. One
+  that would wait longer than the store's five seconds fails and is sent
+  again; a token's changes come one at a time and its hour is bounded, so it
+  can hold its row against a revocation for seconds and not for an hour. A
   filing and a part's upload, whose bodies come after the credential, ask for
   the token again in the transaction that stores them.
 - **The maker's role** is asked by the authenticating query, as designed, and
