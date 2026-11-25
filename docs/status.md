@@ -570,6 +570,9 @@ report API with levels ([reports](reports.md) §"Report tokens"):
   and the audit.
 
 The owner settled the questions the first build left open the same day
-([reports](reports.md) §"Decided by the owner"). Open: the nine languages
-besides English and German for a speaker to read, which does not hold the
-change back; the migration's production run through its own gate.
+([reports](reports.md) §"Decided by the owner"). Open: the privacy
+policy's version 2026-11-26, which names a hosted AI agent's provider as a
+processor before a read token goes to one, drafted and waiting for the
+owner; the nine languages besides English and German for a speaker to
+read, which does not hold the change back; the migration's production run
+through its own gate.

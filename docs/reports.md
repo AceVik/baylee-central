@@ -387,8 +387,10 @@ reported chat message is not filed here: it is the gateway's moderation.
 The `client` object and the record are read only by an administrator or,
 since 25.11.2026, by the holder of a report token that may read
 ([below](#report-tokens-25112026)), one report at a time, and never logged.
-Who may hold such a token is the administrators' to decide; such tokens
-serve the administration's own tools only (§"Decided by the owner" there).
+Who may hold such a token is the administrators' to decide: the
+administration's own tools, and a hosted AI agent only once its provider
+is a processor under contract and named in the privacy policy
+(§"Decided by the owner" there).
 
 ### The website's section
 
@@ -763,11 +765,17 @@ implementing agent's and are not an audit.
 Asked on 25.11.2026, the owner settled the four questions the first build
 left open:
 
-- **The privacy notice stays as it is.** The owner alone manages feedback,
-  and reports never leave Baylee's own systems: a report token that may read
-  goes to the administration's own scripts and agents, not to another
-  company, so there is no processor and no contract. `legal/` is unchanged.
-  Handing such a token to anyone outside is a new question for the owner.
+- **Hosted AI agents may read reports.** The owner alone manages feedback.
+  By the owner's decision of 25.11.2026, report tokens that may read may
+  also go to hosted AI agents (such as Claude by Anthropic or Codex by
+  OpenAI) that triage reports for the owner. The provider then receives
+  players' words, screenshots and records and is a processor (Art. 28
+  GDPR), in the USA. Before the first read token goes to such an agent,
+  the provider's commercial terms with their data processing agreement
+  must apply (consumer plans have none, and may train on inputs), and the
+  privacy policy must name the provider as a recipient and the transfer
+  (version 2026-11-26, drafted in a pull request of its own). Until then
+  read tokens go only to the administration's own machines.
 - **A purge by a token** needs no password, since a token has none: the
   preset "everything" may delete for good, from the trash only, and each
   report it deletes leaves a line naming the token in `report_audit`. Leave

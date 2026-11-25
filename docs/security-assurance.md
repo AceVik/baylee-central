@@ -8788,5 +8788,6 @@ What was not done: nothing ran on the server; the migration has not run on produ
 own gate; the memory of downloads and the time of a search over a full store are by reading the code;
 the translations besides English and German are by a cheaper agent, as the owner set for `.ftl`
 files, and were not read by a speaker (the owner, 25.11.2026: they do not hold the change back); the
-privacy notice is unchanged, by the owner's decision of the same day (reports.md §"Decided by the
-owner"). These passes are by the implementing agent and are not an independent audit.
+privacy policy's change for hosted AI agents that read reports (version 2026-11-26, reports.md
+§"Decided by the owner") is drafted in a pull request of its own and waits for the owner. These
+passes are by the implementing agent and are not an independent audit.
