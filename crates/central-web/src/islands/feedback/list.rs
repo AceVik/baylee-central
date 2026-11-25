@@ -509,6 +509,20 @@ fn counted(lang: Lang, n: Option<u64>) -> impl IntoView + use<> {
     n.map(|n| view! { " " <span class="fb-n">{words::number(lang, n)}</span> })
 }
 
+/// A report token's name as the facets know it, else the end of its id.
+fn token_name(l: &List, id: &[u8; 16]) -> String {
+    l.facets
+        .with(|f| {
+            f.as_ref().and_then(|f| {
+                f.tokens
+                    .iter()
+                    .find(|c| c.value.id == *id)
+                    .map(|c| c.value.name.clone())
+            })
+        })
+        .unwrap_or_else(|| format!("…{}", short_id(id)))
+}
+
 /// A pill's words.
 fn pill_text(l: &List, pill: &Pill) -> String {
     let l = *l;
@@ -524,6 +538,8 @@ fn pill_text(l: &List, pill: &Pill) -> String {
         Pill::Gateway(name) => part(words::fb_gateway(lang), name),
         Pill::Channel(Channel::Gateway) => words::fb_channel_gateway(lang).to_owned(),
         Pill::Channel(Channel::Direct) => words::fb_channel_direct(lang).to_owned(),
+        Pill::Channel(Channel::Token) => words::fb_channel_token(lang).to_owned(),
+        Pill::Token(id) => part(words::fb_token(lang), &token_name(&l, id)),
         Pill::Reporter(r) => part(words::fb_reporter(lang), &alias(r).0),
         Pill::Signature(s) => words::fb_crash_group(lang, &s.chars().take(8).collect::<String>()),
         Pill::DuplicateOf(id) => words::fb_duplicates_of(lang, &short_id(id)),
@@ -823,8 +839,7 @@ fn channel_select(l: &List) -> impl IntoView + use<> {
     let current = Signal::derive(move || {
         l.query.with(|q| match q.channel {
             None => String::new(),
-            Some(Channel::Gateway) => "gateway".into(),
-            Some(Channel::Direct) => "direct".into(),
+            Some(channel) => channel.as_str().to_owned(),
         })
     });
     let options = move || {
@@ -848,6 +863,12 @@ fn channel_select(l: &List) -> impl IntoView + use<> {
                 current,
             )
             .into_any(),
+            opt(
+                "token".into(),
+                with_count(lang, words::fb_channel_token(lang), n(Channel::Token)),
+                current,
+            )
+            .into_any(),
         ]
         .collect_view()
     };
@@ -857,8 +878,50 @@ fn channel_select(l: &List) -> impl IntoView + use<> {
             l.set(|q| q.channel = match v.as_str() {
                 "gateway" => Some(Channel::Gateway),
                 "direct" => Some(Channel::Direct),
+                "token" => Some(Channel::Token),
                 _ => None,
             });
+        }>{options}</select>
+    }
+}
+
+/// The report tokens the facets count, each by its name, the chosen one
+/// kept even where the facets no longer name it.
+fn token_select(l: &List) -> impl IntoView + use<> {
+    let l = *l;
+    let lang = l.c.lang;
+    let current = Signal::derive(move || {
+        l.query
+            .with(|q| q.token.map(|id| hex(&id)).unwrap_or_default())
+    });
+    let options = move || {
+        let mut list: Vec<([u8; 16], Option<u64>)> = l.facets.with(|f| {
+            f.as_ref()
+                .map(|f| {
+                    f.tokens
+                        .iter()
+                        .map(|c| (c.value.id, Some(c.count)))
+                        .collect()
+                })
+                .unwrap_or_default()
+        });
+        if let Some(chosen) = l.query.with(|q| q.token)
+            && !list.iter().any(|(id, _)| *id == chosen)
+        {
+            list.push((chosen, None));
+        }
+        let mut options =
+            vec![opt(String::new(), words::fb_any(lang).to_owned(), current).into_any()];
+        for (id, n) in list {
+            let text = with_count(lang, &token_name(&l, &id), n);
+            options.push(opt(hex(&id), text, current).into_any());
+        }
+        options.collect_view()
+    };
+    view! {
+        <select id="fb-f-token" on:change=move |ev| {
+            let v = event_target_value(&ev);
+            l.set(|q| q.token = super::text::id_of(&v));
         }>{options}</select>
     }
 }
@@ -1011,6 +1074,7 @@ fn filters_view(l: &List) -> impl IntoView + use<> {
                 {field("fb-f-assignee", words::fb_assignee(lang), assignee_select(&l))}
                 {field("fb-f-label", words::fb_label(lang), label)}
                 {field("fb-f-gateway", words::fb_gateway(lang), gateway)}
+                {field("fb-f-token", words::fb_token(lang), token_select(&l))}
                 {field("fb-f-channel", words::fb_channel(lang), channel_select(&l))}
                 {field("fb-f-record", words::fb_record(lang), record_select(&l))}
                 {field("fb-f-reporter", words::fb_reporter(lang), reporter)}
@@ -1574,6 +1638,15 @@ fn row_people(l: &List, r: &ReportSummary) -> impl IntoView + use<> {
     };
     let gateway = if r.channel == Channel::Direct {
         view! { <span class="meta">{words::fb_channel_direct(lang)}</span> }.into_any()
+    } else if let Some(token) = r.token {
+        let name = r.gateway.clone();
+        let title = words::fb_only_token(lang, &name);
+        view! {
+            <span class="meta">{words::fb_token(lang)}" "</span>
+            <button type="button" class="fb-linkish" title=title.clone() aria-label=title
+                on:click=move |_| l.set(|q| q.token = Some(token))><bdi translate="no">{name}</bdi></button>
+        }
+        .into_any()
     } else {
         let name = r.gateway.clone();
         let pick = name.clone();

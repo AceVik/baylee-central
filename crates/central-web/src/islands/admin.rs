@@ -19,8 +19,8 @@
 //!
 //! The administration's other pages are this module's children: the
 //! counts (`overview`), the accounts (`users`) and one account (`user`),
-//! the gateways (`gateways`), the audit log (`audit`) and the legacy store
-//! (`legacy`), with what they share (`common`: the navigation, reads, and
+//! the gateways (`gateways`), the report tokens (`tokens`), the audit log
+//! (`audit`) and the legacy store (`legacy`), with what they share (`common`: the navigation, reads, and
 //! a change's confirmation). [`area`] draws the one an address names.
 //!
 //! [`Administration`] is the island of every page under
@@ -34,6 +34,7 @@ mod common;
 mod gateways;
 mod legacy;
 mod overview;
+mod tokens;
 mod user;
 mod users;
 
@@ -1206,6 +1207,7 @@ pub fn area(
         Section::AdminAudit => audit::page(cx).into_any(),
         Section::AdminLegacy => legacy::page(cx).into_any(),
         Section::AdminPictures => super::moderation::section(lang, worker).into_any(),
+        Section::FeedbackTokens => tokens::page(cx).into_any(),
         _ => page(lang, worker, username, own, signed_out).into_any(),
     };
     view! {

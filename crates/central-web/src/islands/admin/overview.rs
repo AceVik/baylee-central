@@ -401,6 +401,7 @@ mod tests {
             assignees: vec![],
             labels: vec![],
             gateways: vec![],
+            tokens: Vec::new(),
             channels: vec![],
             reporters: vec![],
             total: 4,

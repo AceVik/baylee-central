@@ -67,10 +67,12 @@ pub struct ListQuery {
     pub to: Option<String>,
     /// With a record, or without.
     pub record: Option<bool>,
-    /// Through a gateway, or direct.
+    /// Through a gateway, direct, or from a report token.
     pub channel: Option<Channel>,
     /// Filed by the gateway of this name.
     pub gateway: Option<String>,
+    /// Filed by this report token.
+    pub token: Option<[u8; 16]>,
     /// Looked after by.
     pub assignee: Option<Assignee>,
     /// With this label.
@@ -107,6 +109,7 @@ impl Default for ListQuery {
             record: None,
             channel: None,
             gateway: None,
+            token: None,
             assignee: None,
             label: None,
             reporter: None,
@@ -386,11 +389,13 @@ pub fn read(search: &str) -> ListQuery {
     q.channel = match get("channel") {
         Some("gateway") => Some(Channel::Gateway),
         Some("direct") => Some(Channel::Direct),
+        Some("token") => Some(Channel::Token),
         _ => None,
     };
     q.gateway = get("gateway")
         .filter(|g| valid_gateway(g))
         .map(str::to_owned);
+    q.token = get("token").and_then(id_of);
     q.assignee = match get("assignee") {
         Some("none") => Some(Assignee::Nobody),
         Some(text) => id_of(text).map(Assignee::Admin),
@@ -451,16 +456,8 @@ pub fn write(q: &ListQuery) -> String {
         ),
         ("label", q.label.clone()),
         ("gateway", q.gateway.clone()),
-        (
-            "channel",
-            q.channel.map(|c| {
-                match c {
-                    Channel::Gateway => "gateway",
-                    Channel::Direct => "direct",
-                }
-                .to_owned()
-            }),
-        ),
+        ("token", q.token.map(|id| hex(&id))),
+        ("channel", q.channel.map(|c| c.as_str().to_owned())),
         ("reporter", q.reporter.clone()),
         ("signature", q.signature.clone()),
         ("duplicate_of", q.duplicate_of.map(|id| hex(&id))),
@@ -541,6 +538,7 @@ pub fn filter_of(q: &ListQuery) -> ReportFilter {
         has_record: q.record,
         channel: q.channel,
         gateway: q.gateway.clone(),
+        token: q.token,
         assignee: match q.assignee {
             Some(Assignee::Admin(id)) => Some(id),
             _ => None,
@@ -632,6 +630,8 @@ pub enum Pill {
     Label(String),
     /// The gateway.
     Gateway(String),
+    /// The report token.
+    Token([u8; 16]),
     /// The channel.
     Channel(Channel),
     /// The reporter.
@@ -669,6 +669,7 @@ pub fn pills_of(q: &ListQuery, view: Option<View>) -> Vec<Pill> {
     }
     pills.extend(q.label.clone().map(Pill::Label));
     pills.extend(q.gateway.clone().map(Pill::Gateway));
+    pills.extend(q.token.map(Pill::Token));
     pills.extend(q.channel.map(Pill::Channel));
     pills.extend(q.reporter.clone().map(Pill::Reporter));
     pills.extend(q.signature.clone().map(Pill::Signature));
@@ -696,6 +697,7 @@ pub fn without(q: &ListQuery, pill: &Pill) -> ListQuery {
         Pill::Assignee(_) => n.assignee = None,
         Pill::Label(_) => n.label = None,
         Pill::Gateway(_) => n.gateway = None,
+        Pill::Token(_) => n.token = None,
         Pill::Channel(_) => n.channel = None,
         Pill::Reporter(_) => n.reporter = None,
         Pill::Signature(_) => n.signature = None,
@@ -717,6 +719,7 @@ pub fn panel_count(q: &ListQuery, view: Option<View>) -> usize {
         !q.priorities.is_empty(),
         q.label.is_some(),
         q.gateway.is_some(),
+        q.token.is_some(),
         q.channel.is_some(),
         q.record.is_some(),
         q.reporter.is_some(),

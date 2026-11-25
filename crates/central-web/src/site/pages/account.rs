@@ -69,6 +69,7 @@ fn section_name(lang: Lang, section: Section) -> (&'static str, &'static str) {
         Section::AdminLegacy => (words::admin_legacy(lang), icons::FILE_ARCHIVE),
         Section::AdminPictures => (words::admin_pictures_title(lang), icons::FLAG),
         Section::Feedback => (words::fb_title(lang), icons::MESSAGE_CIRCLE),
+        Section::FeedbackTokens => (words::rt_title(lang), icons::KEY_ROUND),
         Section::Report => (words::fb_report_title(lang), icons::FILE_TEXT),
     }
 }

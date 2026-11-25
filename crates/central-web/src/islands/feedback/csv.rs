@@ -66,16 +66,14 @@ pub fn to_csv(reports: &[ReportSummary], name: &dyn Fn([u8; 16]) -> String) -> S
                 .unwrap_or_default(),
             r.assignee.map(name).unwrap_or_default(),
             r.labels.join(" "),
+            // a direct report came through no gateway of its own; a report
+            // token's has the token's name here, and its channel says so
             if r.channel == Channel::Direct {
                 String::new()
             } else {
                 r.gateway.clone()
             },
-            match r.channel {
-                Channel::Gateway => "gateway",
-                Channel::Direct => "direct",
-            }
-            .to_owned(),
+            r.channel.as_str().to_owned(),
             r.reporter.clone(),
             r.build.clone().unwrap_or_default(),
             r.crash.clone().unwrap_or_default(),
@@ -113,6 +111,7 @@ pub(super) mod tests {
             created_at: 1_794_000_000,
             updated_at: 1_794_000_060,
             gateway: "Synthetic gateway".into(),
+            token: None,
             gateway_says: None,
             gateway_version: None,
             channel: Channel::Gateway,

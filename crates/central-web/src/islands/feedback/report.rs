@@ -676,6 +676,9 @@ fn facts_view(r: &Rep) -> impl IntoView + use<> {
             let s = &d.summary;
             let gateway = if s.channel == Channel::Direct {
                 view! { {words::fb_channel_direct(lang)} }.into_any()
+            } else if s.channel == Channel::Token {
+                // no gateway's: the token's name, marked as one
+                view! { <bdi translate="no">{words::fb_by_token(lang, &s.gateway)}</bdi> }.into_any()
             } else {
                 let says = s
                     .gateway_says
@@ -779,9 +782,11 @@ fn history_view(r: &Rep) -> impl IntoView + use<> {
                 .audit
                 .iter()
                 .map(|row| {
-                    let who = row
-                        .actor
-                        .map_or_else(|| words::fb_h_central(lang).to_owned(), |a| c.name(Some(a)));
+                    let who = match (&row.token, row.actor) {
+                        (Some(name), _) => words::fb_by_token(lang, name),
+                        (None, Some(admin)) => c.name(Some(admin)),
+                        (None, None) => words::fb_h_central(lang).to_owned(),
+                    };
                     let what = action_text(lang, &row.action).map_or_else(
                         || view! { <code>{row.action.clone()}</code> }.into_any(),
                         |w| view! { {w} }.into_any(),
@@ -796,7 +801,10 @@ fn history_view(r: &Rep) -> impl IntoView + use<> {
                     }
                 })
                 .collect_view();
-            view! { <ol class="fb-history">{rows}</ol> }.into_any()
+            let older = d
+                .older
+                .then(|| view! { <p class="meta">{words::fb_history_older(lang)}</p> });
+            view! { {older}<ol class="fb-history">{rows}</ol> }.into_any()
         })
     };
     section("fb-history", words::fb_history(lang), body)
@@ -1259,7 +1267,11 @@ fn notes_view(r: &Rep) -> impl IntoView + use<> {
                 .notes
                 .iter()
                 .map(|n| {
-                    let mine = n.author == me;
+                    let mine = n.token.is_none() && n.author == me;
+                    let who = n.token.as_ref().map_or_else(
+                        || r.c.who(n.author),
+                        |name| words::fb_by_token(lang, name),
+                    );
                     let at = when(lang, n.at);
                     let note = n.id;
                     let remove = mine.then(|| {
@@ -1276,7 +1288,7 @@ fn notes_view(r: &Rep) -> impl IntoView + use<> {
                     view! {
                         <li class="fb-note">
                             <p class="fb-note-head meta">
-                                <bdi translate="no">{r.c.who(n.author)}</bdi>" · "{at.clone()}
+                                <bdi translate="no">{who}</bdi>" · "{at.clone()}
                                 {remove}
                             </p>
                             <p class="fb-note-text" dir="auto">{n.text.clone()}</p>
