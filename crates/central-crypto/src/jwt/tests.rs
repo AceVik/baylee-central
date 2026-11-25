@@ -541,6 +541,50 @@ fn the_replay_cache_refuses_rather_than_forgets_a_live_message() {
 }
 
 #[test]
+fn a_full_replay_cache_keeps_every_message_to_its_last_valid_second() {
+    let key = key(1);
+    let live = key.sign(&revocation_claims()).unwrap();
+    let mut cache = ReplayCache::new(1);
+    cache.take(&revocation_claims(), NOW).unwrap();
+    let mut other = revocation_claims();
+    other.jti = "00000000000000000000000000000001".into();
+    let last = NOW + REVOCATION_SECONDS + LEEWAY_SECONDS - 1;
+    // While the message still verifies, no other one may push it out.
+    let at = |now| Expected { now, ..AT_GATEWAY };
+    assert!(verify::<RevocationClaims>(&live, &keys(&key), at(last)).is_ok());
+    assert_eq!(cache.take(&other, last), Err(JwtError::Full));
+    assert_eq!(
+        cache.take(&revocation_claims(), last),
+        Err(JwtError::Replayed)
+    );
+    // From the second it no longer verifies, its place is free.
+    assert!(verify::<RevocationClaims>(&live, &keys(&key), at(last + 1)).is_err());
+    cache.take(&other, last + 1).unwrap();
+}
+
+#[test]
+fn a_replay_cache_without_room_takes_nothing_and_a_refusal_takes_no_room() {
+    let mut none = ReplayCache::new(0);
+    assert_eq!(none.take(&revocation_claims(), NOW), Err(JwtError::Full));
+    let with = |n: u32| {
+        let mut claims = revocation_claims();
+        claims.jti = format!("{n:032x}");
+        claims
+    };
+    let mut cache = ReplayCache::new(2);
+    cache.take(&with(1), NOW).unwrap();
+    for _ in 0..5 {
+        assert_eq!(cache.take(&with(1), NOW), Err(JwtError::Replayed));
+    }
+    cache.take(&with(2), NOW).unwrap();
+    assert_eq!(cache.take(&with(3), NOW), Err(JwtError::Full));
+    // Neither refusal displaced what was taken.
+    for taken in [1, 2] {
+        assert_eq!(cache.take(&with(taken), NOW), Err(JwtError::Replayed));
+    }
+}
+
+#[test]
 fn rotation_keeps_old_tokens_valid_while_their_key_is_listed() {
     let old = key(1);
     let new = key(2);

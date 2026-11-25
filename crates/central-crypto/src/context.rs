@@ -55,3 +55,74 @@ impl Context {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn account() -> [u8; 16] {
+        let mut account = [3; 16];
+        account[6] = 0x70;
+        account[8] = 0x80;
+        account
+    }
+
+    #[test]
+    fn an_account_is_a_version_seven_uuid_and_nothing_near_it() {
+        for octet in 0..=u8::MAX {
+            let mut version = account();
+            version[6] = octet;
+            assert_eq!(
+                Context::new([1; 32], version, 1).is_ok(),
+                (0x70..=0x7f).contains(&octet),
+                "version octet {octet:#x}"
+            );
+            let mut variant = account();
+            variant[8] = octet;
+            assert_eq!(
+                Context::new([1; 32], variant, 1).is_ok(),
+                (0x80..=0xbf).contains(&octet),
+                "variant octet {octet:#x}"
+            );
+        }
+        // One nonzero octet makes an issuer, at whichever end it stands.
+        for index in [0, 31] {
+            let mut issuer = [0; 32];
+            issuer[index] = 1;
+            assert!(Context::new(issuer, account(), 1).is_ok());
+        }
+        assert!(Context::new([0; 32], account(), 1).is_err());
+        assert!(Context::new([1; 32], account(), 0).is_err());
+        assert!(Context::new([1; 32], account(), u64::MAX).is_ok());
+    }
+
+    #[test]
+    fn no_two_contexts_or_purposes_authenticate_the_same_bytes() {
+        let base = Context::new([1; 32], account(), 1).unwrap();
+        let mut seen = std::collections::BTreeSet::new();
+        assert!(seen.insert(base.aad().to_vec()));
+        assert!(seen.insert(base.recovery_aad().to_vec()));
+        for bit in 0..8 {
+            for octet in 0..32 {
+                let mut issuer = base.issuer;
+                issuer[octet] ^= 1 << bit;
+                let other = Context { issuer, ..base };
+                assert!(seen.insert(other.aad().to_vec()), "issuer {octet} {bit}");
+                assert!(seen.insert(other.recovery_aad().to_vec()));
+            }
+            for octet in 0..16 {
+                let mut account = base.account;
+                account[octet] ^= 1 << bit;
+                let other = Context { account, ..base };
+                assert!(seen.insert(other.aad().to_vec()), "account {octet} {bit}");
+                assert!(seen.insert(other.recovery_aad().to_vec()));
+            }
+        }
+        for shift in 1..64 {
+            let epoch = base.epoch ^ (1 << shift);
+            let other = Context { epoch, ..base };
+            assert!(seen.insert(other.aad().to_vec()), "epoch bit {shift}");
+            assert!(seen.insert(other.recovery_aad().to_vec()));
+        }
+    }
+}
