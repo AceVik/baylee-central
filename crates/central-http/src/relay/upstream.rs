@@ -277,3 +277,6 @@ fn parse(op: Operation, bytes: &[u8]) -> Result<ResultBody, Error> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -6,6 +6,8 @@ pub mod framing;
 mod framing_legacy;
 pub mod puzzle;
 pub mod table;
+#[cfg(test)]
+mod tests;
 
 /// Server-provisioned visual finish.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]

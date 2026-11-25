@@ -306,4 +306,249 @@ mod tests {
             Some([5; 16])
         ));
     }
+
+    const FENCE: Fence = Fence {
+        match_id: [1; 16],
+        generation: 3,
+    };
+    const OWNER: api::Id = [5; 16];
+
+    fn answered(request: &SeatRequest, response: &SeatResponse) -> bool {
+        responds(request, response, Some(OWNER))
+    }
+
+    #[test]
+    fn an_assignment_is_this_account_s_own_for_the_deck_it_queued() {
+        let join = SeatRequest::Join {
+            key: [2; 16],
+            format: api::Format::Standard,
+            deck: [7; 32],
+        };
+        let base = || api::Assignment {
+            match_id: [1; 16],
+            host_id: [3; 16],
+            origin: "https://play.example".into(),
+            format: api::Format::Standard,
+            account: OWNER,
+            seat: 1,
+            deck: [7; 32],
+            game: None,
+        };
+        let reply = |key, assignment| SeatResponse::Queue {
+            state: api::QueueState::Assigned { key, assignment },
+        };
+        assert!(answered(&join, &reply([2; 16], base())));
+        assert!(!responds(&join, &reply([2; 16], base()), None));
+        assert!(!responds(&join, &reply([2; 16], base()), Some([6; 16])));
+        assert!(!answered(&join, &reply([9; 16], base())));
+        let changes: [fn(&mut api::Assignment); 4] = [
+            |a| a.format = api::Format::Commander,
+            |a| a.account = [6; 16],
+            |a| a.seat = 2,
+            |a| a.deck[31] ^= 1,
+        ];
+        for change in changes {
+            let mut assignment = base();
+            change(&mut assignment);
+            assert!(
+                !answered(&join, &reply([2; 16], assignment.clone())),
+                "{assignment:?}"
+            );
+        }
+        let waiting = |key, format| SeatResponse::Queue {
+            state: api::QueueState::Waiting {
+                key,
+                format,
+                queued_at: 1,
+            },
+        };
+        assert!(answered(&join, &waiting([2; 16], api::Format::Standard)));
+        assert!(!answered(&join, &waiting([9; 16], api::Format::Standard)));
+        assert!(!answered(&join, &waiting([2; 16], api::Format::Commander)));
+        // A join that leads to no queue was not answered.
+        assert!(!answered(
+            &join,
+            &SeatResponse::Queue {
+                state: api::QueueState::Idle
+            }
+        ));
+    }
+
+    #[test]
+    fn a_consent_counts_only_for_the_hosts_and_generation_that_were_approved() {
+        use api::replica::{HostApproval, HostConsentOffer, Role};
+        let host = |n: u8| HostApproval {
+            epoch: 1,
+            host_id: [n; 16],
+            origin: format!("https://host{n}.example"),
+            terms: None,
+        };
+        let offer = |host, approved, needs_gateway_terms| HostConsentOffer {
+            host,
+            role: Role::Primary,
+            approved,
+            needs_gateway_terms,
+        };
+        let request = SeatRequest::ApproveHosts {
+            fence: FENCE,
+            hosts: vec![host(1), host(2)],
+        };
+        let reply = |fence, hosts| SeatResponse::Hosts { fence, hosts };
+        assert!(answered(
+            &request,
+            &reply(
+                FENCE,
+                vec![offer(host(2), true, false), offer(host(1), true, false)]
+            )
+        ));
+        for hosts in [
+            vec![],
+            vec![offer(host(1), true, false)],
+            vec![offer(host(1), true, false), offer(host(2), false, false)],
+            vec![offer(host(1), true, false), offer(host(2), true, true)],
+            vec![offer(host(1), true, false), offer(host(3), true, false)],
+            // The same operator at another epoch is another disclosure.
+            vec![
+                offer(host(1), true, false),
+                offer(
+                    HostApproval {
+                        epoch: 2,
+                        ..host(2)
+                    },
+                    true,
+                    false,
+                ),
+            ],
+        ] {
+            assert!(
+                !answered(&request, &reply(FENCE, hosts.clone())),
+                "{hosts:?}"
+            );
+        }
+        let both = vec![offer(host(1), true, false), offer(host(2), true, false)];
+        for fence in [
+            Fence {
+                generation: 4,
+                ..FENCE
+            },
+            Fence {
+                match_id: [9; 16],
+                ..FENCE
+            },
+        ] {
+            assert!(!answered(&request, &reply(fence, both.clone())));
+        }
+        let hosts = SeatRequest::Hosts { match_id: [1; 16] };
+        assert!(answered(&hosts, &reply(FENCE, vec![])));
+        let other = Fence {
+            match_id: [9; 16],
+            ..FENCE
+        };
+        assert!(!answered(&hosts, &reply(other, vec![])));
+    }
+
+    #[test]
+    fn a_relayed_answer_fits_its_call_and_a_refusal_carries_no_body() {
+        use api::replica::relay::{Call, HttpBytes, Reply, Secret};
+        let secret = |text: &str| Secret::new(text.into()).unwrap();
+        let good = "a".repeat(64);
+        let relay = |call| SeatRequest::Relay { fence: FENCE, call };
+        let admit = relay(Call::Admit {});
+        let reclaim = relay(Call::Reclaim {
+            bearer: secret(&good),
+            game: [4; 16],
+        });
+        let ticket = relay(Call::SocketTicket {
+            game: [4; 16],
+            seat_token: secret(&good),
+        });
+        let http = |status, body: Option<&[u8]>| SeatResponse::Relayed {
+            reply: Reply::Http {
+                status,
+                body: body.map(|bytes| HttpBytes::new(bytes.to_vec()).unwrap()),
+            },
+        };
+        let socket = |text: &str| SeatResponse::Relayed {
+            reply: Reply::Socket {
+                ticket: secret(text),
+            },
+        };
+        for request in [&admit, &reclaim] {
+            assert!(answered(request, &http(200, Some(b"{}"))));
+            for status in [202, 400, 599] {
+                assert!(answered(request, &http(status, None)), "{status}");
+                assert!(!answered(request, &http(status, Some(b"{}"))), "{status}");
+            }
+            for status in [0, 101, 199, 600] {
+                assert!(!answered(request, &http(status, None)), "{status}");
+            }
+            assert!(!answered(request, &socket(&good)));
+        }
+        assert!(answered(&ticket, &socket(&good)));
+        assert!(!answered(&ticket, &socket(&good[1..])));
+        assert!(!answered(&ticket, &socket(&good.to_uppercase())));
+        assert!(!answered(&ticket, &http(200, Some(b"{}"))));
+    }
+
+    #[test]
+    fn a_route_and_the_names_at_a_table_are_bounded_before_they_are_shown() {
+        let route = SeatRequest::RelayRoute { fence: FENCE };
+        for (seat, accepted) in [(0, true), (1, true), (2, false), (255, false)] {
+            let reply = SeatResponse::RelayRoute {
+                origin: "https://play.example".into(),
+                game: None,
+                seat,
+            };
+            assert_eq!(answered(&route, &reply), accepted, "{seat}");
+        }
+        let names = SeatRequest::Participants { match_id: [1; 16] };
+        let reply = |match_id, name: &str| SeatResponse::Participants {
+            match_id,
+            seats: [None, Some(name.into())],
+        };
+        assert!(answered(&names, &reply([1; 16], &"x".repeat(32))));
+        assert!(!answered(&names, &reply([9; 16], "x")));
+        for name in [
+            "x".repeat(33).as_str(),
+            "two\nlines",
+            "over\u{202e}ride",
+            "\u{feff}",
+            "bell\u{7}",
+        ] {
+            assert!(!answered(&names, &reply([1; 16], name)), "{name:?}");
+        }
+    }
+
+    #[test]
+    fn no_answer_serves_a_request_of_another_kind() {
+        let requests = [
+            SeatRequest::RelayRoute { fence: FENCE },
+            SeatRequest::Hosts { match_id: [1; 16] },
+            SeatRequest::Participants { match_id: [1; 16] },
+        ];
+        let replies = [
+            SeatResponse::RelayRoute {
+                origin: "https://play.example".into(),
+                game: None,
+                seat: 0,
+            },
+            SeatResponse::Hosts {
+                fence: FENCE,
+                hosts: vec![],
+            },
+            SeatResponse::Participants {
+                match_id: [1; 16],
+                seats: [None, None],
+            },
+            SeatResponse::Receipt {
+                command_id: [1; 16],
+                position: 1,
+            },
+        ];
+        for (i, request) in requests.iter().enumerate() {
+            for (j, reply) in replies.iter().enumerate() {
+                assert_eq!(answered(request, reply), i == j, "{i} {j}");
+            }
+        }
+    }
 }

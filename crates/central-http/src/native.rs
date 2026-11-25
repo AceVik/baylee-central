@@ -600,4 +600,59 @@ mod tests {
             Err(Error::Rejected)
         ));
     }
+
+    #[test]
+    fn a_request_names_its_one_type_and_at_most_one_bearer() {
+        let of = |types: &[&str], bearers: &[&str]| {
+            let mut headers = HeaderMap::new();
+            for value in types {
+                headers.append(header::CONTENT_TYPE, value.parse().unwrap());
+            }
+            for value in bearers {
+                headers.append(header::AUTHORIZATION, value.parse().unwrap());
+            }
+            credential(&headers, "application/json")
+        };
+        let json = ["application/json"];
+        let hex = "0123456789abcdef".repeat(4);
+        let bearer = format!("Bearer {hex}");
+        assert!(of(&json, &[]).unwrap().is_none());
+        let found = of(&json, &[&bearer]).unwrap().unwrap();
+        assert_eq!(found.hex().as_str(), hex);
+        for types in [
+            &[][..],
+            &["application/json", "application/json"],
+            &["application/json", "text/plain"],
+            &["text/plain"],
+            &["application/JSON"],
+            &["application/json; charset=utf-8"],
+            &["application/json, text/plain"],
+            &[""],
+        ] {
+            assert!(of(types, &[&bearer]).is_err(), "{types:?}");
+        }
+        for bearers in [
+            &[bearer.as_str(), bearer.as_str()][..],
+            &[""],
+            &["Bearer "],
+            &[hex.as_str()],
+            &[&bearer.replace("Bearer", "bearer")],
+            &[&bearer.replace("Bearer", "Basic")],
+            &[&bearer.replace("Bearer ", "Bearer  ")],
+            &[&bearer.to_uppercase()],
+            &[&bearer[..bearer.len() - 1]],
+            &[&format!("{bearer}0")],
+            &[&format!("{bearer},{bearer}")],
+        ] {
+            assert!(of(&json, bearers).is_err(), "{bearers:?}");
+        }
+        // Octets that are no text are a refusal, not a request without a bearer.
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, json[0].parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            axum::http::HeaderValue::from_bytes(b"Bearer \xff").unwrap(),
+        );
+        assert!(credential(&headers, "application/json").is_err());
+    }
 }

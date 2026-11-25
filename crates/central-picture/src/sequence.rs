@@ -215,4 +215,83 @@ mod tests {
         let big = [good.clone(), vec![0; MAX_SEQUENCE]].concat();
         assert!(!sequence_framing(&big));
     }
+
+    #[test]
+    fn no_changed_octet_panics_and_the_frame_of_the_file_is_fixed() {
+        let good = file(&[trak(&[100, 40])]);
+        assert!(sequence_framing(&good));
+        let mut starts = Vec::new();
+        let mut at = 0;
+        for (_, body) in boxes(&good).unwrap() {
+            starts.push(at);
+            at += 8 + body.len();
+        }
+        assert_eq!(starts.len(), 4);
+        for at in 0..good.len() {
+            let header = starts.iter().any(|&start| (start..start + 8).contains(&at));
+            for value in 0..=u8::MAX {
+                if value == good[at] {
+                    continue;
+                }
+                let mut changed = good.clone();
+                changed[at] = value;
+                let tracks = sequence_tracks(&changed);
+                if header || (8..12).contains(&at) {
+                    assert!(tracks.is_none(), "octet {at} as {value:#x}");
+                }
+                // Whatever is read stays two frames, so no table is believed past itself.
+                assert!(
+                    tracks.is_none_or(|tracks| tracks.iter().all(|t| t.len() == 2)),
+                    "octet {at} as {value:#x}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_sample_table_is_bounded_before_it_is_expanded() {
+        let with = |entries: &[(u32, u32)], samples: u32, timescale: u32| {
+            let mut stts = vec![u32::try_from(entries.len()).unwrap()];
+            for &(count, delta) in entries {
+                stts.extend([count, delta]);
+            }
+            let stbl = boxed(
+                b"stbl",
+                &[full(b"stts", &stts), full(b"stsz", &[0, samples])].concat(),
+            );
+            let mdia = boxed(
+                b"mdia",
+                &[full(b"mdhd", &[0, 0, timescale, 0]), boxed(b"minf", &stbl)].concat(),
+            );
+            sequence_tracks(&file(&[boxed(b"trak", &mdia)]))
+        };
+        assert_eq!(with(&[(2, 1)], 2, 1000), Some(vec![vec![1, 1]]));
+        // Empty runs add nothing and are not an error of their own.
+        assert_eq!(with(&[(0, 9), (2, 1)], 2, 1000), Some(vec![vec![1, 1]]));
+        // Rounded to the nearest millisecond, half up.
+        assert_eq!(with(&[(2, 1)], 2, 2000), Some(vec![vec![1, 1]]));
+        assert_eq!(with(&[(2, 1)], 2, 2001), Some(vec![vec![0, 0]]));
+        let most = u32::try_from(MAX_FRAMES).unwrap();
+        assert!(with(&[(most, 1)], most, 1000).is_some());
+        for (entries, samples, timescale) in [
+            (&[(u32::MAX, 1)][..], 2, 1000),
+            (&[(2, 1), (u32::MAX, 1)], 2, 1000),
+            (&[(1, 1)], 2, 1000),
+            (&[(3, 1)], 2, 1000),
+            (&[(1, 1), (1, 1), (0, 1)], 2, 1000),
+            (&[(most + 1, 1)], most + 1, 1000),
+            (&[(2, 1)], u32::MAX, 1000),
+            (&[], 0, 1000),
+            (&[(1, 1)], 1, 1000),
+            (&[(2, 1)], 2, 0),
+            // Four million seconds a tick: no 32-bit number of milliseconds.
+            (&[(2, u32::MAX)], 2, 1),
+        ] {
+            assert_eq!(
+                with(entries, samples, timescale),
+                None,
+                "{entries:?} {samples}"
+            );
+        }
+    }
 }

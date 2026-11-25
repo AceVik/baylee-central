@@ -134,4 +134,94 @@ mod tests {
         }
         assert_eq!(Endpoint::live().legacy_origin(), Some(LEGACY_ORIGIN));
     }
+
+    #[test]
+    fn a_development_endpoint_is_one_canonical_loopback_origin_whatever_was_typed() {
+        for (typed, origin) in [
+            ("http://127.0.0.1:9000", "http://127.0.0.1:9000"),
+            ("http://127.0.0.1:9000/", "http://127.0.0.1:9000"),
+            ("HTTP://127.0.0.1:9000", "http://127.0.0.1:9000"),
+            ("http://127.1:9000", "http://127.0.0.1:9000"),
+            ("http://0x7f000001:9000", "http://127.0.0.1:9000"),
+            ("http://127.8.9.10:1", "http://127.8.9.10:1"),
+            ("http://[0:0:0:0:0:0:0:1]:65535", "http://[::1]:65535"),
+        ] {
+            let endpoint = Endpoint::development(typed).unwrap();
+            assert_eq!(endpoint.origin(), origin, "{typed}");
+            assert_eq!(endpoint.native_url(), format!("{origin}/v1/native"));
+            // A typed spelling is an endpoint; only the canonical one is a stored origin.
+            assert_eq!(
+                crate::gateway::validate_origin(typed, true).is_ok(),
+                typed == origin,
+                "{typed}"
+            );
+        }
+        for refused in [
+            "",
+            "127.0.0.1:9000",
+            "//127.0.0.1:9000",
+            "https://127.0.0.1:9000",
+            "ws://127.0.0.1:9000",
+            "http://127.0.0.1:80",
+            "http://127.0.0.1:65536",
+            "http://127.0.0.1.evil.example:9000",
+            "http://127.0.0.1@evil.example:9000",
+            "http://evil.example#@127.0.0.1:9000",
+            "http://:secret@127.0.0.1:9000",
+            "http://0.0.0.0:9000",
+            "http://[::]:9000",
+            "http://[::ffff:127.0.0.1]:9000",
+            "http://169.254.169.254:9000",
+            "http://2130706434.evil:9000",
+            "http://128.0.0.1:9000",
+            "http://127.0.0.1:9000?",
+            "http://127.0.0.1:9000/..//v1",
+        ] {
+            assert!(Endpoint::development(refused).is_err(), "{refused}");
+        }
+    }
+
+    #[test]
+    fn only_the_live_endpoint_knows_official_gateways_and_only_by_their_exact_origin() {
+        let live = Endpoint::live().official_origins();
+        assert_eq!(live, [OFFICIAL_ORIGIN, LEGACY_ORIGIN]);
+        for origin in &live {
+            assert!(is_official_origin(origin), "{origin}");
+            assert!(crate::gateway::validate_origin(origin, false).is_ok());
+            for other in [
+                format!("{origin}/"),
+                format!("{origin}:443"),
+                format!("{origin}."),
+                format!("{origin}.evil.example"),
+                origin.replace("https://", "http://"),
+                origin.replace("https://", "https://user@"),
+                origin.to_uppercase(),
+                format!(" {origin}"),
+                origin.replace("https://", ""),
+            ] {
+                assert!(!is_official_origin(&other), "{other}");
+            }
+        }
+        // Central itself is no gateway.
+        assert!(!is_official_origin(LIVE_ORIGIN));
+        assert!(!is_official_origin(""));
+        let development = Endpoint::development("http://127.0.0.1:9000").unwrap();
+        assert_eq!(development.official_origins(), [""; 0]);
+    }
+
+    #[test]
+    fn every_endpoint_is_an_issuer_of_its_own() {
+        let development = |value: &str| Endpoint::development(value).unwrap();
+        let base = development("http://127.0.0.1:9000");
+        assert_eq!(base.issuer(), development("http://127.1:9000/").issuer());
+        let mut seen = std::collections::BTreeSet::from([base.issuer()]);
+        for other in [
+            Endpoint::live(),
+            development("http://127.0.0.1:9001"),
+            development("http://127.0.0.2:9000"),
+            development("http://[::1]:9000"),
+        ] {
+            assert!(seen.insert(other.issuer()), "{other:?}");
+        }
+    }
 }

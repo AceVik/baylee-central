@@ -844,6 +844,9 @@ impl IdentityService {
 }
 
 #[cfg(test)]
+mod surface_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use central_api::{
