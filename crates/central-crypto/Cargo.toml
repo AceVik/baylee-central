@@ -22,7 +22,7 @@ opaque-ke = { version = "=4.0.1", default-features = false, features = ["ristret
 # The fixed OPAQUE KSF and legacy verifier use the current Argon2 implementation
 # with caller-owned, wiped memory; protocol parameters remain unchanged.
 argon2 = { version = "=0.6.0", default-features = false, features = ["zeroize"] }
-sha2 = { version = "=0.11.1", default-features = false, features = ["zeroize"] }
+sha2 = { version = "=0.11.2", default-features = false, features = ["zeroize"] }
 # opaque-ke 4's TripleDh requires digest 0.10. Keep this compatibility type
 # separate from the current SHA implementation used by vaults and chat.
 opaque-sha2 = { package = "sha2", version = "=0.10.9", default-features = false }

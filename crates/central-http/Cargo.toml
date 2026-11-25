@@ -18,7 +18,7 @@ central-policy = { path = "../central-policy", version = "=0.1.0" }
 central-outbound = { path = "../central-outbound", version = "=0.1.0" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "=1.54.1", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time", "sync", "io-util"] }
-hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }
+hyper = { version = "=1.13.0", default-features = false, features = ["server", "http1"] }
 hyper-util = { version = "=0.1.21", default-features = false, features = ["service", "tokio"] }
 tower = { version = "=0.5.3", default-features = false, features = ["util"] }
 tower-http = { version = "=0.7.1", default-features = false, features = ["timeout"] }
@@ -27,7 +27,7 @@ http-body-util = "=0.1.5"
 # The push socket's handshake (RFC 6455 § 4.2.2): SHA-1 there is the
 # protocol's checksum of the client's key, not a security property.
 sha1 = { version = "=0.11.0", default-features = false }
-base64 = { version = "=0.22.1", default-features = false, features = ["alloc"] }
+base64 = { version = "=0.23.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "=1.9.2", features = ["alloc"] }
 # The relay uses the TLS provider and trust roots already used by central-outbound.
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
