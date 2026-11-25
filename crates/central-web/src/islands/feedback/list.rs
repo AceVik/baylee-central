@@ -598,16 +598,26 @@ fn search_view(l: &List) -> impl IntoView + use<> {
                 ask();
             }>
             <label class="visually-hidden" for="fb-search">{words::fb_search(lang)}</label>
-            <input id="fb-search" type="search" autocomplete="off" spellcheck="false" maxlength="400"
-                aria-describedby="fb-search-hint" prop:value=move || l.typed.get() on:input=on_input
-                on:keydown=move |ev: leptos::ev::KeyboardEvent| {
-                    if ev.key() == "Escape" && !l.typed.get_untracked().is_empty() {
-                        ev.prevent_default();
-                        l.typed.set(String::new());
-                        ask();
-                    }
-                } />
-            <button type="submit" class="button">{glyph::glyph(glyph::SEARCH)}<span>{words::fb_search_submit(lang)}</span></button>
+            <div class="inset">
+                {super::super::field::mark(glyph::SEARCH)}
+                <input id="fb-search" type="search" autocomplete="off" spellcheck="false" maxlength="400"
+                    aria-describedby="fb-search-hint" prop:value=move || l.typed.get() on:input=on_input
+                    on:keydown=move |ev: leptos::ev::KeyboardEvent| {
+                        if ev.key() == "Escape" && !l.typed.get_untracked().is_empty() {
+                            ev.prevent_default();
+                            l.typed.set(String::new());
+                            ask();
+                        }
+                    } />
+                <button
+                    type="submit"
+                    class="inset-end"
+                    title=words::fb_search_submit(lang)
+                    aria-label=words::fb_search_submit(lang)
+                >
+                    {glyph::glyph(glyph::SEARCH)}
+                </button>
+            </div>
             <p class="hint" id="fb-search-hint">{words::fb_search_hint(lang)}</p>
         </form>
     }
@@ -1072,6 +1082,40 @@ fn pills_view(l: &List) -> impl IntoView + use<> {
     }
 }
 
+fn save_view_form(l: &List) -> impl IntoView + use<> {
+    let l = *l;
+    let lang = l.c.lang;
+    view! {
+        <form class="field" method="post" novalidate=true on:submit=move |ev| {
+            ev.prevent_default();
+            let name = l.view_name.get_untracked().trim().to_owned();
+            let query = query::write(&query::without_page(&l.query.get_untracked()));
+            if valid_view(&name, &query) {
+                l.read_views(
+                    AdminRequest::SaveReportView { name: name.clone(), query },
+                    Some(words::fb_view_saved(lang, &name)),
+                );
+            }
+        }>
+            <label class="visually-hidden" for="fb-view-name">{words::fb_view_name(lang)}</label>
+            <div class="inset">
+                {super::super::field::mark(glyph::PENCIL)}
+                <input id="fb-view-name" type="text" autocomplete="off" maxlength=MAX_VIEW_NAME.to_string()
+                    placeholder=words::fb_view_name(lang)
+                    prop:value=move || l.view_name.get() on:input=move |ev| l.view_name.set(event_target_value(&ev)) />
+                <button
+                    type="submit"
+                    class="inset-end"
+                    title=words::fb_save_view(lang)
+                    aria-label=words::fb_save_view(lang)
+                >
+                    {glyph::glyph(glyph::CHECK)}
+                </button>
+            </div>
+        </form>
+    }
+}
+
 fn saved_view(l: &List) -> impl IntoView + use<> {
     let l = *l;
     let lang = l.c.lang;
@@ -1122,25 +1166,7 @@ fn saved_view(l: &List) -> impl IntoView + use<> {
                     .collect_view();
                 view! { <ul class="fb-view-list">{items}</ul> }.into_any()
             };
-            let save = (!saved_here && !full).then(|| {
-                view! {
-                    <form class="fb-inline" method="post" novalidate=true on:submit=move |ev| {
-                        ev.prevent_default();
-                        let name = l.view_name.get_untracked().trim().to_owned();
-                        let query = current();
-                        if valid_view(&name, &query) {
-                            l.read_views(AdminRequest::SaveReportView { name: name.clone(), query },
-                                Some(words::fb_view_saved(lang, &name)));
-                        }
-                    }>
-                        <label class="visually-hidden" for="fb-view-name">{words::fb_view_name(lang)}</label>
-                        <input id="fb-view-name" type="text" autocomplete="off" maxlength=MAX_VIEW_NAME.to_string()
-                            placeholder=words::fb_view_name(lang)
-                            prop:value=move || l.view_name.get() on:input=move |ev| l.view_name.set(event_target_value(&ev)) />
-                        <button type="submit" class="button button-ghost button-sm">{words::fb_save_view(lang)}</button>
-                    </form>
-                }
-            });
+            let save = (!saved_here && !full).then(|| save_view_form(&l));
             let full = full.then(|| {
                 let n = words::number(lang, count(MAX_VIEWS));
                 view! { <p class="meta">{words::fb_views_full(lang, &n)}</p> }
@@ -1332,19 +1358,25 @@ fn label_menus(l: &List) -> impl IntoView + use<> {
         )
     });
     view! {
-        <span class="fb-bulk-field fb-inline">
+        <span class="fb-bulk-field">
             <label class="visually-hidden" for="fb-bulk-label">{words::fb_add_label(lang)}</label>
-            <input id="fb-bulk-label" type="text" list="fb-bulk-labels" autocomplete="off" spellcheck="false"
-                maxlength="32" placeholder=words::fb_add_label(lang)
-                prop:value=move || l.bulk_label.get() on:input=move |ev| l.bulk_label.set(event_target_value(&ev))
-                on:keydown=move |ev: leptos::ev::KeyboardEvent| if ev.key() == "Enter" {
-                    ev.prevent_default();
-                    add_label();
-                } />
+            <div class="inset">
+                {super::super::field::mark(glyph::PENCIL)}
+                <input id="fb-bulk-label" type="text" list="fb-bulk-labels" autocomplete="off" spellcheck="false"
+                    maxlength="32" placeholder=words::fb_add_label(lang)
+                    prop:value=move || l.bulk_label.get() on:input=move |ev| l.bulk_label.set(event_target_value(&ev))
+                    on:keydown=move |ev: leptos::ev::KeyboardEvent| if ev.key() == "Enter" {
+                        ev.prevent_default();
+                        add_label();
+                    } />
+                <button type="button" class="inset-end" title=words::fb_add_label(lang)
+                    aria-label=words::fb_add_label(lang)
+                    aria-disabled=move || l.working.get().then_some("true")
+                    on:click=move |_| add_label()>
+                    {glyph::glyph(glyph::PLUS)}
+                </button>
+            </div>
             <datalist id="fb-bulk-labels">{datalist}</datalist>
-            <button type="button" class="round-btn" aria-disabled=move || l.working.get().then_some("true") on:click=move |_| add_label()>
-                {glyph::glyph(glyph::PLUS)}<span class="visually-hidden">{words::fb_add_label(lang)}</span>
-            </button>
         </span>
         {unlabel}
     }

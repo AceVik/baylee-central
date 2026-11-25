@@ -14,6 +14,9 @@ mod personal;
 mod read;
 mod tower;
 
+pub(super) use read::account_badges;
+pub(super) use tower::tower_badges;
+
 fn unavailable(_: impl Sized) -> Error {
     Error::Unavailable
 }

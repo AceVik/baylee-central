@@ -23,6 +23,7 @@ use leptos::prelude::*;
 
 use super::account::when;
 use super::central::{Failure, call};
+use super::chat::glyph;
 use crate::words::{self, Lang};
 
 /// The largest file the page opens. Only the person's own device is at
@@ -54,19 +55,14 @@ pub fn sequence_url(key: &PictureKey) -> String {
 /// One that `moving` plays its sequence, unless the person asked their
 /// system for less motion: then its still, the first frame, stands.
 pub fn face(key: &PictureKey, moving: bool, alt: String) -> impl IntoView + use<> {
-    face_view(key, moving, alt, true)
-}
-
-fn face_view(key: &PictureKey, moving: bool, alt: String, lazy: bool) -> impl IntoView + use<> {
     let sequence = moving.then(|| {
         view! { <source type="image/avif" media="(prefers-reduced-motion: no-preference)" srcset=sequence_url(key) /> }
     });
-    let loading = lazy.then_some("lazy");
     view! {
         <picture class="face">
             {sequence}
             <source type="image/avif" srcset=url(key, true) />
-            <img src=url(key, false) alt=alt loading=loading decoding="async" width="256" height="256" />
+            <img src=url(key, false) alt=alt loading="lazy" decoding="async" width="256" height="256" />
         </picture>
     }
 }
@@ -122,8 +118,9 @@ pub fn face_of(tag: u32) -> Option<(PictureKey, bool)> {
     use_context::<Keys>().and_then(|keys| keys.0.with(|held| held.get(&tag).copied()))
 }
 
-/// Where the square is: its left and top edge in the picture's pixels, and
-/// how far it is zoomed in (1 is the largest square the picture holds).
+/// Where the square is: its left and top edge in the rotated preview's
+/// pixels, how far it is zoomed in (1 is the largest square the picture
+/// holds), and clockwise quarter-turn rotation (`0..=3`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Crop {
     width: f64,
@@ -131,6 +128,7 @@ pub struct Crop {
     x: f64,
     y: f64,
     zoom: f64,
+    rotation_quads: u8,
 }
 
 /// How far the page lets the person zoom in.
@@ -149,21 +147,73 @@ impl Crop {
             x: (width - side) / 2.0,
             y: (height - side) / 2.0,
             zoom: 1.0,
+            rotation_quads: 0,
         }
+    }
+
+    /// Dimensions `(width, height)` after applying the current quarter-turn
+    /// rotation.
+    #[must_use]
+    pub fn effective_size(&self) -> (f64, f64) {
+        if self.rotation_quads.is_multiple_of(2) {
+            (self.width, self.height)
+        } else {
+            (self.height, self.width)
+        }
+    }
+
+    /// Clockwise quarter-turns (`0..=3`).
+    #[cfg(any(target_arch = "wasm32", test))]
+    #[must_use]
+    pub fn rotation_quads(&self) -> u8 {
+        self.rotation_quads % 4
     }
 
     /// The square's side in the picture's pixels.
     #[must_use]
     pub fn side(&self) -> f64 {
-        self.width.min(self.height) / self.zoom
+        let (eff_w, eff_h) = self.effective_size();
+        eff_w.min(eff_h) / self.zoom
     }
 
     fn clamped(mut self) -> Self {
+        self.rotation_quads %= 4;
         self.zoom = self.zoom.clamp(1.0, MAX_ZOOM);
+        let (eff_w, eff_h) = self.effective_size();
         let side = self.side();
-        self.x = self.x.clamp(0.0, (self.width - side).max(0.0));
-        self.y = self.y.clamp(0.0, (self.height - side).max(0.0));
+        self.x = self.x.clamp(0.0, (eff_w - side).max(0.0));
+        self.y = self.y.clamp(0.0, (eff_h - side).max(0.0));
         self
+    }
+
+    fn rotated(mut self, step_cw: u8) -> Self {
+        let (old_w, old_h) = self.effective_size();
+        let side = self.side();
+        let cx = self.x + side / 2.0;
+        let cy = self.y + side / 2.0;
+        let step = step_cw % 4;
+        let (rx, ry) = match step {
+            1 => (old_h - cy, cx),
+            2 => (old_w - cx, old_h - cy),
+            3 => (cy, old_w - cx),
+            _ => (cx, cy),
+        };
+        self.rotation_quads = (self.rotation_quads + step) % 4;
+        self.x = rx - side / 2.0;
+        self.y = ry - side / 2.0;
+        self.clamped()
+    }
+
+    /// Rotated 90° counter-clockwise, keeping the crop centred on the same detail.
+    #[must_use]
+    pub fn rotated_left(self) -> Self {
+        self.rotated(3)
+    }
+
+    /// Rotated 90° clockwise, keeping the crop centred on the same detail.
+    #[must_use]
+    pub fn rotated_right(self) -> Self {
+        self.rotated(1)
     }
 
     /// Moved by a share of its own side (the arrow keys: 5 %, with Shift 25 %).
@@ -200,6 +250,36 @@ impl Crop {
         self.clamped()
     }
 
+    /// Zoomed relative to the current zoom (`delta` added and clamped).
+    #[must_use]
+    pub fn zoomed_by(self, delta: f64) -> Self {
+        self.zoomed(self.zoom + delta)
+    }
+
+    /// Resets position, zoom and rotation to the initial centred square.
+    #[must_use]
+    pub fn reset(self) -> Self {
+        Self::new(self.width, self.height)
+    }
+
+    /// Source square `(sx, sy, side)` in the original unrotated image pixels.
+    #[cfg(any(target_arch = "wasm32", test))]
+    #[must_use]
+    pub fn source_rect(&self) -> (f64, f64, f64) {
+        let side = self.side();
+        let (sx, sy) = match self.rotation_quads % 4 {
+            1 => (self.y, self.height - self.x - side),
+            2 => (self.width - self.x - side, self.height - self.y - side),
+            3 => (self.width - self.y - side, self.x),
+            _ => (self.x, self.y),
+        };
+        (
+            sx.clamp(0.0, (self.width - side).max(0.0)),
+            sy.clamp(0.0, (self.height - side).max(0.0)),
+            side,
+        )
+    }
+
     /// The side of the PNG the page sends: the square's own, from 256 to
     /// 512 pixels.
     #[cfg(any(target_arch = "wasm32", test))]
@@ -217,17 +297,18 @@ impl Crop {
     }
 
     /// Where the square is, for the live region: its centre in per cent of
-    /// the picture, and the zoom in per cent.
+    /// the rotated picture, and the zoom in per cent.
     #[must_use]
     pub fn spoken(&self) -> (u32, u32, u32) {
         let percent = |part: f64, whole: f64| {
             let value = (part / whole * 100.0).round().clamp(0.0, 100.0);
             (0..=100).find(|n| f64::from(*n) >= value).unwrap_or(100)
         };
+        let (eff_w, eff_h) = self.effective_size();
         let side = self.side();
         (
-            percent(self.x + side / 2.0, self.width),
-            percent(self.y + side / 2.0, self.height),
+            percent(self.x + side / 2.0, eff_w),
+            percent(self.y + side / 2.0, eff_h),
             (100..=800)
                 .find(|n| f64::from(*n) >= (self.zoom * 100.0).round())
                 .unwrap_or(800),
@@ -440,6 +521,32 @@ fn refusal(text: &str) -> Option<&'static str> {
     .find(|known| *known == name)
 }
 
+/// Central's answer to a group picture upload (`PUT /api/v1/groups/{group}/picture`).
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GroupPictureAnswer {
+    key: String,
+    moving: bool,
+}
+
+fn answered_group(status: u16, text: &str) -> Result<(PictureKey, bool), Trouble> {
+    match status {
+        200 => {
+            let answer: GroupPictureAnswer =
+                serde_json::from_str(text).map_err(|_| Trouble::Failed)?;
+            let key = crate::data::id_from_hex(&answer.key).ok_or(Trouble::Failed)?;
+            Ok((key, answer.moving))
+        }
+        403 if refusal(text) == Some("blocked") => Err(Trouble::Blocked),
+        413 => Err(Trouble::Refused("too_large")),
+        415 => Err(Trouble::Refused("unsupported")),
+        422 => Err(refusal(text).map_or(Trouble::Failed, Trouble::Refused)),
+        401 => Err(Trouble::SignedOut),
+        429 => Err(Trouble::Busy),
+        _ => Err(Trouble::Failed),
+    }
+}
+
 /// Central's answer to an upload.
 fn answered(status: u16, text: &str) -> Result<Own, Trouble> {
     match status {
@@ -604,7 +711,9 @@ struct Card {
     sending: RwSignal<Sending>,
     /// The last saved animation was kept as its still.
     kept_still: RwSignal<bool>,
+    drag_over: RwSignal<bool>,
     dragging: StoredValue<Option<(f64, f64, Crop)>>,
+    remembered: StoredValue<Option<(PictureKey, bool)>>,
     generation: RwSignal<u64>,
 }
 
@@ -613,8 +722,9 @@ impl Card {
         self.generation
             .update(|value| *value = value.wrapping_add(1));
         let started = self.generation.get_untracked();
-        let Some(stamp) = super::session::marker() else {
+        let Some(stamp) = super::session::login_stamp() else {
             browser::remember(None);
+            self.remembered.set_value(None);
             self.own.set(Some(Err(Trouble::SignedOut)));
             return;
         };
@@ -623,14 +733,22 @@ impl Card {
             if self.generation.get_untracked() != started {
                 return;
             }
-            if super::session::marker().as_deref() != Some(stamp.as_str()) {
+            if super::session::login_stamp().as_deref() != Some(stamp.as_str()) {
                 return;
             }
             match &own {
-                Ok(own) => browser::remember(own.picture.as_ref()),
+                Ok(own) => {
+                    browser::remember(own.picture.as_ref());
+                    self.remembered.set_value(
+                        own.picture
+                            .as_ref()
+                            .map(|p| (p.key, p.sequence_bytes.is_some())),
+                    );
+                }
                 Err(Trouble::SignedOut) => {
                     super::session::forget();
                     browser::remember(None);
+                    self.remembered.set_value(None);
                 }
                 Err(_) => {}
             }
@@ -638,13 +756,16 @@ impl Card {
         });
     }
 
-    fn choose(self) {
+    fn begin_open(
+        self,
+        task: impl std::future::Future<Output = Result<Option<OpenedPicture>, Trouble>> + 'static,
+    ) {
         let prior = self.step.get_untracked();
         self.trouble.set(None);
         self.said.set(None);
         self.step.set(Step::Opening);
         leptos::task::spawn_local(async move {
-            match browser::open().await {
+            match task.await {
                 Ok(Some((width, height, sending))) => {
                     self.crop.set(Crop::new(width, height));
                     self.sending.set(sending);
@@ -660,6 +781,21 @@ impl Card {
                 }
             }
         });
+    }
+
+    fn choose(self) {
+        self.begin_open(browser::open());
+    }
+
+    fn drop_file(self, event: &leptos::ev::DragEvent) {
+        let blocked = self
+            .own
+            .with_untracked(|o| matches!(o, Some(Ok(own)) if own.block.is_some()));
+        if blocked {
+            return;
+        }
+        let dropped = browser::dropped(event);
+        self.begin_open(browser::open_dropped(dropped));
     }
 
     fn save(self) {
@@ -681,6 +817,12 @@ impl Card {
                         .and_then(|picture| picture.sequence_bytes);
                     self.kept_still.set(moving && sequence.is_none());
                     browser::remember(stored.picture.as_ref());
+                    self.remembered.set_value(
+                        stored
+                            .picture
+                            .as_ref()
+                            .map(|p| (p.key, p.sequence_bytes.is_some())),
+                    );
                     self.own.set(Some(Ok(stored)));
                     self.said.set(Some(words::picture_saved(self.lang)));
                     self.step.set(Step::Idle);
@@ -762,52 +904,186 @@ impl Card {
         }
     }
 
-    fn current(self) -> AnyView {
+    fn dropzone_view(
+        self,
+        display_name: String,
+        handle: String,
+        rank: Signal<Option<central_api::ranked::Rank>>,
+    ) -> impl IntoView {
         let (lang, step) = (self.lang, self.step);
-        match self.own.get() {
-            None => {
-                let placeholder = if browser::has_remembered_key() {
-                    view! { <div class="picture-current" aria-hidden="true">{""}</div> }.into_any()
-                } else {
-                    view! { <p class="meta" role="status">{words::account_loading(lang)}</p> }
-                        .into_any()
-                };
-                view! {
-                    {placeholder}
-                    <div class="actions">
-                        <span class="button" aria-disabled="true">{words::picture_choose(lang)}</span>
-                    </div>
+        let loaded = move || self.own.with(|o| matches!(o, Some(Ok(_))));
+        let blocked = move || {
+            self.own
+                .with(|o| matches!(o, Some(Ok(own)) if own.block.is_some()))
+        };
+        let current_pic = move || {
+            self.own.with(|o| match o {
+                None | Some(Err(_)) => self.remembered.get_value(),
+                Some(Ok(own)) => own
+                    .picture
+                    .as_ref()
+                    .map(|p| (p.key, p.sequence_bytes.is_some())),
+            })
+        };
+        let has_picture = move || current_pic().is_some();
+        let file_input = NodeRef::<leptos::html::Input>::new();
+        view! {
+            <div
+                class="picture-dropzone"
+                class:is-dragover=move || self.drag_over.get()
+                on:dragenter=move |ev| {
+                    ev.prevent_default();
+                    self.drag_over.set(true);
                 }
-                .into_any()
-            }
-            Some(Err(problem)) => {
-                view! { <p class="error" role="alert">{trouble_text(lang, problem)}</p> }.into_any()
-            }
-            Some(Ok(own)) => {
-                let shown = own.picture.as_ref().map_or_else(
-                    || view! { <p id="picture-none">{words::picture_none(lang)}</p> }.into_any(),
-                    |picture| view! { <div class="picture-current">{face_view(&picture.key, picture.sequence_bytes.is_some(), words::picture_current(lang).to_owned(), false)}</div> }.into_any(),
-                );
-                let can_remove = own.picture.is_some();
-                let blocked = own.block.is_some();
-                view! {
-                    {shown}
-                    <Show when=move || self.kept_still.get()>
-                        <p class="meta" id="picture-kept-still" role="status">{words::picture_kept_still(lang)}</p>
-                    </Show>
-                    {notice_view(lang, &own)}
-                    <div class="actions" hidden=move || step.get() != Step::Idle>
-                        <label class="button" for="picture-file" hidden=blocked>{words::picture_choose(lang)}</label>
-                        <button type="button" class="button button-ghost" hidden=!can_remove on:click=move |_| step.set(Step::Removing)>{words::picture_remove(lang)}</button>
-                    </div>
+                on:dragover=move |ev| {
+                    ev.prevent_default();
+                    self.drag_over.set(true);
                 }
-                .into_any()
-            }
+                on:dragleave=move |_| self.drag_over.set(false)
+                on:drop=move |ev| {
+                    ev.prevent_default();
+                    self.drag_over.set(false);
+                    self.drop_file(&ev);
+                }
+            >
+                <div
+                    class="picture-avatar-slot"
+                    role="img"
+                    aria-label=move || if has_picture() { words::picture_current(lang) } else { words::picture_none(lang) }
+                >
+                    {move || super::ui::rank_avatar::rank_avatar(
+                        display_name.clone(),
+                        &handle,
+                        current_pic(),
+                        rank.get(),
+                        super::ui::rank_avatar::AvatarSize::Large,
+                    )}
+                </div>
+                <div class="actions" hidden=move || step.get() != Step::Idle>
+                    <button
+                        type="button"
+                        class="button"
+                        hidden=blocked
+                        disabled=move || !loaded()
+                        title=words::picture_choose(lang)
+                        aria-label=words::picture_choose(lang)
+                        on:click=move |_| {
+                            if let Some(el) = file_input.get_untracked() {
+                                el.click();
+                            }
+                        }
+                    >
+                        {glyph::glyph(glyph::UPLOAD)}
+                        <span>{words::picture_choose(lang)}</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="button button-ghost"
+                        hidden=move || !has_picture()
+                        disabled=move || !loaded()
+                        title=words::picture_remove(lang)
+                        aria-label=words::picture_remove(lang)
+                        on:click=move |_| step.set(Step::Removing)
+                    >
+                        {glyph::glyph(glyph::TRASH_2)}
+                        <span>{words::picture_remove(lang)}</span>
+                    </button>
+                </div>
+                <p class="meta">{words::picture_drop_hint(lang)}</p>
+                <input
+                    id="picture-file"
+                    node_ref=file_input
+                    type="file"
+                    hidden=true
+                    accept="image/*"
+                    disabled=move || !loaded() || blocked()
+                    aria-label=words::picture_choose(lang)
+                    on:change=move |_| self.choose()
+                />
+                <p class="hint">{words::picture_choose_hint(lang)}</p>
+            </div>
         }
+    }
+
+    fn side_view(
+        self,
+        display_name: String,
+        handle: String,
+        rank: Signal<Option<central_api::ranked::Rank>>,
+    ) -> AnyView {
+        let (lang, step) = (self.lang, self.step);
+        let error_text = move || {
+            self.trouble.get().or_else(|| {
+                self.own.with(|o| match o {
+                    Some(Err(problem)) => Some(*problem),
+                    _ => None,
+                })
+            })
+        };
+        view! {
+            <div class="picture-block picture-side" aria-labelledby="picture-title">
+                <h3 id="picture-title">{words::picture_title(lang)}</h3>
+                <p class="meta">{words::picture_who_sees(lang)}</p>
+                {self.dropzone_view(display_name, handle, rank)}
+                <Show when=move || self.kept_still.get()>
+                    <p class="meta" id="picture-kept-still" role="status">{words::picture_kept_still(lang)}</p>
+                </Show>
+                {move || self.own.with(|o| match o {
+                    Some(Ok(own)) => notice_view(lang, own),
+                    _ => None,
+                })}
+                <Show when=move || step.get() == Step::Opening>
+                    <p class="meta" role="status">{words::picture_opening(lang)}</p>
+                </Show>
+                <p class="error" role="alert">{move || error_text().map(|t| trouble_text(lang, t))}</p>
+                <p class="meta" role="status">{move || self.said.get()}</p>
+            </div>
+        }
+        .into_any()
+    }
+
+    fn editor_wrap(self) -> AnyView {
+        let (lang, step) = (self.lang, self.step);
+        view! {
+            <Show when=move || matches!(step.get(), Step::Editing | Step::Saving | Step::Removing)>
+                <div class="picture-editor-wrap">
+                    <Show when=move || step.get() == Step::Removing>
+                        <div class="confirm" role="group" aria-labelledby="picture-remove-ask">
+                            <p id="picture-remove-ask">{words::picture_remove_confirm(lang)}</p>
+                            <div class="actions">
+                                <button type="button" class="button danger"
+                                    title=words::picture_remove_yes(lang)
+                                    aria-disabled=move || self.busy.get().then_some("true")
+                                    on:click=move |_| self.remove()>
+                                    {glyph::glyph(glyph::TRASH_2)}
+                                    <span>{words::picture_remove_yes(lang)}</span>
+                                </button>
+                                <button type="button" class="button button-ghost"
+                                    title=words::picture_cancel(lang)
+                                    on:click=move |_| step.set(Step::Idle)>
+                                    <span>{words::picture_cancel(lang)}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </Show>
+                    <Show when=move || matches!(step.get(), Step::Editing | Step::Saving)>
+                        {self.editor()}
+                    </Show>
+                </div>
+            </Show>
+        }
+        .into_any()
     }
 
     fn editor(self) -> impl IntoView {
         let (lang, crop, step) = (self.lang, self.crop, self.step);
+        let preview = NodeRef::<leptos::html::Canvas>::new();
+        Effect::new(move |_| {
+            let at = crop.get();
+            if preview.get().is_some() {
+                browser::draw(at);
+            }
+        });
         let zoom = move |event: leptos::ev::Event| {
             if let Ok(percent) = event_target_value(&event).parse::<f64>() {
                 crop.update(|c| *c = c.zoomed(percent / 100.0));
@@ -821,16 +1097,42 @@ impl Card {
             <div class="picture-editor">
                 <p>{words::picture_editor_lead(lang)}</p>
                 <canvas id="picture-preview" class="picture-preview" width=PREVIEW height=PREVIEW tabindex="0"
+                    node_ref=preview
                     role="img" aria-label=words::picture_preview(lang) aria-describedby="picture-position"
                     on:keydown=move |e| self.key(&e) on:pointerdown=move |e| self.press(&e)
                     on:pointermove=move |e| self.drag(&e)
                     on:pointerup=move |_| self.dragging.set_value(None)
                     on:pointercancel=move |_| self.dragging.set_value(None)></canvas>
                 <p id="picture-position" class="meta" aria-live="polite">{position}</p>
-                <div class="field" hidden=move || self.sending.get() != Sending::Square>
-                    <label for="picture-zoom">{words::picture_zoom(lang)}</label>
+                <div class="picture-toolbar" hidden=move || self.sending.get() != Sending::Square>
+                    <button type="button" class="button button-ghost"
+                        title=words::picture_zoom_out(lang) aria-label=words::picture_zoom_out(lang)
+                        on:click=move |_| crop.update(|c| *c = c.zoomed_by(-0.25))>
+                        {glyph::glyph(glyph::ZOOM_OUT)}
+                    </button>
+                    <label class="visually-hidden" for="picture-zoom">{words::picture_zoom(lang)}</label>
                     <input id="picture-zoom" type="range" min="100" max="800" step="10"
                         prop:value=move || crop.get().spoken().2.to_string() on:input=zoom />
+                    <button type="button" class="button button-ghost"
+                        title=words::picture_zoom_in(lang) aria-label=words::picture_zoom_in(lang)
+                        on:click=move |_| crop.update(|c| *c = c.zoomed_by(0.25))>
+                        {glyph::glyph(glyph::ZOOM_IN)}
+                    </button>
+                    <button type="button" class="button button-ghost"
+                        title=words::picture_rotate_left(lang) aria-label=words::picture_rotate_left(lang)
+                        on:click=move |_| crop.update(|c| *c = c.rotated_left())>
+                        {glyph::glyph(glyph::ROTATE_CCW)}
+                    </button>
+                    <button type="button" class="button button-ghost"
+                        title=words::picture_rotate_right(lang) aria-label=words::picture_rotate_right(lang)
+                        on:click=move |_| crop.update(|c| *c = c.rotated_right())>
+                        {glyph::glyph(glyph::ROTATE_CW)}
+                    </button>
+                    <button type="button" class="button button-ghost"
+                        title=words::picture_reset_crop(lang) aria-label=words::picture_reset_crop(lang)
+                        on:click=move |_| crop.update(|c| *c = c.reset())>
+                        {glyph::glyph(glyph::REFRESH_CW)}
+                    </button>
                 </div>
                 <Show when=move || self.sending.get() == Sending::Original>
                     <p class="meta" id="picture-original">{words::picture_original(lang)}</p>
@@ -839,12 +1141,17 @@ impl Card {
                     <p class="meta" id="picture-moving">{words::picture_moving(lang)}</p>
                 </Show>
                 <div class="actions">
-                    <button type="button" class="button" on:click=move |_| self.save()
-                        aria-disabled=move || (step.get() == Step::Saving).then_some("true")>
-                        {move || if step.get() == Step::Saving { words::picture_saving(lang) } else { words::picture_save(lang) }}
+                    <button type="button" class="button"
+                        title=words::picture_save(lang)
+                        aria-disabled=move || (step.get() == Step::Saving).then_some("true")
+                        on:click=move |_| self.save()>
+                        {glyph::glyph(glyph::CIRCLE_CHECK)}
+                        <span>{move || if step.get() == Step::Saving { words::picture_saving(lang) } else { words::picture_save(lang) }}</span>
                     </button>
-                    <button type="button" class="button button-ghost" on:click=move |_| { browser::close(); step.set(Step::Idle); }>
-                        {words::picture_cancel(lang)}
+                    <button type="button" class="button button-ghost"
+                        title=words::picture_cancel(lang)
+                        on:click=move |_| { browser::close(); step.set(Step::Idle); }>
+                        <span>{words::picture_cancel(lang)}</span>
                     </button>
                 </div>
             </div>
@@ -852,36 +1159,44 @@ impl Card {
     }
 }
 
-/// The signed-in account's own face for the overview: its picture once
-/// Central said which, else the initials of `name`, in one mark of a fixed
-/// size. Asking also tells the header which picture is the account's
-/// (`session.rs`), so it shows from the first page after a sign-in.
-pub fn own_face(name: &str) -> impl IntoView {
-    let own = RwSignal::new(None::<Option<(PictureKey, bool)>>);
-    Effect::new(move |_| {
-        leptos::task::spawn_local(async move {
-            if let Ok(mine) = mine().await {
-                browser::remember(mine.picture.as_ref());
-                own.set(Some(
-                    mine.picture.map(|p| (p.key, p.sequence_bytes.is_some())),
-                ));
-            }
-        });
-    });
-    let initials: String = name.chars().take(1).flat_map(char::to_uppercase).collect();
-    view! {
-        <span class="me-face" aria-hidden="true">
-            {move || match own.get().flatten() {
-                Some((key, moving)) => face_view(&key, moving, String::new(), false).into_any(),
-                None => view! { <span class="me-initials">{initials.clone()}</span> }.into_any(),
-            }}
-        </span>
-    }
+/// Reads the cached `(key, is_animated)` picture tuple from the browser's
+/// local session note so overview and profile avatars render immediately
+/// without flashing initials while `mine()` is in flight.
+#[must_use]
+pub(super) fn remembered_tuple() -> Option<(PictureKey, bool)> {
+    browser::remembered_picture()
 }
 
-/// The profile page's card: the picture, choosing one, placing its square,
-/// saving it, removing it.
-pub fn card(lang: Lang, name: String) -> impl IntoView {
+/// Fetches the signed-in account's own picture `(key, is_animated)` tuple
+/// for the overview's ranked avatar and caches the key for the header bar.
+pub(super) async fn own_tuple() -> Option<(PictureKey, bool)> {
+    let Ok(own) = mine().await else {
+        return None;
+    };
+    browser::remember(own.picture.as_ref());
+    own.picture.map(|p| (p.key, p.sequence_bytes.is_some()))
+}
+
+/// The profile page's picture pieces: the compact side column (ranked avatar,
+/// dropzone, choose/remove controls) and the full-width editor/confirm drawer
+/// placed below the identity grid so opening the cropper never shifts columns.
+pub struct CardParts {
+    /// Left-column ranked avatar, dropzone, and file controls.
+    pub side: AnyView,
+    /// Full-width crop/rotate editor and removal confirmation below the grid.
+    pub editor: AnyView,
+}
+
+/// The profile page's picture block inside the unified identity section:
+/// current ranked avatar, drag-and-drop / file picker, crop/rotate editor,
+/// save, and remove.
+#[must_use]
+pub fn card(
+    lang: Lang,
+    display_name: String,
+    handle: String,
+    rank: Signal<Option<central_api::ranked::Rank>>,
+) -> CardParts {
     let card = Card {
         lang,
         own: RwSignal::new(None),
@@ -892,10 +1207,11 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
         said: RwSignal::new(None),
         sending: RwSignal::new(Sending::Square),
         kept_still: RwSignal::new(false),
+        drag_over: RwSignal::new(false),
         dragging: StoredValue::new(None),
+        remembered: StoredValue::new(browser::remembered_picture()),
         generation: RwSignal::new(0),
     };
-    let step = card.step;
     Effect::new(move |_| {
         card.reload();
         #[cfg(target_arch = "wasm32")]
@@ -906,44 +1222,335 @@ pub fn card(lang: Lang, name: String) -> impl IntoView {
             card.trouble.set(None);
             card.said.set(None);
             card.own.set(None);
+            card.remembered.set_value(browser::remembered_picture());
             card.reload();
         });
     });
     on_cleanup(browser::close);
-    // The preview follows the square.
-    Effect::new(move |_| {
-        let at = card.crop.get();
-        if step.get() == Step::Editing {
-            browser::draw(at);
+    CardParts {
+        side: card.side_view(display_name, handle, rank),
+        editor: card.editor_wrap(),
+    }
+}
+
+const GROUP_FILE_ID: &str = "group-picture-file";
+const GROUP_PREVIEW_ID: &str = "group-picture-preview";
+
+#[derive(Clone, Copy)]
+struct GroupCrop {
+    lang: Lang,
+    group_id: StoredValue<String>,
+    step: RwSignal<Step>,
+    crop: RwSignal<Crop>,
+    sending: RwSignal<Sending>,
+    trouble: RwSignal<Option<Trouble>>,
+    said: RwSignal<Option<&'static str>>,
+    dragging: StoredValue<Option<(f64, f64, Crop)>>,
+    on_saved: Callback<()>,
+    on_remove: Callback<()>,
+}
+
+impl GroupCrop {
+    fn choose(self) {
+        let prior = self.step.get_untracked();
+        self.trouble.set(None);
+        self.said.set(None);
+        self.step.set(Step::Opening);
+        leptos::task::spawn_local(async move {
+            match browser::open_from(GROUP_FILE_ID).await {
+                Ok(Some((width, height, sending))) => {
+                    self.crop.set(Crop::new(width, height));
+                    self.sending.set(sending);
+                    self.step.set(Step::Editing);
+                    super::focus::after_render("#group-picture-preview");
+                }
+                Ok(None) => self.step.set(prior),
+                Err(problem) => {
+                    self.trouble.set(Some(problem));
+                    self.step.set(Step::Idle);
+                }
+            }
+        });
+    }
+
+    fn save(self) {
+        if self.step.get_untracked() == Step::Saving {
+            return;
         }
-    });
-    view! {
-        <section class="card picture-card" aria-labelledby="picture-title">
-            <h2 id="picture-title">{words::picture_title(lang)}</h2>
-            <p class="meta">{words::picture_who_sees(lang)}</p>
-            {move || card.current()}
-            <input id="picture-file" class="visually-hidden" type="file" accept="image/*" aria-label=words::picture_choose(lang) on:change=move |_| card.choose() />
-            <p class="hint">{words::picture_choose_hint(lang)}</p>
-            <Show when=move || step.get() == Step::Opening>
-                <p class="meta" role="status">{words::picture_opening(lang)}</p>
-            </Show>
+        self.step.set(Step::Saving);
+        self.trouble.set(None);
+        self.said.set(None);
+        let id = self.group_id.get_value();
+        let crop = self.crop.get_untracked();
+        leptos::task::spawn_local(async move {
+            match browser::upload_group(&id, crop).await {
+                Ok(_) => {
+                    browser::close();
+                    self.said
+                        .set(Some(words::chat_group_picture_saved(self.lang)));
+                    self.step.set(Step::Idle);
+                    self.on_saved.run(());
+                }
+                Err(problem) => {
+                    if problem == Trouble::SignedOut {
+                        super::session::forget();
+                    }
+                    self.trouble.set(Some(problem));
+                    self.step.set(Step::Editing);
+                }
+            }
+        });
+    }
+
+    fn key(self, event: &leptos::ev::KeyboardEvent) {
+        if self.sending.get_untracked() != Sending::Square {
+            return;
+        }
+        let far = if event.shift_key() { 0.25 } else { 0.05 };
+        let moved = match event.key().as_str() {
+            "ArrowLeft" => Some((-far, 0.0)),
+            "ArrowRight" => Some((far, 0.0)),
+            "ArrowUp" => Some((0.0, -far)),
+            "ArrowDown" => Some((0.0, far)),
+            _ => None,
+        };
+        if let Some((right, down)) = moved {
+            event.prevent_default();
+            self.crop.update(|c| *c = c.moved(right, down));
+        }
+    }
+
+    fn press(self, event: &leptos::ev::PointerEvent) {
+        if self.sending.get_untracked() != Sending::Square {
+            return;
+        }
+        let at = (f64::from(event.client_x()), f64::from(event.client_y()));
+        self.dragging
+            .set_value(Some((at.0, at.1, self.crop.get_untracked())));
+        browser::capture_at(GROUP_PREVIEW_ID, event.pointer_id());
+    }
+
+    fn drag(self, event: &leptos::ev::PointerEvent) {
+        if let Some((x0, y0, from)) = self.dragging.get_value() {
+            let dx = f64::from(event.client_x()) - x0;
+            let dy = f64::from(event.client_y()) - y0;
+            self.crop.update(|c| {
+                *c = c.dragged(from, dx, dy, browser::shown_at(GROUP_PREVIEW_ID));
+            });
+        }
+    }
+
+    fn editor_view(self) -> impl IntoView {
+        let (lang, crop, step) = (self.lang, self.crop, self.step);
+        let preview = NodeRef::<leptos::html::Canvas>::new();
+        Effect::new(move |_| {
+            let at = crop.get();
+            if preview.get().is_some() {
+                browser::draw_into(GROUP_PREVIEW_ID, at);
+            }
+        });
+        let zoom = move |event: leptos::ev::Event| {
+            if let Ok(percent) = event_target_value(&event).parse::<f64>() {
+                crop.update(|c| *c = c.zoomed(percent / 100.0));
+            }
+        };
+        let position = move || {
+            let (x, y, zoom) = crop.get().spoken();
+            words::picture_position(lang, &x.to_string(), &y.to_string(), &zoom.to_string())
+        };
+        view! {
+            <div class="group-crop-box">
+                <canvas
+                    id=GROUP_PREVIEW_ID
+                    class="picture-preview"
+                    width=PREVIEW
+                    height=PREVIEW
+                    tabindex="0"
+                    node_ref=preview
+                    role="img"
+                    aria-label=words::chat_group_picture_preview(lang)
+                    aria-describedby="group-picture-position"
+                    on:keydown=move |e| self.key(&e)
+                    on:pointerdown=move |e| self.press(&e)
+                    on:pointermove=move |e| self.drag(&e)
+                    on:pointerup=move |_| self.dragging.set_value(None)
+                    on:pointercancel=move |_| self.dragging.set_value(None)
+                ></canvas>
+                <p
+                    id="group-picture-position"
+                    class="meta"
+                    aria-live="polite"
+                    hidden=move || self.sending.get() != Sending::Square
+                >
+                    {position}
+                </p>
+                <div class="picture-toolbar" hidden=move || self.sending.get() != Sending::Square>
+                    <button type="button" class="button small quiet"
+                        title=words::picture_zoom_out(lang) aria-label=words::picture_zoom_out(lang)
+                        on:click=move |_| crop.update(|c| *c = c.zoomed_by(-0.25))>
+                        {glyph::glyph(glyph::ZOOM_OUT)}
+                    </button>
+                    <label class="visually-hidden" for="group-picture-zoom">{words::picture_zoom(lang)}</label>
+                    <input id="group-picture-zoom" type="range" min="100" max="800" step="10"
+                        prop:value=move || crop.get().spoken().2.to_string() on:input=zoom />
+                    <button type="button" class="button small quiet"
+                        title=words::picture_zoom_in(lang) aria-label=words::picture_zoom_in(lang)
+                        on:click=move |_| crop.update(|c| *c = c.zoomed_by(0.25))>
+                        {glyph::glyph(glyph::ZOOM_IN)}
+                    </button>
+                    <button type="button" class="button small quiet"
+                        title=words::picture_rotate_left(lang) aria-label=words::picture_rotate_left(lang)
+                        on:click=move |_| crop.update(|c| *c = c.rotated_left())>
+                        {glyph::glyph(glyph::ROTATE_CCW)}
+                    </button>
+                    <button type="button" class="button small quiet"
+                        title=words::picture_rotate_right(lang) aria-label=words::picture_rotate_right(lang)
+                        on:click=move |_| crop.update(|c| *c = c.rotated_right())>
+                        {glyph::glyph(glyph::ROTATE_CW)}
+                    </button>
+                    <button type="button" class="button small quiet"
+                        title=words::picture_reset_crop(lang) aria-label=words::picture_reset_crop(lang)
+                        on:click=move |_| crop.update(|c| *c = c.reset())>
+                        {glyph::glyph(glyph::REFRESH_CW)}
+                    </button>
+                </div>
+                <Show when=move || self.sending.get() == Sending::Original>
+                    <p class="meta">{words::picture_original(lang)}</p>
+                </Show>
+                <Show when=move || self.sending.get() == Sending::Moving>
+                    <p class="meta">{words::picture_moving(lang)}</p>
+                </Show>
+                <div class="actions">
+                    <button type="button" class="button small primary"
+                        title=words::picture_save(lang)
+                        aria-disabled=move || (step.get() == Step::Saving).then_some("true")
+                        on:click=move |_| self.save()>
+                        {glyph::glyph(glyph::CIRCLE_CHECK)}
+                        <span>{move || if step.get() == Step::Saving { words::picture_saving(lang) } else { words::picture_save(lang) }}</span>
+                    </button>
+                    <button type="button" class="button small quiet"
+                        title=words::picture_cancel(lang)
+                        on:click=move |_| { browser::close(); step.set(Step::Idle); }>
+                        <span>{words::picture_cancel(lang)}</span>
+                    </button>
+                </div>
+            </div>
+        }
+    }
+    fn remove_confirm(self) -> impl IntoView {
+        let (lang, step) = (self.lang, self.step);
+        view! {
             <Show when=move || step.get() == Step::Removing>
-                <div class="confirm" role="group" aria-labelledby="picture-remove-ask">
-                    <p id="picture-remove-ask">{words::picture_remove_confirm(lang)}</p>
-                    <div class="actions">
-                        <button type="button" class="button danger" aria-disabled=move || card.busy.get().then_some("true") on:click=move |_| card.remove()>{words::picture_remove_yes(lang)}</button>
-                        <button type="button" class="button button-ghost" on:click=move |_| step.set(Step::Idle)>{words::picture_cancel(lang)}</button>
-                    </div>
+                <div class="ask" role="group" aria-label=words::chat_group_picture_remove(lang)>
+                    <p>{words::chat_group_picture_remove_ask(lang)}</p>
+                    <button
+                        type="button"
+                        class="button small danger"
+                        on:click=move |_| {
+                            step.set(Step::Idle);
+                            self.on_remove.run(());
+                        }
+                    >
+                        {words::chat_group_picture_remove(lang)}
+                    </button>
+                    <button
+                        type="button"
+                        class="button small quiet"
+                        on:click=move |_| step.set(Step::Idle)
+                    >
+                        {words::picture_cancel(lang)}
+                    </button>
                 </div>
             </Show>
-            <Show when=move || matches!(step.get(), Step::Editing | Step::Saving)>
-                {card.editor()}
-            </Show>
-            <p class="error" role="alert">{move || card.trouble.get().map(|t| trouble_text(lang, t))}</p>
-            <p class="meta" role="status">{move || card.said.get()}</p>
-            <p class="visually-hidden" translate="no">{name}</p>
-        </section>
+        }
     }
+}
+
+/// Compact inline group-picture uploader & square cropper for group admins
+/// inside `.group-hero`.
+#[must_use]
+pub fn group_cropper(
+    lang: Lang,
+    group_id: String,
+    has_picture: bool,
+    on_saved: Callback<()>,
+    on_remove: Callback<()>,
+) -> AnyView {
+    let ctl = GroupCrop {
+        lang,
+        group_id: StoredValue::new(group_id),
+        step: RwSignal::new(Step::Idle),
+        crop: RwSignal::new(Crop::new(1.0, 1.0)),
+        sending: RwSignal::new(Sending::Square),
+        trouble: RwSignal::new(None),
+        said: RwSignal::new(None),
+        dragging: StoredValue::new(None),
+        on_saved,
+        on_remove,
+    };
+    on_cleanup(browser::close);
+    let step = ctl.step;
+    let remove_btn = has_picture.then(|| {
+        view! {
+            <button
+                type="button"
+                class="button small danger"
+                title=words::chat_group_picture_remove(lang)
+                aria-label=words::chat_group_picture_remove(lang)
+                on:click=move |_| step.set(Step::Removing)
+            >
+                {glyph::glyph(glyph::TRASH_2)}
+                <span>{words::chat_group_picture_remove(lang)}</span>
+            </button>
+        }
+    });
+    let group_file_input = NodeRef::<leptos::html::Input>::new();
+    view! {
+        <div class="group-avatar-tools" hidden=move || step.get() != Step::Idle>
+            <button
+                type="button"
+                class="button small quiet"
+                title=words::chat_group_picture_change(lang)
+                aria-label=words::chat_group_picture_change(lang)
+                on:click=move |_| {
+                    if let Some(el) = group_file_input.get_untracked() {
+                        el.click();
+                    }
+                }
+            >
+                {glyph::glyph(glyph::CAMERA)}
+                <span>{words::chat_group_picture_change(lang)}</span>
+            </button>
+            <input
+                id=GROUP_FILE_ID
+                node_ref=group_file_input
+                type="file"
+                hidden=true
+                accept="image/*"
+                aria-label=words::chat_group_picture(lang)
+                on:change=move |_| ctl.choose()
+            />
+            {remove_btn}
+        </div>
+        <Show when=move || step.get() == Step::Opening>
+            <p class="meta" role="status">{words::picture_opening(lang)}</p>
+        </Show>
+        {ctl.remove_confirm()}
+        <Show when=move || matches!(step.get(), Step::Editing | Step::Saving)>
+            {ctl.editor_view()}
+        </Show>
+        <p class="error" role="alert">
+            {move || ctl.trouble.get().map(|t| {
+                if t == Trouble::Failed {
+                    words::chat_group_picture_failed(lang)
+                } else {
+                    trouble_text(lang, t)
+                }
+            })}
+        </p>
+        <p class="meta" role="status">{move || ctl.said.get()}</p>
+    }
+    .into_any()
 }
 
 /// The report form for the picture `key` of the account `tag`, opened by
@@ -1039,13 +1646,14 @@ type OpenedPicture = (f64, f64, Sending);
 #[cfg(target_arch = "wasm32")]
 mod browser {
     use super::{
-        Crop, MAX_SIDE, OpenedPicture, Own, PREVIEW, Sending, Trouble, answered, checked, moving,
+        Crop, MAX_SIDE, OpenedPicture, Own, PREVIEW, Sending, Trouble, answered, answered_group,
+        checked, moving,
     };
     use leptos::prelude::*;
     use wasm_bindgen::{JsCast, JsValue, closure::Closure};
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{
-        Blob, CanvasRenderingContext2d, File, HtmlCanvasElement, HtmlImageElement,
+        Blob, CanvasRenderingContext2d, File, FileList, HtmlCanvasElement, HtmlImageElement,
         HtmlInputElement, ImageBitmap, ImageBitmapOptions, ImageOrientation, Url,
     };
 
@@ -1138,18 +1746,50 @@ mod browser {
         matches!((canvas(true), canvas(false)), (Some(a), Some(b)) if a != b)
     }
 
-    /// Opens the chosen file: its sides, and how it will be sent.
+    /// A dropped file extracted synchronously inside a drag-and-drop handler.
+    pub struct Dropped(Option<File>);
+
+    /// Extracts the first dropped file from `event` before leaving the event tick.
+    pub fn dropped(event: &leptos::ev::DragEvent) -> Dropped {
+        let file = js_sys::Reflect::get(event.as_ref(), &JsValue::from_str("dataTransfer"))
+            .ok()
+            .and_then(|dt| js_sys::Reflect::get(&dt, &JsValue::from_str("files")).ok())
+            .and_then(|files| files.dyn_into::<FileList>().ok())
+            .and_then(|list| list.get(0));
+        Dropped(file)
+    }
+
+    /// Opens the chosen file from `input_id`: its sides, and how it will be sent.
     /// `Ok(None)` when the person closed the file dialog without a file.
-    pub async fn open() -> Result<Option<OpenedPicture>, Trouble> {
-        let input: HtmlInputElement = element("picture-file").ok_or(Trouble::Failed)?;
+    pub async fn open_from(input_id: &str) -> Result<Option<OpenedPicture>, Trouble> {
+        let input: HtmlInputElement = element(input_id).ok_or(Trouble::Failed)?;
         let Some(file) = input.files().and_then(|files| files.get(0)) else {
             return Ok(None);
         };
         close();
         input.set_value("");
-        let head = head(&file).await;
-        checked(file.size(), &head)?;
-        let moves = moving(&head);
+        open_file(file).await
+    }
+
+    /// Opens the chosen file: its sides, and how it will be sent.
+    /// `Ok(None)` when the person closed the file dialog without a file.
+    pub async fn open() -> Result<Option<OpenedPicture>, Trouble> {
+        open_from("picture-file").await
+    }
+
+    /// Opens a file dropped onto the picture dropzone.
+    pub async fn open_dropped(dropped: Dropped) -> Result<Option<OpenedPicture>, Trouble> {
+        let Some(file) = dropped.0 else {
+            return Ok(None);
+        };
+        close();
+        open_file(file).await
+    }
+
+    async fn open_file(file: File) -> Result<Option<OpenedPicture>, Trouble> {
+        let file_head = head(&file).await;
+        checked(file.size(), &file_head)?;
+        let moves = moving(&file_head);
         let options = ImageBitmapOptions::new();
         options.set_image_orientation(ImageOrientation::FromImage);
         let bitmap = match window()
@@ -1227,10 +1867,26 @@ mod browser {
         }
     }
 
-    /// Whether the header already holds this sign-in's own picture
-    /// (`session.rs`), so its place can be kept while the page asks.
-    pub fn has_remembered_key() -> bool {
-        super::super::session::noted_picture()
+    /// Reads the account's remembered picture key and moving flag from the
+    /// header's local note (`session::OWN`), so the profile and overview
+    /// avatars keep their image immediately while `mine()` is in flight.
+    pub fn remembered_picture() -> Option<(central_api::picture::PictureKey, bool)> {
+        if !super::super::session::noted_picture() {
+            return None;
+        }
+        let of = super::super::session::marker()?;
+        let text = super::super::session::read(super::super::session::OWN)?;
+        let held: serde_json::Value = serde_json::from_str(&text).ok()?;
+        if held.get("of").and_then(serde_json::Value::as_str) != Some(of.as_str()) {
+            return None;
+        }
+        let hex = held.get("key")?.as_str()?;
+        let key = crate::data::id_from_hex(hex)?;
+        let moving = held
+            .get("moving")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        Some((key, moving))
     }
 
     /// Notes the account's own picture for the header: its key and whether
@@ -1247,44 +1903,78 @@ mod browser {
     fn paint(canvas: &HtmlCanvasElement, crop: Crop, side: f64) -> Option<()> {
         let context: CanvasRenderingContext2d = canvas.get_context("2d").ok()??.dyn_into().ok()?;
         context.clear_rect(0.0, 0.0, side, side);
-        let square = crop.side();
-        OPENED.with(|o| {
+        let (sx, sy, square) = crop.source_rect();
+        let quads = crop.rotation_quads();
+        context.save();
+        if quads != 0 {
+            let half = side / 2.0;
+            let _ = context.translate(half, half);
+            let _ = context.rotate(f64::from(quads) * std::f64::consts::FRAC_PI_2);
+            let _ = context.translate(-half, -half);
+        }
+        let drawn = OPENED.with(|o| {
             let opened = o.borrow();
             let opened = opened.as_ref()?;
             match &opened.source {
                 Source::Bitmap(bitmap) => context
                     .draw_image_with_image_bitmap_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        bitmap, crop.x, crop.y, square, square, 0.0, 0.0, side, side,
+                        bitmap, sx, sy, square, square, 0.0, 0.0, side, side,
                     )
                     .ok(),
                 Source::Image(image, _) => context
                     .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                        image, crop.x, crop.y, square, square, 0.0, 0.0, side, side,
+                        image, sx, sy, square, square, 0.0, 0.0, side, side,
                     )
                     .ok(),
                 Source::Unopened => None,
             }
-        })
+        });
+        context.restore();
+        drawn
     }
 
-    /// Draws the square into the preview.
-    pub fn draw(crop: Crop) {
-        if let Some(canvas) = element::<HtmlCanvasElement>("picture-preview") {
+    /// Draws the square into canvas `canvas_id`. If `<Show>` has not mounted
+    /// the canvas yet, schedules a `requestAnimationFrame` redraw.
+    pub fn draw_into(canvas_id: &str, crop: Crop) {
+        if let Some(canvas) = element::<HtmlCanvasElement>(canvas_id) {
             let _ = paint(&canvas, crop, f64::from(PREVIEW));
+            return;
         }
+        let id = canvas_id.to_owned();
+        let later = Closure::once_into_js(move || {
+            if let Some(canvas) = element::<HtmlCanvasElement>(&id) {
+                let _ = paint(&canvas, crop, f64::from(PREVIEW));
+            }
+        });
+        let _ = window().request_animation_frame(later.unchecked_ref());
+    }
+
+    /// Draws the square into the profile picture preview.
+    pub fn draw(crop: Crop) {
+        draw_into("picture-preview", crop);
     }
 
     /// The preview's width on screen, for dragging.
-    pub fn shown() -> f64 {
-        element::<HtmlCanvasElement>("picture-preview")
+    pub fn shown_at(canvas_id: &str) -> f64 {
+        element::<HtmlCanvasElement>(canvas_id)
             .map_or(f64::from(PREVIEW), |c| f64::from(c.client_width()))
     }
 
-    /// Keeps the pointer's moves on the preview while it is pressed.
-    pub fn capture(pointer: i32) {
-        if let Some(canvas) = element::<HtmlCanvasElement>("picture-preview") {
+    /// The profile preview's width on screen, for dragging.
+    pub fn shown() -> f64 {
+        shown_at("picture-preview")
+    }
+
+    /// Keeps the pointer's moves on `canvas_id` while pressed.
+    pub fn capture_at(canvas_id: &str, pointer: i32) {
+        if let Some(canvas) = element::<HtmlCanvasElement>(canvas_id) {
             let _ = canvas.set_pointer_capture(pointer);
         }
+    }
+
+    /// Keeps the pointer's moves on the profile preview while pressed.
+    pub fn capture(pointer: i32) {
+        capture_at("picture-preview", pointer);
     }
 
     async fn png(crop: Crop) -> Option<Blob> {
@@ -1303,9 +1993,7 @@ mod browser {
         JsFuture::from(made).await.ok()?.dyn_into().ok()
     }
 
-    /// Sends the square as a PNG, or, where the page cannot read its
-    /// canvas or open the file, the file itself.
-    pub async fn upload(crop: Crop) -> Result<Own, Trouble> {
+    async fn prepared_blob(crop: Crop) -> Result<(Blob, String), Trouble> {
         let (readable, file) = OPENED
             .with(|o| {
                 o.borrow()
@@ -1313,19 +2001,38 @@ mod browser {
                     .map(|opened| (opened.readable, opened.file.clone()))
             })
             .ok_or(Trouble::Failed)?;
-        let (blob, kind): (Blob, String) = if readable {
-            (
+        if readable {
+            Ok((
                 png(crop).await.ok_or(Trouble::Failed)?,
                 "image/png".to_owned(),
-            )
+            ))
         } else {
             let kind = accepted(&file.type_()).ok_or(Trouble::Refused("unsupported"))?;
-            (file.into(), kind.to_owned())
-        };
+            Ok((file.into(), kind.to_owned()))
+        }
+    }
+
+    /// Sends the square as a PNG, or, where the page cannot read its
+    /// canvas or open the file, the file itself.
+    pub async fn upload(crop: Crop) -> Result<Own, Trouble> {
+        let (blob, kind) = prepared_blob(crop).await?;
         let (status, text) = super::super::net::put_blob("/api/v1/picture", &blob, &kind)
             .await
             .map_err(|_| Trouble::Failed)?;
         answered(status, &text)
+    }
+
+    /// Sends the cropped group picture to `PUT /api/v1/groups/{group_id}/picture`.
+    pub async fn upload_group(
+        group_id: &str,
+        crop: Crop,
+    ) -> Result<(central_api::picture::PictureKey, bool), Trouble> {
+        let (blob, kind) = prepared_blob(crop).await?;
+        let url = format!("/api/v1/groups/{group_id}/picture");
+        let (status, text) = super::super::net::put_blob(&url, &blob, &kind)
+            .await
+            .map_err(|_| Trouble::Failed)?;
+        answered_group(status, &text)
     }
 }
 
@@ -1334,24 +2041,49 @@ mod browser {
 mod browser {
     use super::{Crop, OpenedPicture, Own, Trouble};
 
+    pub struct Dropped;
+
+    pub fn dropped(_: &leptos::ev::DragEvent) -> Dropped {
+        Dropped
+    }
+
+    pub fn open_dropped(_: Dropped) -> std::future::Ready<Result<Option<OpenedPicture>, Trouble>> {
+        std::future::ready(Ok(None))
+    }
+
+    pub fn open_from(_: &str) -> std::future::Ready<Result<Option<OpenedPicture>, Trouble>> {
+        std::future::ready(Ok(None))
+    }
+
     /// The checks run as in the browser, on nothing; nothing is opened.
     pub fn open() -> std::future::Ready<Result<Option<OpenedPicture>, Trouble>> {
         let _ = super::moving(&[]);
         std::future::ready(super::checked(0.0, &[]).and(Err(Trouble::Open)))
     }
     pub fn close() {}
-    pub fn has_remembered_key() -> bool {
-        false
+    pub fn remembered_picture() -> Option<(central_api::picture::PictureKey, bool)> {
+        None
     }
     pub fn remember(_: Option<&central_api::picture::Picture>) {}
+    pub fn draw_into(_: &str, _: Crop) {}
     pub fn draw(_: Crop) {}
+    pub fn shown_at(_: &str) -> f64 {
+        f64::from(super::PREVIEW)
+    }
     pub fn shown() -> f64 {
         f64::from(super::PREVIEW)
     }
+    pub fn capture_at(_: &str, _: i32) {}
     pub fn capture(_: i32) {}
     /// Nothing is sent; there is no answer to read.
     pub fn upload(_: Crop) -> std::future::Ready<Result<Own, Trouble>> {
         std::future::ready(super::answered(0, ""))
+    }
+    pub fn upload_group(
+        _: &str,
+        _: Crop,
+    ) -> std::future::Ready<Result<(central_api::picture::PictureKey, bool), Trouble>> {
+        std::future::ready(super::answered_group(0, ""))
     }
 }
 
@@ -1376,6 +2108,35 @@ mod tests {
         let dragged = start.dragged(start, 50.0, 0.0, 200.0);
         assert_eq!(dragged.x, 200.0 - 100.0);
         assert_eq!(start.spoken(), (50, 50, 100));
+    }
+
+    #[test]
+    fn rotation_and_source_rect_stay_in_bounds() {
+        let start = Crop::new(800.0, 400.0).zoomed(2.0).moved(0.5, 0.25);
+        assert_eq!(start.rotation_quads(), 0);
+        let cw = start.rotated_right();
+        assert_eq!(cw.rotation_quads(), 1);
+        assert_eq!(cw.effective_size(), (400.0, 800.0));
+        let full = cw.rotated_right().rotated_right().rotated_right();
+        assert_eq!(full.rotation_quads(), 0);
+        assert!((full.x - start.x).abs() < 1e-9);
+        assert!((full.y - start.y).abs() < 1e-9);
+
+        let ccw = start.rotated_left();
+        assert_eq!(ccw.rotation_quads(), 3);
+        assert_eq!(ccw.rotated_right().rotation_quads(), 0);
+
+        for rotated in [start, cw, cw.rotated_right(), ccw] {
+            let (sx, sy, side) = rotated.source_rect();
+            assert!(sx >= 0.0 && sy >= 0.0);
+            assert!(sx + side <= 800.0 + 1e-9);
+            assert!(sy + side <= 400.0 + 1e-9);
+            let (x_pct, y_pct, zoom_pct) = rotated.spoken();
+            assert!(x_pct <= 100 && y_pct <= 100 && zoom_pct == 200);
+        }
+
+        let reset = cw.zoomed_by(0.5).reset();
+        assert_eq!(reset, Crop::new(800.0, 400.0));
     }
 
     #[test]

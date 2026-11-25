@@ -3,17 +3,28 @@
 //! message on its way, the composer and the conversation's details.
 //! Every text a person wrote is rendered as text, never as markup.
 
-use central_api::social::{Person, Relation};
+use std::time::Duration;
+
+use central_api::picture::PictureKey;
+use central_api::social::{
+    CardPrinting, CardSuggestion, FINISH_ETCHED, FINISH_FOIL, FINISH_NONFOIL, Person, Relation,
+};
 use leptos::html;
 use leptos::prelude::*;
 use leptos::wasm_bindgen::JsCast;
 use leptos::web_sys;
 
+use super::super::field;
+use super::super::ui::copy_handle::handle_with_copy;
+use super::super::ui::rank_avatar::{rank_canvas, rank_of, rank_scale_class};
+use super::cache;
 use super::glyph::{self, glyph};
+use super::mentions::{self, CardFinish, Trigger, TriggerKind};
 use super::model::{self, Conversation, Kind, Message, Review, Sources, initials, tag_text};
 use super::people;
+use super::preview::PreviewCtl;
 use super::time;
-use super::{Ctl, Me, Phase, Tab, href, missing_view, remember};
+use super::{Ctl, Me, Phase, Tab, href, missing_view, remember, wire};
 use crate::rich::rich;
 use crate::words::{self, Lang};
 
@@ -28,6 +39,39 @@ fn focus(id: &str) {
         .and_then(|e| e.dyn_into::<web_sys::HtmlElement>().ok())
     {
         let _ = element.focus();
+    }
+}
+
+/// Opens a native `<dialog>` element modally via `showModal()` once mounted
+/// (SSR-safe, without requiring extra `web-sys` feature flags).
+pub(in super::super) fn open_modal_dialog(id: &str) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use js_sys::{Function, Reflect};
+        use wasm_bindgen::JsValue;
+        let id = id.to_owned();
+        let _ = request_animation_frame(move || {
+            let Some(el) = document().get_element_by_id(&id) else {
+                return;
+            };
+            let already_open = Reflect::get(&el, &JsValue::from_str("open"))
+                .ok()
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if already_open {
+                return;
+            }
+            if let Some(show) = Reflect::get(&el, &JsValue::from_str("showModal"))
+                .ok()
+                .and_then(|f| f.dyn_into::<Function>().ok())
+            {
+                let _ = show.call0(&el);
+            }
+        });
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = id;
     }
 }
 
@@ -50,7 +94,50 @@ pub fn avatar(name: &str, seed: &str, group: bool, tag: Option<u32>) -> AnyView 
         })
         .into_any()
     };
-    view! { <span class="avatar" data-hue=model::hue(seed).to_string() aria-hidden="true">{face}</span> }.into_any()
+    let hue = model::hue(seed).to_string();
+    if group {
+        return view! { <span class="avatar" data-hue=hue aria-hidden="true">{face}</span> }
+            .into_any();
+    }
+    let plate_hue = hue.clone();
+    let class = move || match tag.and_then(rank_of) {
+        Some(rank) => format!(
+            "avatar rank-avatar {} has-rank",
+            rank_scale_class(Some(&rank))
+        ),
+        None => "avatar".to_owned(),
+    };
+    let frame = move || {
+        tag.and_then(rank_of)
+            .map(|rank| rank_canvas("frame", rank, false, 40))
+    };
+    let presence_dot = move || {
+        tag.and_then(super::socket::presence_of).map(|state| {
+            let attr = state.attr();
+            view! { <span class="presence-dot" data-state=attr aria-hidden="true">{""}</span> }
+        })
+    };
+    view! {
+        <span class=class data-hue=hue aria-hidden="true">
+            <span class="rank-avatar-plate" data-hue=plate_hue>{face}</span>
+            {frame}
+            {presence_dot}
+        </span>
+    }
+    .into_any()
+}
+
+/// A group's avatar: its uploaded picture when present, else the users glyph
+/// in its seeded tint.
+pub fn group_avatar(seed: &str, picture: Option<(PictureKey, bool)>) -> AnyView {
+    let hue = model::hue(seed).to_string();
+    let face = match picture {
+        Some((key, moving)) => {
+            crate::islands::picture::face(&key, moving, String::new()).into_any()
+        }
+        None => glyph(glyph::USERS),
+    };
+    view! { <span class="avatar" data-hue=hue aria-hidden="true">{face}</span> }.into_any()
 }
 
 /// What the lists are made of: the contacts, the groups, every conversation.
@@ -170,6 +257,37 @@ fn tabs(
     .into_any()
 }
 
+fn msgr_header(lang: Lang, me: &Me, making: RwSignal<bool>) -> impl IntoView {
+    let own = me.tag;
+    view! {
+        <header class="msgr-me">
+            {avatar(&me.name, &own.to_string(), false, Some(own))}
+            <span class="msgr-me-name">
+                {handle_with_copy(lang, me.name.clone(), tag_text(own), true)}
+            </span>
+            <button
+                type="button"
+                id="msgr-new-group-btn"
+                class="icon-button msgr-me-action"
+                title=words::chat_new_group(lang)
+                aria-label=words::chat_new_group(lang)
+                aria-expanded=move || making.get().to_string()
+                aria-controls="new-group-dialog"
+                on:click=move |_| making.set(true)
+            >
+                {glyph(glyph::PLUS)}
+            </button>
+        </header>
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MainView {
+    Missing,
+    Ended,
+    Ready,
+}
+
 /// The whole messenger.
 pub fn messenger(
     lang: Lang,
@@ -182,6 +300,7 @@ pub fn messenger(
     let own = me.tag;
     let lists = Lists::new(own, ctl);
     lists.title();
+    let making = RwSignal::new(false);
     let choose = Callback::new(move |id: String| {
         remember(lang, Tab::Chats, Some(&id));
         tab.set(Tab::Chats);
@@ -194,7 +313,6 @@ pub fn messenger(
             "list"
         }
     };
-    // the empty list's way forward: the contacts, at the field that adds one
     let add_contact = Callback::new(move |()| {
         remember(lang, Tab::Contacts, None);
         tab.set(Tab::Contacts);
@@ -202,51 +320,67 @@ pub fn messenger(
         crate::islands::focus::after_render("#contact-find");
     });
     let me_store = StoredValue::new(me.clone());
-    let own_handle = central_api::profile::handle(&me.name, own);
     let side = move || match tab.get() {
         Tab::Chats => {
             chats_panel(lang, own, ctl, lists.rows, selected, choose, add_contact).into_any()
         }
-        Tab::Contacts => {
-            people::contacts_panel(lang, own, own_handle.clone(), ctl, choose).into_any()
-        }
+        Tab::Contacts => people::contacts_panel(lang, own, ctl, choose).into_any(),
     };
     let current = Memo::new(move |_| {
         selected
             .get()
             .filter(|id| lists.rows.with(|r| r.iter().any(|c| c.id == *id)))
     });
-    let phase = Memo::new(move |_| ctl.shown.with(|s| s.phase));
+    let phase = Memo::new(move |_| match ctl.shown.with(|s| s.phase) {
+        Phase::Missing => MainView::Missing,
+        Phase::Ended => MainView::Ended,
+        Phase::Opening | Phase::Ready | Phase::Failed => MainView::Ready,
+    });
     let main = move || {
         match phase.get() {
-        Phase::Missing => missing_view(lang, worker.get_value(), me_store.get_value(), ctl).into_any(),
-        Phase::Ended => view! {
+        MainView::Missing => {
+            missing_view(lang, worker.get_value(), me_store.get_value(), ctl).into_any()
+        }
+        MainView::Ended => view! {
             <div class="msgr-welcome" role="alert">
                 <h2>{words::chat_ended(lang)}</h2>
                 <p><a class="button primary" href=format!("/{}/signin", lang.code())>{words::nav_sign_in(lang)}</a></p>
             </div>
         }
         .into_any(),
-        _ => match current.get() {
+        MainView::Ready => match current.get() {
             Some(id) => conversation(lang, &id, own, ctl, lists, selected),
             None => welcome(lang, ctl).into_any(),
         },
     }
     };
+    let new_group_modal = move || {
+        making.get().then(|| {
+            people::new_group_dialog(
+                lang,
+                own,
+                ctl,
+                lists.friends,
+                Callback::new(move |id: String| {
+                    making.set(false);
+                    choose.run(format!("grp:{id}"));
+                }),
+                Callback::new(move |()| {
+                    making.set(false);
+                    focus("msgr-new-group-btn");
+                }),
+            )
+        })
+    };
     view! {
         <div class="messenger" data-pane=pane>
             <section class="msgr-side" aria-label=words::chat_side(lang)>
-                <header class="msgr-me">
-                    {avatar(&me.name, &own.to_string(), false, Some(own))}
-                    <span class="msgr-me-name">
-                        <bdi translate="no">{me.name.clone()}</bdi>
-                        <span class="tag" translate="no">{format!("#{}", tag_text(own))}</span>
-                    </span>
-                </header>
+                {msgr_header(lang, me, making)}
                 {tabs(lang, lists, tab, selected)}
                 {side}
             </section>
             <section class="msgr-main" aria-label=words::chat_main(lang)>{main}</section>
+            {new_group_modal}
         </div>
     }
     .into_any()
@@ -365,6 +499,86 @@ fn find_shortcut() {
     on_cleanup(move || find.remove());
 }
 
+fn chat_search_bar(lang: Lang, query: RwSignal<String>) -> impl IntoView {
+    view! {
+        <div class="msgr-bar">
+            <div class="inset msgr-find">
+                <label class="visually-hidden" for="chat-search">{words::chat_search(lang)}</label>
+                {field::mark(glyph::SEARCH)}
+                <input id="chat-search" type="search" autocomplete="off" spellcheck="false"
+                    placeholder=words::chat_search_hint(lang)
+                    on:input=move |ev| query.set(event_target_value(&ev)) prop:value=move || query.get() />
+                <Show when=move || !query.with(String::is_empty)>
+                    <button
+                        type="button"
+                        class="inset-end"
+                        title=words::chat_search_clear(lang)
+                        aria-label=words::chat_search_clear(lang)
+                        on:click=move |_| {
+                            query.set(String::new());
+                            focus("chat-search");
+                        }
+                    >
+                        {glyph(glyph::CLOSE)}
+                    </button>
+                </Show>
+            </div>
+        </div>
+    }
+}
+
+fn conv_row_key(
+    c: &Conversation,
+) -> (
+    String,
+    Option<String>,
+    usize,
+    String,
+    bool,
+    Option<PictureKey>,
+    bool,
+) {
+    let (pic, moving) = match &c.kind {
+        Kind::Group(g) => (g.picture_key, g.picture_moving),
+        _ => (None, false),
+    };
+    (
+        c.id.clone(),
+        c.last.as_ref().map(|m| m.id.clone()),
+        c.unread,
+        c.title.clone(),
+        c.open,
+        pic,
+        moving,
+    )
+}
+
+fn conv_list_keys(
+    event: &leptos::ev::KeyboardEvent,
+    visible: Memo<Vec<Conversation>>,
+    anchor: Memo<Option<String>>,
+    rove: RwSignal<Option<String>>,
+) {
+    let ids: Vec<String> = visible.with_untracked(|v| v.iter().map(|c| c.id.clone()).collect());
+    let Some(last) = ids.len().checked_sub(1) else {
+        return;
+    };
+    let at = anchor
+        .get_untracked()
+        .and_then(|a| ids.iter().position(|id| *id == a))
+        .unwrap_or(0);
+    let next = match event.key().as_str() {
+        "ArrowDown" => (at + 1).min(last),
+        "ArrowUp" => at.saturating_sub(1),
+        "Home" => 0,
+        "End" => last,
+        _ => return,
+    };
+    event.prevent_default();
+    rove.set(Some(ids[next].clone()));
+    focus(&row_id(&ids[next]));
+}
+
 /// The Chats half: search, a new group, invitations, the list.
 fn chats_panel(
     lang: Lang,
@@ -376,7 +590,8 @@ fn chats_panel(
     add_contact: Callback<()>,
 ) -> impl IntoView {
     let query = RwSignal::new(String::new());
-    let making = RwSignal::new(false);
+    let shown = RwSignal::new(40_usize);
+    let panel: NodeRef<html::Div> = NodeRef::new();
     let visible = Memo::new(move |_| {
         let needle = query.get().trim().to_lowercase();
         rows.with(|r| {
@@ -386,9 +601,18 @@ fn chats_panel(
                 .collect::<Vec<_>>()
         })
     });
+    Effect::new(move |_| {
+        query.track();
+        shown.set(40);
+    });
+    let total = Memo::new(move |_| visible.with(Vec::len));
+    let paged = Memo::new(move |_| {
+        let limit = shown.get();
+        visible.with(|v| v.iter().take(limit).cloned().collect::<Vec<_>>())
+    });
     let rove = RwSignal::new(None::<String>);
     let anchor = Memo::new(move |_| {
-        visible.with(|v| {
+        paged.with(|v| {
             let has = |id: &String| v.iter().any(|c| c.id == *id);
             rove.get()
                 .filter(has)
@@ -402,74 +626,46 @@ fn chats_panel(
         rove,
         choose,
     };
-    let keys = move |event: leptos::ev::KeyboardEvent| {
-        let ids: Vec<String> = visible.with_untracked(|v| v.iter().map(|c| c.id.clone()).collect());
-        let Some(last) = ids.len().checked_sub(1) else {
-            return;
-        };
-        let at = anchor
-            .get_untracked()
-            .and_then(|a| ids.iter().position(|id| *id == a))
-            .unwrap_or(0);
-        let next = match event.key().as_str() {
-            "ArrowDown" => (at + 1).min(last),
-            "ArrowUp" => at.saturating_sub(1),
-            "Home" => 0,
-            "End" => last,
-            _ => return,
-        };
-        event.prevent_default();
-        rove.set(Some(ids[next].clone()));
-        focus(&row_id(&ids[next]));
-    };
     find_shortcut();
     let known = Known::watch(ctl);
-    // what stands in the list's place: nothing while there are rows (so a
-    // new line or a keystroke never draws the list anew, and the focus in
-    // it stays), "no match" for a search, else the empty list's state
     let instead = Memo::new(move |_| {
         visible
             .with(Vec::is_empty)
             .then(|| query.with(|q| q.trim().is_empty()).then(|| known.get()))
     });
+    let on_scroll = move |_| {
+        let Some(node) = panel.get_untracked() else {
+            return;
+        };
+        if node.scroll_height() - node.scroll_top() - node.client_height() < 160
+            && shown.get_untracked() < total.get_untracked()
+        {
+            shown.update(|n| *n += 40);
+        }
+    };
     let list = move || {
         match instead.get() {
-            Some(None) => {
-                return view! { <p class="msgr-note">{words::chat_no_match(lang)}</p> }.into_any();
-            }
-            Some(Some(known)) => return list_empty(lang, known, add_contact),
-            None => {}
-        }
-        view! {
+        Some(None) => view! { <p class="msgr-note">{words::chat_no_match(lang)}</p> }.into_any(),
+        Some(Some(known)) => list_empty(lang, known, add_contact),
+        None => view! {
             <nav class="conv-nav" aria-label=words::chat_conversations(lang)>
-                <ul class="conv-list" on:keydown=keys>
-                    <For each=move || visible.get()
-                        key=|c| (c.id.clone(), c.last.as_ref().map(|m| m.id.clone()), c.unread, c.title.clone(), c.open)
+                <ul class="conv-list" on:keydown=move |ev| conv_list_keys(&ev, paged, anchor, rove)>
+                    <For each=move || paged.get() key=conv_row_key
                         children=move |c| row(lang, &c, own, ctl, pick) />
                 </ul>
             </nav>
+            {move || (total.get() > shown.get()).then(|| view! {
+                <button type="button" class="button small conv-more" on:click=move |_| shown.update(|n| *n += 40)>
+                    {words::admin_more(lang)}
+                </button>
+            })}
         }
-        .into_any()
+        .into_any(),
+    }
     };
     view! {
-        <div class="msgr-panel">
-            <div class="msgr-bar">
-                <div class="msgr-find">
-                    <label class="visually-hidden" for="chat-search">{words::chat_search(lang)}</label>
-                    {glyph(glyph::SEARCH)}
-                    <input id="chat-search" type="search" autocomplete="off" spellcheck="false"
-                        placeholder=words::chat_search_hint(lang)
-                        on:input=move |ev| query.set(event_target_value(&ev)) prop:value=move || query.get() />
-                </div>
-                <button type="button" class="button small quiet msgr-new" aria-expanded=move || making.get().to_string()
-                    aria-controls="new-group" on:click=move |_| making.update(|m| *m = !*m)>
-                    {glyph(glyph::PLUS)}<span>{words::chat_new_group(lang)}</span>
-                </button>
-            </div>
-            {move || making.get().then(|| people::new_group(lang, ctl, Callback::new(move |id: String| {
-                making.set(false);
-                choose.run(format!("grp:{id}"));
-            })))}
+        <div class="msgr-panel" node_ref=panel on:scroll=on_scroll>
+            {chat_search_bar(lang, query)}
             {people::invites(lang, own, ctl, choose)}
             {list_failed(lang, ctl, known)}
             {list}
@@ -522,7 +718,7 @@ fn row(lang: Lang, c: &Conversation, own: u32, ctl: Ctl, pick: Pick) -> AnyView 
         _ => None,
     };
     let preview = match (&c.last, &c.kind) {
-        (Some(m), _) => m.text.clone(),
+        (Some(m), _) => mentions::plain_preview(&m.text),
         (None, Kind::Group(g)) => {
             words::chat_members(lang, u64::try_from(g.members.len()).unwrap_or(0))
         }
@@ -565,10 +761,13 @@ fn row(lang: Lang, c: &Conversation, own: u32, ctl: Ctl, pick: Pick) -> AnyView 
                         choose.run(to.clone());
                     }
                 }>
-                {avatar(&name, &id, !matches!(c.kind, Kind::Direct(_)), match &c.kind {
-                    Kind::Direct(p) => Some(p.tag),
-                    _ => None,
-                })}
+                {match &c.kind {
+                    Kind::Direct(p) => avatar(&name, &id, false, Some(p.tag)),
+                    Kind::Group(g) => {
+                        group_avatar(&id, g.picture_key.map(|k| (k, g.picture_moving)))
+                    }
+                    Kind::Former => group_avatar(&id, None),
+                }}
                 <span class="conv-main">
                     <span class="conv-top">
                         <bdi class="conv-name" translate="no">{name.clone()}</bdi>{tag}{when}
@@ -647,8 +846,10 @@ struct Open {
     friends: Memo<Vec<Person>>,
     selected: RwSignal<Option<String>>,
     group_now: Memo<Option<central_api::groups::Group>>,
+    mention_people: Memo<Vec<Person>>,
     waiting: Memo<Option<(String, bool, bool)>>,
     trouble: Memo<(bool, bool)>,
+    preview: PreviewCtl,
 }
 
 fn conversation(
@@ -663,23 +864,49 @@ fn conversation(
     open.watch();
     // a conversation opened from the list: its heading takes the focus
     crate::islands::focus::after_render("#conv-title");
-    let escape = move |event: leptos::ev::KeyboardEvent| {
-        if event.key() == "Escape" && open.details.get_untracked() {
-            open.details.set(false);
-            focus("conv-details-toggle");
-        }
-    };
     view! {
-        <div class="conv" on:keydown=escape>
+        <div class="conv">
             {open.head()}
             {move || open.details_view()}
             {move || open.banners()}
             {open.scroll()}
             {move || open.footer()}
+            {open.preview.view()}
             {open.announcer()}
         </div>
     }
     .into_any()
+}
+
+fn mention_candidates(
+    conv: Memo<Option<Conversation>>,
+    friends: Memo<Vec<Person>>,
+) -> Memo<Vec<Person>> {
+    Memo::new(move |_| {
+        let mut out: Vec<Person> = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        conv.with(|c| match c.as_ref().map(|c| &c.kind) {
+            Some(Kind::Group(g)) => {
+                for m in &g.members {
+                    if seen.insert(m.person.tag) {
+                        out.push(m.person.clone());
+                    }
+                }
+            }
+            Some(Kind::Direct(p)) if seen.insert(p.tag) => {
+                out.push(p.clone());
+            }
+            _ => {}
+        });
+        friends.with(|list| {
+            for p in list {
+                if seen.insert(p.tag) {
+                    out.push(p.clone());
+                }
+            }
+        });
+        out
+    })
 }
 
 impl Open {
@@ -740,6 +967,7 @@ impl Open {
                 _ => None,
             })
         });
+        let mention_people = mention_candidates(conv, friends);
         let waiting = Memo::new(move |_| {
             id.with_value(|id| {
                 ctl.shown.with(|s| {
@@ -753,8 +981,10 @@ impl Open {
         let trouble = Memo::new(move |_| ctl.shown.with(|s| (s.refused > 0, s.error)));
         Open {
             group_now,
+            mention_people,
             waiting,
             trouble,
+            preview: PreviewCtl::new(lang),
             lang,
             own,
             ctl,
@@ -766,7 +996,7 @@ impl Open {
             changed,
             can_send,
             details: RwSignal::new(false),
-            visible: RwSignal::new(100),
+            visible: RwSignal::new(60),
             friends,
             selected,
         }
@@ -817,12 +1047,13 @@ impl Open {
 
     fn head(self) -> AnyView {
         let lang = self.lang;
-        let tag = self
+        let direct_tag = self
             .conv
             .with_untracked(|c| match c.as_ref().map(|c| &c.kind) {
-                Some(Kind::Direct(p)) => Some(format!("#{}", tag_text(p.tag))),
+                Some(Kind::Direct(p)) => Some(tag_text(p.tag)),
                 _ => None,
             });
+        let direct_num = self.direct_tag();
         let subtitle = move || {
             self.conv.with(|c| match c.as_ref().map(|c| &c.kind) {
                 Some(Kind::Group(g)) => {
@@ -839,28 +1070,103 @@ impl Open {
             let row = self.id.with_value(|id| row_id(id));
             crate::islands::focus::after_render(format!("#{row}"));
         };
-        let (changed, details) = (self.changed, self.details);
         let name = self.name();
         let id = self.id.get_value();
+        let head_face = self.head_face(id, name.clone());
+        let group_title = {
+            let fallback = name.clone();
+            let group_now = self.group_now;
+            move || {
+                group_now.with(|g| {
+                    g.as_ref()
+                        .map_or_else(|| fallback.clone(), |g| g.name.clone())
+                })
+            }
+        };
         view! {
             <header class="conv-head">
                 <button type="button" class="icon-button conv-back" aria-label=words::chat_back(lang) on:click=back>
                     {glyph(glyph::BACK)}
                 </button>
-                {avatar(&name, &id, self.group(), self.direct_tag())}
+                {head_face}
                 <div class="conv-head-text">
-                    <h2 id="conv-title" tabindex="-1"><bdi class="conv-head-name" translate="no">{name.clone()}</bdi>
-                        {tag.map(|t| view! { <span class="tag" translate="no">{t}</span> })}</h2>
-                    <p class="conv-head-state">{glyph(glyph::LOCK)}<span>{subtitle}</span></p>
+                    <h2 id="conv-title" tabindex="-1">
+                        {match direct_tag {
+                            Some(tag_hex) => handle_with_copy(lang, name.clone(), tag_hex, true),
+                            None => view! { <bdi class="conv-head-name" translate="no">{group_title}</bdi> }.into_any(),
+                        }}
+                    </h2>
+                    <p class="conv-head-state">
+                        {glyph(glyph::LOCK)}
+                        <span>{subtitle}</span>
+                        {move || self.head_presence(direct_num)}
+                    </p>
                 </div>
+                {self.head_actions()}
+            </header>
+        }
+        .into_any()
+    }
+
+    fn head_presence(self, direct_num: Option<u32>) -> impl IntoView {
+        let lang = self.lang;
+        direct_num
+            .and_then(super::socket::presence_of)
+            .map(|p_state| {
+                let attr = p_state.attr();
+                let label = p_state.label(lang);
+                view! {
+                    <span class="conv-head-presence" data-state=attr>
+                        <span class="conv-head-sep" aria-hidden="true">{"·"}</span>
+                        <span class="presence-dot" data-state=attr aria-hidden="true">{""}</span>
+                        <span>{label}</span>
+                    </span>
+                }
+            })
+    }
+
+    fn head_actions(self) -> impl IntoView {
+        let lang = self.lang;
+        let (changed, details, preview) = (self.changed, self.details, self.preview);
+        let previews_on = preview.previews_enabled;
+        view! {
+            <div class="conv-head-actions">
+                <button
+                    type="button"
+                    id="chat-card-previews-toggle"
+                    class="icon-button"
+                    aria-pressed=move || previews_on.get().to_string()
+                    data-active=move || previews_on.get().then_some("true")
+                    title=move || if previews_on.get() { words::chat_card_previews_on(lang) } else { words::chat_card_previews_off(lang) }
+                    aria-label=move || if previews_on.get() { words::chat_card_previews_on(lang) } else { words::chat_card_previews_off(lang) }
+                    on:click=move |_| preview.toggle_previews()
+                >
+                    {move || if previews_on.get() { glyph(glyph::EYE) } else { glyph(glyph::EYE_OFF) }}
+                </button>
                 <button type="button" id="conv-details-toggle" class="icon-button" data-warn=move || changed.get().then_some("true")
                     aria-expanded=move || details.get().to_string() aria-controls="conv-details"
                     aria-label=words::chat_details(lang) on:click=move |_| details.update(|d| *d = !*d)>
                     {move || if changed.get() { glyph(glyph::SHIELD_ALERT) } else { glyph(glyph::INFO) }}
                 </button>
-            </header>
+            </div>
         }
-        .into_any()
+    }
+
+    fn head_face(self, id: String, name: String) -> impl IntoView + 'static {
+        let is_group = self.group();
+        let direct = self.direct_tag();
+        let group_now = self.group_now;
+        move || {
+            if is_group {
+                let pic = group_now.with(|g| {
+                    g.as_ref()
+                        .and_then(|g| g.picture_key.map(|k| (k, g.picture_moving)))
+                });
+                group_avatar(&id, pic)
+            } else {
+                avatar(&name, &id, false, direct)
+            }
+        }
     }
 
     fn details_view(self) -> Option<AnyView> {
@@ -868,6 +1174,8 @@ impl Open {
         if !self.details.get() {
             return None;
         }
+        open_modal_dialog("conv-details");
+        let backdrop_down = RwSignal::new(false);
         let group = move || {
             self.group_now.get().map(|g| {
                 people::group_panel(lang, &g, self.own, self.ctl, self.friends, self.selected)
@@ -879,23 +1187,52 @@ impl Open {
         };
         Some(
             view! {
-                <aside id="conv-details" class="conv-details" aria-labelledby="conv-details-title">
-                    <header class="conv-details-head">
-                        <h3 id="conv-details-title">{words::chat_details(lang)}</h3>
-                        <button type="button" class="icon-button" aria-label=words::chat_close(lang) on:click=close>
-                            {glyph(glyph::CLOSE)}
-                        </button>
-                    </header>
-                    {group}
-                    {move || self.direct_tag().and_then(|tag| {
-                        crate::islands::picture::key_of(tag).map(|key| crate::islands::picture::report(lang, tag, key))
-                    })}
-                    {safety(lang, self.reviews, self.ctl)}
-                    <p class="conv-fan">
-                        {glyph(glyph::INFO)}
-                        <span>{rich(words::chat_fan(lang), move |tag| (tag == "more").then(|| format!("/{}/fan-content", lang.code())))}</span>
-                    </p>
-                </aside>
+                <dialog
+                    id="conv-details"
+                    class="conv-details-dialog"
+                    aria-labelledby="conv-details-title"
+                    on:pointerdown=move |ev: leptos::ev::PointerEvent| {
+                        backdrop_down.set(ev.target() == ev.current_target());
+                    }
+                    on:click=move |ev: leptos::ev::MouseEvent| {
+                        if backdrop_down.get_untracked() && ev.target() == ev.current_target() {
+                            self.details.set(false);
+                            focus("conv-details-toggle");
+                        }
+                    }
+                    on:close=move |_| {
+                        if self.details.get_untracked() {
+                            self.details.set(false);
+                        }
+                        focus("conv-details-toggle");
+                    }
+                >
+                    <div class="conv-details-card">
+                        <header class="conv-details-head">
+                            <h3 id="conv-details-title">{words::chat_details(lang)}</h3>
+                            <button
+                                type="button"
+                                class="dialog-close"
+                                title=words::chat_close(lang)
+                                aria-label=words::chat_close(lang)
+                                on:click=close
+                            >
+                                {glyph(glyph::CLOSE)}
+                            </button>
+                        </header>
+                        <div class="conv-details-body">
+                            {group}
+                            {move || self.direct_tag().and_then(|tag| {
+                                crate::islands::picture::key_of(tag).map(|key| crate::islands::picture::report(lang, tag, key))
+                            })}
+                            {safety(lang, self.reviews, self.ctl)}
+                            <p class="conv-fan">
+                                {glyph(glyph::INFO)}
+                                <span>{rich(words::chat_fan(lang), move |tag| (tag == "more").then(|| format!("/{}/fan-content", lang.code())))}</span>
+                            </p>
+                        </div>
+                    </div>
+                </dialog>
             }
             .into_any(),
         )
@@ -938,7 +1275,7 @@ impl Open {
                 <div class="msg pending" data-own="true" data-first="true" data-last="true"
                     data-failed=failed.then_some("true")>
                     <div class="msg-bubble">
-                        <p class="msg-text">{text}</p>
+                        <p class="msg-text">{mentions::render_message_with(lang, &text, self.own, Some(self.preview))}</p>
                     </div>
                     <span class="msg-state" role=failed.then_some("alert")>
                         {if failed { words::chat_not_sent(lang) } else { words::chat_sending(lang) }}
@@ -969,12 +1306,22 @@ impl Open {
     /// possible, a way to the composer.
     fn start(self) -> AnyView {
         let lang = self.lang;
-        let face = avatar(
-            &self.name(),
-            &self.id.get_value(),
-            self.group(),
-            self.direct_tag(),
-        );
+        let id = self.id.get_value();
+        let name = self.name();
+        let is_group = self.group();
+        let direct = self.direct_tag();
+        let group_now = self.group_now;
+        let face = move || {
+            if is_group {
+                let pic = group_now.with(|g| {
+                    g.as_ref()
+                        .and_then(|g| g.picture_key.map(|k| (k, g.picture_moving)))
+                });
+                group_avatar(&id, pic)
+            } else {
+                avatar(&name, &id, false, direct)
+            }
+        };
         if self.can_send.get() {
             view! {
                 <div class="conv-start">
@@ -999,7 +1346,8 @@ impl Open {
     }
 
     fn day(self, (key, label, list): (String, String, Vec<Line>)) -> AnyView {
-        let (lang, own, ctl, group) = (self.lang, self.own, self.ctl, self.group());
+        let (lang, own, ctl, group, preview) =
+            (self.lang, self.own, self.ctl, self.group(), self.preview);
         let known = move |tag: u32| {
             ctl.shown
                 .with_untracked(|s| s.known.get(&tag).cloned())
@@ -1030,7 +1378,7 @@ impl Open {
                         <div class="msg-bubble">
                             {sender}
                             <span class="visually-hidden">{prefix}</span>
-                            <p class="msg-text" class:emote=m.emote>{m.text}</p>
+                            <p class="msg-text" class:emote=m.emote>{mentions::render_message_with(lang, &m.text, own, Some(preview))}</p>
                             <time datetime=time::machine(m.at) aria-hidden="true">{time::clock(m.at)}</time>
                         </div>
                     </li>
@@ -1048,7 +1396,8 @@ impl Open {
     }
 
     fn scroll(self) -> AnyView {
-        let (lang, messages, visible) = (self.lang, self.messages, self.visible);
+        let (lang, messages, visible, preview) =
+            (self.lang, self.messages, self.visible, self.preview);
         let by_day = Memo::new(move |_| {
             let count = visible.get();
             messages.with(|m| days(lang, &m[m.len().saturating_sub(count)..]))
@@ -1075,17 +1424,25 @@ impl Open {
             });
         });
         let on_scroll = move |_| {
+            preview.dismiss_hover();
             if let Some(node) = scroller.get_untracked() {
                 follow.set_value(
                     node.scroll_height() - node.scroll_top() - node.client_height() < 80,
                 );
+                if node.scroll_top() < 120
+                    && older_height.get_value().is_none()
+                    && messages.with_untracked(Vec::len) > visible.get_untracked()
+                {
+                    older_height.set_value(Some(node.scroll_height()));
+                    visible.update(|v| *v += 50);
+                }
             }
         };
         let older = move |_| {
             if let Some(node) = scroller.get_untracked() {
                 older_height.set_value(Some(node.scroll_height()));
             }
-            visible.update(|v| *v += 100);
+            visible.update(|v| *v += 50);
         };
         let more = move || {
             (messages.with(Vec::len) > visible.get()).then(|| view! {
@@ -1117,7 +1474,15 @@ impl Open {
             }
             .into_any()
         } else if self.can_send.get() {
-            composer(lang, self.id.get_value(), self.members, self.ctl).into_any()
+            composer(
+                lang,
+                self.id.get_value(),
+                self.members,
+                self.mention_people,
+                self.preview,
+                self.ctl,
+            )
+            .into_any()
         } else {
             let text = self.conv.with(|c| match c.as_ref().map(|c| &c.kind) {
                 Some(Kind::Direct(_)) => words::chat_friend_required(lang),
@@ -1186,11 +1551,17 @@ fn safety(lang: Lang, reviews: Memo<Vec<Review>>, ctl: Ctl) -> impl IntoView {
                         }
                     });
                     let tag = u32::from_str_radix(&r.tag, 16).ok();
+                    let who = match r.snapshot.handle.rsplit_once('#') {
+                        Some((name, hex)) => {
+                            handle_with_copy(lang, name.to_owned(), hex.to_owned(), true)
+                        }
+                        None => view! { <bdi translate="no">{r.snapshot.handle.clone()}</bdi> }.into_any(),
+                    };
                     view! {
                         <li class="safety-item" data-warn=r.changed.then_some("true")>
                             <span class="safety-who">
                                 {avatar(&r.snapshot.handle, &r.tag, false, tag)}
-                                <bdi translate="no">{r.snapshot.handle.clone()}</bdi>
+                                {who}
                                 {r.changed.then(|| view! { <span class="pill bad">{words::chat_changed(lang)}</span> })}</span>
                             <p class="safety-number" translate="no">{r.grouped()}</p>
                             {confirm}
@@ -1209,8 +1580,780 @@ fn safety(lang: Lang, reviews: Memo<Vec<Review>>, ctl: Ctl) -> impl IntoView {
     }
 }
 
-fn composer(lang: Lang, conv: String, members: Memo<Vec<u32>>, ctl: Ctl) -> impl IntoView {
+#[cfg(target_arch = "wasm32")]
+fn utf16_to_byte(text: &str, utf16_offset: usize) -> usize {
+    let mut seen = 0_usize;
+    for (idx, ch) in text.char_indices() {
+        if seen >= utf16_offset {
+            return idx;
+        }
+        seen += ch.len_utf16();
+    }
+    text.len()
+}
+
+fn composer_caret_bytes(text: &str) -> usize {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use wasm_bindgen::JsValue;
+        let pos = document()
+            .get_element_by_id("composer-text")
+            .and_then(|el| js_sys::Reflect::get(&el, &JsValue::from_str("selectionStart")).ok())
+            .and_then(|v| v.as_f64())
+            .and_then(|n| format!("{:.0}", n.max(0.0).trunc()).parse::<usize>().ok());
+        pos.map_or(text.len(), |utf16| utf16_to_byte(text, utf16))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        text.len()
+    }
+}
+
+fn set_composer_caret(text: &str, byte_index: usize) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use js_sys::{Function, Reflect};
+        use wasm_bindgen::JsValue;
+        let end = byte_index.min(text.len());
+        let utf16 = u32::try_from(text[..end].encode_utf16().count()).unwrap_or(u32::MAX);
+        let _ = request_animation_frame(move || {
+            let Some(el) = document().get_element_by_id("composer-text") else {
+                return;
+            };
+            if let Ok(html_el) = el.clone().dyn_into::<web_sys::HtmlElement>() {
+                let _ = html_el.focus();
+            }
+            if let Some(func) = Reflect::get(&el, &JsValue::from_str("setSelectionRange"))
+                .ok()
+                .and_then(|f| f.dyn_into::<Function>().ok())
+            {
+                let pos = JsValue::from_f64(f64::from(utf16));
+                let _ = func.call2(&el, &pos, &pos);
+            }
+        });
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = (text, byte_index);
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum MentionChoice {
+    Card(CardSuggestion),
+    User(Person),
+}
+
+#[derive(Clone, Copy)]
+struct ComposerMentions {
+    lang: Lang,
+    text: RwSignal<String>,
+    people: Memo<Vec<Person>>,
+    preview: PreviewCtl,
+    trigger: RwSignal<Option<Trigger>>,
+    parsed_query: RwSignal<Option<mentions::CardTriggerQuery>>,
+    cards: RwSignal<Vec<CardSuggestion>>,
+    cards_loading: RwSignal<bool>,
+    active: RwSignal<usize>,
+    printings: RwSignal<Vec<CardPrinting>>,
+    printings_loading: RwSignal<bool>,
+    selected_print_idx: RwSignal<usize>,
+    selected_finish: RwSignal<CardFinish>,
+    print_explicit: RwSignal<bool>,
+    pause: StoredValue<Option<TimeoutHandle>>,
+    card_gen: StoredValue<u32>,
+    print_gen: StoredValue<u32>,
+}
+
+fn warm_printing_images(printings: &[CardPrinting], enabled: bool, limit: usize) {
+    if !enabled {
+        return;
+    }
+    for p in printings.iter().filter(|p| !p.ub).take(limit) {
+        if let Some(uuid) = p.scryfall_id.as_deref()
+            && let Some(img_url) = mentions::scryfall_image_url(uuid)
+        {
+            cache::warm_card_image(&img_url);
+        }
+    }
+}
+
+fn best_finish(printing: Option<&CardPrinting>, preferred: CardFinish) -> CardFinish {
+    let Some(p) = printing else {
+        return preferred;
+    };
+    if p.finishes == 0 || (p.finishes & preferred.bit()) != 0 {
+        return preferred;
+    }
+    if (p.finishes & FINISH_NONFOIL) != 0 {
+        return CardFinish::Normal;
+    }
+    if (p.finishes & FINISH_FOIL) != 0 {
+        return CardFinish::Foil;
+    }
+    if (p.finishes & FINISH_ETCHED) != 0 {
+        return CardFinish::Etched;
+    }
+    preferred
+}
+
+impl ComposerMentions {
+    fn new(
+        lang: Lang,
+        text: RwSignal<String>,
+        people: Memo<Vec<Person>>,
+        preview: PreviewCtl,
+    ) -> Self {
+        let pause = StoredValue::new(None::<TimeoutHandle>);
+        on_cleanup(move || {
+            if let Some(Some(handle)) = pause.try_get_value() {
+                handle.clear();
+            }
+        });
+        Self {
+            lang,
+            text,
+            people,
+            preview,
+            trigger: RwSignal::new(None),
+            parsed_query: RwSignal::new(None),
+            cards: RwSignal::new(Vec::new()),
+            cards_loading: RwSignal::new(false),
+            active: RwSignal::new(0),
+            printings: RwSignal::new(Vec::new()),
+            printings_loading: RwSignal::new(false),
+            selected_print_idx: RwSignal::new(0),
+            selected_finish: RwSignal::new(CardFinish::Normal),
+            print_explicit: RwSignal::new(false),
+            pause,
+            card_gen: StoredValue::new(0),
+            print_gen: StoredValue::new(0),
+        }
+    }
+
+    fn clear_pause(self) {
+        if let Some(Some(handle)) = self.pause.try_get_value() {
+            handle.clear();
+        }
+        let _ = self.pause.try_set_value(None);
+    }
+
+    fn dismiss(self) {
+        self.clear_pause();
+        self.trigger.set(None);
+        self.parsed_query.set(None);
+        self.cards.set(Vec::new());
+        self.cards_loading.set(false);
+        self.printings.set(Vec::new());
+        self.printings_loading.set(false);
+        self.selected_print_idx.set(0);
+        self.selected_finish.set(CardFinish::Normal);
+        self.print_explicit.set(false);
+        self.active.set(0);
+    }
+
+    fn load_active_printings(self) {
+        let items = self.cards.get_untracked();
+        let idx = self.active.get_untracked();
+        let Some(item) = items.get(idx).cloned() else {
+            self.printings.set(Vec::new());
+            self.printings_loading.set(false);
+            self.selected_print_idx.set(0);
+            return;
+        };
+        let previews_on = self.preview.previews_enabled.get_untracked();
+        let pq = self.parsed_query.get_untracked();
+        let seed_printings: Vec<CardPrinting> = item.preview.iter().cloned().collect();
+        warm_printing_images(&seed_printings, previews_on, 1);
+        let pref = pq
+            .as_ref()
+            .and_then(|q| q.preferred_finish)
+            .unwrap_or_else(|| self.selected_finish.get_untracked());
+        self.selected_finish
+            .set(best_finish(seed_printings.first(), pref));
+        self.selected_print_idx.set(0);
+        self.printings.set(seed_printings);
+
+        let next_pg = self.print_gen.get_value().wrapping_add(1);
+        self.print_gen.set_value(next_pg);
+
+        let lookup_name = item.name.clone();
+        let lookup_lang = if item.matched_lang.trim().is_empty() {
+            self.lang.code().to_owned()
+        } else {
+            item.matched_lang.clone()
+        };
+        let set_f = pq.as_ref().and_then(|q| q.set_filter.clone());
+        let col_f = pq.as_ref().and_then(|q| q.collector_filter.clone());
+        let fin_f = pq.as_ref().and_then(|q| q.finish_filter.clone());
+        let cache_key = cache::card_cache_key(
+            &lookup_name,
+            &lookup_lang,
+            set_f.as_deref(),
+            col_f.as_deref(),
+            fin_f.as_deref(),
+        );
+
+        if let Some((_, cached)) = cache::get_card_printings(&cache_key)
+            && !cached.is_empty()
+        {
+            self.printings_loading.set(false);
+            warm_printing_images(&cached, previews_on, 4);
+            self.selected_finish.set(best_finish(
+                cached.first(),
+                self.selected_finish.get_untracked(),
+            ));
+            self.selected_print_idx.set(0);
+            self.printings.set(cached);
+            return;
+        }
+
+        self.printings_loading.set(true);
+        leptos::task::spawn_local(async move {
+            let mut res = wire::card_printings_lang(
+                &lookup_name,
+                &lookup_lang,
+                set_f.as_deref(),
+                col_f.as_deref(),
+                fin_f.as_deref(),
+            )
+            .await;
+            if res.as_ref().is_ok_and(|(_, list)| list.is_empty())
+                && (set_f.is_some() || col_f.is_some() || fin_f.is_some())
+            {
+                res = wire::card_printings_lang(&lookup_name, &lookup_lang, None, None, None).await;
+            }
+            let list = match res {
+                Ok((card_opt, list)) => {
+                    if !list.is_empty() {
+                        cache::put_card_printings(cache_key, card_opt, list.clone());
+                    }
+                    list
+                }
+                Err(_) => Vec::new(),
+            };
+            if self.print_gen.try_get_value() != Some(next_pg) {
+                return;
+            }
+            self.printings_loading.set(false);
+            if !list.is_empty() {
+                warm_printing_images(&list, previews_on, 4);
+                self.selected_finish.set(best_finish(
+                    list.first(),
+                    self.selected_finish.get_untracked(),
+                ));
+                self.selected_print_idx.set(0);
+                self.printings.set(list);
+            }
+        });
+    }
+
+    fn select_index(self, idx: usize) {
+        self.active.set(idx);
+        if self
+            .trigger
+            .with_untracked(|t| t.as_ref().is_some_and(|t| t.kind == TriggerKind::Card))
+        {
+            self.load_active_printings();
+        }
+    }
+
+    fn refresh_trigger(self, current: &str) {
+        let caret = composer_caret_bytes(current);
+        let found = mentions::active_trigger(current, caret);
+        self.trigger.set(found.clone());
+        self.active.set(0);
+        self.clear_pause();
+        let Some(Trigger {
+            kind: TriggerKind::Card,
+            query,
+            ..
+        }) = found
+        else {
+            self.print_gen
+                .set_value(self.print_gen.get_value().wrapping_add(1));
+            self.parsed_query.set(None);
+            self.cards.set(Vec::new());
+            self.printings.set(Vec::new());
+            self.cards_loading.set(false);
+            self.printings_loading.set(false);
+            return;
+        };
+        let parsed = mentions::parse_card_trigger(&query);
+        self.parsed_query.set(Some(parsed.clone()));
+        self.selected_finish
+            .set(parsed.preferred_finish.unwrap_or(CardFinish::Normal));
+        self.print_explicit
+            .set(parsed.set_filter.is_some() || parsed.collector_filter.is_some());
+        if parsed.name_query.trim().chars().count() < 2 {
+            self.print_gen
+                .set_value(self.print_gen.get_value().wrapping_add(1));
+            self.cards.set(Vec::new());
+            self.printings.set(Vec::new());
+            self.cards_loading.set(false);
+            self.printings_loading.set(false);
+            return;
+        }
+        self.print_gen
+            .set_value(self.print_gen.get_value().wrapping_add(1));
+        self.printings.set(Vec::new());
+        self.printings_loading.set(false);
+
+        let next_gen = self.card_gen.get_value().wrapping_add(1);
+        self.card_gen.set_value(next_gen);
+        let lang = self.lang;
+        let suggest_key = cache::card_cache_key(
+            &parsed.name_query,
+            lang.code(),
+            parsed.set_filter.as_deref(),
+            parsed.collector_filter.as_deref(),
+            parsed.finish_filter.as_deref(),
+        );
+        if let Some(cached) = cache::get_card_suggestions(&suggest_key) {
+            self.cards.set(cached);
+            self.cards_loading.set(false);
+            self.active.set(0);
+            self.load_active_printings();
+            return;
+        }
+
+        self.cards_loading.set(true);
+        let handle = set_timeout(
+            move || {
+                let _ = self.pause.try_set_value(None);
+                leptos::task::spawn_local(async move {
+                    let list = match wire::suggest_cards_rich(
+                        &parsed.name_query,
+                        lang,
+                        parsed.set_filter.as_deref(),
+                        parsed.collector_filter.as_deref(),
+                        parsed.finish_filter.as_deref(),
+                    )
+                    .await
+                    {
+                        Ok(list) => {
+                            cache::put_card_suggestions(suggest_key, &list);
+                            list
+                        }
+                        Err(_) => Vec::new(),
+                    };
+                    if self.card_gen.try_get_value() == Some(next_gen) {
+                        self.cards.set(list);
+                        self.cards_loading.set(false);
+                        self.active.set(0);
+                        self.load_active_printings();
+                    }
+                });
+            },
+            Duration::from_millis(220),
+        )
+        .ok();
+        self.pause.set_value(handle);
+    }
+
+    fn choices(self) -> Vec<MentionChoice> {
+        let Some(trig) = self.trigger.get() else {
+            return Vec::new();
+        };
+        match trig.kind {
+            TriggerKind::Card => self
+                .cards
+                .get()
+                .into_iter()
+                .map(MentionChoice::Card)
+                .collect(),
+            TriggerKind::User => {
+                let needle = trig.query.trim().to_lowercase();
+                self.people.with(|list| {
+                    list.iter()
+                        .filter(|p| {
+                            needle.is_empty()
+                                || p.display_name.to_lowercase().contains(&needle)
+                                || model::handle(p).to_lowercase().contains(&needle)
+                        })
+                        .take(8)
+                        .cloned()
+                        .map(MentionChoice::User)
+                        .collect()
+                })
+            }
+        }
+    }
+
+    fn choices_untracked(self) -> Vec<MentionChoice> {
+        let Some(trig) = self.trigger.get_untracked() else {
+            return Vec::new();
+        };
+        match trig.kind {
+            TriggerKind::Card => self
+                .cards
+                .get_untracked()
+                .into_iter()
+                .map(MentionChoice::Card)
+                .collect(),
+            TriggerKind::User => {
+                let needle = trig.query.trim().to_lowercase();
+                self.people.with_untracked(|list| {
+                    list.iter()
+                        .filter(|p| {
+                            needle.is_empty()
+                                || p.display_name.to_lowercase().contains(&needle)
+                                || model::handle(p).to_lowercase().contains(&needle)
+                        })
+                        .take(8)
+                        .cloned()
+                        .map(MentionChoice::User)
+                        .collect()
+                })
+            }
+        }
+    }
+
+    fn handle_key(self, event: &leptos::ev::KeyboardEvent) -> bool {
+        if self.trigger.with_untracked(Option::is_none) {
+            return false;
+        }
+        let items = self.choices_untracked();
+        match event.key().as_str() {
+            "ArrowDown" if !items.is_empty() => {
+                event.prevent_default();
+                let len = items.len();
+                let next = (self.active.get_untracked() + 1) % len;
+                self.select_index(next);
+                true
+            }
+            "ArrowUp" if !items.is_empty() => {
+                event.prevent_default();
+                let len = items.len();
+                let cur = self.active.get_untracked();
+                let next = if cur == 0 { len - 1 } else { cur - 1 };
+                self.select_index(next);
+                true
+            }
+            "Enter" | "Tab" if !items.is_empty() && !event.shift_key() && !event.is_composing() => {
+                event.prevent_default();
+                let idx = self.active.get_untracked().min(items.len() - 1);
+                self.apply(&items[idx]);
+                true
+            }
+            "Escape" => {
+                event.prevent_default();
+                self.dismiss();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn apply(self, choice: &MentionChoice) {
+        let Some(trig) = self.trigger.get_untracked() else {
+            return;
+        };
+        let replacement = match choice {
+            MentionChoice::Card(card) => {
+                let finish = self.selected_finish.get_untracked();
+                let explicit = self.print_explicit.get_untracked();
+                let active_card = self
+                    .cards
+                    .with_untracked(|list| list.get(self.active.get_untracked()).cloned());
+                let printing = if explicit {
+                    if active_card
+                        .as_ref()
+                        .is_some_and(|a| a.en_name == card.en_name)
+                    {
+                        self.printings
+                            .with_untracked(|p| {
+                                p.get(self.selected_print_idx.get_untracked()).cloned()
+                            })
+                            .or_else(|| card.preview.clone())
+                    } else {
+                        card.preview.clone()
+                    }
+                } else {
+                    None
+                };
+                mentions::card_replacement(&card.name, &card.en_name, printing.as_ref(), finish)
+            }
+            MentionChoice::User(person) => mentions::user_replacement(person),
+        };
+        let (next, caret) =
+            mentions::replace_trigger(&self.text.get_untracked(), &trig, &replacement);
+        self.dismiss();
+        self.text.set(next.clone());
+        set_composer_caret(&next, caret);
+    }
+
+    fn card_preview_visual(
+        self,
+        card: &CardSuggestion,
+        active_printing: Option<&CardPrinting>,
+        active_finish: CardFinish,
+    ) -> AnyView {
+        let lang = self.lang;
+        if !self.preview.previews_enabled.get() {
+            return view! {
+                <div class="card-preview-notice compact">
+                    {glyph(glyph::EYE_OFF)}
+                    <p>{words::chat_card_previews_disabled(lang)}</p>
+                </div>
+            }
+            .into_any();
+        }
+        if let Some(p) = active_printing
+            && !p.ub
+            && let Some(uuid) = p.scryfall_id.as_deref()
+            && let Some(img_url) = mentions::scryfall_image_url(uuid)
+        {
+            let finish_attr = active_finish.attr();
+            let foil_w = "200";
+            let foil_h = "278";
+            return view! {
+                <div class="card-preview-frame" data-finish=finish_attr>
+                    <img
+                        class="card-preview-img"
+                        src=img_url
+                        alt=card.name.clone()
+                        referrerpolicy="no-referrer"
+                        decoding="async"
+                    />
+                    {finish_attr.map(|f| view! {
+                        <canvas
+                            class="card-foil-canvas"
+                            width=foil_w
+                            height=foil_h
+                            aria-hidden="true"
+                            data-card-finish=f
+                        ></canvas>
+                    })}
+                </div>
+            }
+            .into_any();
+        }
+        let msg = if active_printing.is_some_and(|p| p.ub) {
+            words::chat_card_ub_notice(lang)
+        } else {
+            words::chat_card_credit(lang)
+        };
+        view! {
+            <div class="card-preview-notice compact">
+                {glyph(glyph::LAYERS)}
+                <p>{msg}</p>
+            </div>
+        }
+        .into_any()
+    }
+
+    fn card_preview_pane(self, card: &CardSuggestion) -> AnyView {
+        let lang = self.lang;
+        let all_prints = self.printings.get();
+        let print_idx = self
+            .selected_print_idx
+            .get()
+            .min(all_prints.len().saturating_sub(1));
+        let active_printing = all_prints.get(print_idx).or(card.preview.as_ref());
+        let active_finish = self.selected_finish.get();
+        let visual = self.card_preview_visual(card, active_printing, active_finish);
+
+        let finishes_mask = active_printing.map_or(7, |p| p.finishes);
+        let finish_pills = [
+            (
+                CardFinish::Normal,
+                FINISH_NONFOIL,
+                words::chat_card_finish_normal(lang),
+            ),
+            (
+                CardFinish::Foil,
+                FINISH_FOIL,
+                words::chat_card_finish_foil(lang),
+            ),
+            (
+                CardFinish::Etched,
+                FINISH_ETCHED,
+                words::chat_card_finish_etched(lang),
+            ),
+        ]
+        .into_iter()
+        .map(|(f, bit, label)| {
+            let active = active_finish == f;
+            let supported = finishes_mask == 0 || (finishes_mask & bit) != 0;
+            view! {
+                <button
+                    type="button"
+                    class="pill-button"
+                    data-active=active.then_some("true")
+                    data-unsupported=(!supported).then_some("true")
+                    on:mousedown=|ev: leptos::ev::MouseEvent| ev.prevent_default()
+                    on:click=move |_| self.selected_finish.set(f)
+                >
+                    {label}
+                </button>
+            }
+        })
+        .collect_view();
+
+        let print_select = (!all_prints.is_empty()).then(|| {
+            let opts = all_prints
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let label = format!(
+                        "{} #{} ({}) · {}",
+                        p.set_code.to_ascii_uppercase(),
+                        p.collector_number,
+                        p.lang.to_ascii_uppercase(),
+                        p.set_name
+                    );
+                    view! {
+                        <option value=i.to_string() selected=i == print_idx>
+                            {label}
+                        </option>
+                    }
+                })
+                .collect_view();
+            view! {
+                <label class="preview-print-row">
+                    <span class="visually-hidden">{words::chat_card_prints(lang)}</span>
+                    <select
+                        class="mention-print-select"
+                        on:change=move |ev| {
+                            if let Ok(i) = event_target_value(&ev).parse::<usize>() {
+                                self.selected_print_idx.set(i);
+                                self.print_explicit.set(true);
+                                let finish_now = self.selected_finish.get_untracked();
+                                let next_f = self.printings.with_untracked(|list| best_finish(list.get(i), finish_now));
+                                self.selected_finish.set(next_f);
+                            }
+                        }
+                    >
+                        {opts}
+                    </select>
+                </label>
+            }
+        });
+
+        let credit = words::chat_card_credit(lang);
+        view! {
+            <div class="mention-ac-preview">
+                {visual}
+                {print_select}
+                <div class="card-finish-pills" role="group">{finish_pills}</div>
+                <p class="preview-card-credit">{credit}</p>
+            </div>
+        }
+        .into_any()
+    }
+
+    fn choice_row(self, idx: usize, active_idx: usize, item: MentionChoice) -> AnyView {
+        let selected = idx == active_idx;
+        let pick = item.clone();
+        let label = match item {
+            MentionChoice::Card(c) => {
+                let show_en = !c.en_name.eq_ignore_ascii_case(&c.name);
+                let set_tag = c.preview.as_ref().map(|p| p.set_code.to_ascii_uppercase());
+                view! {
+                    {glyph(glyph::LAYERS)}
+                    <span class="ac-card-titles" translate="no">
+                        <span>{c.name}</span>
+                        {show_en.then(|| view! { <small class="ac-card-sub">{c.en_name}</small> })}
+                    </span>
+                    {set_tag.map(|s| view! { <span class="ac-card-set">{s}</span> })}
+                }
+                .into_any()
+            }
+            MentionChoice::User(p) => view! {
+                {avatar(&p.display_name, &p.tag.to_string(), false, Some(p.tag))}
+                <span translate="no">
+                    <bdi>{p.display_name}</bdi>
+                    <span class="tag">{"#"}{tag_text(p.tag)}</span>
+                </span>
+            }
+            .into_any(),
+        };
+        view! {
+            <li role="presentation">
+                <button
+                    type="button"
+                    class="ac-item"
+                    role="option"
+                    aria-selected=selected.to_string()
+                    on:mouseenter=move |_| {
+                        if self.active.get_untracked() != idx {
+                            self.select_index(idx);
+                        }
+                    }
+                    on:mousedown=|ev: leptos::ev::MouseEvent| ev.prevent_default()
+                    on:click=move |_| self.apply(&pick)
+                >
+                    {label}
+                </button>
+            </li>
+        }
+        .into_any()
+    }
+
+    fn popover(self) -> impl IntoView {
+        let lang = self.lang;
+        move || {
+            let trig = self.trigger.get()?;
+            let items = self.choices();
+            let loading = trig.kind == TriggerKind::Card && self.cards_loading.get();
+            if items.is_empty() && !loading {
+                return None;
+            }
+            let is_cards = trig.kind == TriggerKind::Card;
+            let active_idx = self.active.get().min(items.len().saturating_sub(1));
+            let active_card = match items.get(active_idx) {
+                Some(MentionChoice::Card(c)) => Some(c.clone()),
+                _ => None,
+            };
+            let (head_icon, head_label) = match trig.kind {
+                TriggerKind::Card => (glyph(glyph::HASH), words::chat_mention_cards(lang)),
+                TriggerKind::User => (glyph(glyph::AT_SIGN), words::chat_mention_people(lang)),
+            };
+            let rows = items
+                .into_iter()
+                .enumerate()
+                .map(|(idx, item)| self.choice_row(idx, active_idx, item))
+                .collect_view();
+            let status = loading.then(|| {
+                view! { <p class="ac-empty" role="status">{words::chat_group_invite_searching(lang)}</p> }
+            });
+            let preview_pane = active_card.as_ref().map(|c| self.card_preview_pane(c));
+            Some(view! {
+                <div class=if is_cards { "mention-popover is-cards" } else { "mention-popover" }>
+                    <div class="mention-ac-main">
+                        <p class="ac-heading">{head_icon}<span>{head_label}</span></p>
+                        <ul class="ac-list" role="listbox">{rows}</ul>
+                        {status}
+                    </div>
+                    {preview_pane}
+                </div>
+            })
+        }
+    }
+}
+
+fn focus_current_row() {
+    if let Some(row) = document()
+        .query_selector(".conv-row[aria-current]")
+        .ok()
+        .flatten()
+        && let Ok(row) = row.dyn_into::<web_sys::HtmlElement>()
+    {
+        let _ = row.focus();
+    }
+}
+
+fn composer(
+    lang: Lang,
+    conv: String,
+    members: Memo<Vec<u32>>,
+    mention_people: Memo<Vec<Person>>,
+    preview: PreviewCtl,
+    ctl: Ctl,
+) -> impl IntoView {
     let text = RwSignal::new(String::new());
+    let mentions = ComposerMentions::new(lang, text, mention_people, preview);
     {
         let conv = conv.clone();
         Effect::new(move |_| {
@@ -1236,6 +2379,7 @@ fn composer(lang: Lang, conv: String, members: Memo<Vec<u32>>, ctl: Ctl) -> impl
         {
             return;
         }
+        mentions.dismiss();
         text.set(String::new());
         ctl.send(conv.clone(), body, members.get_untracked());
     };
@@ -1246,24 +2390,20 @@ fn composer(lang: Lang, conv: String, members: Memo<Vec<u32>>, ctl: Ctl) -> impl
             send();
         }
     };
-    let keys = move |event: leptos::ev::KeyboardEvent| match event.key().as_str() {
-        "Enter" if !event.shift_key() && !event.is_composing() => {
-            if event.ctrl_key() || event.meta_key() || !coarse() {
-                event.prevent_default();
-                send();
-            }
+    let keys = move |event: leptos::ev::KeyboardEvent| {
+        if mentions.handle_key(&event) {
+            return;
         }
-        "Escape" => {
-            if let Some(row) = document()
-                .query_selector(".conv-row[aria-current]")
-                .ok()
-                .flatten()
-                && let Ok(row) = row.dyn_into::<web_sys::HtmlElement>()
-            {
-                let _ = row.focus();
+        match event.key().as_str() {
+            "Enter" if !event.shift_key() && !event.is_composing() => {
+                if event.ctrl_key() || event.meta_key() || !coarse() {
+                    event.prevent_default();
+                    send();
+                }
             }
+            "Escape" => focus_current_row(),
+            _ => {}
         }
-        _ => {}
     };
     let count = move || {
         let n = text.with(|t| t.chars().count());
@@ -1271,19 +2411,35 @@ fn composer(lang: Lang, conv: String, members: Memo<Vec<u32>>, ctl: Ctl) -> impl
             .then(|| words::chat_count(lang, &words::number(lang, u64::try_from(n).unwrap_or(0))))
     };
     view! {
-        <form class="composer" on:submit=submit>
-            <label class="visually-hidden" for="composer-text">{words::chat_write(lang)}</label>
-            <textarea id="composer-text" rows="1" maxlength="1000" placeholder=words::chat_write(lang)
-                aria-describedby="composer-hint" prop:value=move || text.get()
-                on:input=move |ev| text.set(event_target_value(&ev)) on:keydown=keys></textarea>
-            <button type="submit" class="send" aria-label=words::chat_send(lang)
-                aria-disabled=move || (blocked() || text.with(|t| t.trim().is_empty())).then_some("true")>
-                {glyph(glyph::SEND)}
-            </button>
-            <p id="composer-hint" class="composer-hint">
-                <span>{words::chat_enter_hint(lang)}</span>
-                <span class="composer-count" aria-live="polite">{count}</span>
-            </p>
-        </form>
+        <div class="composer-wrap">
+            {mentions.popover()}
+            <form class="composer" on:submit=submit>
+                <label class="visually-hidden" for="composer-text">{words::chat_write(lang)}</label>
+                <div class="composer-field">
+                    {field::mark(glyph::MESSAGE)}
+                    <textarea id="composer-text" rows="1" maxlength="1000" placeholder=words::chat_write(lang)
+                        aria-describedby="composer-hint" prop:value=move || text.get()
+                        on:input=move |ev| {
+                            let val = event_target_value(&ev);
+                            text.set(val.clone());
+                            mentions.refresh_trigger(&val);
+                        }
+                        on:click=move |_| {
+                            let val = text.get_untracked();
+                            mentions.refresh_trigger(&val);
+                        }
+                        on:keydown=keys></textarea>
+                    <button type="submit" class="send composer-send" title=words::chat_send(lang)
+                        aria-label=words::chat_send(lang)
+                        aria-disabled=move || (blocked() || text.with(|t| t.trim().is_empty())).then_some("true")>
+                        {glyph(glyph::SEND)}
+                    </button>
+                </div>
+                <p id="composer-hint" class="composer-hint">
+                    <span>{format!("{} · {}", words::chat_enter_hint(lang), words::chat_composer_mentions_hint(lang))}</span>
+                    <span class="composer-count" aria-live="polite">{count}</span>
+                </p>
+            </form>
+        </div>
     }
 }

@@ -245,6 +245,25 @@ pub fn parse(markdown: &str) -> Vec<Block> {
     blocks
 }
 
+fn rewrite_href(href: String) -> String {
+    let (base, frag) = match href.split_once('#') {
+        Some((base, frag)) => (base, Some(frag)),
+        None => (href.as_str(), None),
+    };
+    let rewritten = match base.trim_end_matches('/') {
+        "https://baylee.app/datenschutz" => "/de/privacy",
+        "https://baylee.app/agb" => "/de/terms",
+        "https://baylee.app/impressum" => "/impressum",
+        "https://baylee.app/privacy" => "/privacy",
+        "https://baylee.app/terms" => "/terms",
+        _ => return href,
+    };
+    match frag {
+        Some(frag) => format!("{rewritten}#{frag}"),
+        None => rewritten.to_owned(),
+    }
+}
+
 fn spans_view(spans: Vec<Span>) -> AnyView {
     spans
         .into_iter()
@@ -256,10 +275,8 @@ fn spans_view(spans: Vec<Span>) -> AnyView {
                 (false, false) => span.text.into_any(),
             };
             match span.href {
-                Some(href) if href.starts_with("https://baylee.app/") => {
-                    view! { <a href=href>{text}</a> }.into_any()
-                }
                 Some(href) => {
+                    let href = rewrite_href(href);
                     view! { <a href=href target="_blank" rel="noopener noreferrer">{text}</a> }
                         .into_any()
                 }
@@ -354,6 +371,38 @@ mod tests {
                 Block::Rule,
                 Block::Heading(2, inline("Sub")),
             ]
+        );
+    }
+
+    #[test]
+    fn rewrites_legacy_legal_links() {
+        assert_eq!(
+            rewrite_href("https://baylee.app/datenschutz".to_owned()),
+            "/de/privacy"
+        );
+        assert_eq!(
+            rewrite_href("https://baylee.app/agb".to_owned()),
+            "/de/terms"
+        );
+        assert_eq!(
+            rewrite_href("https://baylee.app/impressum".to_owned()),
+            "/impressum"
+        );
+        assert_eq!(
+            rewrite_href("https://baylee.app/privacy".to_owned()),
+            "/privacy"
+        );
+        assert_eq!(
+            rewrite_href("https://baylee.app/terms".to_owned()),
+            "/terms"
+        );
+        assert_eq!(
+            rewrite_href("https://baylee.app/datenschutz#cookies".to_owned()),
+            "/de/privacy#cookies"
+        );
+        assert_eq!(
+            rewrite_href("https://example.org/docs".to_owned()),
+            "https://example.org/docs"
         );
     }
 }

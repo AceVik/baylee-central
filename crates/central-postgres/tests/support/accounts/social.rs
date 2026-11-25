@@ -94,7 +94,50 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     assert_eq!(list(store, &alice).await, []);
     assert_eq!(list(store, &bob).await[0].relation, Relation::Blocked);
 
+    search_profiles(store, &alice, &carol, at, bt, ct).await;
     sessions_and_budget(store, operator, a, alice, bt, ct).await;
+}
+
+async fn search(
+    store: &AccountStore,
+    token: &Token,
+    query: &str,
+) -> Result<Vec<central_api::social::Person>, Error> {
+    match store
+        .social(
+            Session::Native(token),
+            Request::Search {
+                query: query.into(),
+            },
+        )
+        .await?
+    {
+        Response::People { people } => Ok(people),
+        _ => panic!("people response required"),
+    }
+}
+
+async fn search_profiles(
+    store: &AccountStore,
+    alice: &Token,
+    carol: &Token,
+    at: u32,
+    bt: u32,
+    ct: u32,
+) {
+    assert!(search(store, alice, "a").await.is_err());
+    // Bob blocked Alice above, so Bob is hidden from Alice's searches; Carol is visible.
+    let found = search(store, alice, "Public_").await.unwrap();
+    assert!(found.iter().any(|p| p.tag == ct));
+    assert!(!found.iter().any(|p| p.tag == bt || p.tag == at));
+    // Private login names never match.
+    assert_eq!(
+        search(store, alice, "socialcarol").await.unwrap(),
+        Vec::new()
+    );
+    // Exact tag matches rank first.
+    let by_tag = search(store, carol, &format!("#{bt:x}")).await.unwrap();
+    assert_eq!(by_tag.first().map(|p| p.tag), Some(bt));
 }
 
 async fn sessions_and_budget(

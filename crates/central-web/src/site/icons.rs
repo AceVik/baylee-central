@@ -166,3 +166,5 @@ pub const ARROW_UP_DOWN: &str = r#"<path d="m21 16-4 4-4-4" /> <path d="M17 20V4
 pub const SWORDS: &str = r#"<path d="m13 19 6-6" /> <path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5" /> <path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586" /> <path d="m16 16 4 4" /> <path d="m19 21 2-2" /> <path d="m5 14 4 4" /> <path d="m5 21-2-2" /> <path d="M7.5 16.5 4 20" />"#;
 /// The `play` icon.
 pub const PLAY: &str = r#"<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />"#;
+/// The `panel-left-close` icon.
+pub const PANEL_LEFT_CLOSE: &str = r#"<rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M9 3v18" /> <path d="m16 15-3-3 3-3" />"#;

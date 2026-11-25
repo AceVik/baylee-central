@@ -14,7 +14,16 @@
     "typescript/no-non-null-assertion": "error",
     "import/no-unassigned-import": "off",
     "unicorn/no-array-sort": "off",
+    "unicorn/require-post-message-target-origin": "off",
     "no-await-in-loop": "off"
   },
+  "overrides": [
+    {
+      "files": ["**/boot.ts"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["dist/**", "node_modules/**"]
 }

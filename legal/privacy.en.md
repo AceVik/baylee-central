@@ -31,7 +31,8 @@ data protection officer, as none is required.
 
 ## 3. What we process, why, and on what basis
 
-- **Username, account ID, creation time, display name and tag** – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. *Art. 6(1)(b) GDPR (contract)*
+- **Username, account ID, creation time, display name and tag** – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. Your public player profile at `/{lang}/player/{Name}-{tag}` (display name, tag, profile picture, ranked standings and earned badges) is visible by default and can be turned off at any time in your Profile settings. *Art. 6(1)(b) GDPR (contract)*
+- **Optional personal profile details (first name, last name, date of birth)** – stored exclusively for you in your private profile settings and never shown publicly or to other players or gateways. Date of birth is validated for the minimum age of 16. These fields are included in your data export and deleted when your account is deleted. *Art. 6(1)(b) GDPR*
 - **Roles (administrator)** – administering Baylee Central. *Art. 6(1)(b) GDPR*
 - **The time of your last sign-in with your password** (no address) – administering accounts and noticing misuse. *Art. 6(1)(f) GDPR (our interest in secure operation)*
 - **OPAQUE sign-in record, encrypted key container, credential state** – sign-in, protecting your encrypted data. *Art. 6(1)(b) GDPR*
@@ -77,11 +78,7 @@ These providers learn your IP address, but nothing about your account.
 
 ## 5. Cookies and browser storage
 
-The website sets only one technically necessary cookie: a session cookie
-while you are signed in, for at most 12 hours. It protects itself against
-forged requests without a cookie. This needs no consent (section 25(2) no. 2 TDDDG). Your choice of language and display is
-stored locally by your browser. There are no tracking cookies and no embedded
-third-party services that collect data about you.
+The website sets only strictly necessary session cookies while you are signed in: a short-lived access cookie (`__Host-central`, 15 minutes) and a sliding refresh cookie (`__Host-central-refresh`, 3 days of inactivity, capped at 30 days from sign-in). It protects itself against forged requests without a cookie. This needs no consent (section 25(2) no. 2 TDDDG). Your choice of language and display is stored locally by your browser. There are no tracking cookies and no embedded third-party services that collect data about you.
 
 ## 5a. Chat and notifications
 
@@ -180,8 +177,7 @@ you sign in there is your decision.
   gateway keeps its own copy of your old account there, its password removed;
   we delete it on request, and for every account once moving from the
   official gateway ends.
-- Sessions end 30 minutes after their last use and at most 12 hours after
-  signing in, sign-in tickets after seconds.
+- Native client sessions end 30 minutes after their last use and at most 12 hours after signing in. Browser sessions automatically refresh within a 3-day sliding inactivity window (capped at 30 days after signing in with your password); sign-in tickets expire after seconds.
 - Whether you are online and what you are doing exists only while the Baylee
   app is connected to Central, and only in memory. Your choice of how your
   friends see you (online, away, offline) is kept until you change it or

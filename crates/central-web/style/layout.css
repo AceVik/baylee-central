@@ -144,26 +144,28 @@
 }
 
 /* ---- where a link leads ---------------------------------------------------------
-   In the window's lower left corner while the pointer or the keyboard is on
-   a link (hint.js). It stands a line above the corner, where a browser
-   writes its own. */
+   Flush at the very bottom-left edge of the viewport while the pointer or the
+   keyboard is on a link (hint.js), shown only in browsers/modes (e.g. Safari,
+   installed PWAs) that do not display their own link-preview status bar. */
 
 .link-hint {
   position: fixed;
-  inset: auto auto 2rem 0.75rem;
+  inset: auto auto 0 0;
   z-index: 90;
   display: flex;
   align-items: center;
   gap: 0.4em;
-  max-inline-size: min(34rem, calc(100vw - 1.5rem));
+  max-inline-size: 100vw;
   margin: 0;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--edge);
-  border-radius: var(--pill);
+  padding: 0.22rem 0.65rem 0.22rem 0.5rem;
+  border: 0;
+  border-block-start: var(--hairline) solid var(--edge);
+  border-inline-end: var(--hairline) solid var(--edge);
+  border-radius: 0 var(--radius-sm) 0 0;
   background: var(--panel-solid);
   box-shadow: var(--shadow);
   color: var(--ink-soft);
-  font: 500 0.78rem/1.3 var(--sans);
+  font: 500 0.78rem/1.35 var(--mono);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--dur-fast) ease;
@@ -184,9 +186,10 @@
 }
 
 .link-hint > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-inline-size: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .link-hint-out {
@@ -265,29 +268,49 @@
    A page that takes longer than a blink to fetch (nav.js) shows a line
    running under the bar; it stands still where motion is not welcome. */
 
-:root[data-loading] .top::after {
-  content: "";
+/* Active navigation / route-fetch progress bar inside `.top`, independent of
+   the scroll indicator on `.top::after`. Static gradient when motion is
+   reduced; animated gold/violet shimmer otherwise. */
+.nav-progress {
   position: absolute;
   inset-inline: 0;
-  inset-block-end: -2px;
-  block-size: 2px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent) 0 0 / 40% 100% no-repeat;
+  inset-block-end: 0;
+  z-index: 2;
+  block-size: 3px;
+  background: linear-gradient(90deg, var(--violet), var(--gold), var(--violet));
+  opacity: 0;
   pointer-events: none;
 }
 
+:root:is([data-loading], [data-busy]) .nav-progress {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-loading] .top::after {
-    animation: page-fetch 900ms linear infinite;
+  .nav-progress {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--violet) 30%, transparent) 0%,
+      var(--violet) 25%,
+      var(--gold) 50%,
+      var(--violet) 75%,
+      color-mix(in srgb, var(--violet) 30%, transparent) 100%
+    ) 0 0 / 200% 100% repeat-x;
+    transition: opacity var(--dur-fast) ease;
+  }
+
+  :root:is([data-loading], [data-busy]) .nav-progress {
+    animation: page-fetch 1s linear infinite;
   }
 }
 
 @keyframes page-fetch {
   from {
-    background-position: -70% 0;
+    background-position: 0% 0;
   }
 
   to {
-    background-position: 170% 0;
+    background-position: 200% 0;
   }
 }
 

@@ -11,7 +11,9 @@ mod download;
 mod errors;
 mod home;
 mod info;
+mod invite;
 mod legal;
+mod player;
 mod security;
 
 /// The document for `page`.
@@ -32,6 +34,8 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::Register => account::register(cx),
         Page::Reset => account::reset(cx),
         Page::Account(section) => account::area(cx, section),
+        Page::Player => player::page(cx),
+        Page::Invite => invite::page(cx),
         Page::NotFound => errors::not_found(cx),
         Page::Gone => errors::gone(cx),
         Page::Offline => errors::offline(cx),

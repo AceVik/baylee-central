@@ -220,11 +220,16 @@ async fn only_the_exact_first_line_asks_for_the_socket() {
     };
     let pause = Duration::from_millis(30);
     assert!(asked(vec![b"GET /v1/ws HTTP/1.1\r\nHost: x\r\n\r\n"], pause).await);
+    assert!(asked(vec![b"GET /api/v1/ws HTTP/1.1\r\nHost: x\r\n\r\n"], pause).await);
+    assert!(asked(vec![b"GET /api/v1", b"/ws HT", b"TP/1.1\r\n"], pause).await);
     assert!(asked(vec![b"GET /v1/ranked/", b"socket HTTP/1.1\r\n"], pause).await);
     // the line in pieces, within the time a first line has
     assert!(asked(vec![b"GET /v1", b"/ws HT", b"TP/1.1\r\n"], pause).await);
     for line in [
         &b"GET /v1/ws?x=1 HTTP/1.1\r\n"[..],
+        b"GET /api/v1/ws?token=1 HTTP/1.1\r\n",
+        b"GET /api/v1/pictures/abcd HTTP/1.1\r\n",
+        b"POST /api/v1 HTTP/1.1\r\n",
         b"GET /v1/wss HTTP/1.1\r\n",
         b"POST /v1/ws HTTP/1.1\r\n",
         b"GET /v1/ws HTTP/1.0\r\n",
@@ -252,6 +257,8 @@ struct Fake {
     tables: std::sync::Mutex<BTreeMap<u32, Arc<Table>>>,
     /// What a check of the session answers.
     standing: std::sync::Mutex<Option<Result<bool, Error>>>,
+    notices: std::sync::Mutex<Vec<Notice>>,
+    away_log: std::sync::Mutex<Vec<bool>>,
 }
 
 impl Fake {
@@ -259,11 +266,30 @@ impl Fake {
         self.bits.fetch_or(bits, Ordering::AcqRel);
         self.bell.notify_one();
     }
+
+    fn push(&self, bits: u8, notice: Notice) {
+        self.notices.lock().unwrap().push(notice);
+        self.raise(bits);
+    }
 }
 
 impl Account for Arc<Fake> {
     fn take(&self) -> u8 {
         self.bits.swap(0, Ordering::AcqRel)
+    }
+
+    fn take_browser(&self) -> (u8, Vec<Notice>) {
+        let bits = self.take();
+        if bits & (news::CHAT | news::SOCIAL) == 0 {
+            return (bits, Vec::new());
+        }
+        let notices = std::mem::take(&mut *self.notices.lock().unwrap());
+        (bits, notices)
+    }
+
+    fn set_away(&self, away: bool) -> bool {
+        self.away_log.lock().unwrap().push(away);
+        true
     }
 
     fn rung(&self) -> impl Future<Output = ()> + Send {
@@ -309,16 +335,26 @@ struct Harness {
 }
 
 fn served(times: Times, buffer: usize) -> Harness {
+    served_with(times, buffer, false)
+}
+
+fn served_with(times: Times, buffer: usize, structured: bool) -> Harness {
     let account = Arc::new(Fake::default());
     let (client, server) = tokio::io::duplex(buffer);
     let (reader, writer) = tokio::io::split(server);
     let (stop, stopped) = watch::channel(false);
-    let socket = Socket::new(Arc::clone(&account), reader, writer, stopped, times);
+    let task = if structured {
+        tokio::spawn(
+            Socket::new_browser(Arc::clone(&account), reader, writer, stopped, times).run(),
+        )
+    } else {
+        tokio::spawn(Socket::new(Arc::clone(&account), reader, writer, stopped, times).run())
+    };
     Harness {
         account,
         client,
         stop,
-        task: tokio::spawn(socket.run()),
+        task,
     }
 }
 
@@ -382,7 +418,15 @@ fn text(event: &str) -> Heard {
 }
 
 async fn opened(times: Times) -> Harness {
-    let mut socket = served(times, 4096);
+    opened_with(times, false).await
+}
+
+async fn opened_browser(times: Times) -> Harness {
+    opened_with(times, true).await
+}
+
+async fn opened_with(times: Times, structured: bool) -> Harness {
+    let mut socket = served_with(times, 4096, structured);
     assert_eq!(hear(&mut socket.client).await, text(READY));
     assert_eq!(
         hear(&mut socket.client).await,
@@ -902,4 +946,145 @@ async fn a_socket_opens_with_every_friend_s_table_and_a_friend_gone_has_its_tabl
     );
     stop.send(true).unwrap();
     let _ = task.await;
+}
+
+#[test]
+fn parse_client_presence_validates_strictly() {
+    assert_eq!(
+        parse_client_presence(r#"{"event":"presence","away":true}"#),
+        Some(true)
+    );
+    assert_eq!(
+        parse_client_presence(r#" { "away" : false , "event" : "presence" } "#),
+        Some(false)
+    );
+    for bad in [
+        "",
+        "{}",
+        r#"{"event":"presence"}"#,
+        r#"{"away":true}"#,
+        r#"{"event":"chat","away":true}"#,
+        r#"{"event":"presence","away":"true"}"#,
+        r#"{"event":"presence","away":true,}"#,
+        r#"{"event":"presence","away":true,"extra":1}"#,
+        r#"{"event":"presence","away":true,"away":false}"#,
+        r#"{"event":"presence","away":true} x"#,
+    ] {
+        assert_eq!(parse_client_presence(bad), None, "{bad}");
+    }
+}
+
+#[tokio::test]
+async fn browser_socket_emits_structured_notices_and_accepts_away_presence() {
+    let mut socket = opened_browser(SHORT).await;
+
+    socket
+        .client
+        .write_all(&sent(0x81, br#"{"event":"presence","away":true}"#))
+        .await
+        .unwrap();
+    socket
+        .client
+        .write_all(&sent(0x81, br#"{ "away" : false , "event" : "presence" }"#))
+        .await
+        .unwrap();
+    // Ping/Pong barrier ensures both text frames are handled before reading `away_log`.
+    socket.client.write_all(&sent(0x89, b"ok")).await.unwrap();
+    assert_eq!(hear(&mut socket.client).await, Heard::Pong(b"ok".to_vec()));
+    assert_eq!(*socket.account.away_log.lock().unwrap(), vec![true, false]);
+
+    socket.account.push(
+        news::CHAT,
+        Notice::ChatMessage {
+            conv: "dm:0001:0002".into(),
+            id: "id-1".into(),
+            at: 42,
+            from: Some(0x2a),
+        },
+    );
+    assert_eq!(
+        hear(&mut socket.client).await,
+        text(
+            r#"{"event":"chat","kind":"message","conv":"dm:0001:0002","id":"id-1","at":42,"from":"002a"}"#
+        )
+    );
+
+    socket.account.push(
+        news::SOCIAL,
+        Notice::Thread {
+            action: "renamed",
+            group: r#"grp-"1""#.into(),
+        },
+    );
+    assert_eq!(
+        hear(&mut socket.client).await,
+        text(r#"{"event":"social","kind":"thread","action":"renamed","group":"grp-\"1\""}"#)
+    );
+
+    socket
+        .account
+        .push(news::SOCIAL, Notice::FriendRequest { tag: 0x0015 });
+    assert_eq!(
+        hear(&mut socket.client).await,
+        text(r#"{"event":"social","kind":"friend_request","tag":"0015"}"#)
+    );
+
+    socket.account.push(
+        news::SOCIAL,
+        Notice::FriendAccept {
+            tag: 0x0016,
+            via_invite: true,
+        },
+    );
+    assert_eq!(
+        hear(&mut socket.client).await,
+        text(r#"{"event":"social","kind":"friend_accept","tag":"0016","via":"invite"}"#)
+    );
+
+    socket.account.push(
+        news::SOCIAL,
+        Notice::FriendAccept {
+            tag: 0x0017,
+            via_invite: false,
+        },
+    );
+    assert_eq!(
+        hear(&mut socket.client).await,
+        text(r#"{"event":"social","kind":"friend_accept","tag":"0017","via":"contact"}"#)
+    );
+
+    socket
+        .account
+        .push(news::SOCIAL, Notice::ContactChanged { tag: 0x0018 });
+    assert_eq!(
+        hear(&mut socket.client).await,
+        text(r#"{"event":"social","kind":"contact_changed","tag":"0018"}"#)
+    );
+
+    socket.account.push(news::CHAT, Notice::ChatSync);
+    assert_eq!(hear(&mut socket.client).await, text(CHAT));
+
+    socket.account.push(news::SOCIAL, Notice::SocialSync);
+    assert_eq!(hear(&mut socket.client).await, text(SOCIAL));
+
+    socket.account.raise(news::REVOKED);
+    assert_eq!(hear(&mut socket.client).await, text(REVOKED));
+    assert_eq!(hear(&mut socket.client).await, Heard::Close(1008));
+    let _ = socket.task.await;
+}
+
+#[tokio::test]
+async fn browser_socket_rejects_invalid_text_commands_and_binary_frames() {
+    for (bytes, code) in [
+        (sent(0x81, br#"{"event":"chat"}"#), 1003),
+        (sent(0x81, br#"{"event":"presence","away":"yes"}"#), 1003),
+        (sent(0x81, &[0xff, 0xfe]), 1007),
+        (sent(0x82, br#"{"event":"presence","away":true}"#), 1003),
+        (vec![0x81, 0x80 | 0x7e, 0, 126], 1003),
+    ] {
+        let mut socket = opened_browser(SHORT).await;
+        socket.client.write_all(&bytes).await.unwrap();
+        assert_eq!(hear(&mut socket.client).await, Heard::Close(code));
+        assert_eq!(socket.task.await.unwrap(), End::Close(Code(code)));
+    }
 }

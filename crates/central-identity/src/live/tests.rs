@@ -1355,3 +1355,162 @@ fn two_dials_around_a_choice_both_admit_with_what_the_store_holds() {
     assert_eq!(b.take(), 0);
     drop((first, second));
 }
+
+fn browser_socket(
+    live: &Arc<Live>,
+    account: [u8; 16],
+    session: u8,
+    friends: &[[u8; 16]],
+) -> Listener {
+    let (listener, reading) = live
+        .admit_with(
+            account,
+            Some(u32::from(account[0])),
+            Choice::Online,
+            digest(session),
+            true,
+        )
+        .unwrap();
+    if let Some(reading) = reading {
+        live.friends_read(reading, friends.to_vec());
+    }
+    let _ = listener.take_browser();
+    listener
+}
+
+#[test]
+fn rotated_session_survives_checks_and_revocation_targets_the_new_digest() {
+    let live = Arc::new(Live::default());
+    let browser = browser_socket(&live, A, 1, &[]);
+    browser.ready();
+    assert_eq!(browser.current_digest(), digest(1));
+    assert_eq!(live.digests(), BTreeSet::from([digest(1)]));
+
+    // RefreshSession rotates digest(1) -> digest(2)
+    live.rotated(&digest(1), digest(2));
+    assert_eq!(browser.current_digest(), digest(2));
+    assert_eq!(live.digests(), BTreeSet::from([digest(2)]));
+
+    // An earlier check asking about digest(1) or logout of digest(1) does not kill the rotated socket
+    live.checked(&BTreeSet::from([digest(1)]), &BTreeSet::new());
+    live.ended(&digest(1));
+    assert_eq!(browser.take_browser().0, 0);
+
+    // Standing new digest keeps the socket alive; explicit logout/revocation ends it immediately
+    live.checked(&BTreeSet::from([digest(2)]), &BTreeSet::from([digest(2)]));
+    assert_eq!(browser.take_browser().0, 0);
+
+    live.ended(&digest(2));
+    assert_eq!(browser.take_browser().0 & news::REVOKED, news::REVOKED);
+}
+
+#[test]
+fn browser_away_and_multi_tab_disconnect_drive_presence() {
+    let live = Arc::new(Live::default());
+    let watcher = socket(&live, B, 9, &[A]);
+    watcher.ready();
+    let tab1 = browser_socket(&live, A, 1, &[B]);
+    tab1.ready();
+    let _ = watcher.take();
+
+    let tab2 = browser_socket(&live, A, 2, &[B]);
+    tab2.ready();
+    assert_eq!(watcher.take(), 0);
+    assert_eq!(live.presence(&B).states, vec![ONLINE]);
+
+    // First tab becomes idle/hidden while second tab stays visible -> stays online
+    assert!(tab1.set_away(true));
+    assert_eq!(watcher.take(), 0);
+    assert_eq!(live.presence(&B).states, vec![ONLINE]);
+
+    // Closing the active tab leaves only the away tab -> transitions friends' view to away
+    drop(tab2);
+    assert_eq!(watcher.take(), news::PRESENCE);
+    assert_eq!(
+        live.presence(&B).states,
+        vec![Shown {
+            away: true,
+            activity: None,
+        }]
+    );
+
+    // Returning from idle restores online; last socket disconnect transitions to offline
+    assert!(tab1.set_away(false));
+    assert_eq!(watcher.take(), news::PRESENCE);
+    assert_eq!(live.presence(&B).states, vec![ONLINE]);
+
+    drop(tab1);
+    assert_eq!(watcher.take(), news::PRESENCE);
+    assert_eq!(live.presence(&B).online, [] as [u32; 0]);
+}
+
+#[test]
+fn structured_notices_queue_and_collapse_to_fallback_on_overflow() {
+    let live = Arc::new(Live::default());
+    let native = socket(&live, A, 1, &[]);
+    let browser = browser_socket(&live, A, 2, &[]);
+
+    let sample = [
+        (
+            news::CHAT,
+            Notice::ChatMessage {
+                conv: "dm:0001:0002".into(),
+                id: "msg-1".into(),
+                at: 123,
+                from: Some(2),
+            },
+        ),
+        (
+            news::SOCIAL,
+            Notice::Thread {
+                action: "renamed",
+                group: "grp-1".into(),
+            },
+        ),
+        (news::SOCIAL, Notice::FriendRequest { tag: 2 }),
+        (
+            news::SOCIAL,
+            Notice::FriendAccept {
+                tag: 3,
+                via_invite: true,
+            },
+        ),
+        (news::SOCIAL, Notice::ContactChanged { tag: 4 }),
+    ];
+    {
+        let mut state = live.state();
+        for (bit, notice) in &sample {
+            state.raise_notice(&A, *bit, notice);
+        }
+    }
+
+    assert_eq!(native.take(), news::CHAT | news::SOCIAL);
+    let (bits, drained) = browser.take_browser();
+    assert_eq!(bits, news::CHAT | news::SOCIAL);
+    let expected: Vec<Notice> = sample.into_iter().map(|(_, n)| n).collect();
+    assert_eq!(drained, expected);
+
+    // Overflow past MAX_SOCKET_NOTICES preserves bounded queue plus ChatSync/SocialSync fallbacks
+    {
+        let mut state = live.state();
+        for n in 0..MAX_SOCKET_NOTICES {
+            state.raise_notice(
+                &A,
+                news::CHAT,
+                &Notice::ChatMessage {
+                    conv: "dm:0001:0002".into(),
+                    id: format!("id-{n}"),
+                    at: u64::try_from(n).unwrap(),
+                    from: Some(2),
+                },
+            );
+        }
+        state.raise_notice(&A, news::SOCIAL, &Notice::FriendRequest { tag: 2 });
+    }
+
+    let (overflow_bits, overflow_notices) = browser.take_browser();
+    assert_eq!(overflow_bits, news::CHAT | news::SOCIAL);
+    assert_eq!(overflow_notices.len(), MAX_SOCKET_NOTICES + 1);
+    assert!(overflow_notices.contains(&Notice::SocialSync));
+    assert!(!overflow_notices.contains(&Notice::ChatSync));
+}

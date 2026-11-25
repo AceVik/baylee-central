@@ -6,7 +6,7 @@
 //! read or written.
 use super::{AccountStore, Error, Session, Token, statement};
 use central_api::{
-    gateway::{GatewayMetadata, GatewayState, validate_origin},
+    gateway::{GatewayActivity, GatewayMetadata, GatewayState, validate_origin},
     is_official_origin,
     owner::{
         GatewayScopes, MAX_TOKEN_DAYS, MyGateway, SessionInfo, SessionKind, TOKENS_PER_GATEWAY,
@@ -125,13 +125,15 @@ impl AccountStore {
             .query_all_raw(statement(
                 "SELECT s.kind, s.digest = $2 AS current,
                      floor(extract(epoch FROM COALESCE(s.proven_at, s.created_at)))::bigint AS signed_in_at,
-                     floor(extract(epoch FROM s.expires_at))::bigint AS expires_at,
+                     floor(extract(epoch FROM COALESCE(s.refresh_expires_at, s.expires_at)))::bigint AS expires_at,
                      (SELECT string_agg(DISTINCT i.stream, ' ' ORDER BY i.stream)
                       FROM central_identity.gateway_sids i WHERE i.session_digest = s.digest)
                      AS gateways
                  FROM central_identity.sessions s JOIN central_identity.accounts a
                  ON a.id = s.account_id AND a.credential_revision = s.credential_revision
-                 WHERE s.account_id = $1 AND s.expires_at > pg_catalog.clock_timestamp()
+                 WHERE s.account_id = $1
+                 AND COALESCE(s.refresh_expires_at, s.expires_at) > pg_catalog.clock_timestamp()
+                 AND COALESCE(s.absolute_expires_at, pg_catalog.clock_timestamp() + interval '1 second') > pg_catalog.clock_timestamp()
                  ORDER BY current DESC, s.kind LIMIT 4",
                 vec![
                     account.into(),
@@ -200,12 +202,17 @@ impl AccountStore {
             .query_all_raw(statement(
                 &format!(
                     "SELECT g.id, g.origin, g.name, g.version, g.website, {STATE} AS state,
+                         COALESCE(p.ranked_verified, false) AS ranked_verified,
                          COALESCE(g.last_seen > pg_catalog.clock_timestamp() - interval '90 seconds', false) AS online,
+                         CASE WHEN g.last_seen > pg_catalog.clock_timestamp() - interval '90 seconds'
+                              AND g.activity_at > pg_catalog.clock_timestamp() - interval '90 seconds'
+                              THEN g.activity_players END AS activity_players,
+                         g.activity_playing, g.activity_tables, g.activity_games,
                          floor(extract(epoch FROM g.last_seen))::bigint AS last_seen,
                          floor(extract(epoch FROM g.created_at))::bigint AS created_at
                      FROM central_identity.gateways g
                      LEFT JOIN central_identity.gateway_approvals p ON p.gateway_id = g.id
-                     WHERE g.owner_id = $1 ORDER BY g.id DESC LIMIT $2"
+                     WHERE g.owner_id = $1 AND g.deleted_at IS NULL ORDER BY g.id DESC LIMIT $2"
                 ),
                 vec![account.into(), GATEWAYS_PER_OWNER.into()],
             ))
@@ -216,7 +223,7 @@ impl AccountStore {
                 &format!(
                     "SELECT t.gateway_id, {TOKEN_COLUMNS}
                      FROM central_identity.gateway_tokens t JOIN central_identity.gateways g ON g.id = t.gateway_id
-                     WHERE g.owner_id = $1
+                     WHERE g.owner_id = $1 AND g.deleted_at IS NULL
                      AND COALESCE(t.revoked_at, t.expires_at) > pg_catalog.clock_timestamp() - interval '30 days'
                      ORDER BY t.id DESC LIMIT $2"
                 ),
@@ -232,12 +239,38 @@ impl AccountStore {
             .iter()
             .map(|row| {
                 let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+                let activity_players: Option<i32> = row
+                    .try_get("", "activity_players")
+                    .map_err(|_| Error::Unavailable)?;
+                let activity = if let Some(players) = activity_players {
+                    let count = |column: &str| {
+                        row.try_get::<Option<i32>>("", column)
+                            .ok()
+                            .flatten()
+                            .and_then(|n| u32::try_from(n).ok())
+                            .ok_or(Error::Unavailable)
+                    };
+                    let act = GatewayActivity {
+                        players: u32::try_from(players).map_err(|_| Error::Unavailable)?,
+                        playing: count("activity_playing")?,
+                        tables: count("activity_tables")?,
+                        games: count("activity_games")?,
+                    };
+                    act.validate().map_err(|_| Error::Unavailable)?;
+                    Some(act)
+                } else {
+                    None
+                };
                 Ok(MyGateway {
                     id: *id.as_bytes(),
                     origin: row.try_get("", "origin").map_err(|_| Error::Unavailable)?,
                     metadata: metadata(row)?,
                     state: state(row)?,
+                    ranked_verified: row
+                        .try_get("", "ranked_verified")
+                        .map_err(|_| Error::Unavailable)?,
                     online: row.try_get("", "online").map_err(|_| Error::Unavailable)?,
+                    activity,
                     last_seen: row
                         .try_get("", "last_seen")
                         .map_err(|_| Error::Unavailable)?,
@@ -310,8 +343,8 @@ impl AccountStore {
             .query_one_raw(statement(
                 "INSERT INTO central_identity.gateways (owner_id, origin, name, version, website)
                  SELECT $1, $2, $3, $4, $5
-                 WHERE (SELECT count(*) FROM central_identity.gateways WHERE owner_id = $1) < $6
-                 ON CONFLICT (origin) DO NOTHING RETURNING id",
+                 WHERE (SELECT count(*) FROM central_identity.gateways WHERE owner_id = $1 AND deleted_at IS NULL) < $6
+                 ON CONFLICT (origin) WHERE deleted_at IS NULL DO NOTHING RETURNING id",
                 vec![
                     account.into(),
                     origin.into(),
@@ -326,7 +359,7 @@ impl AccountStore {
         let Some(row) = row else {
             let taken = tx
                 .query_one_raw(statement(
-                    "SELECT 1 AS taken FROM central_identity.gateways WHERE origin = $1",
+                    "SELECT 1 AS taken FROM central_identity.gateways WHERE origin = $1 AND deleted_at IS NULL",
                     vec![origin.into()],
                 ))
                 .await
@@ -337,6 +370,106 @@ impl AccountStore {
         let id: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(*id.as_bytes())
+    }
+
+    /// Update the public display name of a non-official active gateway owned by
+    /// the account behind `browser`.
+    ///
+    /// # Errors
+    /// `Rejected` without a live browser session, for an unknown/foreign/official
+    /// gateway or an invalid name; storage failure.
+    pub async fn update_own_gateway(
+        &self,
+        browser: &Token,
+        gateway: [u8; 16],
+        name: &str,
+    ) -> Result<(), Error> {
+        let trimmed = name.trim();
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let (account, _) = owner(&tx, browser, true).await?;
+        let gateway = Uuid::from_bytes(gateway);
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT origin, version, website FROM central_identity.gateways
+                 WHERE id = $1 AND owner_id = $2 AND NOT official AND deleted_at IS NULL FOR UPDATE",
+                vec![gateway.into(), account.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let origin: String = row.try_get("", "origin").map_err(|_| Error::Unavailable)?;
+        let metadata = GatewayMetadata {
+            name: trimmed.to_owned(),
+            version: row.try_get("", "version").map_err(|_| Error::Unavailable)?,
+            website: row.try_get("", "website").map_err(|_| Error::Unavailable)?,
+        };
+        metadata.validate(&origin)?;
+        tx.execute_raw(statement(
+            "UPDATE central_identity.gateways SET name = $3
+             WHERE id = $1 AND owner_id = $2 AND NOT official AND deleted_at IS NULL",
+            vec![gateway.into(), account.into(), metadata.name.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Soft-delete a non-official gateway owned by the account behind `browser`
+    /// (requires a password sign-in less than 30 minutes old), disabling any
+    /// directory approval, revoking all live gateway tokens and ending active
+    /// sessions at that gateway while keeping audit history.
+    ///
+    /// # Errors
+    /// `Rejected` without a fresh live browser session or for an unknown,
+    /// foreign, already-deleted, or official gateway; storage failure.
+    pub async fn delete_own_gateway(
+        &self,
+        browser: &Token,
+        gateway: [u8; 16],
+    ) -> Result<(), Error> {
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let (account, fresh) = owner(&tx, browser, true).await?;
+        if !fresh {
+            return Err(Error::Rejected);
+        }
+        let gateway = Uuid::from_bytes(gateway);
+        tx.query_one_raw(statement(
+            "SELECT id FROM central_identity.gateways
+             WHERE id = $1 AND owner_id = $2 AND NOT official AND deleted_at IS NULL FOR UPDATE",
+            vec![gateway.into(), account.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+        tx.execute_raw(statement(
+            "UPDATE central_identity.gateways SET deleted_at = pg_catalog.clock_timestamp()
+             WHERE id = $1 AND deleted_at IS NULL",
+            vec![gateway.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.execute_raw(statement(
+            "UPDATE central_identity.gateway_approvals SET enabled = false
+             WHERE gateway_id = $1 AND enabled",
+            vec![gateway.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.execute_raw(statement(
+            "UPDATE central_identity.gateway_tokens SET revoked_at = pg_catalog.clock_timestamp()
+             WHERE gateway_id = $1 AND revoked_at IS NULL",
+            vec![gateway.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.gateway_sids i USING central_identity.gateways g
+             WHERE g.id = $1 AND i.stream = g.origin",
+            vec![gateway.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+        tx.commit().await.map_err(|_| Error::Unavailable)
     }
 
     /// Store the digest of `token` as a token of `gateway`, which the account
@@ -370,8 +503,8 @@ impl AccountStore {
         }
         let gateway = Uuid::from_bytes(gateway);
         tx.query_one_raw(statement(
-            "SELECT id FROM central_identity.gateways WHERE id = $1 AND owner_id = $2 AND NOT official
-             FOR UPDATE",
+            "SELECT id FROM central_identity.gateways
+             WHERE id = $1 AND owner_id = $2 AND NOT official AND deleted_at IS NULL FOR UPDATE",
             vec![gateway.into(), account.into()],
         ))
         .await
@@ -445,7 +578,7 @@ impl AccountStore {
             .query_one_raw(statement(
                 "SELECT t.revoked_at IS NULL AS live FROM central_identity.gateway_tokens t
                  JOIN central_identity.gateways g ON g.id = t.gateway_id
-                 WHERE t.id = $1 AND g.owner_id = $2",
+                 WHERE t.id = $1 AND g.owner_id = $2 AND g.deleted_at IS NULL",
                 vec![token.into(), account.into()],
             ))
             .await
@@ -495,7 +628,7 @@ impl AccountStore {
                          floor(extract(epoch FROM t.expires_at))::bigint AS expires_at
                      FROM central_identity.gateway_tokens t JOIN central_identity.gateways g ON g.id = t.gateway_id
                      LEFT JOIN central_identity.gateway_approvals p ON p.gateway_id = g.id
-                     WHERE t.digest = $1 AND {LIVE_TOKEN} AND NOT g.official"
+                     WHERE t.digest = $1 AND {LIVE_TOKEN} AND NOT g.official AND g.deleted_at IS NULL"
                 ),
                 vec![token.digest().to_vec().into()],
             ))

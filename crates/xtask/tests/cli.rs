@@ -65,6 +65,7 @@ fn every_task_and_flag_parses() {
     assert_eq!(parse(&args("secrets")), Ok(Task::Secrets));
     assert_eq!(parse(&args("wasm")), Ok(Task::Wasm { check: false }));
     assert_eq!(parse(&args("wasm --check")), Ok(Task::Wasm { check: true }));
+    assert_eq!(parse(&args("dev-site")), Ok(Task::DevSite));
 }
 
 #[test]

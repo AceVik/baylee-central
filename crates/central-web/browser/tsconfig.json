@@ -26,5 +26,5 @@
     "forceConsistentCasingInFileNames": true,
     "useUnknownInCatchVariables": true
   },
-  "include": ["e2e-site", "e2e-real"]
+  "include": ["e2e-site", "e2e-real", "scripts"]
 }

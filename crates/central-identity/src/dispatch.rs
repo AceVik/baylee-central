@@ -2,7 +2,12 @@ use super::{
     BrowserReply, Discovery, Error, IdentityService, Place, Request, Response, Seen, Surface,
     Token, browser_only, browser_operation, challenge,
 };
-use std::time::Instant;
+use central_api::{
+    chat::{ChatRequest, ChatResponse},
+    groups::{Change as GroupChange, GroupRequest, GroupResponse},
+    social::{ContactAction, SocialRequest, SocialResponse},
+};
+use std::{collections::BTreeSet, time::Instant};
 
 impl IdentityService {
     /// `place` is where the request came from, for the starts that test a
@@ -39,6 +44,44 @@ impl IdentityService {
                 .change_password_finish(bearer, surface, &attempt, proof, &record, &wrapped_master)
                 .await;
         }
+        if matches!(request, Request::RefreshSession) {
+            if surface != Surface::Browser {
+                return Err(Error::Rejected);
+            }
+            let refresh = bearer.ok_or(Error::Rejected)?;
+            let next_access = super::Token::generate()?;
+            let next_refresh = super::Token::generate()?;
+            return match self
+                .store
+                .refresh_browser_session(refresh, &next_access, &next_refresh)
+                .await?
+            {
+                central_postgres::RefreshOutcome::Refreshed {
+                    expires_at,
+                    previous_digest,
+                } => {
+                    self.issued(&next_access);
+                    let next_digest = central_postgres::Session::Browser(&next_access).digest();
+                    self.live.rotated(&previous_digest, next_digest);
+                    Ok(BrowserReply {
+                        response: Response::Renewed { expires_at },
+                        session: Some(next_access),
+                        refresh: Some(next_refresh),
+                        clear_cookies: false,
+                    })
+                }
+                central_postgres::RefreshOutcome::Rejected { revoked_digest } => {
+                    if let Some(digest) = revoked_digest {
+                        self.live.ended(&digest);
+                    }
+                    Err(Error::Rejected)
+                }
+                central_postgres::RefreshOutcome::Reused { revoked_digest } => {
+                    self.live.ended(&revoked_digest);
+                    Err(Error::Rejected)
+                }
+            };
+        }
         // A choice's budget is spent before the terms are read for it.
         self.presence_budget(&request, bearer)?;
         if super::terms::needs_acceptance(&request) {
@@ -47,6 +90,8 @@ impl IdentityService {
         Ok(BrowserReply {
             response: self.respond(request, bearer, surface, seen, place).await?,
             session: None,
+            refresh: None,
+            clear_cookies: false,
         })
     }
 
@@ -72,6 +117,14 @@ impl IdentityService {
             Request::Ranked { request } => self.ranked(request, bearer, surface).await,
             Request::RankedHost { request } => self.ranked_host(request, bearer).await,
             Request::ChallengeHost { request } => self.challenge_host(request, bearer).await,
+            Request::Notifications { request } => self.notifications(request, bearer).await,
+            Request::Social { request } => self.social(request, bearer, surface).await,
+            request @ (Request::Presence
+            | Request::SetPresence { .. }
+            | Request::ReportPresence { .. }) => {
+                self.presence_request(request, bearer, surface).await
+            }
+            Request::PublicFunding {} => self.public_funding(),
             other => {
                 self.account_dispatch(other, bearer, surface, seen, place)
                     .await
@@ -88,14 +141,6 @@ impl IdentityService {
         place: Option<Place>,
     ) -> Result<Response, Error> {
         match request {
-            Request::Notifications { request } => self.notifications(request, bearer).await,
-            Request::Social { request } => self.social(request, bearer, surface).await,
-            request @ (Request::Presence
-            | Request::SetPresence { .. }
-            | Request::ReportPresence { .. }) => {
-                self.presence_request(request, bearer, surface).await
-            }
-            Request::PublicFunding {} => self.public_funding(),
             request @ (Request::Terms
             | Request::GatewayTerms { .. }
             | Request::TermsStatus
@@ -113,9 +158,25 @@ impl IdentityService {
             }
             Request::Email { request } => self.email_request(request, bearer, surface).await,
             Request::ResetMail { username, lang } => self.reset_mail(username, lang),
+            Request::SendRecoveryBackupMail {
+                email,
+                attachment_base64,
+                encrypted,
+                lang,
+            } => {
+                self.send_recovery_backup_mail(bearer, &email, attachment_base64, encrypted, &lang)
+                    .await
+            }
+            Request::PublicProfile { handle } => Ok(Response::PublicProfile {
+                profile: Box::new(self.store.public_profile(&handle).await?),
+            }),
+            Request::FriendInviteInfo { code } => self.friend_invite_info(&code).await,
             request @ (Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::ProfileDetails
+            | Request::SetProfileDetails { .. }
+            | Request::OwnBadges
             | Request::Admin { .. }
             | Request::Owner { .. }
             | Request::Picture { .. }) => self.account_request(request, bearer, surface).await,
@@ -141,6 +202,7 @@ impl IdentityService {
             | Request::GatewayRevocations { .. }
             | Request::GatewayStatus) => self.gateway_request(request, bearer).await,
             request @ (Request::AccountExport
+            | Request::ExportProfileDetails
             | Request::DeleteAccountStart { .. }
             | Request::DeleteAccountFinish { .. }) => {
                 self.lifecycle_request(request, bearer, surface, place)
@@ -167,6 +229,7 @@ impl IdentityService {
             }
             request @ (Request::RegisterChallenge
             | Request::RegisterChallengeFor { .. }
+            | Request::RegisterInviteChallenge { .. }
             | Request::Register { .. }
             | Request::EnrollmentStart { .. }
             | Request::EnrollmentFinish { .. }) => self.enrollment(request, surface, seen).await,
@@ -187,17 +250,31 @@ impl IdentityService {
         match request {
             Request::RegisterChallenge => Self::older_challenge(surface),
             Request::RegisterChallengeFor { signals } => {
-                self.register_challenge(surface, seen, signals).await
+                self.register_challenge(surface, seen, signals, None).await
+            }
+            Request::RegisterInviteChallenge {
+                signals,
+                invite_code,
+            } => {
+                self.register_challenge(surface, seen, signals, Some(&invite_code))
+                    .await
             }
             Request::Register {
                 username,
                 display_name,
                 nonce,
                 counters,
+                invite_code,
             } => {
                 let proof = (nonce.as_str(), counters.as_slice());
-                self.register(&username, display_name.as_deref(), proof, surface)
-                    .await
+                self.register(
+                    &username,
+                    display_name.as_deref(),
+                    proof,
+                    invite_code.as_deref(),
+                    surface,
+                )
+                .await
             }
             Request::EnrollmentStart { ticket, message } => {
                 self.enrollment_challenge(&ticket, message).await
@@ -209,21 +286,91 @@ impl IdentityService {
 
     async fn social(
         &self,
-        request: central_api::social::SocialRequest,
+        request: SocialRequest,
         bearer: Option<&Token>,
         surface: Surface,
     ) -> Result<Response, Error> {
         if surface == Surface::Native && native_refuses(&request) {
             return Err(Error::Rejected);
         }
-        let (response, concerns) = self
-            .store
-            .social_concerning(surface.session(bearer)?, request)
-            .await?;
+        if matches!(
+            &request,
+            SocialRequest::FriendInvites
+                | SocialRequest::CreateFriendInvite { .. }
+                | SocialRequest::RevokeFriendInvite { .. }
+                | SocialRequest::RedeemFriendInvite { .. }
+        ) {
+            return self.social_operation(request, bearer, surface).await;
+        }
+        let session = surface.session(bearer)?;
+        let hint = social_hint(&request);
+        let (response, concerns) = self.store.social_concerning(session, request).await?;
         // Committed: the push sockets of exactly the accounts it concerns are
         // told, whichever listener the change came from (`live.rs`).
-        self.tell(&concerns);
+        self.tell_social(session, hint, &response, &concerns).await;
         Ok(Response::Social { response })
+    }
+
+    async fn caller_for(
+        &self,
+        session: central_postgres::Session<'_>,
+        targets: &BTreeSet<[u8; 16]>,
+    ) -> Option<([u8; 16], u32)> {
+        if !self.has_structured(targets) {
+            return None;
+        }
+        if let Some(cached) = self.caller_tag_cached(&session.digest()) {
+            return Some(cached);
+        }
+        self.store.session_account_tag(session).await.ok().flatten()
+    }
+
+    async fn tell_social(
+        &self,
+        session: central_postgres::Session<'_>,
+        hint: SocialHint,
+        response: &SocialResponse,
+        concerns: &central_postgres::Concerns,
+    ) {
+        match (hint, response) {
+            (
+                SocialHint::ChatSend { conv },
+                SocialResponse::Chat {
+                    response: ChatResponse::Sent { id, at },
+                },
+            ) if !concerns.chat.is_empty() => {
+                let caller = self.caller_for(session, &concerns.chat).await;
+                self.tell_chat_message(
+                    &concerns.chat,
+                    &conv,
+                    id,
+                    *at,
+                    caller.map(|(_, tag)| tag),
+                    &concerns.social,
+                );
+            }
+            (
+                SocialHint::GroupCreate,
+                SocialResponse::Group {
+                    response: GroupResponse::Created { id },
+                },
+            ) if !concerns.social.is_empty() => {
+                self.tell_thread(&concerns.social, "created", id);
+            }
+            (
+                SocialHint::GroupChange { id, action },
+                SocialResponse::Group {
+                    response: GroupResponse::Done,
+                },
+            ) if !concerns.social.is_empty() => {
+                self.tell_thread(&concerns.social, action, &id);
+            }
+            (SocialHint::Contact { tag, action }, _) => {
+                let caller = self.caller_for(session, &concerns.social).await;
+                self.tell_contact(&concerns.social, concerns.pair, tag, action, caller);
+            }
+            _ => self.tell(concerns),
+        }
     }
 
     async fn notifications(
@@ -261,10 +408,8 @@ impl IdentityService {
             }),
             Request::Logout => {
                 self.store.logout(session).await?;
-                // A native session's push sockets end with it.
-                if let central_postgres::Session::Native(token) = session {
-                    self.live.ended(&token.digest());
-                }
+                // Both native and browser push sockets end with their session.
+                self.live.ended(&session.digest());
                 Ok(Response::Done)
             }
             Request::SessionStatus => {
@@ -328,6 +473,16 @@ impl IdentityService {
                 self.store.set_display_name(cookie, &display_name).await?;
                 Ok(Response::Done)
             }
+            Request::ProfileDetails => Ok(Response::ProfileDetails {
+                details: self.store.profile_details(cookie).await?,
+            }),
+            Request::SetProfileDetails { details } => {
+                self.store.set_profile_details(cookie, &details).await?;
+                Ok(Response::Done)
+            }
+            Request::OwnBadges => Ok(Response::OwnBadges {
+                badges: Box::new(self.store.own_badges(cookie).await?),
+            }),
             _ => Err(Error::Rejected),
         }
     }
@@ -353,11 +508,19 @@ impl IdentityService {
         surface: Surface,
         seen: Seen,
         signals: u8,
+        invite_code: Option<&str>,
     ) -> Result<Response, Error> {
         if surface != Surface::Browser {
             return Err(Error::Rejected);
         }
-        if !self.store.registration_open().await? {
+        let allowed = if self.store.registration_open().await? {
+            true
+        } else if let Some(code) = invite_code {
+            self.store.invite_can_register(code).await?
+        } else {
+            false
+        };
+        if !allowed {
             return Ok(Response::RegistrationClosed);
         }
         let issued = self
@@ -392,6 +555,7 @@ impl IdentityService {
         username: &str,
         display_name: Option<&str>,
         (nonce, counters): (&str, &[u64]),
+        invite_code: Option<&str>,
         surface: Surface,
     ) -> Result<Response, Error> {
         // Registration has the browser listener's per-address budget; the
@@ -401,7 +565,7 @@ impl IdentityService {
         }
         // The proof of work is checked and spent first, whatever follows,
         // before the name is looked at; the store refuses while registration
-        // is closed. `Busy` without a worker spends nothing.
+        // is closed (unless a live invite code authorises enrollment).
         challenge::prove(
             &self.challenges,
             &self.workers,
@@ -411,7 +575,10 @@ impl IdentityService {
         )
         .await?;
         let ticket = Token::generate()?;
-        let identity = self.store.register(username, display_name, &ticket).await?;
+        let identity = self
+            .store
+            .register_with_invite(username, display_name, &ticket, invite_code)
+            .await?;
         self.challenges
             .lock()
             .map_err(|_| Error::Unavailable)?
@@ -559,16 +726,18 @@ impl IdentityService {
         else {
             return Err(Error::Rejected);
         };
-        self.store
-            .enroll(
+        let concerns = self
+            .store
+            .enroll_concerning(
                 &ticket,
                 &record,
                 &wrapped_master,
                 &document,
                 recovery.as_deref(),
             )
-            .await
-            .map(|()| Response::Done)
+            .await?;
+        self.tell(&concerns);
+        Ok(Response::Done)
     }
 }
 
@@ -577,7 +746,52 @@ impl IdentityService {
 /// (`Pictures`) are served on both listeners by the same rules since M6
 /// (19.11.2026, `docs/profile-pictures.md`), so the game client can show
 /// the pictures of the people it lists.
-fn native_refuses(request: &central_api::social::SocialRequest) -> bool {
+enum SocialHint {
+    ChatSend { conv: String },
+    GroupCreate,
+    GroupChange { id: String, action: &'static str },
+    Contact { tag: u32, action: ContactAction },
+    Other,
+}
+
+const fn group_action(change: &GroupChange) -> &'static str {
+    match change {
+        GroupChange::Rename { .. } => "renamed",
+        GroupChange::SetDescription { .. } => "description",
+        GroupChange::SetAdmin { .. } => "admin",
+        GroupChange::RemovePicture => "picture",
+        GroupChange::Invite { .. } => "invited",
+        GroupChange::Join => "accepted",
+        GroupChange::Withdraw { .. } => "withdrawn",
+        GroupChange::Remove { .. } => "removed",
+        GroupChange::Transfer { .. } => "transferred",
+        GroupChange::Delete => "deleted",
+    }
+}
+
+fn social_hint(request: &SocialRequest) -> SocialHint {
+    match request {
+        SocialRequest::Chat {
+            request: ChatRequest::Send { conv, .. },
+        } => SocialHint::ChatSend { conv: conv.clone() },
+        SocialRequest::Group {
+            request: GroupRequest::Create { .. },
+        } => SocialHint::GroupCreate,
+        SocialRequest::Group {
+            request: GroupRequest::Change { id, change },
+        } => SocialHint::GroupChange {
+            id: id.clone(),
+            action: group_action(change),
+        },
+        SocialRequest::Contact { tag, change } => SocialHint::Contact {
+            tag: *tag,
+            action: *change,
+        },
+        _ => SocialHint::Other,
+    }
+}
+
+fn native_refuses(request: &SocialRequest) -> bool {
     matches!(
         request,
         central_api::social::SocialRequest::ReportPicture { .. }

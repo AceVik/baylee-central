@@ -15,12 +15,16 @@ pub mod policy;
 pub mod random;
 pub mod secrets;
 
+mod cards_ingest;
 mod chrono_scope;
 mod client;
 mod crypto_scope;
+mod dev_site;
 mod gate;
+mod pgo;
 mod postgres;
 mod process;
+mod security_audio;
 mod site;
 mod smoke;
 mod socket;

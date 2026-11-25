@@ -125,6 +125,43 @@ fn check_notices(html: &str, lang: Lang, page: Page) {
     );
 }
 
+fn check_page_links(html: &str, code: &str, page: Page) {
+    // a link that leaves the site — or opens a legal policy document outside
+    // the language switcher — opens a tab of its own and tells any external
+    // site nothing about this one
+    for anchor in tags(html, "a") {
+        let away =
+            anchor.contains(" href=\"https://") && !anchor.contains(" href=\"https://baylee.app/");
+        let href = anchor
+            .split_once(" href=\"")
+            .and_then(|(_, rest)| rest.split('"').next())
+            .unwrap_or("");
+        let path = href.split(['#', '?']).next().unwrap_or(href);
+        let legal = !anchor.contains(" hreflang=\"")
+            && !path.contains("/account/")
+            && [
+                "/terms",
+                "/privacy",
+                "/impressum",
+                "/fan-content",
+                "/notices.txt",
+            ]
+            .iter()
+            .any(|suffix| path.ends_with(suffix));
+        if away || legal {
+            assert!(
+                anchor.contains(" target=\"_blank\"") && anchor.contains("noopener noreferrer"),
+                "{code} {page:?}: a link away or legal page opens its own tab: {anchor}"
+            );
+        } else {
+            assert!(
+                !anchor.contains(" target=\""),
+                "{code} {page:?}: a link within the site stays in the tab: {anchor}"
+            );
+        }
+    }
+}
+
 fn check_page(html: &str, lang: Lang, page: Page) {
     let code = lang.code();
     assert!(
@@ -164,23 +201,7 @@ fn check_page(html: &str, lang: Lang, page: Page) {
             "{code} {page:?}: nothing loaded from elsewhere ({attribute})"
         );
     }
-    // a link that leaves the site opens a tab of its own and tells the other
-    // site nothing about this one
-    for anchor in tags(html, "a") {
-        let away =
-            anchor.contains(" href=\"https://") && !anchor.contains(" href=\"https://baylee.app/");
-        if away {
-            assert!(
-                anchor.contains(" target=\"_blank\"") && anchor.contains("noopener noreferrer"),
-                "{code} {page:?}: a link away opens its own tab: {anchor}"
-            );
-        } else {
-            assert!(
-                !anchor.contains(" target=\""),
-                "{code} {page:?}: a link within the site stays in the tab: {anchor}"
-            );
-        }
-    }
+    check_page_links(html, code, page);
     let canonical = format!(
         "<link rel=\"canonical\" href=\"https://baylee.app{}\"",
         page.path(lang)
@@ -1118,11 +1139,11 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
         );
     }
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
-    assert!(english.contains("An e-mail address is optional; an account needs none."));
+    assert!(english.contains("An e-mail address is optional. An account needs none."));
     assert!(english.contains("you need no e-mail address"));
     assert!(english.contains("As of 19 November 2026"));
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
-    assert!(german.contains("Eine E-Mail-Adresse ist freiwillig; ein Account braucht keine."));
+    assert!(german.contains("Eine E-Mail-Adresse ist freiwillig. Ein Account braucht keine."));
     assert!(german.contains("eine E-Mail-Adresse brauchst du nicht"));
 }
 
@@ -1141,7 +1162,7 @@ async fn the_privacy_notice_says_who_sees_an_account_online() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("your friends (contacts you both accepted) see that you are online"));
     assert!(english.contains("whether you are away, playing"));
-    assert!(english.contains("with “offline” they never see you online"));
+    assert!(english.contains("With “offline” they never see you online."));
     assert!(english.contains("Central keeps only in memory while the connection is open"));
     assert!(
         english.contains("Your choice (online, away, offline) Central stores with your account")
@@ -1151,7 +1172,7 @@ async fn the_privacy_notice_says_who_sees_an_account_online() {
         "sehen deine Freunde (Kontakte, die ihr beide angenommen habt), dass du online bist"
     ));
     assert!(german.contains("ob du abwesend bist, spielst"));
-    assert!(german.contains("bei „offline“ sehen sie dich nie online"));
+    assert!(german.contains("Bei „offline“ sehen sie dich nie online."));
     assert!(german.contains("hält Central nur im Arbeitsspeicher, solange die Verbindung besteht"));
     assert!(
         german.contains(
@@ -1173,15 +1194,23 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
     // label, and the value apart from it
     for (label, value) in [
         (
-            "Spieler",
+            "Im Spiel",
+            "<span aria-hidden=\"true\" class=\"dot ok live\"></span>34",
+        ),
+        (
+            "Online",
             "<span aria-hidden=\"true\" class=\"dot ok live\"></span>44",
         ),
-        ("Partien", "12"),
+        (
+            "Partien",
+            "<span aria-hidden=\"true\" class=\"dot ok live\"></span>12",
+        ),
         ("Offene Tische", "4"),
         ("Konten", "1.234"),
+        ("Aufrufe", "48.213"),
     ] {
         let cell = format!(
-            "<span class=\"strip-label\">{label}</span></dt><dd class=\"num\">{value}</dd>"
+            "<span class=\"strip-label\">{label}</span></dt><dd translate=\"no\" class=\"num\">{value}</dd>"
         );
         assert_eq!(count(&home, &cell), 1, "{label}");
     }
@@ -1211,8 +1240,10 @@ async fn the_figures_are_shown_only_while_a_source_reports_them() {
         for never in [
             "gw-now",
             "Konten",
-            "Spieler<",
-            "strip-label\">Players",
+            "Im Spiel<",
+            "strip-label\">Online",
+            "strip-label\">In game",
+            "strip-label\">Online",
             "strip-label\">Accounts",
             "strip-label\">Partien",
             "strip-label\">Games",
@@ -1257,7 +1288,7 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
         let mark = home.find("class=\"strip\"").expect("the strip");
         let start = home[..mark].rfind("<section").expect("its section");
         let strip = &home[start..start + home[start..].find("</section>").expect("its end")];
-        let cells = 1 + 3 * usize::from(live) + usize::from(accounts) + usize::from(views);
+        let cells = 1 + 4 * usize::from(live) + usize::from(accounts) + usize::from(views);
         assert_eq!(count(strip, "class=\"strip-cell\""), cells, "{silent:04b}");
         assert!(
             strip.contains(&format!("data-count=\"{cells}\"")),
@@ -1267,12 +1298,13 @@ async fn the_strip_has_a_cell_for_each_reported_figure_and_nothing_of_github() {
         // the owner's six, in his order: players, running games, open
         // tables, the gateways online of all, the accounts, the views
         let order: Vec<usize> = [
-            (live, ">Players</span></dt><dd class=\"num\"><span aria-hidden=\"true\" class=\"dot ok live\"></span>44</dd>"),
-            (live, ">Games</span></dt><dd class=\"num\">12</dd>"),
-            (live, ">Open tables</span></dt><dd class=\"num\">4</dd>"),
-            (true, ">Gateways</span></dt><dd class=\"num\"><a href=\"#gateways\"><span>5</span><span class=\"strip-of\">/ 7</span></a></dd>"),
-            (accounts, ">Accounts</span></dt><dd class=\"num\">1,234</dd>"),
-            (views, ">Views</span></dt><dd class=\"num\">48,213</dd>"),
+            (true, ">Gateways</span></dt><dd translate=\"no\" class=\"num\"><a href=\"/en/gateways\"><span>5</span><span class=\"strip-of\">/ 7</span></a></dd>"),
+            (live, ">In game</span></dt><dd translate=\"no\" class=\"num\"><span aria-hidden=\"true\" class=\"dot ok live\"></span>34</dd>"),
+            (live, ">Online</span></dt><dd translate=\"no\" class=\"num\"><span aria-hidden=\"true\" class=\"dot ok live\"></span>44</dd>"),
+            (live, ">Games</span></dt><dd translate=\"no\" class=\"num\"><span aria-hidden=\"true\" class=\"dot ok live\"></span>12</dd>"),
+            (live, ">Open tables</span></dt><dd translate=\"no\" class=\"num\">4</dd>"),
+            (accounts, ">Accounts</span></dt><dd translate=\"no\" class=\"num\">1,234</dd>"),
+            (views, ">Views</span></dt><dd translate=\"no\" class=\"num\">48,213</dd>"),
         ]
         .iter()
         .map(|(shown, words)| {
@@ -1311,7 +1343,7 @@ async fn page_views_are_shown_and_told_only_where_they_are_counted() {
     assert_eq!(
         count(
             &home,
-            "<span class=\"strip-label\">Aufrufe</span></dt><dd class=\"num\">48.213</dd>"
+            "<span class=\"strip-label\">Aufrufe</span></dt><dd translate=\"no\" class=\"num\">48.213</dd>"
         ),
         1
     );
@@ -1320,7 +1352,7 @@ async fn page_views_are_shown_and_told_only_where_they_are_counted() {
     assert_eq!(
         count(
             &english,
-            "<span class=\"strip-label\">Views</span></dt><dd class=\"num\">48,213</dd>"
+            "<span class=\"strip-label\">Views</span></dt><dd translate=\"no\" class=\"num\">48,213</dd>"
         ),
         1
     );
@@ -1364,7 +1396,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(views.now().count, 42);
     assert_eq!(
-        count(&first, ">Views</span></dt><dd class=\"num\">41</dd>"),
+        count(
+            &first,
+            ">Views</span></dt><dd translate=\"no\" class=\"num\">41</dd>"
+        ),
         1
     );
     // the second visit counts, and gets the very same page
@@ -1405,7 +1440,10 @@ async fn a_visit_counts_once_and_never_changes_the_page_it_gets() {
     install(&state.data, |snapshot| snapshot.views = Some(views.now()));
     let (_, _, later) = get(&app, "/en/", &[]).await;
     assert_eq!(
-        count(&later, ">Views</span></dt><dd class=\"num\">44</dd>"),
+        count(
+            &later,
+            ">Views</span></dt><dd translate=\"no\" class=\"num\">44</dd>"
+        ),
         1
     );
     views.save();
@@ -2191,34 +2229,25 @@ async fn the_start_page_asks_once_and_leads_to_the_donation_page() {
 #[tokio::test]
 async fn the_account_s_overview_shows_the_public_figures() {
     let (_, _, html) = get(&app(true), "/en/account", &[]).await;
-    assert_eq!(count(&html, "id=\"numbers-title\""), 1);
-    // its own class: `.numbers` is the start page's grid of four, which once
-    // laid this part's title, lead and tiles out in one row
-    assert_eq!(
-        count(
-            &html,
-            "<section aria-labelledby=\"numbers-title\" class=\"in-numbers\">"
-        ),
-        1
-    );
-    let (_, numbers) = html.split_once("id=\"numbers-title\"").expect("the part");
-    let numbers = numbers.split_once("</section>").expect("its end").0;
-    // the directory's four, then accounts, cards and visits
-    assert_eq!(count(numbers, "class=\"dir-stat glass\""), 7);
-    for said in [
-        "<span class=\"num\">5</span><span class=\"dir-stat-of\">/ 7</span>",
-        "<dt>Accounts at Baylee Central</dt>",
-        "<span class=\"num\">1,234</span>",
-        "<dt>Playable cards</dt>",
-        "<span class=\"num\">8,348</span><span class=\"dir-stat-of\">/ ",
-        "<dt>Page views since 1 November 2026</dt>",
-        "<span class=\"num\">48,213</span>",
-    ] {
-        assert!(numbers.contains(said), "{said}");
-    }
+    assert_eq!(count(&html, "id=\"numbers-title\""), 0);
+    assert_eq!(count(&html, "class=\"strip\""), 1);
+    assert!(html.contains(">Gateways</span>"));
+    assert!(html.contains(">In game</span>"));
+    assert!(html.contains(">Online</span>"));
+    assert!(html.contains(">Accounts</span>"));
+    assert!(html.contains(">Games</span>"));
+    assert!(html.contains(">Open tables</span>"));
+    assert!(html.contains(">Views</span>"));
+    assert!(html.contains("34"));
+    assert!(html.contains("44"));
+    assert!(html.contains("1,234"));
+    assert!(html.contains("12"));
+    assert!(html.contains('4'));
+    assert!(html.contains("48,213"));
     let (_, _, bare) = get(&app(false), "/en/account", &[]).await;
     assert_eq!(count(&bare, "id=\"numbers-title\""), 0);
-    assert_eq!(count(&bare, "dir-stat"), 0);
+    assert_eq!(count(&bare, "class=\"strip\""), 1);
+    assert_eq!(count(&bare, "class=\"strip-cell\""), 1);
 }
 
 /// A page's title says the site's name after its own, unless its own
@@ -2268,5 +2297,18 @@ async fn a_title_names_the_site_and_the_footer_is_one_landmark() {
             let title = rest.split_once("</title>").expect("its end").0;
             assert_eq!(count(title, "Baylee"), 1, "{lang:?} {page}: {title}");
         }
+    }
+}
+
+#[tokio::test]
+async fn the_player_profile_page_renders_with_clean_url() {
+    let app = app(true);
+    for path in ["/de/player/Synthetic-0001", "/en/player/Synthetic-0001"] {
+        let (status, _, html) = get(&app, path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert!(html.contains("class=\"nav-progress\""), "{path}");
+        assert!(html.contains("name=\"baylee-ranks\""), "{path}");
+        assert!(html.contains("PlayerProfile"), "{path}");
+        assert!(!html.contains("(Quellcode einsehbar)"), "{path}");
     }
 }

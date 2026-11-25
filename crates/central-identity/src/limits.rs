@@ -184,12 +184,15 @@ fn class(request: &Request) -> Class {
             // (`challenge::HELD`), whatever token comes with the request.
             | Request::RegisterChallenge
             | Request::RegisterChallengeFor { .. }
+            | Request::RegisterInviteChallenge { .. }
             | Request::Register { .. }
+            | Request::FriendInviteInfo { .. }
             | Request::EnrollmentStart { .. }
             | Request::EnrollmentFinish { .. }
             | Request::GatewayDirectory { .. }
             | Request::PublicFigures { .. }
             | Request::PublicFunding {}
+            | Request::PublicProfile { .. }
             | Request::Challenges {
                 request: central_api::challenges::Request::Catalogue { .. }
                     | central_api::challenges::Request::Detail { .. }
@@ -212,6 +215,7 @@ fn class(request: &Request) -> Class {
             | Request::TowerToken {}
             | Request::TowerIdentity {}
             | Request::RenewSession
+            | Request::RefreshSession
             | Request::GatewayToken { .. }
             | Request::RankedToken { .. }
             | Request::GatewayRevocations { .. }
@@ -270,6 +274,11 @@ fn tells(request: &Request) -> Tells {
         | Request::SessionStatus
         | Request::RenewSession
         | Request::AccountSummary
+        | Request::ProfileDetails
+        | Request::SetProfileDetails { .. }
+        | Request::ExportProfileDetails
+        | Request::OwnBadges
+        | Request::SendRecoveryBackupMail { .. }
         | Request::TermsStatus
         | Request::Social { .. }
         | Request::Notifications { .. }
@@ -1930,6 +1939,10 @@ mod tests {
         for request in [
             Request::RegisterChallenge,
             Request::RegisterChallengeFor { signals: 0 },
+            Request::RegisterInviteChallenge {
+                signals: 0,
+                invite_code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+            },
         ] {
             let mut limits = Limits::default();
             for _ in 0..GLOBAL_PER_SECOND / 2 {

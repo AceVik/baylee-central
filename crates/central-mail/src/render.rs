@@ -260,6 +260,83 @@ fn content<'a>(mail: &'a Mail, site: &str) -> Content<'a> {
             "issued-not-you",
             security,
         ),
+        Kind::RecoveryBackup {
+            handle, encrypted, ..
+        } => recovery_backup_mail(lang, handle, *encrypted, page("account/security")),
+        Kind::FriendInvite {
+            inviter,
+            invite_code,
+            note,
+            days,
+        } => friend_invite_mail(
+            lang,
+            &page(&format!("invite/{}", invite_code.as_str())),
+            inviter,
+            note.as_deref(),
+            *days,
+        ),
+    }
+}
+
+fn recovery_backup_mail(
+    lang: Lang,
+    handle: &str,
+    encrypted: bool,
+    security_url: String,
+) -> Content<'_> {
+    let say = |id: &str| lang.text(id, &[]);
+    Content {
+        subject: say("recovery-backup-subject"),
+        title: say("recovery-backup-title"),
+        before: vec![
+            Paragraph(lang.pieces("recovery-backup-intro", &[("name", handle)])),
+            Paragraph::plain(say(if encrypted {
+                "recovery-backup-encrypted"
+            } else {
+                "recovery-backup-plain"
+            })),
+        ],
+        facts: vec![
+            say("recovery-backup-fact-file"),
+            say("recovery-backup-fact-reset"),
+        ],
+        code: None,
+        warning: Some(say("recovery-backup-warning")),
+        link: Some((say("recovery-backup-link"), Zeroizing::new(security_url))),
+        after: Vec::new(),
+    }
+}
+
+fn friend_invite_mail<'a>(
+    lang: Lang,
+    link_url: &str,
+    inviter: &str,
+    note: Option<&str>,
+    days: u8,
+) -> Content<'a> {
+    let say = |id: &str| lang.text(id, &[]);
+    let days_str = days.to_string();
+    let valid_fact = if days == 1 {
+        say("invite-valid-one")
+    } else {
+        lang.text("invite-valid", &[("days", &days_str)])
+    };
+    let mut before = vec![Paragraph(lang.pieces("invite-intro", &[("name", inviter)]))];
+    if let Some(note) = note {
+        before.push(Paragraph::plain(format!(
+            "{} {note}",
+            say("invite-note-label")
+        )));
+    }
+    Content {
+        subject: say("invite-subject"),
+        title: say("invite-title"),
+        before,
+        facts: vec![say("invite-fact-friend"), valid_fact],
+        code: None,
+        warning: Some(say("invite-warning")),
+        link: Some((say("invite-link"), Zeroizing::new(link_url.to_owned()))),
+        after: Vec::new(),
     }
 }
 

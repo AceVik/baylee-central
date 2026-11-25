@@ -154,8 +154,8 @@ body:has(dialog[open]) .top {
   display: inline-grid;
   flex: none;
   place-items: center;
-  inline-size: 1.5rem;
-  block-size: 1.5rem;
+  inline-size: 1.85rem;
+  block-size: 1.85rem;
   margin-inline-end: 0.5rem;
   overflow: hidden;
   border-radius: var(--radius-full);
@@ -165,8 +165,8 @@ body:has(dialog[open]) .top {
 
 .nav-account .nav-face[data-none]::before {
   content: "";
-  inline-size: 0.75rem;
-  block-size: 0.75rem;
+  inline-size: 0.85rem;
+  block-size: 0.85rem;
   border-radius: var(--radius-full);
   background: var(--on-avatar);
   opacity: 0.7;
@@ -177,6 +177,73 @@ body:has(dialog[open]) .top {
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
+}
+
+.nav-account .nav-face.has-rank {
+  position: relative;
+  overflow: visible;
+  background: transparent;
+}
+
+.nav-account .nav-face.has-rank > picture {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--avatar-0);
+}
+
+.nav-account .nav-face.has-rank[data-none]::before {
+  inline-size: 100%;
+  block-size: 100%;
+  background:
+    radial-gradient(circle, var(--on-avatar) 0 36%, transparent 38%),
+    var(--avatar-0);
+  opacity: 1;
+}
+
+.rank-frame-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.is-lit > .rank-static {
+  display: none;
+}
+
+/* Tier frame cutout scales: static portrait sizing only, never on :hover. */
+.nav-face.has-rank.rank-scale-p > picture,
+.nav-face.has-rank.rank-scale-p[data-none]::before,
+.nav-face.has-rank > picture.rank-scale-p {
+  transform: scale(0.81);
+}
+
+.nav-face.has-rank.rank-scale-i > picture,
+.nav-face.has-rank.rank-scale-i[data-none]::before,
+.nav-face.has-rank > picture.rank-scale-i {
+  transform: scale(0.77);
+}
+
+.nav-face.has-rank.rank-scale-g > picture,
+.nav-face.has-rank.rank-scale-g[data-none]::before,
+.nav-face.has-rank > picture.rank-scale-g {
+  transform: scale(0.73);
+}
+
+.nav-face.has-rank.rank-scale-m > picture,
+.nav-face.has-rank.rank-scale-m[data-none]::before,
+.nav-face.has-rank > picture.rank-scale-m {
+  transform: scale(0.67);
+}
+
+.nav-face.has-rank.rank-scale-u > picture,
+.nav-face.has-rank.rank-scale-u[data-none]::before,
+.nav-face.has-rank > picture.rank-scale-u {
+  transform: scale(0.95);
 }
 
 /* Whose account it is (boot.js): the display name, cut with an ellipsis
@@ -228,6 +295,37 @@ body:has(dialog[open]) .top {
 
 .theme-in-menu {
   display: none;
+}
+
+.give-in-bar {
+  display: none;
+  border-color: color-mix(in srgb, var(--heart) 55%, var(--edge));
+  color: var(--heart);
+}
+
+.give-in-bar:hover,
+.give-in-bar[aria-current="page"] {
+  border-color: var(--heart);
+  background: color-mix(in srgb, var(--heart) 16%, var(--panel-2));
+  color: var(--heart);
+}
+
+.give-in-bar[aria-current="page"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--heart) 24%, transparent);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .give-in-bar,
+  :root:not([data-theme="dark"]) .give-in-bar:hover,
+  :root:not([data-theme="dark"]) .give-in-bar[aria-current="page"] {
+    color: color-mix(in srgb, var(--heart) 38%, var(--bad));
+  }
+}
+
+:root[data-theme="light"] .give-in-bar,
+:root[data-theme="light"] .give-in-bar:hover,
+:root[data-theme="light"] .give-in-bar[aria-current="page"] {
+  color: color-mix(in srgb, var(--heart) 38%, var(--bad));
 }
 
 .lang {
@@ -374,11 +472,11 @@ body:has(dialog[open]) .top {
 }
 
 [open] > .menu {
-  animation: menu-in 260ms var(--ease) both;
+  animation: menu-in 160ms var(--ease) both;
 }
 
 [data-closing] > .menu {
-  animation: menu-out 150ms var(--ease-in) both;
+  animation: menu-out 110ms var(--ease-in) both;
   pointer-events: none;
 }
 
@@ -619,6 +717,10 @@ body:has(dialog[open]) .top {
     display: none;
   }
 
+  .give-in-bar {
+    display: inline-grid;
+  }
+
   .nav[popover] {
     position: fixed;
     inset: calc(var(--top-h) + 1px) 0 auto 0;
@@ -655,6 +757,26 @@ body:has(dialog[open]) .top {
     right: auto;
     width: 2.2rem;
     bottom: 0.55rem;
+  }
+
+  .nav .nav-account {
+    align-self: flex-start;
+    margin: var(--space-2) 0 0 0.6em;
+    padding: 0 1em;
+    border: 1px solid var(--edge);
+    border-radius: var(--pill);
+    background: var(--tool-bg);
+    color: var(--title);
+  }
+
+  .nav .nav-account:hover {
+    border-color: var(--gold);
+    background: var(--panel-2);
+    color: var(--title);
+  }
+
+  .nav .nav-account::after {
+    display: none;
   }
 
   .theme-in-menu {
@@ -707,6 +829,27 @@ body:has(dialog[open]) .top {
   }
 }
 
+@media (max-width: 420px) {
+  .top-inner {
+    gap: 0.45rem;
+    padding-inline: 0.75rem;
+  }
+
+  .top-tools {
+    gap: 0.35rem;
+  }
+
+  .lang-main {
+    gap: 0.32rem;
+    padding: 0 0.42rem 0 0.5rem;
+  }
+
+  .lang-toggle {
+    min-width: 32px;
+    padding: 0 0.42rem 0 0.38rem;
+  }
+}
+
 @media (max-width: 380px) {
   /* the picture alone names the brand (its link keeps its name) */
   .brand span {
@@ -722,7 +865,7 @@ body:has(dialog[open]) .top {
 /* ---- the strip: Baylee in numbers, under the bar on the start page --------
    A cell a figure: its value, and with it a glyph and a short label (owner,
    18.11.2026: compact labels with glyphs, evenly spread, on a phone above
-   all). The server writes how many cells there are (data-count, 1 to 6: a
+   all). The server writes how many cells there are (data-count, 1 to 7: a
    number nobody reported is no cell, so it leaves no hole).
 
    A phone stands them three to a line (four as two and two), the value over
@@ -851,21 +994,84 @@ body:has(dialog[open]) .top {
   font-weight: 600;
 }
 
-/* from a tablet on: one line, shared out evenly */
+/* on phones, 7 figures form 2 balanced rows (4 on row 1, 3 centred on row 2)
+   instead of leaving a lonely 7th item on a tall third row */
+@media (max-width: 599.98px) {
+  .strip-inner:has(.strip-list[data-count="7"]) {
+    padding: 0.42rem 0.5rem;
+  }
+
+  .strip-list[data-count="7"] {
+    --cols: 4;
+    --gap-x: 0.25rem;
+
+    gap: 0.4rem var(--gap-x);
+  }
+
+  .strip-list[data-count="7"] dt {
+    gap: 0.2rem;
+    font-size: 0.65rem;
+    line-height: 1.2;
+  }
+
+  .strip-list[data-count="7"] dd {
+    font-size: 0.9rem;
+    line-height: 1.2;
+  }
+
+  .strip-list[data-count="7"] .icon {
+    inline-size: 0.72rem;
+    block-size: 0.72rem;
+  }
+
+  .strip-list[data-count="7"] dd > .dot {
+    margin-inline-end: 0.28rem;
+  }
+}
+
+/* from a tablet on: up to 5 items share one line evenly; larger bars wrap cleanly */
 @media (min-width: 600px) {
   .strip-list {
+    gap: 0.55rem 0.75rem;
+  }
+
+  .strip-cell {
+    flex: 1 1 8.5rem;
+    max-inline-size: 12.5rem;
+    padding-inline: 0.45rem;
+  }
+
+  .strip-list:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"]) {
     --gap-x: 0;
 
     flex-wrap: nowrap;
   }
 
-  .strip-cell {
+  .strip-list:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"]) .strip-cell {
     flex: 1 1 0;
+    max-inline-size: none;
     padding-inline: 0.5rem;
   }
 
-  .strip-cell + .strip-cell {
+  .strip-list:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"]) .strip-cell + .strip-cell {
     border-inline-start: 1px solid var(--edge-soft);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1099.98px) {
+  .strip-list[data-count="6"] {
+    --cols: 3;
+    --gap-x: 0.75rem;
+  }
+
+  .strip-list[data-count="7"] {
+    --cols: 4;
+    --gap-x: 0.75rem;
+  }
+
+  .strip-list:is([data-count="6"], [data-count="7"]) .strip-cell {
+    flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap-x)) / var(--cols));
+    max-inline-size: none;
   }
 }
 
@@ -875,11 +1081,40 @@ body:has(dialog[open]) .top {
     padding-block: 0.45rem;
   }
 
+  .strip-list {
+    gap: 0.35rem 1.1rem;
+  }
+
   .strip-cell {
+    flex: 0 1 auto;
     flex-direction: row;
     gap: 0.45rem;
     align-items: baseline;
     justify-content: center;
+    max-inline-size: none;
+    padding-inline: 0.35rem;
+  }
+
+  .strip-list:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"]) {
+    --gap-x: 0;
+
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .strip-list:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"]) .strip-cell {
+    flex: 1 1 0;
+    padding-inline: 0.45rem;
+  }
+
+  .strip-list[data-count="7"] .strip-cell {
+    flex: 1 1 auto;
+    gap: 0.35rem;
+    padding-inline: 0.4rem;
+  }
+
+  .strip-list:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"]) .strip-cell + .strip-cell {
+    border-inline-start: 1px solid var(--edge-soft);
   }
 
   .strip dt {

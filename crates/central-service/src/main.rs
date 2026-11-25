@@ -8,6 +8,7 @@ use std::process::ExitCode;
 
 mod accounts;
 mod advent_import;
+mod cards_ingest;
 mod funding;
 mod gateway_push;
 mod legacy;
@@ -17,7 +18,7 @@ mod production;
 mod push;
 mod reports_import;
 
-const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --generate-secrets | --generate-token-key";
+const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -42,6 +43,7 @@ async fn main() -> ExitCode {
         Some("--import-reports-stdin") => return reports_import::run().await,
         Some("--advent-import-stdin") => return advent_import::run().await,
         Some("--ranked-cosmetics-import-stdin") => return advent_import::ranked::run().await,
+        Some("--cards-ingest-stdin") => return cards_ingest::run().await,
         Some("--check-accounts-stdin") => return production::run_check(),
         Some("--generate-secrets") => return production::generate_secrets(),
         Some("--generate-token-key") => return production::generate_token_key(),

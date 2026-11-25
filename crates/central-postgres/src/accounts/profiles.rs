@@ -2,7 +2,9 @@
 //! §"Display name and tag"): the tag a registered account draws, the name it
 //! chooses and the name and tag the bridge carries from the official gateway.
 use super::{AccountStore, Error, Session, Token, statement};
-use central_api::profile::{self, REGISTERED_TAG_FLOOR};
+use central_api::profile::{
+    self, ProfileDetails, PublicBadges, PublicPicture, PublicProfile, REGISTERED_TAG_FLOOR,
+};
 use sea_orm::{
     ConnectionTrait, DatabaseTransaction, QueryResult, SqlErr, Statement, TransactionTrait,
     prelude::Uuid,
@@ -218,6 +220,234 @@ impl AccountStore {
         }
         tx.commit().await.map_err(|_| Error::Unavailable)
     }
+
+    /// Owner-only profile details (given name, family name, ISO birth date)
+    /// and the account's public profile visibility flag.
+    ///
+    /// # Errors
+    /// `Rejected` without a live browser session; storage failure.
+    pub async fn profile_details(&self, browser: &Token) -> Result<ProfileDetails, Error> {
+        read_profile_details(&self.db, browser, false).await
+    }
+
+    /// Owner-only export of personal profile details, requiring a password
+    /// sign-in less than 30 minutes old.
+    ///
+    /// # Errors
+    /// `Rejected` without a fresh live browser session; storage failure.
+    pub async fn export_profile_details(&self, browser: &Token) -> Result<ProfileDetails, Error> {
+        read_profile_details(&self.db, browser, true).await
+    }
+
+    /// Update owner-only profile details and public profile visibility for the
+    /// account behind `browser`. Optional personal names are trimmed and
+    /// checked with `shown_char`; optional `birth_date` (`YYYY-MM-DD`) must be
+    /// valid and at least 16 years old relative to the database's `CURRENT_DATE`.
+    ///
+    /// # Errors
+    /// `Rejected` for invalid names, malformed birth date, age under 16, or
+    /// missing live browser session; storage failure.
+    pub async fn set_profile_details(
+        &self,
+        browser: &Token,
+        details: &ProfileDetails,
+    ) -> Result<(), Error> {
+        let first_name = profile::validate_person_name(details.first_name.as_deref())?;
+        let last_name = profile::validate_person_name(details.last_name.as_deref())?;
+        let birth_date = match details.birth_date.as_deref().map(str::trim) {
+            None | Some("") => None,
+            Some(date) => {
+                let (y, m, d) = profile::parse_iso_date(date)?;
+                Some(format!("{y:04}-{m:02}-{d:02}"))
+            }
+        };
+        let session = Session::Browser(browser);
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT a.id FROM central_identity.accounts a
+                 JOIN central_identity.sessions s
+                     ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 WHERE s.digest = $1 AND s.kind = 'browser' AND a.credential IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp() FOR UPDATE OF a",
+                vec![session.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        let updated = tx
+            .query_one_raw(statement(
+                "UPDATE central_identity.accounts
+                 SET first_name = $2,
+                     last_name = $3,
+                     birth_date = $4::date,
+                     public_profile = $5
+                 WHERE id = $1
+                 AND ($4::date IS NULL OR $4::date <= (CURRENT_DATE - INTERVAL '16 years')::date)
+                 RETURNING id",
+                vec![
+                    account.into(),
+                    first_name.into(),
+                    last_name.into(),
+                    birth_date.into(),
+                    details.public_profile.into(),
+                ],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        if updated.is_none() {
+            return Err(Error::Rejected);
+        }
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+
+    /// Current ranked standings, awards, challenge medals and Tower badges for
+    /// the account behind `browser`.
+    ///
+    /// # Errors
+    /// `Rejected` without a live browser session; storage failure.
+    pub async fn own_badges(&self, browser: &Token) -> Result<PublicBadges, Error> {
+        let session = Session::Browser(browser);
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT a.id FROM central_identity.accounts a
+                 JOIN central_identity.sessions s
+                     ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 WHERE s.digest = $1 AND s.kind = 'browser' AND a.credential IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp()",
+                vec![session.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        let badges = collect_badges(&tx, account).await?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(badges)
+    }
+
+    /// Public showcase for a player handle (`Name#tag` or `Name-tag`), served
+    /// when `public_profile = true`. Private or missing handles both return
+    /// `Rejected` so opt-out is indistinguishable from absence.
+    ///
+    /// # Errors
+    /// `Rejected` for invalid handle, private profile, or unknown account;
+    /// storage failure.
+    pub async fn public_profile(&self, raw_handle: &str) -> Result<PublicProfile, Error> {
+        let (name, tag) = profile::parse_handle(raw_handle)?;
+        let tag_num = wire_tag(tag)?;
+        let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
+        let row = tx
+            .query_one_raw(statement(
+                "SELECT id, display_name, tag FROM central_identity.accounts
+                 WHERE display_name = $1 AND tag = $2
+                 AND credential IS NOT NULL AND public_profile",
+                vec![name.into(), tag_num.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        let account: Uuid = row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+        let (display_name, tag) = columns(&row)?;
+        let (Some(display_name), Some(tag)) = (display_name, tag) else {
+            return Err(Error::Rejected);
+        };
+        let pic = tx
+            .query_one_raw(statement(
+                "SELECT key, sequence IS NOT NULL AS moving
+                 FROM central_identity.pictures WHERE account_id = $1",
+                vec![account.into()],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        let picture = pic
+            .map(|p| {
+                let bytes: Vec<u8> = p.try_get("", "key").map_err(|_| Error::Unavailable)?;
+                let key = <[u8; 16]>::try_from(bytes).map_err(|_| Error::Unavailable)?;
+                Ok::<_, Error>(PublicPicture {
+                    key,
+                    moving: p.try_get("", "moving").map_err(|_| Error::Unavailable)?,
+                })
+            })
+            .transpose()?;
+        let badges = collect_badges(&tx, account).await?;
+        tx.commit().await.map_err(|_| Error::Unavailable)?;
+        Ok(PublicProfile {
+            display_name,
+            tag,
+            picture,
+            badges,
+        })
+    }
+}
+
+async fn read_profile_details(
+    db: &impl ConnectionTrait,
+    browser: &Token,
+    require_fresh: bool,
+) -> Result<ProfileDetails, Error> {
+    let session = Session::Browser(browser);
+    let fresh_clause = if require_fresh {
+        " AND COALESCE(s.proven_at, s.created_at) > pg_catalog.clock_timestamp() - interval '30 minutes'"
+    } else {
+        ""
+    };
+    let row = db
+        .query_one_raw(statement(
+            &format!(
+                "SELECT a.first_name, a.last_name,
+                     to_char(a.birth_date, 'YYYY-MM-DD') AS birth_date,
+                     a.public_profile
+                 FROM central_identity.accounts a
+                 JOIN central_identity.sessions s
+                     ON s.account_id = a.id AND s.credential_revision = a.credential_revision
+                 WHERE s.digest = $1 AND s.kind = 'browser' AND a.credential IS NOT NULL
+                 AND s.expires_at > pg_catalog.clock_timestamp(){fresh_clause}"
+            ),
+            vec![session.digest().to_vec().into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?
+        .ok_or(Error::Rejected)?;
+    Ok(ProfileDetails {
+        first_name: row
+            .try_get("", "first_name")
+            .map_err(|_| Error::Unavailable)?,
+        last_name: row
+            .try_get("", "last_name")
+            .map_err(|_| Error::Unavailable)?,
+        birth_date: row
+            .try_get("", "birth_date")
+            .map_err(|_| Error::Unavailable)?,
+        public_profile: row
+            .try_get("", "public_profile")
+            .map_err(|_| Error::Unavailable)?,
+    })
+}
+
+async fn collect_badges(tx: &DatabaseTransaction, account: Uuid) -> Result<PublicBadges, Error> {
+    let (ranked_season, ranked_standings, ranked_awards) =
+        super::ranked::boards::account_ranked_badges(tx, account).await?;
+    let best_rank = central_api::ranked::best_player_rank(&ranked_standings);
+    let challenge_badges = super::challenges::account_badges(tx, account).await?;
+    let tower_badges = super::challenges::tower_badges(tx, account).await?;
+    let echoes_badges = super::tower_awards::totals(tx, account)
+        .await?
+        .badges()
+        .to_vec();
+    let social_badges = super::social::invites::account_social_badges(tx, account).await?;
+    Ok(PublicBadges {
+        ranked_season,
+        ranked_standings,
+        ranked_awards,
+        best_rank,
+        challenge_badges,
+        tower_badges,
+        echoes_badges,
+        social_badges,
+    })
 }
 
 /// What one write with one tag came to.

@@ -87,6 +87,7 @@ test("the account area says when nobody is signed in", async ({ page }) => {
 });
 
 test("registration refuses a robot's haste and its hidden field, and says when it is paused", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-11-25T12:00:00Z"));
   const asked: string[] = [];
   await page.route("**/api/v1", (route) => {
     asked.push(String(JSON.parse(route.request().postData() ?? "{}").operation));
@@ -109,7 +110,7 @@ test("registration refuses a robot's haste and its hidden field, and says when i
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("alert")).toHaveText(refused);
   // the field people never see, filled as form robots do: not sent
-  await page.waitForTimeout(3_000);
+  await page.clock.setFixedTime(new Date("2026-11-25T12:00:04Z"));
   await fill();
   await page.locator("#register-website").evaluate((field: HTMLInputElement) => {
     field.value = "https://spam.invalid";
@@ -209,7 +210,7 @@ test("a price above what the page and Central agreed on is not worked on", async
     asked.length = 0;
     await fillRegistration(page);
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByText("Something went wrong. Try again; if it keeps happening, tell us.")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Something went wrong. Try again, and if it keeps happening, tell us.")).toBeVisible({ timeout: 15_000 });
     // refused before any work, and nothing was handed in
     expect(asked, JSON.stringify(price)).toEqual(["register_challenge_for"]);
   }
@@ -341,13 +342,15 @@ test("signed in, each action puts the focus where its result is", async ({ page 
   const ids = await page.locator("[id]").evaluateAll((all) => all.map((element) => element.id));
   expect(ids.filter((value, index) => ids.indexOf(value) !== index)).toEqual([]);
   const second = page.locator("article").filter({ hasText: "Gateway 2" });
+  await second.getByRole("button", { name: /^Tokens/ }).click();
+  await second.locator(".gw-mint-toggle").click();
   const ranked = second.getByRole("checkbox", { name: "Hosts ranked matches and reports results" });
   await expect(ranked).not.toBeChecked();
   await second.getByRole("checkbox", { name: "Signs players in" }).uncheck();
   await second.getByRole("checkbox", { name: "Lists the gateway" }).uncheck();
   await ranked.check();
   await second.getByLabel("Token name").fill("qa");
-  await second.getByRole("button", { name: "Create token" }).click();
+  await second.locator(".gw-mint-form button[type=submit]").click();
   // the new token takes the focus; kept, its gateway's card does
   await expect(page.getByRole("heading", { name: "Your new token" })).toBeFocused();
   await page.getByRole("button", { name: "I have saved it" }).focus();
@@ -400,6 +403,21 @@ test("an administrator closes registration, signs in again when asked, and keeps
         source: "registered", recovery: true, admin: true, signed_in_at: 1_794_000_000, expires_at: 4_102_444_800,
       });
     }
+    if (body.operation === "admin" && body.request?.action === "overview") {
+      return json({
+        result: "admin",
+        answer: { answer: "overview", overview: { accounts: 1, accounts_week: 0, moved: 0, admins: 1, pending: 0, approved: 0, online: 0, disabled: 0, tokens: 0 } },
+      });
+    }
+    if (body.operation === "admin" && body.request?.action === "legacy_accounts") {
+      return json({ result: "admin", answer: { answer: "legacy_accounts", store: { accounts: [], deadline: 0 } } });
+    }
+    if (body.operation === "admin" && body.request?.action === "report_facets") {
+      return json({
+        result: "admin",
+        answer: { answer: "report_facets", facets: { statuses: [], kinds: [], priorities: [], assignees: [], labels: [], gateways: [], channels: [], reporters: [], total: 0 } },
+      });
+    }
     if (body.operation === "admin" && body.request?.action === "registration") {
       return json({ result: "admin", answer: { answer: "registration", open, changed_at: null } });
     }
@@ -412,7 +430,7 @@ test("an administrator closes registration, signs in again when asked, and keeps
     }
     return route.fulfill({ status: 401, body: "rejected\n" });
   });
-  await page.goto("/en/account");
+  await page.goto("/en/account/admin/overview");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   const status = page.getByText("Open: anyone may create an account after solving the proof of work.");
   await expect(status).toBeVisible();
@@ -422,4 +440,82 @@ test("an administrator closes registration, signs in again when asked, and keeps
   await expect(page.getByRole("button", { name: "Open registration again" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#reauth-name")).toBeFocused();
+});
+
+test("badges rescale cleanly when devicePixelRatio changes without a layout resize", async ({ page }) => {
+  const problems: string[] = [];
+  page.on("pageerror", (error) => problems.push(error.message));
+  await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
+  await page.route("**/api/v1", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    const json = (value: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(value) });
+    switch (body.operation) {
+      case "account_summary":
+        return json({
+          result: "account_summary", identity: { account: ACCOUNT, epoch: 1 }, username: "erika", display_name: "Erika", tag: 0x1a2b,
+          source: "registered", recovery: true, admin: false, signed_in_at: 1_794_000_000, expires_at: 4_102_444_800,
+        });
+      case "email":
+        return json({ result: "email", address: null, pending: null, resend_in: 0, mail_available: true });
+      case "picture":
+        return json({ result: "my_picture", picture: null, notice: null, block: null });
+      case "profile_details":
+        return json({ result: "profile_details", details: { first_name: null, last_name: null, birth_date: null, public_profile: false } });
+      case "own_badges":
+        return json({
+          result: "own_badges",
+          badges: {
+            ranked_season: null,
+            ranked_standings: [],
+            ranked_awards: [],
+            best_rank: { league: "gold", division: 2, champion_place: null },
+            challenge_badges: [],
+            tower_badges: [],
+            echoes_badges: [],
+            social_badges: [{ kind: "recruiter", count: 3, tier: "silver", next: 5 }],
+          },
+        });
+      case "owner":
+        return json({
+          result: "owner",
+          answer: { answer: "sessions", sessions: [{ kind: "browser", current: true, signed_in_at: 1_794_000_000, expires_at: 4_102_444_800, gateways: [] }] },
+        });
+      default:
+        return route.fulfill({ status: 401, body: "rejected\n" });
+    }
+  });
+  await page.goto("/en/account");
+  await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
+  const canvas = page.locator("canvas[data-rank-kind]").first();
+  await expect(canvas).toBeVisible();
+  const readMetrics = () => canvas.evaluate((el) => {
+    const c = el as HTMLCanvasElement;
+    return {
+      cssW: c.getBoundingClientRect().width,
+      backingW: c.width,
+      backend: c.dataset.shaderBackend ?? "",
+    };
+  });
+  await expect.poll(async () => {
+    const m = await readMetrics();
+    return m.backend.length > 0 && m.backingW > 0 ? m.backingW : 0;
+  }).toBeGreaterThan(0);
+
+  const initial = await readMetrics();
+  expect(Math.abs(initial.backingW - Math.round(initial.cssW))).toBeLessThanOrEqual(1);
+
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 1440, height: 900, deviceScaleFactor: 2, mobile: false,
+  });
+  await expect.poll(async () => (await readMetrics()).backingW).toBeGreaterThan(initial.backingW);
+  const at2x = await readMetrics();
+  expect(Math.abs(at2x.cssW - initial.cssW)).toBeLessThanOrEqual(1);
+  expect(Math.abs(at2x.backingW - Math.min(384, Math.round(initial.cssW * 2)))).toBeLessThanOrEqual(1);
+
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 1440, height: 900, deviceScaleFactor: 1, mobile: false,
+  });
+  await expect.poll(async () => Math.abs((await readMetrics()).backingW - initial.backingW)).toBeLessThanOrEqual(1);
+  expect(problems).toEqual([]);
 });

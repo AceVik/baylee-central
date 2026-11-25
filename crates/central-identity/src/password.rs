@@ -143,14 +143,20 @@ impl IdentityService {
         // new one.
         self.proved(&guess)?;
         let token = Token::generate()?;
+        let refresh = if surface == Surface::Browser {
+            Some(Token::generate()?)
+        } else {
+            None
+        };
         let done = self
             .store
-            .change_password(
+            .change_password_with_refresh(
                 surface.session(Some(presented))?,
                 &credential,
                 record,
                 wrapped,
                 surface.session(Some(&token))?,
+                refresh.as_ref(),
             )
             .await;
         // The account's confirmed address is told, later.
@@ -160,6 +166,6 @@ impl IdentityService {
         // Whoever knew the old password has no place of the account's any
         // more; the one this change came from stays its own.
         self.changed(credential.identity.account, guess.place());
-        signed_in(self, surface, credential.identity, issued, token)
+        signed_in(self, surface, credential.identity, issued, token, refresh)
     }
 }

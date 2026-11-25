@@ -3,6 +3,7 @@
 //! §"Display name and tag"). The name is not unique; the tag is, and it never
 //! changes once an account holds it, because chat on a gateway is keyed by it.
 use crate::Error;
+use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 
 /// The lowest tag a registered account draws. Accounts moved from the
@@ -77,6 +78,231 @@ pub fn tag_text(tag: u32) -> String {
 #[must_use]
 pub fn handle(name: &str, tag: u32) -> String {
     format!("{name}#{}", tag_text(tag))
+}
+
+/// Parse a full public handle (`Name#tag`, case-insensitive hex tag of 4–8
+/// digits matching canonical formatting).
+///
+/// # Errors
+/// `Rejected` when the name or tag shape is invalid.
+pub fn parse_handle(value: &str) -> Result<(&str, u32), Error> {
+    let (name, tag) = value.rsplit_once('#').ok_or(Error::Rejected)?;
+    if !valid_display_name(name)
+        || !(4..=8).contains(&tag.len())
+        || !tag.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err(Error::Rejected);
+    }
+    let parsed = u32::from_str_radix(tag, 16).map_err(|_| Error::Rejected)?;
+    if !valid_tag(parsed) || tag_text(parsed).len() != tag.len() {
+        return Err(Error::Rejected);
+    }
+    Ok((name, parsed))
+}
+
+/// Maximum length of an optional first or last name in Unicode scalar values.
+pub const MAX_PERSON_NAME: usize = 80;
+/// Minimum required age in years when supplying a birth date.
+pub const MIN_BIRTH_AGE_YEARS: i32 = 16;
+
+/// Validate an optional personal name (`first_name` or `last_name`): trimmed,
+/// blank treated as `None`, at most [`MAX_PERSON_NAME`] characters and free of
+/// control or directional formatting characters.
+///
+/// # Errors
+/// `Rejected` for overlong text or forbidden formatting/control characters.
+pub fn validate_person_name(value: Option<&str>) -> Result<Option<String>, Error> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    if trimmed.chars().count() > MAX_PERSON_NAME
+        || trimmed.len() > MAX_PERSON_NAME * 4
+        || !trimmed.chars().all(crate::gateway::shown_char)
+    {
+        return Err(Error::Rejected);
+    }
+    Ok(Some(trimmed.to_owned()))
+}
+
+const fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+/// Number of days in `month` (1..=12) of `year`.
+#[must_use]
+pub const fn days_in_month(year: i32, month: u8) -> u8 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if is_leap_year(year) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 0,
+    }
+}
+
+/// Parse an ISO calendar date (`YYYY-MM-DD`) and check Gregorian month lengths,
+/// rejecting dates before 1900-01-01. Does not check minimum age on its own
+/// (`is_at_least_age`).
+///
+/// # Errors
+/// `Rejected` for malformed syntax or impossible calendar dates.
+pub fn parse_iso_date(value: &str) -> Result<(i32, u8, u8), Error> {
+    let trimmed = value.trim();
+    let bytes = trimmed.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !bytes[..4].iter().all(u8::is_ascii_digit)
+        || !bytes[5..7].iter().all(u8::is_ascii_digit)
+        || !bytes[8..10].iter().all(u8::is_ascii_digit)
+    {
+        return Err(Error::Rejected);
+    }
+    let year: i32 = trimmed[..4].parse().map_err(|_| Error::Rejected)?;
+    let month: u8 = trimmed[5..7].parse().map_err(|_| Error::Rejected)?;
+    let day: u8 = trimmed[8..10].parse().map_err(|_| Error::Rejected)?;
+    if !(1900..=2100).contains(&year) || !(1..=12).contains(&month) {
+        return Err(Error::Rejected);
+    }
+    let max_day = days_in_month(year, month);
+    if day == 0 || day > max_day {
+        return Err(Error::Rejected);
+    }
+    Ok((year, month, day))
+}
+
+/// Whether `birth` `(year, month, day)` is at least `min_years` old relative to
+/// `today` `(year, month, day)`. Handles leap-day birthdays (`02-29` turns older on `02-28`/`03-01` by calendar comparison `month/day`).
+#[must_use]
+pub const fn is_at_least_age(birth: (i32, u8, u8), today: (i32, u8, u8), min_years: i32) -> bool {
+    let cutoff_year = today.0 - min_years;
+    if birth.0 < cutoff_year {
+        return true;
+    }
+    if birth.0 > cutoff_year {
+        return false;
+    }
+    birth.1 < today.1 || (birth.1 == today.1 && birth.2 <= today.2)
+}
+
+/// Validate an optional ISO `YYYY-MM-DD` birth date against `today`
+/// (enforcing at least [`MIN_BIRTH_AGE_YEARS`] years old).
+///
+/// # Errors
+/// `Rejected` for invalid syntax/date or age under [`MIN_BIRTH_AGE_YEARS`].
+pub fn validate_birth_date(
+    value: Option<&str>,
+    today: (i32, u8, u8),
+) -> Result<Option<String>, Error> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let parsed = parse_iso_date(trimmed)?;
+    if !is_at_least_age(parsed, today, MIN_BIRTH_AGE_YEARS) {
+        return Err(Error::Rejected);
+    }
+    Ok(Some(format!(
+        "{:04}-{:02}-{:02}",
+        parsed.0, parsed.1, parsed.2
+    )))
+}
+
+/// Convert Unix seconds to UTC `(year, month, day)` using Howard Hinnant's
+/// civil-from-days algorithm (zero external crate dependencies).
+#[must_use]
+pub fn utc_date_from_unix_secs(secs: i64) -> (i32, u8, u8) {
+    let days = secs.div_euclid(86_400) + 719_468;
+    let era = days.div_euclid(146_097);
+    let doe = days.rem_euclid(146_097);
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = y + i64::from(m <= 2);
+    let year = i32::try_from(year).unwrap_or(if year < 0 { i32::MIN } else { i32::MAX });
+    (
+        year,
+        u8::try_from(m).unwrap_or(1),
+        u8::try_from(d).unwrap_or(1),
+    )
+}
+
+/// Optional personal profile details and public profile toggle for the account
+/// owner (`docs/web-accounts.md`). Personal fields are private and never public.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileDetails {
+    /// Optional given name (owner-only).
+    pub first_name: Option<String>,
+    /// Optional family name (owner-only).
+    pub last_name: Option<String>,
+    /// Optional ISO `YYYY-MM-DD` birth date (owner-only).
+    pub birth_date: Option<String>,
+    /// Whether `/{lang}/player/{Name}-{tag}` is publicly accessible.
+    pub public_profile: bool,
+}
+
+/// Picture metadata for a public player profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublicPicture {
+    /// Random 16-byte picture key (`/api/v1/pictures/{key}`).
+    pub key: crate::picture::PictureKey,
+    /// Whether `{key}.sequence.avif` is available.
+    pub moving: bool,
+}
+
+/// Ranked and permanent badge showcase shared by overview and public profiles.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublicBadges {
+    /// Active ranked season metadata, if any.
+    pub ranked_season: Option<crate::ranked::Season>,
+    /// Standings in the active season across formats and tracks.
+    pub ranked_standings: Vec<crate::ranked::Standing>,
+    /// Historical/peak ranked awards.
+    pub ranked_awards: Vec<crate::ranked::Award>,
+    /// Highest current-season player rank.
+    pub best_rank: Option<crate::ranked::Rank>,
+    /// Daily/Weekly/Tactician challenge badges.
+    pub challenge_badges: Vec<crate::challenges::Badge>,
+    /// Legacy 5-floor Tower badges.
+    pub tower_badges: Vec<crate::tower::Badge>,
+    /// Tower Echoes permanent badges.
+    pub echoes_badges: Vec<crate::tower_awards::Badge>,
+    /// Permanent social/referral achievements (such as Recruiter).
+    #[serde(default)]
+    pub social_badges: Vec<crate::social::SocialBadge>,
+}
+
+/// Public player showcase served at `/{lang}/player/{Name}-{tag}` when opted in
+/// (enabled by default). Never contains `username`, email, private details or presence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublicProfile {
+    /// Public display name.
+    pub display_name: String,
+    /// Immutable positive discriminator.
+    pub tag: u32,
+    /// Uploaded profile picture metadata, if any.
+    pub picture: Option<PublicPicture>,
+    /// Ranked standings and permanent badges.
+    pub badges: PublicBadges,
 }
 
 /// The range a registered account's tag is drawn from first, and each one

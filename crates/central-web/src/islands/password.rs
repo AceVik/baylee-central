@@ -11,9 +11,8 @@ use serde_json::json;
 
 use super::auth::{Problem, problem_text};
 use super::central::{Failure, call};
-use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
-use super::field::{self, Labelled};
+use super::field;
 use super::session;
 use crate::words::{self, Lang};
 
@@ -252,27 +251,62 @@ fn form_view(
     username: String,
     submit: impl Fn(leptos::ev::SubmitEvent) + 'static,
 ) -> impl IntoView {
-    let text = move |what: Labelled, held: RwSignal<String>| {
-        field::labelled(lang, what, move || held.get(), move |value| held.set(value))
-    };
-    let spec = |id, label, hint, mark, auto| Labelled {
-        id,
-        label,
-        hint,
-        mark,
-        auto,
-        max: "1024",
-    };
     view! {
         <form class="form" method="post" novalidate=true on:submit=submit>
             // for a password manager: whose password this is
             <input type="text" autocomplete="username" readonly=true hidden=true value=username />
-            {text(spec("password-current", words::password_current(lang), None, glyph::LOCK, "current-password"), held.current)}
-            {text(spec("password-new", words::password_new(lang), Some(words::register_password_hint(lang)), glyph::KEY, "new-password"), held.new)}
-            {text(spec("password-repeat", words::password_new_repeat(lang), Some(words::register_repeat_hint(lang)), glyph::LOCK_KEYHOLE, "new-password"), held.repeat)}
+            {field::password_box(
+                lang,
+                "password-current",
+                words::password_current(lang),
+                "current-password",
+                held.current,
+                None,
+                None,
+                "1024",
+            )}
+            {field::password_box(
+                lang,
+                "password-new",
+                words::password_new(lang),
+                "new-password",
+                held.new,
+                None,
+                Some(view! { {words::register_password_hint(lang)} }.into_any()),
+                "1024",
+            )}
+            {field::password_box(
+                lang,
+                "password-repeat",
+                words::password_new_repeat(lang),
+                "new-password",
+                held.repeat,
+                None,
+                Some(view! { {words::register_repeat_hint(lang)} }.into_any()),
+                "1024",
+            )}
             <p class="error" role="alert">{move || held.error.get()}</p>
             <button type="submit" class="button primary">{words::password_change_submit(lang)}</button>
         </form>
+    }
+}
+
+/// The password-change section in the account area's profile view.
+/// `changed` runs after a change (the sessions listed in security are others
+/// now), `signed_out` when this browser turns out not to be signed in.
+pub fn section(
+    lang: Lang,
+    worker: String,
+    username: String,
+    changed: Callback<()>,
+    signed_out: Callback<()>,
+) -> impl IntoView {
+    view! {
+        <section class="card" aria-labelledby="password-title">
+            <h2 id="password-title">{words::security_password_title(lang)}</h2>
+            <p>{words::security_password_lead(lang)}</p>
+            {change_form(lang, worker, username, changed, signed_out)}
+        </section>
     }
 }
 

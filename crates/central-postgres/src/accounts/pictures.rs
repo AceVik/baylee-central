@@ -4,7 +4,7 @@
 //! columns; no statement reads a picture's bytes but the public read and the
 //! owner's own.
 use super::admin::{Action, id};
-use super::{AccountStore, Error, Session, Token, statement};
+use super::{AccountStore, Concerns, Error, Session, Token, statement};
 use central_api::picture::{
     AdminPictureReport, BlockChoice, FiledReport, MAX_BLOCK_DAYS, MAX_NOTICE_NOTE,
     MAX_PICTURE_TAGS, MAX_REPORT_NOTE, Named, Picture, PictureDecision, PictureDigest, PictureKey,
@@ -209,10 +209,36 @@ async fn block(db: &impl ConnectionTrait, account: Uuid) -> Result<Option<Upload
     Ok(own(db, account).await?.block)
 }
 
+/// Whether `account`'s hourly and daily upload budgets both have room.
+async fn upload_room(db: &impl ConnectionTrait, account: Uuid) -> Result<bool, Error> {
+    db.query_one_raw(statement(
+        "SELECT (hour_start <= pg_catalog.clock_timestamp() - interval '1 hour' OR hour_count < $2)
+            AND (day_start <= pg_catalog.clock_timestamp() - interval '1 day' OR day_count < $3) AS room
+         FROM central_identity.picture_budgets WHERE account_id = $1",
+        vec![
+            account.into(),
+            UPLOADS_PER_HOUR.into(),
+            UPLOADS_PER_DAY.into(),
+        ],
+    ))
+    .await
+    .map_err(unavailable)?
+    .map_or(Ok(true), |row| row.try_get("", "room").map_err(unavailable))
+}
+
+fn group_uuid(bytes: [u8; 16]) -> Result<Uuid, Error> {
+    let id = Uuid::from_bytes(bytes);
+    if id.get_version_num() != 7 || id.as_bytes()[8] & 0xc0 != 0x80 {
+        return Err(Error::Rejected);
+    }
+    Ok(id)
+}
+
 impl AccountStore {
     /// A picture's bytes by its key, for anyone: the public read behind the
-    /// picture's URLs, with the PNG master's digest as its entity tag. A
-    /// removed or replaced picture's key finds nothing.
+    /// picture's URLs, with the PNG master's digest as its entity tag. Serves
+    /// both account pictures and group pictures; a removed or replaced key
+    /// finds nothing.
     ///
     /// # Errors
     /// Storage failure.
@@ -231,7 +257,11 @@ impl AccountStore {
             .query_one_raw(statement(
                 &format!(
                     "SELECT {column} AS bytes, sha256 FROM central_identity.pictures
-                     WHERE key = $1 AND {column} IS NOT NULL"
+                     WHERE key = $1 AND {column} IS NOT NULL
+                     UNION ALL
+                     SELECT {column} AS bytes, sha256 FROM central_identity.chat_group_pictures
+                     WHERE key = $1 AND {column} IS NOT NULL
+                     LIMIT 1"
                 ),
                 vec![key.to_vec().into()],
             ))
@@ -254,17 +284,48 @@ impl AccountStore {
     pub async fn picture_admission(&self, cookie: &Token) -> Result<Admission, Error> {
         let account = browser_account(&self.db, cookie, false).await?;
         let block = block(&self.db, account).await?;
-        let room = self
+        let room = upload_room(&self.db, account).await?;
+        Ok(Admission {
+            account: *account.as_bytes(),
+            block,
+            room,
+        })
+    }
+
+    /// What a group picture upload by the browser session `cookie` for `group`
+    /// may do, before its body is read: requires a joined administrator (or
+    /// owner) of `group`, plus the uploader's block and budget status.
+    ///
+    /// # Errors
+    /// `Rejected` without a live browser session or joined group admin role;
+    /// storage failure.
+    pub async fn group_picture_admission(
+        &self,
+        cookie: &Token,
+        group: [u8; 16],
+    ) -> Result<Admission, Error> {
+        let group = group_uuid(group)?;
+        let account = browser_account(&self.db, cookie, false).await?;
+        let allowed = self
             .db
             .query_one_raw(statement(
-                "SELECT (hour_start <= pg_catalog.clock_timestamp() - interval '1 hour' OR hour_count < $2)
-                    AND (day_start <= pg_catalog.clock_timestamp() - interval '1 day' OR day_count < $3) AS room
-                 FROM central_identity.picture_budgets WHERE account_id = $1",
-                vec![account.into(), UPLOADS_PER_HOUR.into(), UPLOADS_PER_DAY.into()],
+                "SELECT 1
+                 FROM central_identity.chat_groups g
+                 JOIN central_identity.chat_members m
+                   ON m.group_id = g.id AND m.account_id = $2
+                 WHERE g.id = $1
+                   AND m.accepted
+                   AND (g.owner = $2 OR m.admin)",
+                vec![group.into(), account.into()],
             ))
             .await
             .map_err(unavailable)?
-            .map_or(Ok(true), |row| row.try_get("", "room").map_err(unavailable))?;
+            .is_some();
+        if !allowed {
+            return Err(Error::Rejected);
+        }
+        let block = block(&self.db, account).await?;
+        let room = upload_room(&self.db, account).await?;
         Ok(Admission {
             account: *account.as_bytes(),
             block,
@@ -344,6 +405,17 @@ impl AccountStore {
         if block(&tx, account).await?.is_some() {
             return Err(Error::Conflict);
         }
+        let collides = tx
+            .query_one_raw(statement(
+                "SELECT 1 FROM central_identity.chat_group_pictures WHERE key = $1",
+                vec![key.to_vec().into()],
+            ))
+            .await
+            .map_err(unavailable)?
+            .is_some();
+        if collides {
+            return Err(Error::Conflict);
+        }
         tx.execute_raw(statement(
             "UPDATE central_identity.picture_reports SET state = 'gone', decided_at = pg_catalog.clock_timestamp()
              WHERE account_id = $1 AND state = 'open' AND sha256 <> $2
@@ -391,6 +463,82 @@ impl AccountStore {
         let own = own(&tx, account).await?;
         tx.commit().await.map_err(unavailable)?;
         Ok(own)
+    }
+
+    /// Set `group`'s picture to a converted pair under a new `key`, locking
+    /// the group then the uploader's account and rechecking the live browser
+    /// session, admin role, upload block, and cross-table key uniqueness.
+    /// Returns push concerns covering every group member and invitee.
+    ///
+    /// # Errors
+    /// `Rejected` without a live browser session or joined group admin role;
+    /// `Conflict` when a block is in force or the key collides; storage
+    /// failure.
+    pub async fn set_group_picture(
+        &self,
+        cookie: &Token,
+        account: [u8; 16],
+        group: [u8; 16],
+        key: PictureKey,
+        files: PictureFiles<'_>,
+    ) -> Result<Concerns, Error> {
+        let PictureFiles {
+            avif,
+            png,
+            sequence,
+            sha256,
+        } = files;
+        let group = group_uuid(group)?;
+        let account = Uuid::from_bytes(account);
+        let tx = self.db.begin().await.map_err(unavailable)?;
+        let locked = super::social::groups::lock(&tx, group, account).await?;
+        if !locked.is_admin(account) {
+            return Err(Error::Rejected);
+        }
+        tx.query_one_raw(statement(
+            "SELECT id FROM central_identity.accounts WHERE id = $1 FOR UPDATE",
+            vec![account.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Rejected)?;
+        if browser_account(&tx, cookie, true).await? != account {
+            return Err(Error::Rejected);
+        }
+        if block(&tx, account).await?.is_some() {
+            return Err(Error::Conflict);
+        }
+        let collides = tx
+            .query_one_raw(statement(
+                "SELECT 1 FROM central_identity.pictures WHERE key = $1",
+                vec![key.to_vec().into()],
+            ))
+            .await
+            .map_err(unavailable)?
+            .is_some();
+        if collides {
+            return Err(Error::Conflict);
+        }
+        tx.execute_raw(statement(
+            "INSERT INTO central_identity.chat_group_pictures (group_id, key, avif, png, sequence, sha256, side)
+             VALUES ($1, $2, $3, $4, $5, $6, 256)
+             ON CONFLICT (group_id) DO UPDATE SET key = EXCLUDED.key, avif = EXCLUDED.avif,
+                png = EXCLUDED.png, sequence = EXCLUDED.sequence, sha256 = EXCLUDED.sha256,
+                side = EXCLUDED.side, set_at = pg_catalog.clock_timestamp()",
+            vec![
+                group.into(),
+                key.to_vec().into(),
+                avif.to_vec().into(),
+                png.to_vec().into(),
+                sequence.map(<[u8]>::to_vec).into(),
+                sha256.to_vec().into(),
+            ],
+        ))
+        .await
+        .map_err(|_| Error::Conflict)?;
+        let concerns = Concerns::social_of(locked.everyone());
+        tx.commit().await.map_err(unavailable)?;
+        Ok(concerns)
     }
 
     /// The browser session's own picture, notice and block.

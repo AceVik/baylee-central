@@ -159,6 +159,25 @@ async function open(page: Page, w: World, options: { admin?: boolean; path?: str
           return json({ result: "done" });
         }
         return json(mine(w));
+      case "profile_details":
+        return json({
+          result: "profile_details",
+          details: { first_name: null, last_name: null, birth_date: null, public_profile: false },
+        });
+      case "own_badges":
+        return json({
+          result: "own_badges",
+          badges: {
+            ranked_season: null,
+            ranked_standings: [],
+            ranked_awards: [],
+            best_rank: null,
+            challenge_badges: [],
+            tower_badges: [],
+            echoes_badges: [],
+            social_badges: [],
+          },
+        });
       case "admin":
         // an account's case: its current picture, which no report names
         if (body.request?.request?.action === "case") {
@@ -263,7 +282,7 @@ test("every kind of picture the browser opens becomes a square PNG without its d
     expect(near(seen.br, BLUE), `${name} bottom right: ${seen.br}`).toBe(true);
   }
   // the stored picture is shown, AVIF first
-  await expect(page.locator(".picture-current source[type='image/avif']")).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.avif`);
+  await expect(page.locator(".picture-avatar-slot source[type='image/avif']")).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.avif`);
   expect(problems).toEqual([]);
 });
 
@@ -354,9 +373,9 @@ test("a picture that moves goes to Central as it is, and its square is not place
   }
   // the stored picture plays where motion is welcome, its still elsewhere
   const sequence = `/api/v1/pictures/${"5a".repeat(16)}.sequence.avif`;
-  const playing = page.locator(`.picture-current source[srcset='${sequence}']`);
+  const playing = page.locator(`.picture-avatar-slot source[srcset='${sequence}']`);
   await expect(playing).toHaveAttribute("media", "(prefers-reduced-motion: no-preference)");
-  await expect(page.locator(".picture-current source").nth(1)).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.avif`);
+  await expect(page.locator(".picture-avatar-slot source").nth(1)).toHaveAttribute("srcset", `/api/v1/pictures/${"5a".repeat(16)}.avif`);
   // an animation Central could not encode is kept as its still, and said
   w.makes = "still";
   await choose(page, "moving.gif", "image/gif", fixture("animated.gif"));
@@ -428,7 +447,8 @@ test("refusals are named, a block is said, and removing asks first", async ({ pa
   await page.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Your picture is removed." })).toBeVisible();
   expect(w.asked).toContain("picture:remove");
-  await expect(page.locator("#picture-none")).toBeVisible();
+  await expect(page.locator(".picture-avatar-slot")).toHaveAttribute("aria-label", "You have no profile picture yet.");
+  await expect(page.locator(".picture-avatar-slot img")).toHaveCount(0);
 });
 
 test("the card at 320 px and in both schemes", async ({ page }) => {
@@ -444,7 +464,7 @@ test("the header shows the account's own picture, or a neutral mark, at one size
   const w = world(true);
   w.moving = true;
   const problems = await open(page, w);
-  await expect(page.locator(".picture-current picture")).toBeVisible();
+  await expect(page.locator(".picture-avatar-slot picture")).toBeVisible();
   const face = page.locator(".nav-account .nav-face").first();
   const shown = async () => {
     await page.goto("/en/faq");
@@ -465,19 +485,27 @@ test("the header shows the account's own picture, or a neutral mark, at one size
   w.picture = false;
   w.moving = false;
   await page.goto("/en/account/profile");
-  await expect(page.locator("#picture-none")).toBeVisible();
+  await expect(page.locator(".picture-avatar-slot")).toHaveAttribute("aria-label", "You have no profile picture yet.");
+  await expect(page.locator(".picture-avatar-slot img")).toHaveCount(0);
   await shown();
   await expect(face).toHaveAttribute("data-none", "");
   await expect(face.locator("img")).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 
-test("only the profile page allows blob: pictures", async ({ page }) => {
-  const profile = await page.request.get("/en/account/profile");
-  expect(profile.headers()["content-security-policy"]).toContain("img-src 'self' blob:;");
-  for (const other of ["/en/account", "/en/account/privacy", "/en/chat", "/en/"]) {
+test("only the signed-in account area allows blob: and Scryfall card preview images", async ({ page }) => {
+  for (const accountPath of ["/en/account/profile", "/en/account", "/en/account/privacy"]) {
+    const answer = await page.request.get(accountPath);
+    expect(answer.headers()["content-security-policy"], accountPath).toContain(
+      "img-src 'self' blob: https://cards.scryfall.io;",
+    );
+  }
+  for (const other of ["/en/chat", "/en/", "/en/security"]) {
     const answer = await page.request.get(other);
-    expect(answer.headers()["content-security-policy"], other).toContain("img-src 'self';");
+    const csp = answer.headers()["content-security-policy"];
+    expect(csp, other).toContain("img-src 'self';");
+    expect(csp, other).not.toContain("blob:");
+    expect(csp, other).not.toContain("scryfall");
   }
 });
 

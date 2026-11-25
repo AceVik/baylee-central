@@ -60,7 +60,7 @@ impl AccountStore {
             .query_all_raw(statement(
                 "SELECT g.id, g.origin, EXISTS (SELECT 1 FROM central_identity.gateway_approvals p
                      WHERE p.gateway_id = g.id) AS approved
-                 FROM central_identity.gateways g WHERE g.owner_id = $1 ORDER BY g.id LIMIT $2",
+                 FROM central_identity.gateways g WHERE g.owner_id = $1 AND g.deleted_at IS NULL ORDER BY g.id LIMIT $2",
                 vec![uuid(credential.identity.account).into(), OWNED.into()],
             ))
             .await

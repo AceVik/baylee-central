@@ -72,6 +72,7 @@ fn register(name: &str, nonce: &str, counters: &[u64]) -> Request {
         display_name: None,
         nonce: nonce.into(),
         counters: counters.to_vec(),
+        invite_code: None,
     }
 }
 

@@ -1,449 +1,486 @@
-// baylee.app's only blocking script, loaded in <head> so it runs before the
-// first paint (WebAssembly cannot): it applies the colour scheme the
-// visitor chose (localStorage "baylee-site-theme", as before), shows the
-// colour switch, which turns the scheme shown into the other one, and lets
-// a new scheme spread from it, names the account link while a session is remembered
-// ("baylee-central-session", which holds only when it ends): with the
-// account's own picture, display name and tag where a page noted them
-// ("baylee-central-own"), opens
-// dialogs in browsers without invoker commands, closes the dropdowns as a
-// menu closes, copies a gateway's address, pauses the hero's light off
-// screen, and marks what is on screen as the page opens. Nothing here is
-// required: without it the device's scheme decides and every page still
-// works.
+// GENERATED from crates/central-web/ts/boot.ts via TypeScript 7.1 — do not edit directly.
+"use strict";
 (() => {
-  "use strict";
-  const root = document.documentElement;
-  const KEY = "baylee-site-theme";
-  const read = (key) => {
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  };
-  const stored = read(KEY);
-  if (stored === "light" || stored === "dark") root.dataset.theme = stored;
-
-  // The scheme on screen: the one chosen, else the device's as the
-  // stylesheet reads it (light only where the device asks for light).
-  // One press always shows the other one. A choice the device would make
-  // anyway is not kept, so the page follows the device again; before, the
-  // switch went from the device's scheme to light and dark, and on a light
-  // device its first press changed nothing.
-  const light = matchMedia("(prefers-color-scheme: light)");
-  const device = () => (light.matches ? "light" : "dark");
-  const shown = () => root.dataset.theme ?? device();
-  const label = (button) => {
-    const name = shown();
-    button.dataset.state = name;
-    button.setAttribute("aria-label", button.dataset[name] ?? name);
-  };
-  const relabel = () => {
-    for (const button of document.querySelectorAll("[data-theme-switch]")) label(button);
-  };
-  // the device changing while nothing is chosen changes what is shown
-  light.addEventListener("change", relabel);
-  const turn = (event) => {
-    const next = shown() === "dark" ? "light" : "dark";
-    const follow = next === device();
-    try {
-      if (follow) localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, next);
-    } catch {
-      // Private windows may refuse storage; the choice then lasts this page.
-    }
-    const pressed = event.currentTarget;
-    const apply = () => {
-      if (follow) delete root.dataset.theme;
-      else root.dataset.theme = next;
-      relabel();
+    "use strict";
+    const root = document.documentElement;
+    const KEY = "baylee-site-theme";
+    const read = (key) => {
+        try {
+            return localStorage.getItem(key);
+        }
+        catch {
+            return null;
+        }
     };
-    // The new colours spread from the switch where the browser can show
-    // one state giving way to another (a view transition), and where
-    // nobody asked for less motion; anywhere else they are simply there.
-    if (typeof document.startViewTransition === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const box = pressed.getBoundingClientRect();
-      root.style.setProperty("--switch-x", `${box.left + box.width / 2}px`);
-      root.style.setProperty("--switch-y", `${box.top + box.height / 2}px`);
-      root.dataset.switching = "";
-      document.startViewTransition(apply).finished.finally(() => {
-        delete root.dataset.switching;
-      });
-    } else {
-      apply();
-    }
-    pressed.focus();
-  };
-
-  const signedIn = () => {
-    try {
-      const session = JSON.parse(read("baylee-central-session") ?? "null");
-      return typeof session?.expiresAt === "number" && session.expiresAt * 1000 > Date.now();
-    } catch {
-      return false;
-    }
-  };
-
-  // The chat identity kept in this browser lives only as long as the
-  // sign-in (docs/central-chat.md): with no live session, it goes.
-  // A browser that cannot list its databases is told to delete it all the
-  // same: deleting what is not there does nothing.
-  if (!signedIn()) {
-    try {
-      if (typeof indexedDB.databases === "function") {
-        indexedDB
-          .databases()
-          .then((all) => {
-            if (all.some((db) => db.name === "baylee-chat")) indexedDB.deleteDatabase("baylee-chat");
-          })
-          .catch(() => {});
-      } else {
-        indexedDB.deleteDatabase("baylee-chat");
-      }
-      // and the header's note of who was signed in (the second key is
-      // the note's earlier, per-tab home)
-      localStorage.removeItem("baylee-central-own");
-      sessionStorage.removeItem("baylee-central-own-picture");
-    } catch {
-      // no storage here, nothing kept
-    }
-  }
-
-  // Who is signed in, beside the account link (docs/web-accounts.md,
-  // docs/profile-pictures.md). Asked of nobody: the pages that learn the
-  // display name, the tag and the own picture's key note them in
-  // localStorage ("baylee-central-own") with the session record they
-  // belong to, and tell this page ("baylee:own"). A note of another
-  // sign-in is not shown. Only Central's own files under their random key;
-  // a moving picture plays only where the system allows motion. Until the
-  // key is known, or without a picture, a neutral mark of the same fixed
-  // size, so nothing shifts.
-  const own = () => {
-    try {
-      const held = JSON.parse(read("baylee-central-own") ?? "null");
-      const session = read("baylee-central-session");
-      return held && typeof held === "object" && session !== null && held.of === session ? held : null;
-    } catch {
-      return null;
-    }
-  };
-  const ownFace = (link, held) => {
-    const face = document.createElement("span");
-    face.className = "nav-face";
-    face.setAttribute("aria-hidden", "true");
-    if (held?.key && /^[0-9a-f]{32}$/.test(held.key)) {
-      const base = `/api/v1/pictures/${held.key}`;
-      const picture = document.createElement("picture");
-      if (held.moving) {
-        const moving = document.createElement("source");
-        moving.type = "image/avif";
-        moving.media = "(prefers-reduced-motion: no-preference)";
-        moving.srcset = `${base}.sequence.avif`;
-        picture.append(moving);
-      }
-      const still = document.createElement("source");
-      still.type = "image/avif";
-      still.srcset = `${base}.avif`;
-      const image = document.createElement("img");
-      image.src = `${base}.png`;
-      image.alt = "";
-      image.width = 24;
-      image.height = 24;
-      image.decoding = "async";
-      picture.append(still, image);
-      face.append(picture);
-    } else {
-      face.dataset.none = "";
-    }
-    link.prepend(face);
-  };
-  // The account link of a signed-in visitor: where it leads, whose it is
-  // (the handle, its tag set apart; "Your account" until a page noted
-  // one) and the picture. Drawn again whenever the note changes.
-  const account = () => {
-    const live = signedIn();
-    const held = live ? own() : null;
-    for (const link of document.querySelectorAll("a[data-account-href]")) {
-      link.querySelector(".nav-face")?.remove();
-      if (!live) continue;
-      link.href = link.dataset.accountHref;
-      const text = link.querySelector(":scope > span");
-      if (text) {
-        const named = typeof held?.name === "string" && held.name !== "" && /^[0-9a-f]{4,8}$/.test(held.tag ?? "");
-        if (named) {
-          const whose = document.createElement("span");
-          whose.className = "visually-hidden";
-          whose.textContent = `${link.dataset.account}: `;
-          const name = document.createElement("bdi");
-          name.className = "nav-name";
-          name.textContent = held.name;
-          const tag = document.createElement("span");
-          tag.className = "nav-tag";
-          tag.textContent = `#${held.tag}`;
-          text.replaceChildren(whose, name, tag);
-          text.translate = false;
-        } else {
-          text.textContent = link.dataset.account;
-          text.translate = true;
+    const stored = read(KEY);
+    if (stored === "light" || stored === "dark")
+        root.dataset.theme = stored;
+    const NAV_KEY = "baylee-nav-collapsed";
+    if (read(NAV_KEY) === "1")
+        root.dataset.navCollapsed = "";
+    const syncNavToggle = () => {
+        const collapsed = "navCollapsed" in root.dataset;
+        for (const button of document.querySelectorAll("[data-nav-toggle]")) {
+            const text = collapsed ? button.dataset.expand : button.dataset.collapse;
+            button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+            if (text) {
+                button.setAttribute("aria-label", text);
+                button.setAttribute("title", text);
+            }
         }
-      }
-      ownFace(link, held);
-    }
-  };
-  window.addEventListener("baylee:own", account);
-
-  const ready = () => {
-    for (const button of document.querySelectorAll("[data-theme-switch]")) {
-      button.hidden = false;
-      label(button);
-      button.addEventListener("click", turn);
-    }
-    account();
-    if (signedIn()) {
-      for (const line of document.querySelectorAll("[data-signed-out]")) line.hidden = true;
-    }
-    // The hero's slow light moves only while the hero is on screen.
-    const hero = document.querySelector(".hero");
-    if (hero && typeof IntersectionObserver === "function") {
-      new IntersectionObserver(([entry]) => {
-        if (entry?.isIntersecting) delete hero.dataset.away;
-        else hero.dataset.away = "";
-      }).observe(hero);
-    }
-    // Copying an address (a gateway's card), only where the browser can:
-    // the button shows a check for a moment, and the live line says it.
-    if (window.isSecureContext && typeof navigator.clipboard?.writeText === "function") {
-      let live = null;
-      const say = (words) => {
-        if (!live) {
-          live = document.createElement("p");
-          live.className = "visually-hidden";
-          live.setAttribute("role", "status");
-          document.body.append(live);
+    };
+    const light = matchMedia("(prefers-color-scheme: light)");
+    const device = () => (light.matches ? "light" : "dark");
+    const shown = () => root.dataset.theme ?? device();
+    const label = (button) => {
+        const name = shown();
+        button.dataset.state = name;
+        button.setAttribute("aria-label", button.dataset[name] ?? name);
+    };
+    const relabel = () => {
+        for (const button of document.querySelectorAll("[data-theme-switch]"))
+            label(button);
+    };
+    light.addEventListener("change", relabel);
+    const turn = (event) => {
+        const next = shown() === "dark" ? "light" : "dark";
+        const follow = next === device();
+        try {
+            if (follow)
+                localStorage.removeItem(KEY);
+            else
+                localStorage.setItem(KEY, next);
         }
-        // the same words twice in a row would not be read again
-        live.textContent = live.textContent === words ? `${words}\u00a0` : (words ?? "");
-      };
-      for (const button of document.querySelectorAll("button[data-copy]")) {
-        let back = 0;
-        const label = button.querySelector("span");
-        const words = label?.textContent ?? "";
-        button.hidden = false;
-        button.addEventListener("click", () => {
-          navigator.clipboard.writeText(button.dataset.copy ?? "").then(
-            () => {
-              button.dataset.copied = "";
-              if (label) label.textContent = button.dataset.copiedLabel ?? words;
-              say(button.dataset.copiedSaid);
-              clearTimeout(back);
-              back = setTimeout(() => {
-                delete button.dataset.copied;
-                if (label) label.textContent = words;
-              }, 1600);
-            },
-            () => say(button.dataset.copyFailed),
-          );
+        catch {
+            // Private windows may refuse storage; the choice then lasts this page.
+        }
+        const pressed = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+        const apply = () => {
+            if (follow)
+                delete root.dataset.theme;
+            else
+                root.dataset.theme = next;
+            relabel();
+        };
+        if (pressed && typeof document.startViewTransition === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            const box = pressed.getBoundingClientRect();
+            root.style.setProperty("--switch-x", `${box.left + box.width / 2}px`);
+            root.style.setProperty("--switch-y", `${box.top + box.height / 2}px`);
+            root.dataset.switching = "";
+            const vt = document.startViewTransition(apply);
+            vt.ready.catch(() => { });
+            vt.finished
+                .catch(() => { })
+                .finally(() => {
+                delete root.dataset.switching;
+            });
+        }
+        else {
+            apply();
+        }
+        pressed?.focus();
+    };
+    const REFRESH_GRACE_MS = (3 * 86400 - 900) * 1000;
+    const signedIn = () => {
+        try {
+            const session = JSON.parse(read("baylee-central-session") ?? "null");
+            return typeof session?.expiresAt === "number" && session.expiresAt * 1000 + REFRESH_GRACE_MS > Date.now();
+        }
+        catch {
+            return false;
+        }
+    };
+    if (!signedIn()) {
+        try {
+            if (typeof indexedDB.databases === "function") {
+                indexedDB
+                    .databases()
+                    .then((all) => {
+                    if (all.some((db) => db.name === "baylee-chat"))
+                        indexedDB.deleteDatabase("baylee-chat");
+                })
+                    .catch(() => { });
+            }
+            else {
+                indexedDB.deleteDatabase("baylee-chat");
+            }
+            localStorage.removeItem("baylee-central-own");
+            sessionStorage.removeItem("baylee-central-own-picture");
+        }
+        catch {
+            // no storage here, nothing kept
+        }
+    }
+    const own = () => {
+        try {
+            const held = JSON.parse(read("baylee-central-own") ?? "null");
+            const session = read("baylee-central-session");
+            return held && typeof held === "object" && session !== null && held.of === session ? held : null;
+        }
+        catch {
+            return null;
+        }
+    };
+    const ownFace = (link, held) => {
+        const face = document.createElement("span");
+        face.className = "nav-face";
+        face.setAttribute("aria-hidden", "true");
+        if (typeof held?.key === "string" && /^[0-9a-f]{32}$/.test(held.key)) {
+            const base = `/api/v1/pictures/${held.key}`;
+            const picture = document.createElement("picture");
+            if (held.moving) {
+                const moving = document.createElement("source");
+                moving.type = "image/avif";
+                moving.media = "(prefers-reduced-motion: no-preference)";
+                moving.srcset = `${base}.sequence.avif`;
+                picture.append(moving);
+            }
+            const still = document.createElement("source");
+            still.type = "image/avif";
+            still.srcset = `${base}.avif`;
+            const image = document.createElement("img");
+            image.src = `${base}.png`;
+            image.alt = "";
+            image.width = 24;
+            image.height = 24;
+            image.decoding = "async";
+            picture.append(still, image);
+            face.append(picture);
+        }
+        else {
+            face.dataset.none = "";
+        }
+        if (held?.rank && typeof held.rank.tier === "number") {
+            const tier = Math.max(0, Math.min(11, Number(held.rank.tier) || 0));
+            const scaleCls = tier <= 1
+                ? "rank-scale-p"
+                : tier <= 4
+                    ? "rank-scale-i"
+                    : tier <= 7
+                        ? "rank-scale-g"
+                        : tier <= 10
+                            ? "rank-scale-m"
+                            : "rank-scale-u";
+            face.classList.add("has-rank", scaleCls);
+            const frame = document.createElement("canvas");
+            frame.className = "rank-frame-overlay";
+            frame.width = 48;
+            frame.height = 48;
+            frame.dataset.rankKind = "frame";
+            frame.dataset.rankTier = String(tier);
+            frame.dataset.rankDiv = String(Number(held.rank.div) || 0);
+            frame.dataset.rankPodium = String(Number(held.rank.podium) || 0);
+            frame.dataset.rankTrack = "0";
+            face.append(frame);
+        }
+        link.prepend(face);
+    };
+    const account = () => {
+        const live = signedIn();
+        const held = live ? own() : null;
+        for (const link of document.querySelectorAll("a[data-account-href]")) {
+            link.querySelector(".nav-face")?.remove();
+            if (!live)
+                continue;
+            link.href = link.dataset.accountHref ?? "";
+            const text = link.querySelector(":scope > span");
+            if (text) {
+                const tagStr = typeof held?.tag === "string" ? held.tag : "";
+                const named = typeof held?.name === "string" && held.name !== "" && /^[0-9a-f]{4,8}$/.test(tagStr);
+                if (named && typeof held?.name === "string") {
+                    const whose = document.createElement("span");
+                    whose.className = "visually-hidden";
+                    whose.textContent = `${link.dataset.account ?? ""}: `;
+                    const name = document.createElement("bdi");
+                    name.className = "nav-name";
+                    name.textContent = held.name;
+                    const tag = document.createElement("span");
+                    tag.className = "nav-tag";
+                    tag.textContent = `#${tagStr}`;
+                    text.replaceChildren(whose, name, tag);
+                    text.translate = false;
+                }
+                else {
+                    text.textContent = link.dataset.account ?? "";
+                    text.translate = true;
+                }
+            }
+            ownFace(link, held);
+        }
+        window.dispatchEvent(new Event("baylee:badges"));
+    };
+    window.addEventListener("baylee:own", account);
+    const ready = () => {
+        for (const button of document.querySelectorAll("[data-theme-switch]")) {
+            button.hidden = false;
+            label(button);
+            button.addEventListener("click", turn);
+        }
+        account();
+        syncNavToggle();
+        if (signedIn()) {
+            for (const line of document.querySelectorAll("[data-signed-out]"))
+                line.hidden = true;
+        }
+        const hero = document.querySelector(".hero");
+        if (hero && typeof IntersectionObserver === "function") {
+            new IntersectionObserver(([entry]) => {
+                if (entry?.isIntersecting)
+                    delete hero.dataset.away;
+                else
+                    hero.dataset.away = "";
+            }).observe(hero);
+        }
+        if (window.isSecureContext && typeof navigator.clipboard?.writeText === "function") {
+            let live = null;
+            const say = (words) => {
+                if (!live) {
+                    live = document.createElement("p");
+                    live.className = "visually-hidden";
+                    live.setAttribute("role", "status");
+                    document.body.append(live);
+                }
+                live.textContent = live.textContent === words ? `${words}\u00a0` : (words ?? "");
+            };
+            for (const button of document.querySelectorAll("button[data-copy]")) {
+                let back = 0;
+                const copyLabel = button.querySelector("span");
+                const words = copyLabel?.textContent ?? "";
+                button.hidden = false;
+                button.addEventListener("click", () => {
+                    navigator.clipboard.writeText(button.dataset.copy ?? "").then(() => {
+                        button.dataset.copied = "";
+                        if (copyLabel)
+                            copyLabel.textContent = button.dataset.copiedLabel ?? words;
+                        say(button.dataset.copiedSaid);
+                        clearTimeout(back);
+                        back = window.setTimeout(() => {
+                            delete button.dataset.copied;
+                            if (copyLabel)
+                                copyLabel.textContent = words;
+                        }, 1600);
+                    }, () => say(button.dataset.copyFailed));
+                });
+            }
+        }
+        const fold = window.innerHeight + 80;
+        for (const part of document.querySelectorAll(".reveal, .band > .wrap > .eyebrow, .band > .wrap > h2, .share-bar")) {
+            if (part.getBoundingClientRect().top < fold)
+                part.dataset.seen = "";
+        }
+    };
+    if (document.readyState === "loading")
+        document.addEventListener("DOMContentLoaded", ready, { once: true });
+    else
+        ready();
+    document.addEventListener("baylee:page", ready);
+    if (!("command" in HTMLButtonElement.prototype)) {
+        document.addEventListener("click", (event) => {
+            const button = event.target instanceof Element ? event.target.closest("button[commandfor]") : null;
+            const dialog = button ? document.getElementById(button.getAttribute("commandfor") ?? "") : null;
+            if (!(dialog instanceof HTMLDialogElement))
+                return;
+            const command = button?.getAttribute("command");
+            if (command === "show-modal" && !dialog.open)
+                dialog.showModal();
+            else if (command === "close")
+                dialog.close();
         });
-      }
     }
-    // What stands on screen as the page opens is there at once: rising and
-    // brightening on the way into view (home.css) is for what comes after.
-    // A card that started half in view would otherwise wait half faded.
-    const fold = window.innerHeight + 80;
-    for (const part of document.querySelectorAll(".reveal, .band > .wrap > .eyebrow, .band > .wrap > h2, .share-bar")) {
-      if (part.getBoundingClientRect().top < fold) part.dataset.seen = "";
-    }
-  };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready, { once: true });
-  else ready();
-  // a page put in place without a new document (`nav.js`) is made ready as
-  // a loaded one is
-  document.addEventListener("baylee:page", ready);
-
-  // Invoker commands (<button commandfor command>) where the browser has none.
-  if (!("command" in HTMLButtonElement.prototype)) {
-    document.addEventListener("click", (event) => {
-      const button = event.target instanceof Element ? event.target.closest("button[commandfor]") : null;
-      const dialog = button ? document.getElementById(button.getAttribute("commandfor") ?? "") : null;
-      if (!(dialog instanceof HTMLDialogElement)) return;
-      const command = button.getAttribute("command");
-      if (command === "show-modal" && !dialog.open) dialog.showModal();
-      else if (command === "close") dialog.close();
+    const calm = matchMedia("(prefers-reduced-motion: reduce)");
+    const menus = () => document.querySelectorAll("details[data-menu][open]");
+    const gone = (menu) => {
+        if (!("closing" in menu.dataset))
+            return;
+        delete menu.dataset.closing;
+        menu.open = false;
+    };
+    const close = (menu) => {
+        if (!menu.open || "closing" in menu.dataset)
+            return;
+        if (calm.matches || !menu.querySelector(":scope > .menu")) {
+            menu.open = false;
+            return;
+        }
+        menu.dataset.closing = "";
+        window.setTimeout(gone, 240, menu);
+    };
+    document.addEventListener("animationend", (event) => {
+        const menu = event.target instanceof Element && event.target.matches(".menu") ? event.target.parentElement : null;
+        if (menu instanceof HTMLDetailsElement)
+            gone(menu);
     });
-  }
-
-  // The dropdowns (the language menu, the download's other systems) are
-  // <details data-menu>: they open without script; with it, one at a time,
-  // and they close on a press outside, on Escape (the keyboard back on
-  // their button) and when the keyboard leaves them. A menu leaves the way
-  // it came: `data-closing` plays its way out, then `open` falls.
-  const calm = matchMedia("(prefers-reduced-motion: reduce)");
-  const menus = () => document.querySelectorAll("details[data-menu][open]");
-  const gone = (menu) => {
-    if (!("closing" in menu.dataset)) return;
-    delete menu.dataset.closing;
-    menu.open = false;
-  };
-  const close = (menu) => {
-    if (!menu.open || "closing" in menu.dataset) return;
-    if (calm.matches || !menu.querySelector(":scope > .menu")) {
-      menu.open = false;
-      return;
-    }
-    menu.dataset.closing = "";
-    setTimeout(gone, 240, menu);
-  };
-  document.addEventListener("animationend", (event) => {
-    const menu = event.target instanceof Element && event.target.matches(".menu") ? event.target.parentElement : null;
-    if (menu instanceof HTMLDetailsElement) gone(menu);
-  });
-  document.addEventListener(
-    "toggle",
-    (event) => {
-      const opened = event.target;
-      if (!(opened instanceof HTMLDetailsElement) || !opened.open || !opened.matches("[data-menu]")) return;
-      for (const other of menus()) if (other !== opened) close(other);
-    },
-    true,
-  );
-  document.addEventListener("click", (event) => {
-    const summary = event.target instanceof Element ? event.target.closest("details[data-menu] > summary") : null;
-    const menu = summary?.parentElement;
-    if (!(menu instanceof HTMLDetailsElement) || !menu.open) return;
-    // its own button closes an open menu; a second press while it leaves does nothing
-    event.preventDefault();
-    close(menu);
-  });
-  document.addEventListener("pointerdown", (event) => {
-    for (const menu of menus()) if (!(event.target instanceof Node && menu.contains(event.target))) close(menu);
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    for (const menu of menus()) {
-      menu.querySelector("summary")?.focus();
-      close(menu);
-    }
-  });
-  document.addEventListener("focusout", (event) => {
-    const menu = event.target instanceof Element ? event.target.closest("details[data-menu][open]") : null;
-    if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget))) close(menu);
-  });
-
-  // Signing in, registering and setting a new password open over the page
-  // that asked for them: every link to one of the three shows its dialog
-  // where the page has one. A press with a modifier key, a browser without
-  // <dialog>, or a page without them (the signed-in area) follows the link
-  // as ever, and the address it leads to is the start page with that dialog
-  // open (`data-auth` on the document). The dialog closes by its button, by
-  // Escape, and by a press on the veil around it that also began there (a
-  // text selection dragged out of a field is not one).
-  //
-  // An open dialog has its address: opening one puts the form's address in
-  // the bar (one step in the history, however often the forms change
-  // places), closing it goes that step back, and Back closes it. A dialog
-  // that stood open when the page came (the address was entered, or a mail
-  // led here) has nothing to go back to and leaves for the start page.
-  const AUTH = /^\/([A-Za-z-]+)\/(signin|register|reset)\/?$/;
-  const authDialog = (which) => {
-    const dialog = which ? document.getElementById(`auth-${which}`) : null;
-    return dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function" ? dialog : null;
-  };
-  // Closing one dialog to show another, or because the address changed, is
-  // not the visitor leaving the forms. The `close` event comes later, in a
-  // task of its own, so the dialog itself carries the mark until then.
-  const shutAll = () => {
-    for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) {
-      other.dataset.changing = "";
-      other.close();
-    }
-  };
-  // the title of the page a dialog stands over
-  let beneath = document.title;
-  const show = (dialog) => {
-    shutAll();
-    const nav = document.getElementById("nav");
-    if (nav?.matches(":popover-open")) nav.hidePopover();
-    const title = dialog.querySelector("h2")?.textContent;
-    if (title) document.title = `${title} – Baylee`;
-    dialog.showModal();
-  };
-  document.addEventListener(
-    "close",
-    (event) => {
-      const closed = event.target;
-      if (!(closed instanceof HTMLDialogElement) || !closed.matches(".auth-dialog")) return;
-      if ("changing" in closed.dataset) {
-        delete closed.dataset.changing;
-        return;
-      }
-      const at = AUTH.exec(location.pathname);
-      if (!at) return;
-      document.title = beneath;
-      if (history.state?.auth === true) history.back();
-      else location.replace(`/${at[1]}/`);
-    },
-    true,
-  );
-  // The dialog the address names is the one that stands open: as the page
-  // comes, as the history moves, and when another page is put in place
-  // under the same address (`nav.js`, Back to a page a form stood over).
-  const match = () => {
-    const dialog = authDialog(AUTH.exec(location.pathname)?.[2]);
-    if (dialog?.open) return;
-    if (dialog) {
-      show(dialog);
-    } else if (document.querySelector("dialog.auth-dialog[open]")) {
-      shutAll();
-      document.title = beneath;
-    }
-  };
-  window.addEventListener("popstate", match);
-  document.addEventListener("baylee:page", () => {
-    beneath = document.title;
-    match();
-  });
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", match, { once: true });
-  else match();
-  let pressed = null;
-  document.addEventListener("pointerdown", (event) => {
-    pressed = event.target;
-  });
-  document.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target || event.defaultPrevented) return;
-    const shut = target.closest("[data-auth-close]");
-    if (shut) {
-      shut.closest("dialog")?.close();
-      return;
-    }
-    if (target instanceof HTMLDialogElement && target.matches(".auth-dialog")) {
-      if (pressed === target) target.close();
-      return;
-    }
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const link = target.closest("a[href]");
-    if (!(link instanceof HTMLAnchorElement) || link.origin !== location.origin || link.target === "_blank") return;
-    const dialog = authDialog(AUTH.exec(link.pathname)?.[2]);
-    if (!dialog) return;
-    event.preventDefault();
-    const address = link.pathname + link.hash;
-    if (AUTH.test(location.pathname)) history.replaceState(history.state, "", address);
-    else history.pushState({ auth: true, page: history.state?.page ?? location.pathname + location.search }, "", address);
-    show(dialog);
-  });
-
-  // An island's form works only once its island runs. Until then the
-  // browser's own submit would send its fields to the page's address, and
-  // the sign-in's password must never leave the crypto Worker, so it is
-  // held back. The islands' fields carry no names either, so even a submit
-  // let through sends nothing.
-  document.addEventListener(
-    "submit",
-    (event) => {
-      const island = event.target instanceof Element ? event.target.closest("leptos-island") : null;
-      if (island && !("hydrated" in island.dataset)) event.preventDefault();
-    },
-    true,
-  );
+    document.addEventListener("toggle", (event) => {
+        const opened = event.target;
+        if (!(opened instanceof HTMLDetailsElement) || !opened.open || !opened.matches("[data-menu]"))
+            return;
+        for (const other of menus())
+            if (other !== opened)
+                close(other);
+    }, true);
+    document.addEventListener("click", (event) => {
+        const summary = event.target instanceof Element ? event.target.closest("details[data-menu] > summary") : null;
+        const menu = summary?.parentElement;
+        if (!(menu instanceof HTMLDetailsElement) || !menu.open)
+            return;
+        event.preventDefault();
+        close(menu);
+    });
+    document.addEventListener("pointerdown", (event) => {
+        for (const menu of menus())
+            if (!(event.target instanceof Node && menu.contains(event.target)))
+                close(menu);
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape")
+            return;
+        for (const menu of menus()) {
+            menu.querySelector("summary")?.focus();
+            close(menu);
+        }
+    });
+    document.addEventListener("focusout", (event) => {
+        const menu = event.target instanceof Element ? event.target.closest("details[data-menu][open]") : null;
+        if (menu && !(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget)))
+            close(menu);
+    });
+    const AUTH = /^\/([A-Za-z-]+)\/(signin|register|reset)\/?$/;
+    const authDialog = (which) => {
+        const dialog = which ? document.getElementById(`auth-${which}`) : null;
+        return dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function" ? dialog : null;
+    };
+    const shutAll = () => {
+        for (const other of document.querySelectorAll("dialog.auth-dialog[open]")) {
+            other.dataset.changing = "";
+            other.close();
+        }
+    };
+    let beneath = document.title;
+    const show = (dialog) => {
+        shutAll();
+        const nav = document.getElementById("nav");
+        if (nav?.matches(":popover-open"))
+            nav.hidePopover();
+        const title = dialog.querySelector("h2")?.textContent;
+        if (title)
+            document.title = `${title} – Baylee`;
+        dialog.showModal();
+    };
+    document.addEventListener("close", (event) => {
+        const closed = event.target;
+        if (!(closed instanceof HTMLDialogElement) || !closed.matches(".auth-dialog"))
+            return;
+        if ("changing" in closed.dataset) {
+            delete closed.dataset.changing;
+            return;
+        }
+        const at = AUTH.exec(location.pathname);
+        if (!at)
+            return;
+        document.title = beneath;
+        const state = history.state;
+        if (state?.auth === true)
+            history.back();
+        else
+            location.replace(`/${at[1]}/`);
+    }, true);
+    const match = () => {
+        const dialog = authDialog(AUTH.exec(location.pathname)?.[2]);
+        if (dialog?.open)
+            return;
+        if (dialog) {
+            show(dialog);
+        }
+        else if (document.querySelector("dialog.auth-dialog[open]")) {
+            shutAll();
+            document.title = beneath;
+        }
+    };
+    const scrollActiveNav = () => {
+        for (const [itemSel, boxSel] of [
+            ['.frame-nav [aria-current="page"]', ".frame-groups"],
+            ['.admin-nav [aria-current="page"]', ".admin-nav ul"],
+        ]) {
+            const active = document.querySelector(itemSel);
+            const box = active?.closest(boxSel);
+            if (active && box && box.scrollWidth > box.clientWidth) {
+                active.scrollIntoView({ block: "nearest", inline: "center" });
+            }
+        }
+    };
+    window.addEventListener("popstate", match);
+    document.addEventListener("baylee:page", () => {
+        beneath = document.title;
+        match();
+        scrollActiveNav();
+        syncNavToggle();
+    });
+    const syncPage = () => {
+        match();
+        scrollActiveNav();
+        syncNavToggle();
+    };
+    if (document.readyState === "loading")
+        document.addEventListener("DOMContentLoaded", syncPage, { once: true });
+    else
+        syncPage();
+    let pressed = null;
+    document.addEventListener("pointerdown", (event) => {
+        pressed = event.target;
+    });
+    document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target || event.defaultPrevented)
+            return;
+        const navToggle = target.closest("[data-nav-toggle]");
+        if (navToggle) {
+            const collapse = !("navCollapsed" in root.dataset);
+            if (collapse)
+                root.dataset.navCollapsed = "";
+            else
+                delete root.dataset.navCollapsed;
+            try {
+                if (collapse)
+                    localStorage.setItem(NAV_KEY, "1");
+                else
+                    localStorage.removeItem(NAV_KEY);
+            }
+            catch {
+                // Private windows may refuse storage; the choice then lasts this page.
+            }
+            syncNavToggle();
+            return;
+        }
+        const shut = target.closest("[data-auth-close]");
+        if (shut) {
+            shut.closest("dialog")?.close();
+            return;
+        }
+        if (target instanceof HTMLDialogElement && target.matches(".auth-dialog")) {
+            if (pressed === target)
+                target.close();
+            return;
+        }
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+            return;
+        const link = target.closest("a[href]");
+        if (!(link instanceof HTMLAnchorElement) || link.origin !== location.origin || link.target === "_blank")
+            return;
+        const dialog = authDialog(AUTH.exec(link.pathname)?.[2]);
+        if (!dialog || link.search)
+            return;
+        event.preventDefault();
+        const address = link.pathname + link.hash;
+        const state = history.state;
+        if (AUTH.test(location.pathname))
+            history.replaceState(history.state, "", address);
+        else
+            history.pushState({ auth: true, page: state?.page ?? location.pathname + location.search }, "", address);
+        show(dialog);
+    });
+    document.addEventListener("submit", (event) => {
+        const island = event.target instanceof Element ? event.target.closest("leptos-island") : null;
+        if (island && !("hydrated" in island.dataset))
+            event.preventDefault();
+    }, true);
 })();

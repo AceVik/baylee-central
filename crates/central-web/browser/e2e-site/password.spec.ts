@@ -43,9 +43,31 @@ function central(seen: Body[], state: { gone: boolean }) {
       case "login_start":
         return json({ result: "login_challenge", attempt: Array(32).fill(7), message: Array.from({ length: 320 }, (_, i) => (i * 37) % 251) });
       case "email":
-        // the section below the password's (email.spec.ts): no address
+        // the section above/beside the password's on Profile: no address
         if (body.request?.action !== "status") return rejected();
         return json({ result: "email", state: { mail: true, address: null, confirmed_at: null, pending: null, pending_until: null } });
+      case "picture":
+        if (body.request?.action !== "mine") return rejected();
+        return json({ result: "my_picture", picture: null, notice: null, block: null });
+      case "profile_details":
+        return json({
+          result: "profile_details",
+          details: { first_name: null, last_name: null, birth_date: null, public_profile: false },
+        });
+      case "own_badges":
+        return json({
+          result: "own_badges",
+          badges: {
+            ranked_season: null,
+            ranked_standings: [],
+            ranked_awards: [],
+            best_rank: null,
+            challenge_badges: [],
+            tower_badges: [],
+            echoes_badges: [],
+            social_badges: [],
+          },
+        });
       default:
         return rejected();
     }
@@ -61,7 +83,7 @@ async function open(page: Page, seen: Body[], state = { gone: false }) {
     }
   });
   await page.route("**/api/v1", central(seen, state));
-  await page.goto("/en/account/security");
+  await page.goto("/en/account/profile");
   await expect(page.locator("html")).toHaveAttribute("data-islands", "ready");
   await expect(page.locator("#password-current")).toBeVisible();
   // the section below asked what it asks: what a test counts from here on is the password's
@@ -80,7 +102,7 @@ test("the form is labelled, each password has its eye, and nothing is sent befor
     "Your encrypted data and your recovery code stay as they are. Changing the password signs you out everywhere except here.",
   );
   await expect(page.getByText("will follow")).toHaveCount(0);
-  const current = page.getByLabel("Current password");
+  const current = page.getByLabel("Current password", { exact: true });
   const fresh = page.getByLabel("New password", { exact: true });
   const repeat = page.getByLabel("Repeat new password");
   for (const field of [current, fresh, repeat]) {
@@ -129,7 +151,7 @@ test("a wrong current password is refused in the Worker, and nothing more is sen
   const seen: Body[] = [];
   await open(page, seen);
   const asked = seen.length;
-  await page.getByLabel("Current password").fill("the wrong old words");
+  await page.getByLabel("Current password", { exact: true }).fill("the wrong old words");
   await page.getByLabel("New password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Repeat new password").fill(PASSWORD);
   await submit(page).click();
@@ -142,7 +164,7 @@ test("a wrong current password is refused in the Worker, and nothing more is sen
   expect(JSON.stringify(seen)).not.toContain("lantern");
   expect(JSON.stringify(seen)).not.toContain("old words");
   // the form is drawn anew, empty, with the keyboard at its start
-  await expect(page.getByLabel("Current password")).toBeFocused();
+  await expect(page.getByLabel("Current password", { exact: true })).toBeFocused();
   for (const id of ["password-current", "password-new", "password-repeat"]) await expect(page.locator(`#${id}`)).toHaveValue("");
   expect(await axe(page)).toEqual([]);
   expect(problems).toEqual([]);
@@ -152,7 +174,7 @@ test("a session that is gone is said, not papered over", async ({ page }) => {
   const seen: Body[] = [];
   const state = await open(page, seen);
   state.gone = true;
-  await page.getByLabel("Current password").fill("the old words");
+  await page.getByLabel("Current password", { exact: true }).fill("the old words");
   await page.getByLabel("New password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("Repeat new password").fill(PASSWORD);
   await submit(page).click();

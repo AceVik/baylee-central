@@ -112,12 +112,17 @@ async fn fetch(cx: Cx) -> Option<Load> {
 
 fn row(lang: Lang, left: &Left, now: i64) -> impl IntoView + use<> {
     let (progress, tone) = progress_text(lang, left.progress);
-    let name = left.display_name.as_ref().map(|name| {
-        let shown = left.tag.map_or_else(
-            || name.clone(),
-            |tag| central_api::profile::handle(name, tag),
-        );
-        view! { " " <bdi translate="no">{shown}</bdi> }
+    let name = left.display_name.as_ref().map(|name| match left.tag {
+        Some(tag) => {
+            let shown = crate::islands::ui::copy_handle::handle_with_copy(
+                lang,
+                name.clone(),
+                central_api::profile::tag_text(tag),
+                false,
+            );
+            view! { " " {shown} }.into_any()
+        }
+        None => view! { " " <bdi translate="no">{name.clone()}</bdi> }.into_any(),
     });
     let holds = held(left, now);
     let holds = if holds.is_empty() {

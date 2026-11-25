@@ -5,6 +5,7 @@
 //! it is revalidated by its entity tag (`If-None-Match`, 304).
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use axum::Router;
@@ -166,29 +167,31 @@ pub fn csp(https: bool) -> String {
     policy(https, "'self'")
 }
 
-/// The profile page's policy (`docs/profile-pictures.md`): the same, and
-/// `blob:` pictures, so the page can draw a picture the person chose from
-/// their own device (an SVG through `<img>`). Only this page sends it.
+/// The signed-in account area's policy (`docs/profile-pictures.md` and
+/// signed-in chat card previews): `blob:` pictures chosen on the person's
+/// device, and Scryfall's image host for opt-out chat card previews (no scripts,
+/// styles, or `connect-src` allowed there). Only `/<lang>/account*` sends it.
 #[must_use]
 pub fn csp_profile(https: bool) -> String {
-    policy(https, "'self' blob:")
+    policy(https, "'self' blob: https://cards.scryfall.io")
 }
 
-/// Whether `path` is an account's profile page, `/{lang}/account/profile`.
-fn profile_page(path: &str) -> bool {
+/// Whether `path` is inside the signed-in account area, `/{lang}/account` or
+/// `/{lang}/account/*`, so `blob:` picture previews remain permitted across
+/// soft navigation into the profile picture editor.
+fn account_page(path: &str) -> bool {
     path.strip_prefix('/')
         .and_then(|rest| rest.split_once('/'))
         .is_some_and(|(lang, rest)| {
-            Lang::from_code(lang).is_some()
-                && matches!(rest, "account/profile" | "account/profile/")
+            Lang::from_code(lang).is_some() && (rest == "account" || rest.starts_with("account/"))
         })
 }
 
 fn policy(https: bool, images: &str) -> String {
     let mut policy = format!(
         "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src {images}; \
-         font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; \
-         base-uri 'none'; frame-ancestors 'none'; object-src 'none'; \
+         media-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; \
+         form-action 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; \
          require-trusted-types-for 'script'; trusted-types baylee baylee-sw baylee-nav",
     );
     if https {
@@ -199,11 +202,11 @@ fn policy(https: bool, images: &str) -> String {
 
 /// What the browser may use: nothing the site does not need.
 pub const PERMISSIONS: &str = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), \
-     bluetooth=(), hid=(), midi=(), display-capture=(), browsing-topics=(), interest-cohort=()";
+     bluetooth=(), hid=(), midi=(), display-capture=()";
 
 async fn security(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
     let https = app.config.origin.starts_with("https://");
-    let profile = profile_page(request.uri().path());
+    let profile = account_page(request.uri().path());
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     let mut set = |name: &'static str, value: &str| {
@@ -365,7 +368,7 @@ fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {
 }
 
 /// Old and unprefixed paths that live on under a language.
-const MOVED: [&str; 14] = [
+const MOVED: [&str; 16] = [
     "download",
     "gateways",
     "contact",
@@ -380,6 +383,8 @@ const MOVED: [&str; 14] = [
     "reset",
     "account",
     "admin",
+    "player",
+    "invite",
 ];
 
 /// A qvalue (RFC 9110 §12.4.2) in thousandths: `0` to `0.999` or `1` to
@@ -572,6 +577,273 @@ fn old_admin(path: &str, query: Option<&str>) -> Option<String> {
     }
 }
 
+/// Maximum raw byte length of a percent-encoded query value accepted by
+/// `/cards/suggest`.
+const MAX_RAW_QUERY_BYTES: usize = 256;
+
+fn query_param<'a>(uri: &'a Uri, name: &str) -> Option<&'a str> {
+    uri.query()?.split('&').find_map(|pair| {
+        let (key, value) = pair.split_once('=')?;
+        (key == name).then_some(value)
+    })
+}
+
+const fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Decodes a query value (`+` as space, `%XX` as raw byte), returning `None`
+/// if it is overlong, malformed, or not valid UTF-8.
+fn percent_decode(raw: &str) -> Option<String> {
+    if raw.len() > MAX_RAW_QUERY_BYTES {
+        return None;
+    }
+    let bytes = raw.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b'%' => {
+                let hi = hex_nibble(*bytes.get(i + 1)?)?;
+                let lo = hex_nibble(*bytes.get(i + 2)?)?;
+                out.push((hi << 4) | lo);
+                i += 3;
+            }
+            byte => {
+                out.push(byte);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+fn cards_suggest(uri: &Uri) -> Response {
+    let query = query_param(uri, "q")
+        .and_then(percent_decode)
+        .unwrap_or_default();
+    let names = crate::cards::suggest(&query, crate::cards::DEFAULT_LIMIT);
+    let body = serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_owned());
+    let tag = etag(body.as_bytes());
+    let mut response = body.into_response();
+    let map = response.headers_mut();
+    map.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json; charset=utf-8"),
+    );
+    map.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=3600"),
+    );
+    map.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    if let Some(tag) = tag {
+        map.insert(header::ETAG, tag);
+    }
+    response
+}
+
+const SECURITY_AUDIO_PREFIX: &str = "/static/audio/security/";
+const SECURITY_AUDIO_FILES: [(&str, &str); 6] = [
+    ("cues.json", "application/json; charset=utf-8"),
+    ("intro.mp3", "audio/mpeg"),
+    ("signin.mp3", "audio/mpeg"),
+    ("memory.mp3", "audio/mpeg"),
+    ("chat.mp3", "audio/mpeg"),
+    ("pairing.mp3", "audio/mpeg"),
+];
+const EMPTY_CUES_JSON: &[u8] = b"{\"available\":false,\"parts\":{}}\n";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ByteRange {
+    Bounds(usize, usize),
+    Unsatisfiable,
+}
+
+/// Parses a single `Range: bytes=...` specification for `len` bytes.
+fn parse_byte_range(header_value: &str, len: usize) -> Option<ByteRange> {
+    let spec = header_value.trim().strip_prefix("bytes=")?;
+    if spec.contains(',') {
+        return None;
+    }
+    let (start_str, end_str) = spec.split_once('-')?;
+    if len == 0 {
+        return Some(ByteRange::Unsatisfiable);
+    }
+    if start_str.is_empty() {
+        let suffix = end_str.parse::<usize>().ok().filter(|n| *n > 0)?;
+        let start = len.saturating_sub(suffix);
+        return Some(ByteRange::Bounds(start, len - 1));
+    }
+    let start = start_str.parse::<usize>().ok()?;
+    if start >= len {
+        return Some(ByteRange::Unsatisfiable);
+    }
+    if end_str.is_empty() {
+        return Some(ByteRange::Bounds(start, len - 1));
+    }
+    let end = end_str.parse::<usize>().ok()?;
+    if end < start {
+        return Some(ByteRange::Unsatisfiable);
+    }
+    Some(ByteRange::Bounds(start, end.min(len - 1)))
+}
+
+fn read_security_audio_bytes(site: &Path, lang: Lang, filename: &'static str) -> Option<Vec<u8>> {
+    let built = site
+        .join("static")
+        .join("audio")
+        .join("security")
+        .join(lang.code())
+        .join(filename);
+    if built.is_file()
+        && let Ok(bytes) = std::fs::read(&built)
+    {
+        return Some(bytes);
+    }
+    let dev = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../central-web/static/audio/security")
+        .join(lang.code())
+        .join(filename);
+    if dev.is_file()
+        && let Ok(bytes) = std::fs::read(&dev)
+    {
+        return Some(bytes);
+    }
+    None
+}
+
+fn security_audio_response(site: &Path, path: &str, headers: &HeaderMap) -> Option<Response> {
+    let rest = path.strip_prefix(SECURITY_AUDIO_PREFIX)?;
+    let (lang_raw, file_raw) = rest.split_once('/')?;
+    let lang = Lang::from_code(lang_raw)?;
+    let (filename, kind) = SECURITY_AUDIO_FILES
+        .iter()
+        .copied()
+        .find(|(allowed, _)| *allowed == file_raw)?;
+
+    let (bytes, cache_control): (Vec<u8>, &'static str) =
+        if let Some(bytes) = read_security_audio_bytes(site, lang, filename) {
+            let cache = if filename == "cues.json" {
+                "no-cache"
+            } else {
+                "public, max-age=3600"
+            };
+            (bytes, cache)
+        } else if filename == "cues.json" {
+            (EMPTY_CUES_JSON.to_vec(), "no-cache")
+        } else {
+            return None;
+        };
+
+    let total = bytes.len();
+    let tag = etag(&bytes);
+    if let Some(range_hdr) = header_text(headers, "range")
+        && let Some(parsed) = parse_byte_range(range_hdr, total)
+    {
+        return Some(match parsed {
+            ByteRange::Unsatisfiable => {
+                let mut response = Response::new(Body::empty());
+                *response.status_mut() = StatusCode::RANGE_NOT_SATISFIABLE;
+                let map = response.headers_mut();
+                map.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+                if let Ok(val) = HeaderValue::from_str(&format!("bytes */{total}")) {
+                    map.insert(header::CONTENT_RANGE, val);
+                }
+                response
+            }
+            ByteRange::Bounds(start, end) => {
+                let slice = Bytes::copy_from_slice(&bytes[start..=end]);
+                let mut response = Response::new(Body::from(slice));
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                let map = response.headers_mut();
+                map.insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
+                map.insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static(cache_control),
+                );
+                map.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+                map.insert(
+                    header::X_CONTENT_TYPE_OPTIONS,
+                    HeaderValue::from_static("nosniff"),
+                );
+                if let Ok(val) = HeaderValue::from_str(&format!("bytes {start}-{end}/{total}")) {
+                    map.insert(header::CONTENT_RANGE, val);
+                }
+                if let Some(tag) = tag {
+                    map.insert(header::ETAG, tag);
+                }
+                response
+            }
+        });
+    }
+
+    let mut response = Response::new(Body::from(bytes));
+    let map = response.headers_mut();
+    map.insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
+    map.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(cache_control),
+    );
+    map.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+    map.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    if let Some(tag) = tag {
+        map.insert(header::ETAG, tag);
+    }
+    Some(response)
+}
+
+fn special_route(app: &App, headers: &HeaderMap, uri: &Uri) -> Option<Response> {
+    if uri.path().starts_with(SECURITY_AUDIO_PREFIX) {
+        return Some(
+            security_audio_response(&app.config.site, uri.path(), headers)
+                .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response()),
+        );
+    }
+    match uri.path() {
+        "/cards/suggest" => Some(cards_suggest(uri)),
+        "/robots.txt" => Some(text(
+            "text/plain; charset=utf-8",
+            generated::robots(&app.config.origin),
+        )),
+        "/sitemap.xml" => Some(text(
+            "application/xml; charset=utf-8",
+            generated::sitemap(&app.config.origin, &snapshot(app)),
+        )),
+        "/funding.json" => Some(text(
+            "application/json",
+            generated::funding(&app.config.origin, &snapshot(app)),
+        )),
+        "/.well-known/tdmrep.json" => Some(text("application/json", generated::TDMREP.to_owned())),
+        "/datenschutz" | "/de/datenschutz" => Some(redirect(
+            StatusCode::MOVED_PERMANENTLY,
+            "/de/privacy",
+            false,
+        )),
+        "/agb" | "/de/agb" => Some(redirect(StatusCode::MOVED_PERMANENTLY, "/de/terms", false)),
+        "/" => Some(redirect(
+            StatusCode::FOUND,
+            &format!("/{}/", negotiated(headers, uri).code()),
+            true,
+        )),
+        _ => None,
+    }
+}
+
 fn answer(app: &App, headers: &HeaderMap, uri: &Uri) -> Response {
     let path = uri.path();
     if let Some(response) = file(app, path, headers) {
@@ -583,36 +855,8 @@ fn answer(app: &App, headers: &HeaderMap, uri: &Uri) -> Response {
         let to = format!("/{}/{rest}", negotiated(headers, uri).code());
         return redirect(StatusCode::FOUND, &to, true);
     }
-    match path {
-        "/robots.txt" => {
-            return text(
-                "text/plain; charset=utf-8",
-                generated::robots(&app.config.origin),
-            );
-        }
-        "/sitemap.xml" => {
-            return text(
-                "application/xml; charset=utf-8",
-                generated::sitemap(&app.config.origin, &snapshot(app)),
-            );
-        }
-        "/funding.json" => {
-            return text(
-                "application/json",
-                generated::funding(&app.config.origin, &snapshot(app)),
-            );
-        }
-        "/.well-known/tdmrep.json" => {
-            return text("application/json", generated::TDMREP.to_owned());
-        }
-        "/" => {
-            return redirect(
-                StatusCode::FOUND,
-                &format!("/{}/", negotiated(headers, uri).code()),
-                true,
-            );
-        }
-        _ => {}
+    if let Some(response) = special_route(app, headers, uri) {
+        return response;
     }
     let trimmed = path.trim_start_matches('/');
     let (first, rest) = trimmed.split_once('/').unwrap_or((trimmed, ""));
@@ -696,24 +940,116 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_the_profile_page_allows_blob_pictures() {
-        assert!(profile_page("/en/account/profile"));
-        assert!(profile_page("/pt-br/account/profile/"));
-        for other in [
+    fn only_the_account_area_allows_blob_pictures() {
+        for allowed in [
             "/en/account",
-            "/en/account/profile/x",
+            "/en/account/",
+            "/en/account/profile",
+            "/pt-br/account/profile/",
+            "/en/account/privacy",
+            "/en/account/admin/feedback",
+        ] {
+            assert!(account_page(allowed), "{allowed}");
+        }
+        for other in [
             "/xx/account/profile",
             "/account/profile",
-            "/en/account/privacy",
+            "/en/accountfoo",
             "/en/chat",
+            "/en/",
         ] {
-            assert!(!profile_page(other), "{other}");
+            assert!(!account_page(other), "{other}");
         }
-        assert!(csp_profile(true).contains("img-src 'self' blob:;"));
+        assert!(csp_profile(true).contains("img-src 'self' blob: https://cards.scryfall.io;"));
         assert!(csp(true).contains("img-src 'self';"));
+        assert!(csp(true).contains("media-src 'self';"));
+        assert!(csp_profile(true).contains("media-src 'self';"));
         assert!(!csp(false).contains("blob:"));
+        assert!(!csp(false).contains("scryfall"));
         // the rest of the policy is the same
-        assert_eq!(csp_profile(false).replace(" blob:", ""), csp(false));
+        assert_eq!(
+            csp_profile(false).replace(" blob: https://cards.scryfall.io", ""),
+            csp(false)
+        );
+    }
+
+    #[test]
+    fn security_audio_validates_paths_and_supports_ranges() {
+        assert_eq!(
+            parse_byte_range("bytes=0-3", 10),
+            Some(ByteRange::Bounds(0, 3))
+        );
+        assert_eq!(
+            parse_byte_range("bytes=5-", 10),
+            Some(ByteRange::Bounds(5, 9))
+        );
+        assert_eq!(
+            parse_byte_range("bytes=-4", 10),
+            Some(ByteRange::Bounds(6, 9))
+        );
+        assert_eq!(
+            parse_byte_range("bytes=10-", 10),
+            Some(ByteRange::Unsatisfiable)
+        );
+        assert_eq!(
+            parse_byte_range("bytes=6-3", 10),
+            Some(ByteRange::Unsatisfiable)
+        );
+
+        let root =
+            std::env::temp_dir().join(format!("baylee-routes-audio-test-{}", std::process::id()));
+        let en_dir = root.join("static/audio/security/en");
+        std::fs::create_dir_all(&en_dir).unwrap();
+        let fake_mp3 = b"ID3-fake-mp3-data";
+        std::fs::write(en_dir.join("intro.mp3"), fake_mp3).unwrap();
+
+        let headers = HeaderMap::new();
+        // Traversal or unknown files/languages must never resolve.
+        assert!(
+            security_audio_response(&root, "/static/audio/security/../en/intro.mp3", &headers)
+                .is_none()
+        );
+        assert!(
+            security_audio_response(&root, "/static/audio/security/en/secret.txt", &headers)
+                .is_none()
+        );
+        assert!(
+            security_audio_response(&root, "/static/audio/security/xx/intro.mp3", &headers)
+                .is_none()
+        );
+
+        // Missing cues.json gracefully serves an empty manifest without 404 console noise.
+        let stub = security_audio_response(&root, "/static/audio/security/en/cues.json", &headers)
+            .expect("cues fallback");
+        assert_eq!(stub.status(), StatusCode::OK);
+        assert_eq!(
+            stub.headers()[header::CONTENT_TYPE],
+            "application/json; charset=utf-8"
+        );
+
+        // Present MP3 supports full download and partial byte-range requests.
+        let full = security_audio_response(&root, "/static/audio/security/en/intro.mp3", &headers)
+            .expect("intro mp3");
+        assert_eq!(full.status(), StatusCode::OK);
+        assert_eq!(full.headers()[header::CONTENT_TYPE], "audio/mpeg");
+        assert_eq!(full.headers()[header::ACCEPT_RANGES], "bytes");
+
+        let mut ranged_headers = HeaderMap::new();
+        ranged_headers.insert(header::RANGE, HeaderValue::from_static("bytes=4-7"));
+        let part = security_audio_response(
+            &root,
+            "/static/audio/security/en/intro.mp3",
+            &ranged_headers,
+        )
+        .expect("ranged mp3");
+        assert_eq!(part.status(), StatusCode::PARTIAL_CONTENT);
+        assert_eq!(
+            part.headers()[header::CONTENT_RANGE],
+            format!("bytes 4-7/{}", fake_mp3.len()).as_str()
+        );
+
+        assert!(MOVED.contains(&"invite"));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     fn accepts(values: &[&str]) -> HeaderMap {
@@ -795,5 +1131,51 @@ mod tests {
         assert!(!named("0123abcd"));
         assert!(!named("\"0123abce\""));
         assert!(!names(&HeaderMap::new(), &etag));
+    }
+
+    #[test]
+    fn percent_decode_handles_valid_and_malformed_queries() {
+        assert_eq!(percent_decode("sol+r").as_deref(), Some("sol r"));
+        assert_eq!(percent_decode("sol%20r").as_deref(), Some("sol r"));
+        assert_eq!(
+            percent_decode("Lim-D%C3%BBl").as_deref(),
+            Some("Lim-D\u{00fb}l")
+        );
+        assert_eq!(percent_decode("%ZZ"), None);
+        assert_eq!(percent_decode("%2"), None);
+        assert_eq!(percent_decode("%FF%FE"), None);
+        assert_eq!(percent_decode(&"a".repeat(MAX_RAW_QUERY_BYTES + 1)), None);
+        let uri: Uri = "/cards/suggest?foo=1&q=sol%20r&bar=2".parse().unwrap();
+        assert_eq!(query_param(&uri, "q"), Some("sol%20r"));
+    }
+
+    #[tokio::test]
+    async fn cards_suggest_answers_json_with_cache_and_nosniff_headers() {
+        let uri: Uri = "/cards/suggest?q=sol%20r".parse().unwrap();
+        let response = cards_suggest(&uri);
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers()[header::CONTENT_TYPE],
+            "application/json; charset=utf-8"
+        );
+        assert_eq!(
+            response.headers()[header::CACHE_CONTROL],
+            "public, max-age=3600"
+        );
+        assert_eq!(
+            response.headers()[header::X_CONTENT_TYPE_OPTIONS],
+            "nosniff"
+        );
+        let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .unwrap();
+        let names: Vec<String> = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(names.first().map(String::as_str), Some("Sol Ring"));
+
+        let empty: Uri = "/cards/suggest?q=%ZZ".parse().unwrap();
+        let bytes = axum::body::to_bytes(cards_suggest(&empty).into_body(), 64 * 1024)
+            .await
+            .unwrap();
+        assert_eq!(&bytes[..], b"[]");
     }
 }

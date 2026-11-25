@@ -296,14 +296,20 @@ test("an administrator is led there and finds accounts, page by page; a search C
   const first = rows(page).first();
   await expect(first.locator("h3")).toHaveText("Erika#1a2b");
   await expect(first.locator("dt")).toHaveText(["Sign-in name", "State", "Account", "Created", "Last sign-in"]);
-  await expect(first.locator("dd")).toHaveText(["erika", "In use", "Registered on this site", /^.+2026, \d\d:\d\d UTC$/, /2026/]);
+  await expect(first.locator("dd")).toHaveText(["erika", "In use", "Registered on this site", /2026, \d{1,2}:\d\d/, /2026/]);
   await expect(first.locator("code")).toHaveAttribute("translate", "no");
   await expect(rows(page).nth(1).locator("dd").nth(2)).toHaveText("Moved from the official gateway");
   await expect(rows(page).nth(2).locator(".pill")).toHaveText("Administrator");
   await expect(opener(page, ID.erika)).toHaveAccessibleName("Open Erika#1a2b");
   await expect(page.locator("input[name]")).toHaveCount(0);
   await sound(page);
-  await tabs(page, page.locator("#admin-search"), [button(page, "Search"), opener(page, ID.erika), opener(page, ID.moritz)]);
+  await tabs(page, page.locator("#admin-search"), [
+    button(page, "Search"),
+    rows(page).first().getByRole("button", { name: "Copy handle" }),
+    opener(page, ID.erika),
+    rows(page).nth(1).getByRole("button", { name: "Copy handle" }),
+    opener(page, ID.moritz),
+  ]);
 
   // the next page follows the last account shown, and the keyboard goes on at its first
   await button(page, "Show more").click();
@@ -316,7 +322,7 @@ test("an administrator is led there and finds accounts, page by page; a search C
   await expect(rows(page).nth(3).locator("dd").last()).toHaveText("–");
   // an outstanding code's expiry
   await expect(rows(page).nth(5).locator("dt").last()).toHaveText("Reset code");
-  await expect(rows(page).nth(5).locator("dd").last()).toHaveText(/^Until .+ UTC$/);
+  await expect(rows(page).nth(5).locator("dd").last()).toHaveText(/^Until .+2026/);
   await button(page, "Show more").click();
   await expect(rows(page)).toHaveCount(7);
   await expect(button(page, "Show more")).toHaveCount(0);
@@ -370,7 +376,7 @@ test("an account opens with its recovery code's state, and the warning and the p
   await expect(facts.locator("dt")).toHaveText(["Sign-in name", "State", "Account", "Created", "Last sign-in", "Recovery code"]);
   await expect(facts.locator("dd").last()).toHaveText("Yes");
   await sound(page);
-  await tabs(page, page.locator("#admin-account-title"), [button(page, "Reset login"), button(page, "Back")]);
+  await tabs(page, page.locator("#admin-account-title"), [steps(page).getByRole("button", { name: "Copy handle" }), button(page, "Reset login"), button(page, "Back")]);
 
   const from = seen.length;
   await button(page, "Reset login").click();
@@ -387,7 +393,7 @@ test("an account opens with its recovery code's state, and the warning and the p
     "A reset code answers a forgotten password, not a taken-over account: an intruder's sessions and the old password stay until the code is used, and for good if it never is.",
   ]);
   await sound(page);
-  await tabs(page, page.locator("#admin-warning-title"), [button(page, "I have checked who is asking"), button(page, "Back")]);
+  await tabs(page, page.locator("#admin-warning-title"), [steps(page).getByRole("button", { name: "Copy handle" }), button(page, "I have checked who is asking"), button(page, "Back")]);
   await button(page, "Back").click();
   await expect(page.locator("#admin-account-title")).toBeFocused();
   await button(page, "Reset login").click();
@@ -446,7 +452,7 @@ test("the code is made after the password, shown once and copied, and gone when 
   await expect(steps(page).locator("input")).toHaveCount(0);
   await expect(page.locator("input[name]")).toHaveCount(0);
   await sound(page);
-  await tabs(page, title, [button(page, "Copy"), button(page, "Done")]);
+  await tabs(page, title, [steps(page).getByRole("button", { name: "Copy handle" }), button(page, "Copy"), button(page, "Done")]);
 
   await button(page, "Copy").click();
   await expect(shown.getByRole("status")).toHaveText("Copied.");
@@ -463,7 +469,7 @@ test("the code is made after the password, shown once and copied, and gone when 
   await expect(opener(page, ID.erika)).toBeFocused();
   expect(await page.content()).not.toContain(CODE);
   await expect(rows(page).first().locator("dt").last()).toHaveText("Reset code");
-  await expect(rows(page).first().locator("dd").last()).toHaveText(/^Until .+ UTC$/);
+  await expect(rows(page).first().locator("dd").last()).toHaveText(/^Until .+2026/);
   await opener(page, ID.erika).click();
   await expect(steps(page).locator("section")).toContainText(
     "Whether an administrator made it or it went by e-mail, Central does not say. A new code replaces it.",
@@ -539,7 +545,7 @@ test("Central's refusals after the password are explained by what it holds now",
   await back(page, ID.moritz);
 
   // a sign-in Central counts as old
-  await refused(ID.erika, "Baylee Central counts your sign-in as older than 30 minutes. Try again; you enter your password once more.", () => {
+  await refused(ID.erika, "Baylee Central counts your sign-in as older than 30 minutes. Try again, as you enter your password once more.", () => {
     w.stale = true;
   });
   w.stale = false;
@@ -560,12 +566,12 @@ test("Central's refusals after the password are explained by what it holds now",
   await back(page, ID.erika);
 
   // too many requests, and a refusal for the terms: said as the forms say them, with nothing more asked
-  ops = await refused(ID.erika, "Too many attempts. Try again later; after several wrong passwords this can take an hour, at most a day.", () => {
+  ops = await refused(ID.erika, "Too many attempts. Try again later — after several wrong passwords this can take an hour, at most a day.", () => {
     w.next = 429;
   });
   expect(ops).toEqual(["account_summary", "login_start", "login_finish", "admin"]);
   await back(page, ID.erika);
-  ops = await refused(ID.erika, "Something went wrong. Try again; if it keeps happening, tell us.", () => {
+  ops = await refused(ID.erika, "Something went wrong. Try again, and if it keeps happening, tell us.", () => {
     w.next = 403;
   });
   expect(ops).toEqual(["account_summary", "login_start", "login_finish", "admin"]);

@@ -146,6 +146,7 @@ impl Pictures {
 
     #[cfg(not(unix))]
     fn worker(&self) -> Result<central_picture::Worker, ()> {
+        let _ = self;
         Err(())
     }
 }

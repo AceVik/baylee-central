@@ -42,7 +42,7 @@ async fn registered(
     let gateway = db
         .query_one_raw(statement(
             "SELECT g.id,g.origin,g.credential_digest=$1 AS legacy
-         FROM central_identity.gateways g WHERE NOT g.official AND
+         FROM central_identity.gateways g WHERE NOT g.official AND g.deleted_at IS NULL AND
          (g.credential_digest=$1 OR g.id=(SELECT t.gateway_id FROM central_identity.gateway_tokens t
          WHERE t.digest=$1 AND t.ranked)) FOR SHARE OF g",
             vec![digest.to_vec().into()],
@@ -77,7 +77,7 @@ pub(super) async fn authorize(
         RankedHostCredential::Registered(token) => registered(db, token).await?,
         RankedHostCredential::Official(origin) => {
             let gateway=db.query_one_raw(statement(
-                "SELECT id,origin FROM central_identity.gateways WHERE official AND origin=$1 FOR SHARE",
+                "SELECT id,origin FROM central_identity.gateways WHERE official AND deleted_at IS NULL AND origin=$1 FOR SHARE",
                 vec![origin.into()],
             )).await.map_err(unavailable)?.ok_or(Error::Rejected)?;
             (gateway, None)

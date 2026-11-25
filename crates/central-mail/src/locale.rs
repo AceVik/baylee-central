@@ -264,7 +264,7 @@ mod tests {
         let used: Vec<&str> = english.values().flatten().copied().collect();
         assert!(
             used.iter()
-                .all(|name| ["hours", "minutes", "name"].contains(name))
+                .all(|name| ["days", "hours", "minutes", "name"].contains(name))
         );
     }
 

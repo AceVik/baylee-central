@@ -23,6 +23,31 @@ fn mails(lang: Lang) -> (Vec<Mail>, String, String) {
             Mail::reset_done(to, account, lang.code(), true),
             Mail::password_changed(to, account, lang.code()),
             Mail::reset_issued(to, account, lang.code(), 24),
+            Mail::recovery_backup(
+                to,
+                account,
+                lang.code(),
+                "player#1234",
+                true,
+                Zeroizing::new("UEsDBA==".to_owned()),
+            ),
+            Mail::recovery_backup(
+                to,
+                account,
+                lang.code(),
+                "player#1234",
+                false,
+                Zeroizing::new("UEsDBAo=".to_owned()),
+            ),
+            Mail::friend_invite(
+                to,
+                account,
+                lang.code(),
+                "Alice#1a2b",
+                "AAAAAAAAAAAAAAAAAAAAAA",
+                Some("Come play a match!"),
+                7,
+            ),
         ],
         code.display().to_string(),
         reset.display().to_string(),
@@ -46,12 +71,17 @@ fn attributes<'a>(html: &'a str, name: &str) -> Vec<&'a str> {
 fn expected_links(mail: &Mail, lang: Lang) -> Vec<String> {
     let button = match mail.what() {
         crate::What::Reset | crate::What::ResetDone { .. } | crate::What::PasswordChanged => {
-            "reset"
+            "reset".to_owned()
         }
         crate::What::Confirm
         | crate::What::Replaced
         | crate::What::Removed
-        | crate::What::ResetIssued => "account/security",
+        | crate::What::ResetIssued
+        | crate::What::RecoveryBackup { .. } => "account/security".to_owned(),
+        crate::What::FriendInvite => {
+            let code = mail.invite_code().expect("invite mail carries invite code");
+            format!("invite/{code}")
+        }
     };
     let fragment = mail
         .code()
@@ -246,7 +276,7 @@ fn a_code_mail_shows_its_code_once_and_hands_it_to_its_page_once() {
     assert!(!mailed.subject.contains(&reset) && !mailed.subject.contains("player"));
     // the confirmation code is no reset code, and the other way round
     assert!(!confirm.html.contains("/reset") && !mailed.html.contains("/account/security"));
-    for (notice, page) in mails[2..].iter().zip([
+    for (notice, page) in mails[2..8].iter().zip([
         "account/security",
         "account/security",
         "reset",
@@ -262,6 +292,24 @@ fn a_code_mail_shows_its_code_once_and_hands_it_to_its_page_once() {
             assert!(!body.contains("player"), "a notice names no account");
             assert!(body.contains(&format!("https://baylee.example/de/{page}")));
         }
+    }
+    let encrypted_backup = render(&mails[8], SITE, false);
+    let plain_backup = render(&mails[9], SITE, false);
+    assert!(encrypted_backup.text.contains("player#1234"));
+    assert!(
+        encrypted_backup
+            .text
+            .contains("mit dem von dir gewählten Passwort")
+    );
+    assert!(plain_backup.text.contains("unverschlüsselt versendet"));
+    for backup in [&encrypted_backup, &plain_backup] {
+        assert!(!backup.subject.contains("player"));
+        assert!(backup.html.contains("player#1234"));
+        assert!(
+            backup
+                .text
+                .contains("https://baylee.example/de/account/security")
+        );
     }
     // No mail says the address it goes to.
     for mail in &mails {
@@ -553,7 +601,7 @@ fn the_reset_mail_sets_the_account_s_name_in_bold() {
         assert!(rendered.text.lines().any(|line| line == said), "{said}");
         assert!(!rendered.text.contains('*') && !rendered.text.contains('<'));
         for (at, mail) in mails.iter().enumerate() {
-            if at != 1 {
+            if ![1, 8, 9, 10].contains(&at) {
                 assert!(!render(mail, SITE, false).html.contains("<strong"));
             }
         }
@@ -595,10 +643,23 @@ fn a_finished_reset_lists_what_came_of_it() {
             // the warning and the button stay, after the facts
             assert!(content.warning.is_some() && content.link.is_some());
         }
-        // the other mails say theirs in paragraphs
+        // the recovery-backup and invite mails carry 2 facts; the remaining mails say theirs in paragraphs
         for (at, mail) in mails.iter().enumerate() {
-            if at != 4 && at != 5 {
-                assert_eq!(content(mail, SITE).facts, Vec::<String>::new());
+            match at {
+                4 | 5 => {}
+                8 | 9 => assert_eq!(
+                    content(mail, SITE).facts,
+                    ["recovery-backup-fact-file", "recovery-backup-fact-reset"]
+                        .map(|id| lang.text(id, &[]))
+                ),
+                10 => assert_eq!(
+                    content(mail, SITE).facts,
+                    vec![
+                        lang.text("invite-fact-friend", &[]),
+                        lang.text("invite-valid", &[("days", "7")]),
+                    ]
+                ),
+                _ => assert_eq!(content(mail, SITE).facts, Vec::<String>::new()),
             }
         }
     }
@@ -757,6 +818,9 @@ fn every_mail_written_out_for_a_look() {
         "reset-done-new",
         "password-changed",
         "reset-issued",
+        "recovery-backup-encrypted",
+        "recovery-backup-plain",
+        "friend-invite",
     ];
     for lang in [Lang::En, Lang::De] {
         let (mails, ..) = mails(lang);
@@ -770,4 +834,40 @@ fn every_mail_written_out_for_a_look() {
             std::fs::write(stem, logo.html.as_bytes()).unwrap();
         }
     }
+}
+
+#[test]
+fn friend_invite_mail_escapes_note_and_formats_singular_and_plural_days() {
+    let singular = Mail::friend_invite(
+        "friend@example.org",
+        [9; 16],
+        "en",
+        "Alice#1a2b",
+        "BBBBBBBBBBBBBBBBBBBBBA",
+        Some("See <you> & soon!"),
+        1,
+    );
+    let rendered = render(&singular, SITE, false);
+    assert!(rendered.text.contains("valid for 1 day."));
+    assert!(rendered.text.contains("See <you> & soon!"));
+    assert!(
+        rendered
+            .html
+            .contains(&format!("{SITE}/en/invite/BBBBBBBBBBBBBBBBBBBBBA"))
+    );
+    assert!(rendered.html.contains("See &lt;you&gt; &amp; soon!"));
+    assert!(!rendered.html.contains("See <you>"));
+
+    let plural = Mail::friend_invite(
+        "friend@example.org",
+        [9; 16],
+        "de",
+        "Alice#1a2b",
+        "BBBBBBBBBBBBBBBBBBBBBA",
+        None,
+        14,
+    );
+    let rendered_de = render(&plural, SITE, false);
+    assert!(rendered_de.text.contains("14 Tage lang"));
+    assert!(!rendered_de.text.contains("Nachricht:"));
 }

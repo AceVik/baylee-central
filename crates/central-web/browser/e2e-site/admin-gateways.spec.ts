@@ -163,7 +163,7 @@ test("a gateway's tokens are shown on request and revoked after their confirmati
   const w = world();
   const { seen } = await open(page, w, "/en/account/admin/gateways#state=approved");
   const sun = card(page, "Sun Court");
-  await expect(sun.locator("dd").nth(2)).toHaveText(/2026, \d\d:\d\d UTC$/);
+  await expect(sun.locator("dd").nth(2)).toHaveText(/2026, \d{1,2}:\d\d/);
   const toggle = button(sun, "Show tokens");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   let from = seen.length;

@@ -32,7 +32,8 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
-- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. Über `/{lang}/player/{Name}-{Tag}` ist dein öffentliches Spielerprofil (Anzeigename, Tag, Profilbild, Ranked-Platzierungen und verdiente Abzeichen) standardmäßig sichtbar; im Profil kannst du das jederzeit abschalten. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Freiwillige persönliche Angaben im Profil (Vorname, Nachname, Geburtsdatum)** – nur für dich selbst in deinen Profileinstellungen gespeichert und einsehbar (niemals öffentlich, nie für andere Spieler oder Gateways sichtbar). Wir prüfen beim Geburtsdatum lediglich das Mindestalter von 16 Jahren. Die Angaben werden mit deinem Export bereitgestellt und mit deinem Konto gelöscht. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Rollen (Administrator)** – Verwaltung von Baylee Central. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Zeitpunkt deiner letzten Anmeldung mit Passwort** (keine Adresse) – Konten verwalten und Missbrauch bemerken. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem sicheren Betrieb)*
 - **OPAQUE-Anmeldedatensatz, verschlüsselter Schlüsselcontainer, Stand der Zugangsdaten** – Anmeldung, Schutz deiner verschlüsselten Daten. *Art. 6 Abs. 1 lit. b DSGVO*
@@ -80,12 +81,7 @@ Dabei erfahren diese Anbieter deine IP-Adresse, aber nichts über dein Konto.
 
 ## 5. Cookies und Speicher im Browser
 
-Die Website setzt nur ein technisch notwendiges Cookie: ein Sitzungscookie,
-solange du angemeldet bist, höchstens 12 Stunden. Gegen gefälschte Anfragen
-schützt sie sich ohne Cookie. Dafür braucht es keine Einwilligung (§ 25 Abs. 2 Nr. 2 TDDDG). Deine
-Sprach- und Darstellungswahl speichert der Browser lokal. Es gibt keine
-Tracking-Cookies und keine eingebundenen Dienste Dritter, die Daten über
-dich sammeln.
+Die Website setzt nur zwei technisch notwendige Cookies für deine Sitzung, solange du angemeldet bist: ein kurzlebiges Zugriffscookie (`__Host-central`, 15 Minuten) und ein Erneuerungscookie (`__Host-central-refresh`, verlängert sich bei Nutzung gleitend um bis zu 3 Tage ohne Aktivität, höchstens jedoch 30 Tage ab Anmeldung). Gegen gefälschte Anfragen schützt sich die Seite ohne Cookie. Dafür braucht es keine Einwilligung (§ 25 Abs. 2 Nr. 2 TDDDG). Deine Sprach- und Darstellungswahl speichert der Browser lokal. Es gibt keine Tracking-Cookies und keine eingebundenen Dienste Dritter, die Daten über dich sammeln.
 
 ## 5a. Chat und Benachrichtigungen
 
@@ -195,8 +191,8 @@ du dich dort anmeldest, entscheidest du.
   Konto vom offiziellen Gateway umgezogen, behält dieses Gateway seine eigene
   Kopie deines alten Kontos, ohne Passwort; wir löschen sie auf Anfrage und
   für alle Konten, sobald der Umzug vom offiziellen Gateway endet.
-- Sitzungen enden 30 Minuten nach ihrer letzten Nutzung und spätestens
-  12 Stunden nach der Anmeldung, Anmeldetickets nach Sekunden.
+- Native Client-Sitzungen enden 30 Minuten nach ihrer letzten Nutzung und spätestens
+  12 Stunden nach der Anmeldung. Website-Sitzungen erneuern ihr Zugriffstoken automatisch über ein Erneuerungscookie mit einer Ruhezeit von höchstens 3 Tagen (insgesamt höchstens 30 Tage ab der Passwort-Anmeldung); Anmeldetickets verfallen nach Sekunden.
 - Ob du online bist und was du tust, besteht nur, solange die Baylee-App mit
   Central verbunden ist, und nur im Arbeitsspeicher. Deine Wahl, wie deine
   Freunde dich sehen (online, abwesend, offline), speichern wir, bis du sie

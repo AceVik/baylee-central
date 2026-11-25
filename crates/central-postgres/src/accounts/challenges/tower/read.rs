@@ -70,7 +70,10 @@ pub(super) async fn landing(
     })
 }
 
-async fn rewards(db: &impl ConnectionTrait, me: Uuid) -> Result<Vec<api::Badge>, Error> {
+pub(in crate::accounts) async fn rewards(
+    db: &impl ConnectionTrait,
+    me: Uuid,
+) -> Result<Vec<api::Badge>, Error> {
     let row = db
         .query_one_raw(statement(
             "SELECT count(*) AS pathfinder,count(*) FILTER(WHERE floor=5) AS summit,

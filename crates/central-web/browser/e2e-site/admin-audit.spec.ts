@@ -19,12 +19,12 @@ test("the audit log, newest first, with today's names, page by page", async ({ p
   await expect(rows(page)).toHaveCount(3);
   expect(asked(seen)).toEqual([{ action: "audit", account: null, before: null }]);
   await expect(page.locator(".admin-lead")).toHaveText(
-    "What administrators and the operator changed, newest first. The log keeps ids; the names beside them are today's.",
+    "What administrators and the operator changed, newest first. The log keeps ids, while the names beside them are today's.",
   );
   await expect(page.locator(".admin-table thead th")).toHaveText(["When", "What", "By", "About"]);
   await expect(rows(page).locator("th")).toHaveText(["Made administrator", "Gateway approved", "Tag changed"]);
   const first = rows(page).first();
-  await expect(first.locator("td").nth(0)).toHaveText(/2026, \d\d:\d\d UTC$/);
+  await expect(first.locator("td").nth(0)).toHaveText(/2026, \d{1,2}:\d\d/);
   await expect(first.locator("td").nth(1)).toHaveText("Chef#0c4e");
   await expect(first.locator("td").nth(1).locator("a")).toHaveAttribute("href", `/en/account/admin/users/${hex(OWN)}`);
   await expect(first.locator("td").nth(2)).toHaveText("Ada#3c4d");
@@ -95,7 +95,7 @@ test("the legacy store: its deadline, what is left and what holds each back", as
   await expect(rows(page).nth(0).locator("td")).toHaveText(["Not started", "–", "0", /2026$/]);
   await expect(rows(page).nth(1).locator("td").nth(0)).toHaveText("Name reserved");
   await expect(rows(page).nth(1).locator("td").nth(1).locator(".pill")).toHaveText([
-    "Banned", "New password required", /^Locked until .+ UTC$/,
+    "Banned", "New password required", /^Locked until .+2100/,
   ]);
   await expect(rows(page).nth(1).locator("td").nth(2)).toHaveText("3");
   // a lockout that is over holds nothing back

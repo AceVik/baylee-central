@@ -7,6 +7,7 @@
 use leptos::prelude::*;
 
 use super::chat::glyph;
+use super::field;
 use super::net;
 use crate::words::{self, Lang};
 
@@ -175,21 +176,27 @@ pub fn ContactForm(lang: Lang) -> impl IntoView {
                         aria-busy=move || sending().then_some("true") on:submit=send>
                         <div class="field">
                             <label for="contact-name">{words::contact_name(lang)}</label>
-                            <input id="contact-name" type="text" autocomplete="name" maxlength="100"
-                                aria-describedby="contact-name-hint"
-                                readonly=sending
-                                on:input=move |ev| name.set(event_target_value(&ev))
-                                prop:value=move || name.get() />
+                            <div class="inset">
+                                {field::mark(glyph::USER)}
+                                <input id="contact-name" type="text" autocomplete="name" maxlength="100"
+                                    aria-describedby="contact-name-hint"
+                                    readonly=sending
+                                    on:input=move |ev| name.set(event_target_value(&ev))
+                                    prop:value=move || name.get() />
+                            </div>
                             <p class="hint" id="contact-name-hint">{words::contact_name_hint(lang)}</p>
                         </div>
                         <div class="field">
                             <label for="contact-email">{words::contact_email(lang)}</label>
-                            <input id="contact-email" type="email" autocomplete="email" maxlength="254"
-                                aria-describedby="contact-email-hint contact-error"
-                                aria-invalid=move || field_error(State::Email)().then_some("true")
-                                readonly=sending
-                                on:input=move |ev| email.set(event_target_value(&ev))
-                                prop:value=move || email.get() />
+                            <div class="inset">
+                                {field::mark(glyph::MAIL)}
+                                <input id="contact-email" type="email" autocomplete="email" maxlength="254"
+                                    aria-describedby="contact-email-hint contact-error"
+                                    aria-invalid=move || field_error(State::Email)().then_some("true")
+                                    readonly=sending
+                                    on:input=move |ev| email.set(event_target_value(&ev))
+                                    prop:value=move || email.get() />
+                            </div>
                             <p class="hint" id="contact-email-hint">{words::contact_email_hint(lang)}</p>
                         </div>
                         <div class="field">

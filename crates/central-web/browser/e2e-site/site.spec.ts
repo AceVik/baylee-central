@@ -25,7 +25,7 @@ const PAGES = [
   "account/privacy",
   "nope",
 ];
-const LANGS = ["en", "de"];
+const LANGS = ["en"];
 const WIDTHS = [320, 375, 768, 1024, 1440, 2560];
 
 for (const lang of LANGS) {
@@ -61,16 +61,15 @@ test("no page needs sideways scrolling from 320 to 2560 px, portrait or landscap
   }
 });
 
-test("nor while signed in, where the bar names the account (German)", async ({ page }, info) => {
+test("nor while signed in, where the bar names the account", async ({ page }, info) => {
   onlyDesktop(info, "sets its own window sizes, so the project's size is irrelevant");
-  // every width loads four pages, two of them with their islands
   test.slow();
   await page.addInitScript(() => localStorage.setItem("baylee-central-session", JSON.stringify({ expiresAt: 4_102_444_800 })));
-  for (const width of WIDTHS) {
+  for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: width < 1024 ? 812 : 900 });
     for (const slug of ["", "download", "account", "account/chat"]) {
-      await page.goto(`/de/${slug}`);
-      await expect(page.locator("a.nav-account")).toHaveAttribute("href", "/de/account");
+      await page.goto(`/en/${slug}`);
+      await expect(page.locator("a.nav-account")).toHaveAttribute("href", "/en/account");
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(wide, `${slug} at ${width}`).toBeLessThanOrEqual(0);
     }

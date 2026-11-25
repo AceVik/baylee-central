@@ -60,3 +60,22 @@ issued-not-you = 요청한 적이 없다면 로그인해서 보안 페이지에�
 
 # The confirmation mail's button, which opens the security page with the code filled in.
 confirm-link = 주소 확인
+
+recovery-backup-subject = Baylee 복구 코드 백업
+recovery-backup-title = 복구 코드 백업
+recovery-backup-intro = Baylee 계정 { $name }의 복구 코드 백업 파일이 첨부되어 있습니다.
+recovery-backup-encrypted = baylee-recovery-code.zip 파일은 설정한 비밀번호로 암호화되어 있습니다.
+recovery-backup-plain = baylee-recovery-code.zip 파일이 비밀번호 없이 전송되었습니다. 안전하게 보관한 뒤 이 메일을 삭제하세요.
+recovery-backup-fact-file = 이 아카이브를 이 메일함과 분리된 안전한 곳에 보관하세요.
+recovery-backup-fact-reset = 이 코드와 메일 재설정 모두에 접근할 수 있는 사람은 암호화된 데이터를 열 수 있습니다.
+recovery-backup-warning = 본인이 요청하지 않았다면 이 메일을 무시하거나 계정 설정을 확인하세요.
+recovery-backup-link = 계정 열기
+invite-subject = Baylee 친구 초대
+invite-title = 친구 초대
+invite-intro = { $name }님이 Baylee에서 친구로 초대했습니다.
+invite-note-label = 메시지:
+invite-fact-friend = 이 일회용 링크를 수락하면 Baylee에서 서로 친구가 됩니다.
+invite-valid-one = 초대 링크는 1일 동안 유효합니다.
+invite-valid = 초대 링크는 { $days }일 동안 유효합니다.
+invite-warning = 예상치 못한 초대라면 이 메일을 무시하셔도 됩니다.
+invite-link = 초대 열기

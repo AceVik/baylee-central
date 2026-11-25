@@ -73,6 +73,10 @@
   animation: none;
 }
 
+.book::backdrop {
+  transition: none;
+}
+
 .album[data-folding] {
   /* the swinging cover leaves the book's edge, and is seen from a little
      in front of the book's middle */
@@ -263,8 +267,9 @@
 
 .album-dismiss {
   position: absolute;
-  top: 0.7rem;
-  right: 0.4rem;
+  inset-block-start: 0.75rem;
+  inset-inline-end: 0.75rem;
+  z-index: 3;
 }
 
 /* motes of warm light drifting through the margin of the masthead, and a
@@ -826,6 +831,20 @@
   color: var(--ink);
 }
 
+.book .dialog-close {
+  border-radius: var(--pill);
+  border-color: var(--edge);
+  background: #f5ebd2d9;
+  color: var(--ink-soft);
+  box-shadow: 0 4px 14px -4px #4933182e;
+}
+
+.book .dialog-close:hover {
+  border-color: #a68041;
+  background: #fff7e3;
+  color: var(--title);
+}
+
 .book button:active {
   background-color: #d8bd86;
   box-shadow: inset 0 2px 8px #82632d32;
@@ -862,6 +881,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
+}
+
+.photo-viewer-header {
+  padding: 0.1rem 0.2rem 0.25rem;
+}
+
+.photo-viewer-header form {
+  flex: none;
+  margin: 0;
 }
 
 .photo-viewer-header p {
@@ -976,7 +1004,7 @@
   }
 
   .album-masthead {
-    padding: 0.5rem 3.1rem 0.65rem 0.5rem;
+    padding: 0.5rem 3.5rem 0.65rem 0.5rem;
   }
 
   .album-masthead h2 {
@@ -997,8 +1025,8 @@
   }
 
   .album-dismiss {
-    top: 0.3rem;
-    right: 0.2rem;
+    inset-block-start: 0.5rem;
+    inset-inline-end: 0.5rem;
   }
 
   .album-layout {

@@ -21,6 +21,7 @@ use serde_json::{Map, Value};
 use super::super::account::when;
 use super::super::central::Failure;
 use super::super::chat::glyph;
+use super::super::field;
 use super::super::{clip, focus, session};
 use super::api::{self, PartFailure, browser};
 use super::client::{self, MAX_CLIENT_JSON, Piece, Refs, SystemRow, Unreadable};
@@ -537,7 +538,10 @@ fn client_facts(lang: Lang, c: &Map<String, Value>) -> Vec<AnyView> {
     }
     if let Some(game) = client::game(c) {
         if let Some(moment) = game.when {
-            facts.push(view! { <dt>{words::fb_game_when(lang)}</dt><dd>{moment}</dd> }.into_any());
+            let formatted = super::super::time::format_iso_datetime_local(lang, &moment);
+            facts.push(
+                view! { <dt>{words::fb_game_when(lang)}</dt><dd>{formatted}</dd> }.into_any(),
+            );
         }
         if let Some(turn) = game.turn {
             let text = match game.active {
@@ -902,12 +906,15 @@ fn assignee_view(r: &Rep) -> impl IntoView + use<> {
     }
 }
 
-fn labels_view(r: &Rep) -> impl IntoView + use<> {
+fn report_labels(r: &Rep) -> Vec<String> {
+    r.with(|d| d.summary.labels.clone()).unwrap_or_default()
+}
+
+fn label_list(r: &Rep) -> impl IntoView + use<> {
     let r = *r;
     let lang = r.c.lang;
-    let labels = move || r.with(|d| d.summary.labels.clone()).unwrap_or_default();
-    let list = move || {
-        let all = labels();
+    move || {
+        let all = report_labels(&r);
         (!all.is_empty()).then(|| {
             let items = all
                 .iter()
@@ -929,8 +936,13 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
                 .collect_view();
             view! { <ul class="fb-label-list">{items}</ul> }
         })
-    };
-    let full = move || labels().len() >= MAX_LABELS;
+    }
+}
+
+fn labels_view(r: &Rep) -> impl IntoView + use<> {
+    let r = *r;
+    let lang = r.c.lang;
+    let full = move || report_labels(&r).len() >= MAX_LABELS;
     let add = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
         let label = r.label.get_untracked().trim().to_ascii_lowercase();
@@ -940,7 +952,7 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
             return;
         }
         r.label_bad.set(false);
-        let mut all = labels();
+        let mut all = report_labels(&r);
         if all.contains(&label) || full() {
             r.label.set(String::new());
             return;
@@ -959,7 +971,7 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
     };
     // the labels in use, offered once the field is first reached
     let known = move || {
-        let mine = labels();
+        let mine = report_labels(&r);
         r.known
             .get()
             .unwrap_or_default()
@@ -983,19 +995,30 @@ fn labels_view(r: &Rep) -> impl IntoView + use<> {
     view! {
         <div class="fb-field">
             <p class="fb-legend">{words::fb_labels(lang)}</p>
-            {list}
-            <form class="fb-inline" method="post" novalidate=true on:submit=add>
+            {label_list(&r)}
+            <form class="field" method="post" novalidate=true on:submit=add>
                 <label class="visually-hidden" for="fb-label-new">{words::fb_add_label(lang)}</label>
-                <input id="fb-label-new" type="text" list="fb-labels-known" autocomplete="off" spellcheck="false" maxlength="32"
-                    placeholder=words::fb_label_hint(lang) aria-invalid=move || r.label_bad.get().then_some("true")
-                    aria-describedby=move || r.label_bad.get().then_some("fb-label-bad")
-                    prop:disabled=full on:focus=learn
-                    prop:value=move || r.label.get() on:input=move |ev| {
-                        r.label.set(event_target_value(&ev));
-                        r.label_bad.set(false);
-                    } />
+                <div class="inset">
+                    {field::mark(glyph::PENCIL)}
+                    <input id="fb-label-new" type="text" list="fb-labels-known" autocomplete="off" spellcheck="false" maxlength="32"
+                        placeholder=words::fb_label_hint(lang) aria-invalid=move || r.label_bad.get().then_some("true")
+                        aria-describedby=move || r.label_bad.get().then_some("fb-label-bad")
+                        prop:disabled=full on:focus=learn
+                        prop:value=move || r.label.get() on:input=move |ev| {
+                            r.label.set(event_target_value(&ev));
+                            r.label_bad.set(false);
+                        } />
+                    <button
+                        type="submit"
+                        class="inset-end"
+                        title=words::fb_add_label(lang)
+                        aria-label=words::fb_add_label(lang)
+                        aria-disabled=move || r.busy.get().then_some("true")
+                    >
+                        {glyph::glyph(glyph::PLUS)}
+                    </button>
+                </div>
                 <datalist id="fb-labels-known">{known}</datalist>
-                <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>{words::fb_add_label(lang)}</button>
             </form>
             <p class="error" id="fb-label-bad" role="alert">{move || r.label_bad.get().then(|| words::fb_bad_label(lang))}</p>
             {move || full().then(|| view! { <p class="meta">{words::fb_labels_full(lang, &MAX_LABELS.to_string())}</p> })}
@@ -1043,14 +1066,23 @@ fn duplicate_view(r: &Rep) -> impl IntoView + use<> {
         None => view! {
             <form class="field fb-field" method="post" novalidate=true on:submit=mark>
                 <label for="fb-duplicate">{words::fb_mark_duplicate(lang)}</label>
-                <div class="fb-inline">
+                <div class="inset">
+                    {field::mark(glyph::SEARCH)}
                     <input id="fb-duplicate" type="text" autocomplete="off" spellcheck="false" maxlength="200"
                         aria-describedby="fb-duplicate-hint" aria-invalid=move || r.dup_bad.get().then_some("true")
                         prop:value=move || r.dup.get() on:input=move |ev| {
                             r.dup.set(event_target_value(&ev));
                             r.dup_bad.set(false);
                         } />
-                    <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>{words::fb_mark(lang)}</button>
+                    <button
+                        type="submit"
+                        class="inset-end"
+                        title=words::fb_mark(lang)
+                        aria-label=words::fb_mark(lang)
+                        aria-disabled=move || r.busy.get().then_some("true")
+                    >
+                        {glyph::glyph(glyph::CHECK)}
+                    </button>
                 </div>
                 <p class="hint" id="fb-duplicate-hint">{words::fb_duplicate_hint(lang)}</p>
                 <p class="error" role="alert">{move || r.dup_bad.get().then(|| words::fb_bad_duplicate(lang))}</p>
@@ -1158,14 +1190,23 @@ fn issue_view(r: &Rep) -> impl IntoView + use<> {
         None => view! {
             <form class="field" method="post" novalidate=true on:submit=link>
                 <label for="fb-issue">{words::fb_issue_label(lang)}</label>
-                <div class="fb-inline">
+                <div class="inset">
+                    {field::mark(glyph::EXTERNAL_LINK)}
                     <input id="fb-issue" type="text" autocomplete="off" spellcheck="false" maxlength="200"
                         aria-describedby="fb-issue-hint" aria-invalid=move || r.issue_bad.get().then_some("true")
                         prop:value=move || r.issue.get() on:input=move |ev| {
                             r.issue.set(event_target_value(&ev));
                             r.issue_bad.set(false);
                         } />
-                    <button type="submit" class="button button-ghost button-sm" aria-disabled=move || r.busy.get().then_some("true")>{words::fb_link(lang)}</button>
+                    <button
+                        type="submit"
+                        class="inset-end"
+                        title=words::fb_link(lang)
+                        aria-label=words::fb_link(lang)
+                        aria-disabled=move || r.busy.get().then_some("true")
+                    >
+                        {glyph::glyph(glyph::CHECK)}
+                    </button>
                 </div>
                 <p class="hint" id="fb-issue-hint">{words::fb_issue_hint(lang)}</p>
                 <p class="error" role="alert">{move || r.issue_bad.get().then(|| words::fb_bad_issue(lang))}</p>

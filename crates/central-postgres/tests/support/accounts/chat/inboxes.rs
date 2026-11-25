@@ -139,6 +139,8 @@ pub(super) async fn run(
     contact(store, b.token, A, ContactAction::Unblock).await;
     contact(store, a.token, B, ContactAction::Request).await;
     contact(store, b.token, A, ContactAction::Request).await;
+    contact(store, a.token, C, ContactAction::Request).await;
+    contact(store, c.token, A, ContactAction::Request).await;
     let id = create(store, a.token).await;
     let conv = format!("grp:{id}");
     for (member, tag) in [(b, B), (c, C)] {

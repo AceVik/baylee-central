@@ -3,14 +3,18 @@
 //! browser without it, or one that refuses, says so and the page tells the
 //! person to copy by hand.
 
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 use leptos::prelude::*;
 
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 use super::chat::glyph;
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 use crate::words::{self, Lang};
 
 /// A button that copies `code` and the line that says whether the browser
 /// took it. The two go into the page apart: the button among a step's
 /// actions, the line (a status region) under them.
+#[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
 pub fn copier(lang: Lang, code: String) -> (impl IntoView, impl IntoView) {
     let said = RwSignal::new(None::<&'static str>);
     let copy = move |_| {

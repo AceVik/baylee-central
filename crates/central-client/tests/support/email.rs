@@ -665,7 +665,9 @@ fn stale(fixture: &Fixture<'_>, account: &Account) {
     };
     let mailer = fixture.mailer;
     let aged = format!(
-        "UPDATE central_identity.sessions SET created_at = created_at - interval '6 minutes'
+        "UPDATE central_identity.sessions
+         SET created_at = created_at - interval '6 minutes',
+             absolute_expires_at = absolute_expires_at - interval '6 minutes'
          WHERE account_id = '{}'",
         Uuid::from_bytes(account.identity().account)
     );

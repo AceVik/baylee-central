@@ -101,14 +101,14 @@
   font-size: var(--text-sm);
 }
 
-/* danger: a ghost that turns red, for revoke, sign out everywhere and delete */
+/* danger: subtle red signaling at rest, deepening on hover/focus */
 .button.danger,
 .button-danger {
-  border-color: var(--edge-soft);
-  background: transparent;
-  color: var(--ink);
+  border-color: color-mix(in srgb, var(--bad) 48%, var(--edge));
+  background: color-mix(in srgb, var(--bad) 6%, transparent);
+  color: var(--bad);
   box-shadow: none;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .button.danger::after,
@@ -121,7 +121,7 @@
 .button-danger:hover,
 .button-danger:focus-visible {
   border-color: var(--bad);
-  background: color-mix(in srgb, var(--bad) 10%, transparent);
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
   color: var(--bad);
   box-shadow: none;
 }

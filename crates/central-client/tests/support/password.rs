@@ -635,6 +635,7 @@ pub(crate) fn register(name: &str, http: &Http, browser: &Browser) -> Registered
                 display_name: Some("Pass_Web".into()),
                 nonce,
                 counters,
+                invite_code: None,
             },
             None,
         )

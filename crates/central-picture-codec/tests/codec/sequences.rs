@@ -15,9 +15,13 @@
 //!   which CI sets (Ubuntu 24.04's ffmpeg links SVT-AV1 1.7): then it
 //!   fails. Homebrew's ffmpeg has only `libsvtav1`
 //!   (`PICTURE_FFMPEG=/opt/homebrew/bin/ffmpeg`).
-use crate::support::{fixture, valid};
+#[cfg(unix)]
+use crate::support::fixture;
+use crate::support::valid;
 use central_picture::{Format, Motion, Refusal, sequence_tracks};
-use central_picture_codec::{Encoder, Ffmpeg, Found, convert_with};
+#[cfg(unix)]
+use central_picture_codec::Found;
+use central_picture_codec::{Encoder, Ffmpeg, convert_with};
 use std::borrow::Cow;
 use std::time::{Duration, Instant};
 
@@ -108,6 +112,7 @@ fn script(name: &str, body: &str) -> Ffmpeg {
 }
 
 /// The motion of `bytes` converted with `ffmpeg`; the still is always there.
+#[cfg(unix)]
 fn motion(format: Format, bytes: &[u8], ffmpeg: &Ffmpeg) -> Motion {
     let output = convert_with(format, bytes, Some(ffmpeg)).unwrap();
     valid(&output);
@@ -418,6 +423,7 @@ fn without_libaom_svt_encodes_opaque_animations_and_the_service_keeps_them() {
 
 /// An opaque GIF of 256 × 256 frames of a diagonal gradient that slides by
 /// three steps a frame, with `delays` in hundredths of a second.
+#[cfg(unix)]
 fn sliding_gif(delays: &[u16]) -> Vec<u8> {
     let palette: Vec<u8> = (0..=255_u8).flat_map(|v| [v, 255 - v, v / 2]).collect();
     let mut out = Vec::new();

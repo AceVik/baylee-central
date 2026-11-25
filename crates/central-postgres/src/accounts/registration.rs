@@ -27,6 +27,25 @@ impl AccountStore {
         display_name: Option<&str>,
         ticket: &Token,
     ) -> Result<Identity, Error> {
+        self.register_with_invite(name, display_name, ticket, None)
+            .await
+    }
+
+    /// Reserve a username for enrollment, optionally binding a single-use
+    /// friend invite code (permitting registration even while open registration
+    /// is paused).
+    ///
+    /// # Errors
+    /// Rejects malformed usernames/display names, closed registration without a
+    /// valid invite, or invalid/used/expired invite codes (`Rejected`), and
+    /// taken names (`Conflict`).
+    pub async fn register_with_invite(
+        &self,
+        name: &str,
+        display_name: Option<&str>,
+        ticket: &Token,
+        invite_code: Option<&str>,
+    ) -> Result<Identity, Error> {
         let name = username(name)?;
         // A separate statement that waits for no lock: it never holds an account
         // row while another registration waits, so it cannot deadlock with one.
@@ -54,7 +73,7 @@ impl AccountStore {
             .ok_or(Error::Unavailable)?
             .try_get("", "open")
             .map_err(|_| Error::Unavailable)?;
-        if !open {
+        if !open && invite_code.is_none() {
             return Err(Error::Rejected);
         }
         // Only now are the names looked at.
@@ -68,6 +87,12 @@ impl AccountStore {
         ))
         .await
         .map_err(|_| Error::Unavailable)?;
+        let invite_id = match invite_code {
+            Some(code) => {
+                Some(super::social::invites::lock_valid_registration_invite(&tx, code).await?)
+            }
+            None => None,
+        };
         let row = self
             .first_free_tag(&tx, None, None, Error::Unavailable, |tag| {
                 statement(
@@ -88,6 +113,11 @@ impl AccountStore {
             .await?
             .ok_or(Error::Conflict)?;
         let identity = identity(&row)?;
+        if let Some(invite_id) = invite_id {
+            let account_id: sea_orm::prelude::Uuid =
+                row.try_get("", "id").map_err(|_| Error::Unavailable)?;
+            super::social::invites::claim_for_registration(&tx, invite_id, account_id).await?;
+        }
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(identity)
     }

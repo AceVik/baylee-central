@@ -41,7 +41,8 @@ mod legacy;
 mod limits;
 mod live;
 pub use live::{
-    ACCOUNT_SOCKETS, Listener, Presence, SESSION_CHOICES, SESSION_DIALS, SESSION_REPORTS, news,
+    ACCOUNT_SOCKETS, Listener, Notice, Presence, SESSION_CHOICES, SESSION_DIALS, SESSION_REPORTS,
+    news,
 };
 mod objects;
 mod owner;
@@ -56,6 +57,7 @@ pub use push::{GatewayDelivery, GatewayOutcome};
 mod reports;
 pub use reports::PartUpload;
 mod reset;
+mod social;
 mod terms;
 mod tokens;
 mod tower_access;
@@ -121,6 +123,10 @@ pub struct BrowserReply {
     /// A browser session just issued, to be set as the `__Host-central` cookie
     /// and nowhere else.
     pub session: Option<Token>,
+    /// Sliding 3-day browser refresh token, set as `__Host-central-refresh`.
+    pub refresh: Option<Token>,
+    /// Clear browser cookies explicitly on session invalidation.
+    pub clear_cookies: bool,
 }
 
 /// The operations the browser listener serves (`docs/web-accounts.md`); every
@@ -143,11 +149,13 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::LoginFinish { .. }
         | Request::RegisterChallenge
         | Request::RegisterChallengeFor { .. }
+        | Request::RegisterInviteChallenge { .. }
         | Request::Register { .. }
         | Request::EnrollmentStart { .. }
         | Request::EnrollmentFinish { .. }
         | Request::SessionStatus
         | Request::RenewSession
+        | Request::RefreshSession
         | Request::Logout
         | Request::Terms
         | Request::TermsStatus
@@ -157,6 +165,13 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::AccountSummary
         | Request::SetRecovery { .. }
         | Request::SetDisplayName { .. }
+        | Request::ProfileDetails
+        | Request::SetProfileDetails { .. }
+        | Request::ExportProfileDetails
+        | Request::OwnBadges
+        | Request::PublicProfile { .. }
+        | Request::FriendInviteInfo { .. }
+        | Request::SendRecoveryBackupMail { .. }
         | Request::ChangePasswordStart { .. }
         | Request::ChangePasswordFinish { .. }
         | Request::Admin { .. }
@@ -232,10 +247,17 @@ fn browser_only(request: &Request) -> bool {
         Request::Notifications { .. }
             | Request::RegisterChallenge
             | Request::RegisterChallengeFor { .. }
+            | Request::RegisterInviteChallenge { .. }
             | Request::Register { .. }
+            | Request::RefreshSession
             | Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::ProfileDetails
+            | Request::SetProfileDetails { .. }
+            | Request::ExportProfileDetails
+            | Request::OwnBadges
+            | Request::SendRecoveryBackupMail { .. }
             | Request::Admin { .. }
             | Request::Owner { .. }
             | Request::PairStart
@@ -263,6 +285,11 @@ fn uses_session(request: &Request) -> bool {
             | Request::AccountSummary
             | Request::SetRecovery { .. }
             | Request::SetDisplayName { .. }
+            | Request::ProfileDetails
+            | Request::SetProfileDetails { .. }
+            | Request::ExportProfileDetails
+            | Request::OwnBadges
+            | Request::SendRecoveryBackupMail { .. }
             | Request::ChangePasswordStart { .. }
             | Request::ChangePasswordFinish { .. }
             | Request::Admin { .. }
@@ -292,6 +319,7 @@ fn signed_in(
     identity: Identity,
     issued: central_postgres::Issued,
     token: Token,
+    refresh: Option<Token>,
 ) -> Result<BrowserReply, Error> {
     service.issued(&token);
     Ok(match surface {
@@ -302,6 +330,8 @@ fn signed_in(
                 wrapped_master: issued.wrapped_master,
             },
             session: None,
+            refresh: None,
+            clear_cookies: false,
         },
         Surface::Browser => BrowserReply {
             response: Response::BrowserSession {
@@ -311,6 +341,8 @@ fn signed_in(
                 expires_at: issued.expires_at,
             },
             session: Some(token),
+            refresh,
+            clear_cookies: false,
         },
     })
 }
@@ -637,13 +669,16 @@ impl IdentityService {
         // store says to the session.
         self.proved(&guess)?;
         let token = Token::generate()?;
-        let issued = match surface {
+        let (issued, refresh) = match surface {
             Surface::Browser => {
-                self.store
-                    .issue_browser_session(&credential, &token, previous)
-                    .await?
+                let refresh = Token::generate()?;
+                let issued = self
+                    .store
+                    .issue_browser_session_with_refresh(&credential, &token, &refresh, previous)
+                    .await?;
+                (issued, Some(refresh))
             }
-            Surface::Native => self.store.issue_session(&credential, &token).await?,
+            Surface::Native => (self.store.issue_session(&credential, &token).await?, None),
         };
         // Only now is the place the account's own: an attempt begun before
         // a password change proves the old one, and the store refused it.
@@ -652,7 +687,7 @@ impl IdentityService {
         if surface == Surface::Native {
             self.sessions_changed(&credential.identity.account);
         }
-        signed_in(self, surface, credential.identity, issued, token)
+        signed_in(self, surface, credential.identity, issued, token, refresh)
     }
 
     /// Process a typed native command. Authentication is checked for each operation.
@@ -830,7 +865,10 @@ impl IdentityService {
             .request(&request, session, place, Instant::now())?;
         // Login keeps its anonymous budget and proof requirement. The old cookie
         // identifies only existing push consent after that proof is verified.
-        let context = if matches!(&request, Request::LoginFinish { .. }) {
+        let context = if matches!(
+            &request,
+            Request::LoginFinish { .. } | Request::RefreshSession
+        ) {
             cookie
         } else {
             session
@@ -890,11 +928,16 @@ mod tests {
             },
             Request::RegisterChallenge,
             Request::RegisterChallengeFor { signals: 0 },
+            Request::RegisterInviteChallenge {
+                signals: 0,
+                invite_code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+            },
             Request::Register {
                 username: "synthetic".into(),
                 display_name: Some("Synthetic".into()),
                 nonce: String::new(),
                 counters: Vec::new(),
+                invite_code: None,
             },
             Request::EnrollmentStart {
                 ticket: token(),
@@ -926,7 +969,26 @@ mod tests {
         vec![
             Request::GatewayDirectory { after: None },
             Request::PublicFigures { after: None },
+            Request::RefreshSession,
             Request::AccountSummary,
+            Request::ProfileDetails,
+            Request::SetProfileDetails {
+                details: central_api::profile::ProfileDetails::default(),
+            },
+            Request::ExportProfileDetails,
+            Request::OwnBadges,
+            Request::PublicProfile {
+                handle: "Synthetic-0001".into(),
+            },
+            Request::FriendInviteInfo {
+                code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+            },
+            Request::SendRecoveryBackupMail {
+                email: "player@example.org".into(),
+                attachment_base64: String::new(),
+                encrypted: false,
+                lang: "en".into(),
+            },
             Request::Picture {
                 request: central_api::picture::PictureRequest::Mine,
             },
@@ -1159,18 +1221,25 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 70, "every operation is in one of the lists");
+        assert_eq!(named.len(), 79, "every operation is in one of the lists");
     }
 
     #[test]
     fn the_native_listener_refuses_the_websites_own_operations() {
         let (served, _) = (served(), refused());
         let only: Vec<&Request> = served.iter().filter(|r| browser_only(r)).collect();
-        assert_eq!(only.len(), 13);
+        assert_eq!(only.len(), 20);
         // Both ways to ask for a registration challenge: neither is served
         // where no address is counted.
         assert!(browser_only(&Request::RegisterChallenge));
         assert!(browser_only(&Request::RegisterChallengeFor { signals: 0 }));
+        assert!(browser_only(&Request::RegisterInviteChallenge {
+            signals: 0,
+            invite_code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+        }));
+        assert!(!browser_only(&Request::FriendInviteInfo {
+            code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+        }));
         // An account's own area is the website's alone, as administration is.
         assert!(browser_only(&Request::Owner {
             request: central_api::owner::OwnerRequest::Gateways,
@@ -1254,8 +1323,16 @@ mod tests {
             display_name: None,
             nonce: String::new(),
             counters: Vec::new(),
+            invite_code: None,
         }));
         assert!(!uses_session(&Request::RegisterChallenge));
         assert!(!uses_session(&Request::RegisterChallengeFor { signals: 3 }));
+        assert!(!uses_session(&Request::RegisterInviteChallenge {
+            signals: 3,
+            invite_code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+        }));
+        assert!(!uses_session(&Request::FriendInviteInfo {
+            code: "AAAAAAAAAAAAAAAAAAAAAA".into(),
+        }));
     }
 }

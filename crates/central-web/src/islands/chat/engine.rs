@@ -5,20 +5,19 @@
 //! What the page shows lives in a signal ([`Shown`]); the Worker's keys and
 //! every message's key stay in the Worker.
 //!
-//! The inbox is read every 2 s while the page is in view, at once while
-//! Central says more is waiting, and backing off to 30 s after failures;
-//! a hidden page reads nothing. The cursor is in memory, so each page load
-//! replays what Central retains (`docs/central-chat.md`). Central's refusal
-//! of the session ends the chat and forgets the identity kept here.
+//! Reads are event-driven: one initial sync on startup, drain pages while
+//! Central reports more deliveries waiting, and incremental syncs pushed by
+//! `/api/v1/ws` (`chat` / reconnect `ready`). The cursor is in memory, so each
+//! page load replays what Central retains (`docs/central-chat.md`). Central's
+//! refusal of the session ends the chat and forgets the identity kept here.
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Write as _;
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use std::task::{Context, Poll, Waker};
-use std::time::Duration;
 
 use central_api::chat::{AccountKeys, Delivery, DeviceRegistration, Sealed};
 use leptos::prelude::*;
@@ -31,9 +30,6 @@ use super::super::crypto::{Crypto, field_bytes};
 use super::super::session;
 use super::model::{Message, Review, merge, tag_of};
 use super::{Pending, Phase, Shown, time, wire};
-
-const QUICK: u32 = 2_000;
-const SLOWEST: u32 = 30_000;
 
 /// The chat's work, in the order it was asked for.
 pub enum Job {
@@ -77,13 +73,6 @@ pub struct Engine {
     closed: Cell<bool>,
     restored: Cell<bool>,
     cursor: Cell<u64>,
-    delay: Cell<u32>,
-    timer: Cell<Option<TimeoutHandle>>,
-    listener: RefCell<Option<WindowListenerHandle>>,
-    /// The engine's own reactive owner, for its timer and listener: Leptos
-    /// (0.9) ends both with the owner current when they were set, which
-    /// for a poll is whatever part of the page happened to run it.
-    owner: Owner,
     /// The keys last given to the Worker, by tag, as JSON.
     directory: RefCell<BTreeMap<String, String>>,
     /// Tags that have at least one device to write to.
@@ -116,24 +105,9 @@ impl Engine {
             closed: Cell::new(false),
             restored: Cell::new(false),
             cursor: Cell::new(0),
-            delay: Cell::new(QUICK),
-            timer: Cell::new(None),
-            listener: RefCell::new(None),
-            owner: Owner::new_root(None),
             directory: RefCell::default(),
             available: RefCell::default(),
         });
-        let weak = Rc::downgrade(&engine);
-        let listener = engine.owner.with(|| {
-            window_event_listener_untyped("visibilitychange", move |_| {
-                if let Some(engine) = weak.upgrade()
-                    && !document().hidden()
-                {
-                    engine.push(Job::Poll);
-                }
-            })
-        });
-        *engine.listener.borrow_mut() = Some(listener);
         leptos::task::spawn_local(Rc::clone(&engine).run());
         engine.push(Job::Start);
         engine
@@ -164,12 +138,6 @@ impl Engine {
     pub fn close(&self) {
         if self.closed.replace(true) {
             return;
-        }
-        if let Some(timer) = self.timer.take() {
-            timer.clear();
-        }
-        if let Some(listener) = self.listener.borrow_mut().take() {
-            listener.remove();
         }
         self.jobs.borrow_mut().clear();
         self.crypto.end();
@@ -217,35 +185,6 @@ impl Engine {
         let _ = self.crypto.ask("forget", json!({})).await;
         self.shown.update(|s| s.phase = Phase::Ended);
         self.close();
-    }
-
-    fn schedule(self: &Rc<Self>, wait: u32) {
-        if self.closed.get() {
-            return;
-        }
-        if let Some(timer) = self.timer.take() {
-            timer.clear();
-        }
-        let weak: Weak<Engine> = Rc::downgrade(self);
-        let timer = self.owner.with(|| {
-            set_timeout(
-                move || {
-                    if let Some(engine) = weak.upgrade() {
-                        engine.push(Job::Poll);
-                    }
-                },
-                Duration::from_millis(u64::from(wait)),
-            )
-        });
-        self.timer.set(timer.ok());
-    }
-
-    fn failed(&self) {
-        self.delay.set((self.delay.get() * 2).min(SLOWEST));
-        self.shown.update(|s| {
-            s.error = true;
-            s.loading = false;
-        });
     }
 
     fn read_trust(&self) -> Option<Vec<u8>> {
@@ -312,12 +251,16 @@ impl Engine {
                 Ok(())
             }
             Ok(false) => {
-                self.schedule(self.delay.get());
+                self.shown.update(|s| {
+                    s.error = false;
+                });
                 Ok(())
             }
             Err(failure) => {
-                self.failed();
-                self.schedule(self.delay.get());
+                self.shown.update(|s| {
+                    s.error = true;
+                    s.loading = false;
+                });
                 Err(failure)
             }
         }
@@ -355,7 +298,6 @@ impl Engine {
         if let Some(last) = deliveries.last() {
             self.cursor.set(last.seq);
         }
-        self.delay.set(QUICK);
         let names: Vec<(u32, String)> = deliveries
             .iter()
             .map(|d: &Delivery| (d.sender.tag, d.sender.display_name.clone()))

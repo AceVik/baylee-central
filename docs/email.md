@@ -183,7 +183,24 @@ Crate `central-mail`. Each mail has a plain text part and an HTML part:
 - a notice to the account's confirmed address that a reset code set a new
   password, saying whether the data was kept or a new vault began;
 - a notice to it that the password was changed;
-- a notice to it that an administrator made a reset code.
+- a notice to it that an administrator made a reset code;
+- a recovery-code backup mail sent on user request during sign-up or recovery code creation, carrying a client-generated (and optionally AES-256 encrypted) ZIP attachment (`baylee-recovery-code.zip`).
+
+### Mailer attachment contract (`baylee-mailer` `/v1/send`)
+
+All existing mails omit `attachments` (`#[serde(skip_serializing_if = "Option::is_none")]`) so deployed mailers without attachment support continue to accept every existing email unchanged. Only `Mail::RecoveryBackup` includes:
+
+```json
+"attachments": [
+  {
+    "filename": "baylee-recovery-code.zip",
+    "content_type": "application/zip",
+    "content_base64": "<bounded <= 48 KiB base64>"
+  }
+]
+```
+
+Central does not receive the plaintext ZIP password; the browser generates and encrypts `baylee-recovery-code.zip` locally using WinZip AE-2 (AES-256 + HMAC-SHA1-80) when a password is entered.
 
 The HTML is a table layout with inline styles. It has no image except,
 where the operator turned it on, Baylee's logo, which the mailer attaches

@@ -18,10 +18,10 @@
 use central_api::{
     Error,
     presence::{Activity, Choice, Shown, Table},
-    social::MAX_CONTACTS,
+    social::{ContactAction, MAX_CONTACTS},
 };
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{
         Arc, Mutex, PoisonError,
         atomic::{AtomicU8, Ordering},
@@ -29,6 +29,56 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Notify;
+
+/// Structured push notices queued per browser push socket (`ws.rs`), bounded
+/// so bursts collapse cleanly to coarse sync signals.
+const MAX_SOCKET_NOTICES: usize = 32;
+
+/// Structured notification delivered over a browser push socket (`GET /api/v1/ws`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Notice {
+    /// Encrypted chat message accepted for delivery to this account.
+    ChatMessage {
+        /// Canonical conversation identifier (`dm:<lo>:<hi>` or `grp:<uuid>`).
+        conv: String,
+        /// Client correlation identifier (`UUIDv7`).
+        id: String,
+        /// Server acceptance timestamp in Unix milliseconds.
+        at: u64,
+        /// Sender's public tag when known.
+        from: Option<u32>,
+    },
+    /// Group/thread created, updated, or membership changed.
+    Thread {
+        /// Transition verb (`created`, `renamed`, `description`, `picture`,
+        /// `invited`, `accepted`, `declined`, `withdrawn`, `left`, `removed`,
+        /// `transferred`, `admin`, `deleted`).
+        action: &'static str,
+        /// Canonical group identifier.
+        group: String,
+    },
+    /// Incoming or outgoing friend/contact request changed.
+    FriendRequest {
+        /// Peer's public tag from the receiving account's viewpoint.
+        tag: u32,
+    },
+    /// Mutual friendship accepted (contact accept, crossed request, or invite).
+    FriendAccept {
+        /// Peer's public tag from the receiving account's viewpoint.
+        tag: u32,
+        /// `true` when accepted by redeeming a friend invite.
+        via_invite: bool,
+    },
+    /// Contact removed, declined, canceled, or blocked/unblocked.
+    ContactChanged {
+        /// Peer's public tag from the receiving account's viewpoint.
+        tag: u32,
+    },
+    /// Coarse chat sync fallback (`{"event":"chat"}`).
+    ChatSync,
+    /// Coarse social sync fallback (`{"event":"social"}`).
+    SocialSync,
+}
 
 /// Sockets one account may hold at once. A client holds one; a redial while
 /// the server has not yet noticed the old one's end holds a second for up to
@@ -122,6 +172,15 @@ struct Socket {
     signal: Arc<Signal>,
     /// It has said `ready`, so its account is online.
     live: bool,
+    /// Whether this socket receives structured [`Notice`] frames (`GET /api/v1/ws`).
+    structured: bool,
+    /// Visibility/idle away state signaled by this browser socket.
+    away: bool,
+    /// Pending structured notices queued for this socket.
+    notices: VecDeque<Notice>,
+    /// Coarse news bits (`news::CHAT | news::SOCIAL`) when coarse news was
+    /// raised or [`Self::notices`] overflowed.
+    fallback_bits: u8,
     /// What its session last said the client is doing; gone with the socket.
     report: Option<Report>,
 }
@@ -197,11 +256,33 @@ impl State {
         if bits & (news::CHECK | news::REVOKED) != 0 {
             self.ends += 1;
         }
-        if let Some(entry) = self.accounts.get(account) {
-            for id in &entry.sockets {
-                if let Some(socket) = self.sockets.get(id) {
-                    socket.signal.raise(bits);
+        let Some(entry) = self.accounts.get(account) else {
+            return;
+        };
+        for id in &entry.sockets {
+            if let Some(socket) = self.sockets.get_mut(id) {
+                if socket.structured {
+                    socket.fallback_bits |= bits & (news::CHAT | news::SOCIAL);
                 }
+                socket.signal.raise(bits);
+            }
+        }
+    }
+
+    fn raise_notice(&mut self, account: &[u8; 16], bit: u8, notice: &Notice) {
+        let Some(entry) = self.accounts.get(account) else {
+            return;
+        };
+        for id in &entry.sockets {
+            if let Some(socket) = self.sockets.get_mut(id) {
+                if socket.structured {
+                    if socket.notices.len() < MAX_SOCKET_NOTICES {
+                        socket.notices.push_back(notice.clone());
+                    } else {
+                        socket.fallback_bits |= bit & (news::CHAT | news::SOCIAL);
+                    }
+                }
+                socket.signal.raise(bit);
             }
         }
     }
@@ -240,16 +321,29 @@ impl State {
             .iter()
             .filter_map(|id| self.sockets.get(id)?.report.as_ref())
             .max_by_key(|report| report.at);
-        let activity = report.and_then(|report| report.activity);
+        if let Some(report) = report {
+            let activity = report.activity;
+            return Some(Showing {
+                shown: Shown {
+                    away: entry.choice == Choice::Afk || report.idle,
+                    activity,
+                },
+                // A report keeps none without an activity; this says it again.
+                table: report.table.clone().filter(|_| activity.is_some()),
+            });
+        }
+        let all_away = entry
+            .sockets
+            .iter()
+            .filter_map(|id| self.sockets.get(id))
+            .filter(|socket| socket.live)
+            .all(|socket| socket.away);
         Some(Showing {
             shown: Shown {
-                away: entry.choice == Choice::Afk || report.is_some_and(|report| report.idle),
-                activity,
+                away: entry.choice == Choice::Afk || all_away,
+                activity: None,
             },
-            // A report keeps none without an activity; this says it again.
-            table: report
-                .and_then(|report| report.table.clone())
-                .filter(|_| activity.is_some()),
+            table: None,
         })
     }
 
@@ -503,6 +597,7 @@ impl Live {
     /// `again` reads it anew, now that no write of the account is under way.
     /// So a socket is admitted with the store's choice and never an older one,
     /// whichever came first.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) async fn admit_in_turn<R>(
         self: &Arc<Self>,
         account: [u8; 16],
@@ -515,18 +610,59 @@ impl Live {
     where
         R: Future<Output = Result<Choice, Error>>,
     {
+        self.admit_in_turn_with(account, tag, (read, since), digest, false, again)
+            .await
+    }
+
+    pub(super) async fn admit_in_turn_with<R>(
+        self: &Arc<Self>,
+        account: [u8; 16],
+        tag: Option<u32>,
+        (read, since): (Choice, u64),
+        digest: [u8; 32],
+        structured: bool,
+        again: R,
+    ) -> Result<(Listener, Option<Reading>), Error>
+    where
+        R: Future<Output = Result<Choice, Error>>,
+    {
         let _turn = self.turn(account).await;
         let choice = if self.settled() == since {
             read
         } else {
             again.await?
         };
-        self.admit(account, tag, choice, digest)
+        self.admit_with(account, tag, choice, digest, structured)
     }
 
     /// How many choices have settled ([`State::settled`]).
     pub(super) fn settled(&self) -> u64 {
         self.state().settled
+    }
+
+    /// Browser socket visibility/idle `away` update on a single open socket,
+    /// within [`SESSION_REPORTS`] a minute. Redundant updates matching the
+    /// socket's current state succeed without charging the budget.
+    pub(super) fn report_socket(&self, id: u64, away: bool, now: Instant) -> bool {
+        let mut guard = self.state();
+        let state = &mut *guard;
+        let Some(socket) = state.sockets.get(&id) else {
+            return false;
+        };
+        if socket.away == away {
+            return true;
+        }
+        let account = socket.account;
+        let digest = socket.digest;
+        if !spend(&mut state.reports, digest, now, SESSION_REPORTS, DIALERS) {
+            return false;
+        }
+        let before = state.showing(&account);
+        if let Some(socket) = state.sockets.get_mut(&id) {
+            socket.away = away;
+        }
+        state.shown_changed(&account, before.as_ref());
+        true
     }
 
     /// What the client of the session `digest` says it is doing, within
@@ -586,12 +722,24 @@ impl Live {
     /// not been read. `choice` is the store's as the dial read it in the
     /// account's turn ([`Self::admit_in_turn`]), at least as new as the
     /// entry's: it replaces a standing one, whose sockets then say it.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn admit(
         self: &Arc<Self>,
         account: [u8; 16],
         tag: Option<u32>,
         choice: Choice,
         digest: [u8; 32],
+    ) -> Result<(Listener, Option<Reading>), Error> {
+        self.admit_with(account, tag, choice, digest, false)
+    }
+
+    pub(super) fn admit_with(
+        self: &Arc<Self>,
+        account: [u8; 16],
+        tag: Option<u32>,
+        choice: Choice,
+        digest: [u8; 32],
+        structured: bool,
     ) -> Result<(Listener, Option<Reading>), Error> {
         let mut guard = self.state();
         let state = &mut *guard;
@@ -641,6 +789,10 @@ impl Live {
                 digest,
                 signal: Arc::clone(&signal),
                 live: false,
+                structured,
+                away: false,
+                notices: VecDeque::new(),
+                fallback_bits: 0,
                 report: None,
             },
         );
@@ -725,14 +877,68 @@ impl Live {
         self.state().raise(account, bits);
     }
 
+    pub(super) fn raise_notice(&self, account: &[u8; 16], bit: u8, notice: &Notice) {
+        self.state().raise_notice(account, bit, notice);
+    }
+
+    pub(super) fn any_structured(&self, accounts: &BTreeSet<[u8; 16]>) -> bool {
+        let state = self.state();
+        accounts.iter().any(|account| {
+            state.accounts.get(account).is_some_and(|entry| {
+                entry.sockets.iter().any(|id| {
+                    state
+                        .sockets
+                        .get(id)
+                        .is_some_and(|socket| socket.structured)
+                })
+            })
+        })
+    }
+
+    pub(super) fn session_account_tag(&self, digest: &[u8; 32]) -> Option<([u8; 16], u32)> {
+        let state = self.state();
+        let id = state.by_digest.get(digest)?.iter().next().copied()?;
+        let account = state.sockets.get(&id)?.account;
+        let tag = state.accounts.get(&account)?.tag?;
+        Some((account, tag))
+    }
+
+    /// Rebind every open socket on `old_digest` to `new_digest` so routine
+    /// `RefreshSession` rotation does not sever active browser push sockets.
+    pub(super) fn rotated(&self, old_digest: &[u8; 32], new_digest: [u8; 32]) {
+        if old_digest == &new_digest {
+            return;
+        }
+        let mut guard = self.state();
+        let state = &mut *guard;
+        let Some(mut ids) = state.by_digest.remove(old_digest) else {
+            return;
+        };
+        for &id in &ids {
+            if let Some(socket) = state.sockets.get_mut(&id) {
+                socket.digest = new_digest;
+            }
+        }
+        if let Some(report) = state.reports.remove(old_digest) {
+            state.reports.entry(new_digest).or_insert(report);
+        }
+        state
+            .by_digest
+            .entry(new_digest)
+            .or_default()
+            .append(&mut ids);
+    }
+
     /// The session `digest` ended: its sockets say `revoked`. A sign-out ends
     /// exactly the session that asked, so nothing need be read.
     pub(super) fn ended(&self, digest: &[u8; 32]) {
         let mut state = self.state();
         state.ends += 1;
-        for socket in state.sockets.values() {
-            if &socket.digest == digest {
-                socket.signal.raise(news::REVOKED);
+        if let Some(ids) = state.by_digest.get(digest).cloned() {
+            for id in ids {
+                if let Some(socket) = state.sockets.get(&id) {
+                    socket.signal.raise(news::REVOKED);
+                }
             }
         }
     }
@@ -910,6 +1116,29 @@ impl Listener {
         self.signal.bits.swap(0, Ordering::AcqRel)
     }
 
+    /// Clear raised bits and drain any pending structured push notices for a
+    /// browser socket (`GET /api/v1/ws`).
+    #[must_use]
+    pub fn take_browser(&self) -> (u8, Vec<Notice>) {
+        let bits = self.signal.bits.swap(0, Ordering::AcqRel);
+        if bits & (news::CHAT | news::SOCIAL) == 0 {
+            return (bits, Vec::new());
+        }
+        let mut state = self.live.state();
+        let Some(socket) = state.sockets.get_mut(&self.id) else {
+            return (bits, Vec::new());
+        };
+        let mut out: Vec<Notice> = socket.notices.drain(..).collect();
+        let fallback = std::mem::take(&mut socket.fallback_bits);
+        if fallback & news::CHAT != 0 {
+            out.push(Notice::ChatSync);
+        }
+        if fallback & news::SOCIAL != 0 {
+            out.push(Notice::SocialSync);
+        }
+        (bits, out)
+    }
+
     /// Wait until something is raised. Cancel-safe: the bits stay until
     /// [`Self::take`], and a raise while nobody waits is kept for the next wait.
     pub async fn rung(&self) {
@@ -921,8 +1150,22 @@ impl Listener {
         self.live.ready(self.id);
     }
 
-    pub(super) const fn digest(&self) -> &[u8; 32] {
-        &self.digest
+    /// Update this browser socket's visibility/idle away state within
+    /// [`SESSION_REPORTS`] a minute; returns `false` if closed or over budget.
+    #[must_use]
+    pub fn set_away(&self, away: bool) -> bool {
+        self.live.report_socket(self.id, away, Instant::now())
+    }
+
+    /// The digest currently bound to this socket, tracking any session
+    /// rotation via [`Live::rotated`].
+    #[must_use]
+    pub fn current_digest(&self) -> [u8; 32] {
+        self.live
+            .state()
+            .sockets
+            .get(&self.id)
+            .map_or(self.digest, |socket| socket.digest)
     }
 
     pub(super) fn account(&self) -> Option<[u8; 16]> {
@@ -967,7 +1210,35 @@ impl super::IdentityService {
         let super::Presented::Session(token) = presented else {
             return Err(Error::Rejected);
         };
-        self.live.dial(token.digest(), Instant::now())?;
+        self.listen_session(token, super::Surface::Native, false, place)
+            .await
+    }
+
+    /// Admit a structured browser push socket (`GET /api/v1/ws`) for the
+    /// `__Host-central` session `cookie`, from `place`.
+    ///
+    /// # Errors
+    /// `Rejected` for a session that does not stand, `TermsRequired`,
+    /// `Busy` for a limit, `Unavailable` for the store.
+    pub async fn listen_browser(
+        &self,
+        cookie: &super::Token,
+        place: Option<super::Place>,
+    ) -> Result<Listener, Error> {
+        self.listen_session(cookie, super::Surface::Browser, true, place)
+            .await
+    }
+
+    async fn listen_session(
+        &self,
+        token: &super::Token,
+        surface: super::Surface,
+        structured: bool,
+        place: Option<super::Place>,
+    ) -> Result<Listener, Error> {
+        let session = surface.session(Some(token))?;
+        let digest = session.digest();
+        self.live.dial(digest, Instant::now())?;
         // Counted before the status is read: news that a session ended which
         // comes between it and the socket's registration finds no socket, and
         // a choice settled meanwhile may not be in the status.
@@ -979,34 +1250,32 @@ impl super::IdentityService {
             .lock()
             .map_err(|_| Error::Unavailable)?
             .request(&request, Some(token), place, Instant::now())?;
-        let status = self
-            .store
-            .session_status(central_postgres::Session::Native(token))
-            .await;
+        let status = self.store.session_status(session).await;
         // The status answer vouches for the bearer as a status request's does.
         let answer = match &status {
             Ok(_) => Ok(super::BrowserReply {
                 response: central_api::wire::Response::Done,
                 session: None,
+                refresh: None,
+                clear_cookies: false,
             }),
             Err(error) => Err(*error),
         };
         self.answered(told.as_ref(), Some(token), &answer).await;
         let status = status?;
-        self.require_terms(Some(token), super::Surface::Native)
-            .await?;
+        self.require_terms(Some(token), surface).await?;
         let account = status.identity.account;
         let (listener, reading) = self
             .live
-            .admit_in_turn(
+            .admit_in_turn_with(
                 account,
                 status.tag,
-                status.presence,
-                settled,
-                token.digest(),
+                (status.presence, settled),
+                digest,
+                structured,
                 async {
                     self.store
-                        .session_status(central_postgres::Session::Native(token))
+                        .session_status(session)
                         .await
                         .map(|again| again.presence)
                 },
@@ -1025,9 +1294,7 @@ impl super::IdentityService {
         // needs no second look: it was admitted with the store's, and any
         // choice from here on finds the entry ([`Live::settle`]).
         if self.live.ends() != ends {
-            self.store
-                .session_status(central_postgres::Session::Native(token))
-                .await?;
+            self.store.session_status(session).await?;
         }
         Ok(listener)
     }
@@ -1128,7 +1395,7 @@ impl super::IdentityService {
     /// # Errors
     /// `Unavailable` when the store cannot say, which is not an ended session.
     pub async fn listening(&self, listener: &Listener) -> Result<bool, Error> {
-        let digest = *listener.digest();
+        let digest = listener.current_digest();
         Ok(self.store.live_sessions(&[digest]).await?.contains(&digest))
     }
 
@@ -1183,11 +1450,121 @@ impl super::IdentityService {
         for account in &concerns.chat {
             self.live.raise(account, news::CHAT);
         }
-        for account in &concerns.social {
+        if let Some(((inviter, inviter_tag), (invitee, invitee_tag))) = concerns.invite_accepted() {
+            self.live.raise_notice(
+                &inviter,
+                news::SOCIAL,
+                &Notice::FriendAccept {
+                    tag: invitee_tag,
+                    via_invite: true,
+                },
+            );
+            if invitee != inviter {
+                self.live.raise_notice(
+                    &invitee,
+                    news::SOCIAL,
+                    &Notice::FriendAccept {
+                        tag: inviter_tag,
+                        via_invite: true,
+                    },
+                );
+            }
+            for account in &concerns.social {
+                if *account != inviter && *account != invitee {
+                    self.live.raise(account, news::SOCIAL);
+                }
+            }
+        } else {
+            for account in &concerns.social {
+                self.live.raise(account, news::SOCIAL);
+            }
+        }
+        self.spawn_readings(concerns.pair);
+    }
+
+    pub(super) fn has_structured(&self, accounts: &BTreeSet<[u8; 16]>) -> bool {
+        self.live.any_structured(accounts)
+    }
+
+    pub(super) fn caller_tag_cached(&self, digest: &[u8; 32]) -> Option<([u8; 16], u32)> {
+        self.live.session_account_tag(digest)
+    }
+
+    pub(super) fn tell_chat_message(
+        &self,
+        recipients: &BTreeSet<[u8; 16]>,
+        conv: &str,
+        id: &str,
+        at: u64,
+        from: Option<u32>,
+        extra_social: &BTreeSet<[u8; 16]>,
+    ) {
+        let notice = Notice::ChatMessage {
+            conv: conv.to_owned(),
+            id: id.to_owned(),
+            at,
+            from,
+        };
+        for account in recipients {
+            self.live.raise_notice(account, news::CHAT, &notice);
+        }
+        for account in extra_social {
             self.live.raise(account, news::SOCIAL);
         }
-        let readings: Vec<Pending> = concerns
-            .pair
+    }
+
+    pub(super) fn tell_thread(
+        &self,
+        recipients: &BTreeSet<[u8; 16]>,
+        action: &'static str,
+        group: &str,
+    ) {
+        let notice = Notice::Thread {
+            action,
+            group: group.to_owned(),
+        };
+        for account in recipients {
+            self.live.raise_notice(account, news::SOCIAL, &notice);
+        }
+    }
+
+    pub(super) fn tell_contact(
+        &self,
+        social: &BTreeSet<[u8; 16]>,
+        pair: Option<([u8; 16], [u8; 16])>,
+        target_tag: u32,
+        action: ContactAction,
+        caller: Option<([u8; 16], u32)>,
+    ) {
+        let accepted =
+            pair.is_some() && matches!(action, ContactAction::Request | ContactAction::Accept);
+        for account in social {
+            let peer_tag = match caller {
+                Some((caller_id, _)) if *account == caller_id => Some(target_tag),
+                Some((_, caller_tag)) => Some(caller_tag),
+                None => None,
+            };
+            if let Some(tag) = peer_tag {
+                let notice = if accepted {
+                    Notice::FriendAccept {
+                        tag,
+                        via_invite: false,
+                    }
+                } else if matches!(action, ContactAction::Request) {
+                    Notice::FriendRequest { tag }
+                } else {
+                    Notice::ContactChanged { tag }
+                };
+                self.live.raise_notice(account, news::SOCIAL, &notice);
+            } else {
+                self.live.raise(account, news::SOCIAL);
+            }
+        }
+        self.spawn_readings(pair);
+    }
+
+    fn spawn_readings(&self, pair: Option<([u8; 16], [u8; 16])>) {
+        let readings: Vec<Pending> = pair
             .into_iter()
             .flat_map(|(one, other)| [one, other])
             .filter_map(|account| self.live.reread(account))

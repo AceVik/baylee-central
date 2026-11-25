@@ -93,12 +93,12 @@ impl AccountStore {
         let owner = lock_owner(&tx, session).await?;
         let row = tx.query_one_raw(statement(
             "INSERT INTO central_identity.gateways(owner_id,origin,name,version,website,credential_digest,heartbeat_digest)
-             SELECT $1,$2,$3,$4,$5,$6,$7 WHERE (SELECT count(*) FROM central_identity.gateways WHERE owner_id=$1)<8
-             OR EXISTS(SELECT 1 FROM central_identity.gateways g WHERE g.origin=$2 AND g.owner_id=$1
+             SELECT $1,$2,$3,$4,$5,$6,$7 WHERE (SELECT count(*) FROM central_identity.gateways WHERE owner_id=$1 AND deleted_at IS NULL)<8
+             OR EXISTS(SELECT 1 FROM central_identity.gateways g WHERE g.origin=$2 AND g.owner_id=$1 AND g.deleted_at IS NULL
                  AND NOT EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id))
-             ON CONFLICT(origin) DO UPDATE SET (name,version,website,credential_digest,heartbeat_digest) =
+             ON CONFLICT(origin) WHERE deleted_at IS NULL DO UPDATE SET (name,version,website,credential_digest,heartbeat_digest) =
                  (EXCLUDED.name,EXCLUDED.version,EXCLUDED.website,EXCLUDED.credential_digest,EXCLUDED.heartbeat_digest)
-             WHERE gateways.owner_id=EXCLUDED.owner_id AND NOT EXISTS
+             WHERE gateways.deleted_at IS NULL AND gateways.owner_id=EXCLUDED.owner_id AND NOT EXISTS
                  (SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=gateways.id)
              RETURNING id",
             vec![owner.into(),origin.into(),metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),credential.digest().to_vec().into(),heartbeat.digest().to_vec().into()]
@@ -123,7 +123,7 @@ impl AccountStore {
             "SELECT g.id,g.origin,g.name,g.version,g.website,
              COALESCE(g.last_seen > pg_catalog.clock_timestamp()-interval '90 seconds',false) AS online
              FROM central_identity.gateways g JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
-             WHERE ($1::uuid IS NULL OR g.id>$1) ORDER BY g.id LIMIT 100", vec![after.map(uuid).into()]
+             WHERE g.deleted_at IS NULL AND ($1::uuid IS NULL OR g.id>$1) ORDER BY g.id LIMIT 100", vec![after.map(uuid).into()]
         )).await.map_err(|_| Error::Unavailable)?;
         rows.into_iter()
             .map(|row| {
@@ -161,7 +161,7 @@ impl AccountStore {
         let rows = self.db.query_all_raw(statement(
             "SELECT g.id,g.activity_players,g.activity_playing,g.activity_tables,g.activity_games
              FROM central_identity.gateways g JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id AND p.enabled
-             WHERE ($1::uuid IS NULL OR g.id>$1)
+             WHERE g.deleted_at IS NULL AND ($1::uuid IS NULL OR g.id>$1)
              AND g.last_seen > pg_catalog.clock_timestamp()-interval '90 seconds'
              AND g.activity_at > pg_catalog.clock_timestamp()-interval '90 seconds'
              ORDER BY g.id LIMIT 100", vec![after.map(uuid).into()]
@@ -243,7 +243,7 @@ impl AccountStore {
         // be both a credential and a token, so at most one row answers.
         let row=db.query_one_raw(statement(
             &format!("SELECT g.id,g.origin FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official
+             ON p.gateway_id=g.id AND p.enabled WHERE g.credential_digest=$1 AND NOT g.official AND g.deleted_at IS NULL
              UNION ALL
              SELECT g.id,g.origin FROM central_identity.gateway_tokens t
              JOIN central_identity.gateways g ON g.id=t.gateway_id
@@ -274,14 +274,14 @@ impl AccountStore {
             .db
             .query_one_raw(statement(
                 "SELECT g.owner_id FROM central_identity.gateways g
-                 WHERE g.credential_digest = $1 AND NOT g.official
+                 WHERE g.credential_digest = $1 AND NOT g.official AND g.deleted_at IS NULL
                  UNION ALL
                  SELECT g.owner_id FROM central_identity.gateways g
-                 WHERE g.heartbeat_digest = $1 AND NOT g.official
+                 WHERE g.heartbeat_digest = $1 AND NOT g.official AND g.deleted_at IS NULL
                  UNION ALL
                  SELECT g.owner_id FROM central_identity.gateway_tokens t
                  JOIN central_identity.gateways g ON g.id = t.gateway_id
-                 WHERE t.digest = $1 AND NOT g.official LIMIT 1",
+                 WHERE t.digest = $1 AND NOT g.official AND g.deleted_at IS NULL LIMIT 1",
                 vec![bearer.digest().to_vec().into()],
             ))
             .await
@@ -342,7 +342,7 @@ impl AccountStore {
         let [players, playing, tables, games] = counts(activity)?;
         let row=self.db.query_one_raw(statement(
             &format!("SELECT g.id,g.origin,false AS by_token FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official
+             ON p.gateway_id=g.id AND p.enabled WHERE g.heartbeat_digest=$1 AND NOT g.official AND g.deleted_at IS NULL
              UNION ALL
              SELECT g.id,g.origin,true FROM central_identity.gateway_tokens t
              JOIN central_identity.gateways g ON g.id=t.gateway_id
@@ -431,12 +431,12 @@ impl AccountStore {
         let any = any_origin(1);
         self.db.query_one_raw(statement(
             &format!("SELECT g.id FROM central_identity.gateways g JOIN central_identity.gateway_approvals p
-             ON p.gateway_id=g.id AND p.enabled WHERE g.official AND g.origin={any}"),vec![origins(set)?]
+             ON p.gateway_id=g.id AND p.enabled WHERE g.official AND g.deleted_at IS NULL AND g.origin={any}"),vec![origins(set)?]
         )).await.map_err(|_|Error::Unavailable)?.ok_or(Error::Rejected)?;
         let updated=self.db.execute_raw(statement(
             &format!("UPDATE central_identity.gateways g SET name=$2,version=$3,website=$4,last_seen=pg_catalog.clock_timestamp(),
              {ACTIVITY}
-             WHERE official AND origin={any}
+             WHERE official AND deleted_at IS NULL AND origin={any}
              AND (last_seen IS NULL OR last_seen<=pg_catalog.clock_timestamp()-interval '5 seconds')
              AND EXISTS(SELECT 1 FROM central_identity.gateway_approvals p WHERE p.gateway_id=g.id AND p.enabled)"),
             vec![origins(set)?,metadata.name.clone().into(),metadata.version.clone().into(),metadata.website.clone().into(),players,playing,tables,games]
@@ -475,7 +475,7 @@ impl AccountStore {
         let result = tx
             .execute_raw(statement(
                 "UPDATE central_identity.gateways SET admin_revision=admin_revision+1
-             WHERE id=$1 AND owner_id=$2 AND admin_revision=$3",
+             WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL AND admin_revision=$3",
                 vec![uuid(gateway).into(), owner.into(), expected.into()],
             ))
             .await

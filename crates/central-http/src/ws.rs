@@ -25,10 +25,10 @@ use axum::{
 };
 use base64::Engine as _;
 use central_api::{
-    Error,
+    Error, Token,
     presence::{LONGEST_TABLE_FRAME, Table, table_frame},
 };
-use central_identity::{IdentityService, Listener, Place, Presence, news};
+use central_identity::{IdentityService, Listener, Notice, Place, Presence, news};
 use frame::{Code, Ended, Frame, Reader};
 use hyper_util::rt::TokioIo;
 use sha1::Digest as _;
@@ -49,6 +49,7 @@ use tokio::{
 /// The first line of a connection that may become a push socket, exactly.
 pub(crate) const REQUEST_LINE: &[u8] = b"GET /v1/ws HTTP/1.1\r\n";
 const GAME_LINE: &[u8] = b"GET /v1/ranked/socket HTTP/1.1\r\n";
+pub(crate) const BROWSER_LINE: &[u8] = b"GET /api/v1/ws HTTP/1.1\r\n";
 /// How long a new connection has to show its first line before it is taken
 /// for an ordinary one. A client sends its request's head at once.
 const FIRST_LINE: Duration = Duration::from_secs(1);
@@ -288,6 +289,7 @@ impl Upgrades {
 /// without taking it from the connection. Anything else, a line that is
 /// slow to come included, is an ordinary connection.
 pub(crate) async fn asks(stream: &TcpStream) -> bool {
+    const LINES: [&[u8]; 3] = [REQUEST_LINE, GAME_LINE, BROWSER_LINE];
     let deadline = Instant::now() + FIRST_LINE;
     let mut seen = [0_u8; GAME_LINE.len()];
     loop {
@@ -295,10 +297,10 @@ pub(crate) async fn asks(stream: &TcpStream) -> bool {
             return false;
         };
         let received = &seen[..read];
-        if received.starts_with(REQUEST_LINE) || received.starts_with(GAME_LINE) {
+        if LINES.iter().any(|line| received.starts_with(line)) {
             return true;
         }
-        if read == 0 || !(REQUEST_LINE.starts_with(received) || GAME_LINE.starts_with(received)) {
+        if read == 0 || !LINES.iter().any(|line| line.starts_with(received)) {
             return false;
         }
         // Peeking again at once would see the same bytes.
@@ -401,6 +403,64 @@ pub(super) fn accept(key: &str) -> Option<HeaderValue> {
     HeaderValue::from_str(&engine.encode(digest)).ok()
 }
 
+/// Service capabilities needed to run an upgraded browser push socket.
+pub(crate) trait PushPeer: Send + Sync + 'static {
+    fn listen_browser(
+        &self,
+        cookie: &Token,
+        place: Place,
+    ) -> impl Future<Output = Result<Listener, Error>> + Send;
+    fn presence(&self, listener: &Listener) -> Presence;
+    fn listening(&self, listener: &Listener) -> impl Future<Output = Result<bool, Error>> + Send;
+}
+
+impl PushPeer for IdentityService {
+    fn listen_browser(
+        &self,
+        cookie: &Token,
+        place: Place,
+    ) -> impl Future<Output = Result<Listener, Error>> + Send {
+        Self::listen_browser(self, cookie, Some(place))
+    }
+
+    fn presence(&self, listener: &Listener) -> Presence {
+        Self::presence(self, listener)
+    }
+
+    fn listening(&self, listener: &Listener) -> impl Future<Output = Result<bool, Error>> + Send {
+        Self::listening(self, listener)
+    }
+}
+
+/// `GET /api/v1/ws` from a same-origin browser session (`browser.rs`):
+/// validates the WebSocket handshake, `__Host-central` cookie, and address
+/// limits before upgrading to structured browser frames.
+pub(crate) async fn dial_browser<P: PushPeer>(
+    peer: Arc<P>,
+    from: Client,
+    cookie: Option<Token>,
+    request: Request,
+) -> Response {
+    let accept = match handshake(request.headers()) {
+        Ok(accept) => accept,
+        Err(refusal) => return refusal.into_response(),
+    };
+    let Some(cookie) = cookie else {
+        return failure(Error::Rejected);
+    };
+    let opening = match Opening::admit_accepted(&request, Some(from), accept) {
+        Ok(opening) => opening,
+        Err(refusal) => return refusal.into_response(),
+    };
+    let listener = match peer.listen_browser(&cookie, Place::from(from)).await {
+        Ok(listener) => listener,
+        Err(error) => return failure(error),
+    };
+    opening.start(request, |place, upgraded, stop| {
+        serve_with(peer, listener, place, upgraded, stop, true)
+    })
+}
+
 /// `GET /v1/ws` from `from` (`native.rs`): admit a socket, or refuse with the
 /// native route's vocabulary.
 pub(crate) async fn dial(
@@ -424,12 +484,13 @@ pub(crate) async fn dial(
         Ok(listener) => listener,
         Err(error) => return failure(error),
     };
+    let peer = Arc::clone(identity);
     opening.start(request, |place, upgraded, stop| {
-        serve(Arc::clone(identity), listener, place, upgraded, stop)
+        serve_with(peer, listener, place, upgraded, stop, false)
     })
 }
 
-/// Both native WebSocket routes charge the same listener and address budgets.
+/// WebSocket routes share the same listener and address budgets.
 pub(super) struct Opening {
     upgrades: Upgrades,
     place: Seat,
@@ -438,12 +499,20 @@ pub(super) struct Opening {
 
 impl Opening {
     pub(super) fn admit(request: &Request, from: Option<Client>) -> Result<Self, Refusal> {
+        let accept = handshake(request.headers())?;
+        Self::admit_accepted(request, from, accept)
+    }
+
+    fn admit_accepted(
+        request: &Request,
+        from: Option<Client>,
+        accept: HeaderValue,
+    ) -> Result<Self, Refusal> {
         let upgrades = request
             .extensions()
             .get::<Upgrades>()
             .cloned()
             .ok_or(Refusal::Invalid)?;
-        let accept = handshake(request.headers())?;
         if from.is_some_and(|client| !upgrades.dial(client)) {
             return Err(Refusal::Busy);
         }
@@ -490,22 +559,29 @@ pub(crate) fn closing(mut response: Response) -> Response {
 }
 
 /// One socket, from the upgrade to its end.
-async fn serve(
-    identity: Arc<IdentityService>,
+async fn serve_with<P: PushPeer>(
+    peer: Arc<P>,
     listener: Listener,
     place: Seat,
     upgraded: hyper::upgrade::OnUpgrade,
     stop: watch::Receiver<bool>,
+    structured: bool,
 ) {
     let _place = place;
     let Ok(Ok(upgraded)) = tokio::time::timeout(UPGRADE_TIME, upgraded).await else {
         return;
     };
     let (reader, writer) = tokio::io::split(TokioIo::new(upgraded));
-    let account = Served { identity, listener };
-    Socket::new(account, reader, writer, stop, Times::SERVED)
-        .run()
-        .await;
+    let account = Served { peer, listener };
+    if structured {
+        Socket::new_browser(account, reader, writer, stop, Times::SERVED)
+            .run()
+            .await;
+    } else {
+        Socket::new(account, reader, writer, stop, Times::SERVED)
+            .run()
+            .await;
+    }
 }
 
 /// What a socket asks of the account service: its doorbell, its account's
@@ -513,6 +589,14 @@ async fn serve(
 trait Account {
     /// The bits raised since the last call ([`news`]).
     fn take(&self) -> u8;
+    /// Clear raised bits and drain structured notices for a browser socket.
+    fn take_browser(&self) -> (u8, Vec<Notice>) {
+        (self.take(), Vec::new())
+    }
+    /// Update visibility/idle away state signaled over a browser push socket.
+    fn set_away(&self, _away: bool) -> bool {
+        false
+    }
     /// Wait until a bit is raised; cancel-safe.
     fn rung(&self) -> impl Future<Output = ()> + Send;
     /// The socket said `ready`.
@@ -525,14 +609,22 @@ trait Account {
 }
 
 /// The socket's account as the service serves it.
-struct Served {
-    identity: Arc<IdentityService>,
+struct Served<P> {
+    peer: Arc<P>,
     listener: Listener,
 }
 
-impl Account for Served {
+impl<P: PushPeer> Account for Served<P> {
     fn take(&self) -> u8 {
         self.listener.take()
+    }
+
+    fn take_browser(&self) -> (u8, Vec<Notice>) {
+        self.listener.take_browser()
+    }
+
+    fn set_away(&self, away: bool) -> bool {
+        self.listener.set_away(away)
     }
 
     fn rung(&self) -> impl Future<Output = ()> + Send {
@@ -544,11 +636,11 @@ impl Account for Served {
     }
 
     fn presence(&self) -> Presence {
-        self.identity.presence(&self.listener)
+        self.peer.presence(&self.listener)
     }
 
     fn listening(&self) -> impl Future<Output = Result<bool, Error>> + Send {
-        self.identity.listening(&self.listener)
+        self.peer.listening(&self.listener)
     }
 }
 
@@ -599,6 +691,7 @@ struct Socket<A, R, W> {
     reader: R,
     writer: W,
     frames: Reader,
+    structured: bool,
     stop: watch::Receiver<bool>,
     times: Times,
     /// The presence last said (its tables apart), and when it or a table was.
@@ -618,11 +711,37 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
         stop: watch::Receiver<bool>,
         times: Times,
     ) -> Self {
+        Self::with_mode(account, reader, writer, stop, times, false)
+    }
+
+    const fn new_browser(
+        account: A,
+        reader: R,
+        writer: W,
+        stop: watch::Receiver<bool>,
+        times: Times,
+    ) -> Self {
+        Self::with_mode(account, reader, writer, stop, times, true)
+    }
+
+    const fn with_mode(
+        account: A,
+        reader: R,
+        writer: W,
+        stop: watch::Receiver<bool>,
+        times: Times,
+        structured: bool,
+    ) -> Self {
         Self {
             account,
             reader,
             writer,
-            frames: Reader::new(),
+            frames: if structured {
+                Reader::browser()
+            } else {
+                Reader::new()
+            },
+            structured,
             stop,
             times,
             sent: None,
@@ -662,9 +781,13 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
             if *self.stop.borrow() {
                 return End::Close(Code::GOING_AWAY);
             }
-            let bits = self.account.take();
+            let (bits, notices) = if self.structured {
+                self.account.take_browser()
+            } else {
+                (self.account.take(), Vec::new())
+            };
             if bits != 0 {
-                match self.act(bits).await {
+                match self.act_with(bits, notices).await {
                     Ok(None) => continue,
                     Ok(Some(end)) => return end,
                     Err(()) => return End::Drop,
@@ -693,14 +816,11 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
                         return End::Close(Code::POLICY);
                     }
                     match read {
-                        Ok(Frame::Ping(payload)) => {
-                            heard = now;
-                            if self.write(&frame::pong(&payload)).await.is_err() {
-                                return End::Drop;
+                        Ok(frame) => {
+                            if let Some(end) = self.handle_client_frame(frame, &mut heard, now).await {
+                                return end;
                             }
                         }
-                        Ok(Frame::Pong) => heard = now,
-                        Ok(Frame::Close(code)) => return End::Answer(code.unwrap_or(Code::NORMAL)),
                         Err(Ended::Gone) => return End::Drop,
                         Err(Ended::Refused(code)) => return End::Close(code),
                     }
@@ -718,10 +838,48 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
         }
     }
 
+    async fn handle_client_frame(
+        &mut self,
+        frame: Frame,
+        heard: &mut Instant,
+        now: Instant,
+    ) -> Option<End> {
+        match frame {
+            Frame::Text(text) => {
+                if !self.structured {
+                    return Some(End::Close(Code::UNSUPPORTED));
+                }
+                *heard = now;
+                let Some(away) = parse_client_presence(&text) else {
+                    return Some(End::Close(Code::UNSUPPORTED));
+                };
+                let _ = self.account.set_away(away);
+                None
+            }
+            Frame::Ping(payload) => {
+                *heard = now;
+                self.write(&frame::pong(&payload))
+                    .await
+                    .is_err()
+                    .then_some(End::Drop)
+            }
+            Frame::Pong => {
+                *heard = now;
+                None
+            }
+            Frame::Close(code) => Some(End::Answer(code.unwrap_or(Code::NORMAL))),
+        }
+    }
+
+    #[cfg(test)]
+    async fn act(&mut self, bits: u8) -> Result<Option<End>, ()> {
+        self.act_with(bits, Vec::new()).await
+    }
+
     /// Act on the doorbell's bits: an ended session first, then a check of
     /// it, then the news, `social` before `chat` (a client reads both on
     /// `social`), then presence if it changed.
-    async fn act(&mut self, bits: u8) -> Result<Option<End>, ()> {
+    async fn act_with(&mut self, bits: u8, notices: Vec<Notice>) -> Result<Option<End>, ()> {
         if bits & news::REVOKED != 0 {
             return Ok(Some(End::Revoked));
         }
@@ -736,11 +894,18 @@ impl<A: Account, R: AsyncRead + Unpin, W: AsyncWrite + Unpin> Socket<A, R, W> {
                 return Ok(Some(End::Revoked));
             }
         }
-        if bits & news::SOCIAL != 0 {
-            self.write(&frame::text(SOCIAL).unwrap_or_default()).await?;
-        }
-        if bits & news::CHAT != 0 {
-            self.write(&frame::text(CHAT).unwrap_or_default()).await?;
+        if self.structured {
+            for notice in &notices {
+                let text = notice_frame(notice);
+                self.write(&frame::text(&text).unwrap_or_default()).await?;
+            }
+        } else {
+            if bits & news::SOCIAL != 0 {
+                self.write(&frame::text(SOCIAL).unwrap_or_default()).await?;
+            }
+            if bits & news::CHAT != 0 {
+                self.write(&frame::text(CHAT).unwrap_or_default()).await?;
+            }
         }
         if bits & news::PRESENCE != 0 {
             // At most one presence a gap: news within it waits, and what is
@@ -865,6 +1030,127 @@ fn presence(now: &Presence) -> String {
     text.extend(now.states.iter().map(|state| state.letter()));
     let _ = write!(text, r#"","me":"{}"}}"#, now.me.name());
     text
+}
+
+fn write_json_str(out: &mut String, value: &str) {
+    use std::fmt::Write as _;
+    out.push('"');
+    for ch in value.chars() {
+        match ch {
+            '"' => out.push_str(r#"\""#),
+            '\\' => out.push_str(r"\\"),
+            '\x08' => out.push_str(r"\b"),
+            '\x0c' => out.push_str(r"\f"),
+            '\n' => out.push_str(r"\n"),
+            '\r' => out.push_str(r"\r"),
+            '\t' => out.push_str(r"\t"),
+            c if u32::from(c) < 0x20 => {
+                let _ = write!(out, "\\u{:04x}", u32::from(c));
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
+fn notice_frame(notice: &Notice) -> String {
+    use std::fmt::Write as _;
+    match notice {
+        Notice::ChatMessage { conv, id, at, from } => {
+            let mut out = String::from(r#"{"event":"chat","kind":"message","conv":"#);
+            write_json_str(&mut out, conv);
+            out.push_str(r#","id":"#);
+            write_json_str(&mut out, id);
+            let _ = write!(out, r#","at":{at}"#);
+            if let Some(tag) = from {
+                let _ = write!(out, r#","from":"{tag:04x}""#);
+            }
+            out.push('}');
+            if out.len() <= frame::TEXT {
+                out
+            } else {
+                CHAT.to_owned()
+            }
+        }
+        Notice::Thread { action, group } => {
+            let mut out = String::from(r#"{"event":"social","kind":"thread","action":"#);
+            write_json_str(&mut out, action);
+            out.push_str(r#","group":"#);
+            write_json_str(&mut out, group);
+            out.push('}');
+            if out.len() <= frame::TEXT {
+                out
+            } else {
+                SOCIAL.to_owned()
+            }
+        }
+        Notice::FriendRequest { tag } => {
+            format!(r#"{{"event":"social","kind":"friend_request","tag":"{tag:04x}"}}"#)
+        }
+        Notice::FriendAccept { tag, via_invite } => {
+            let via = if *via_invite { "invite" } else { "contact" };
+            format!(
+                r#"{{"event":"social","kind":"friend_accept","tag":"{tag:04x}","via":"{via}"}}"#
+            )
+        }
+        Notice::ContactChanged { tag } => {
+            format!(r#"{{"event":"social","kind":"contact_changed","tag":"{tag:04x}"}}"#)
+        }
+        Notice::ChatSync => CHAT.to_owned(),
+        Notice::SocialSync => SOCIAL.to_owned(),
+    }
+}
+
+fn parse_client_presence(input: &str) -> Option<bool> {
+    let mut rest = input.trim().strip_prefix('{')?.strip_suffix('}')?.trim();
+    if rest.is_empty() {
+        return None;
+    }
+    let mut event_ok = false;
+    let mut seen_event = false;
+    let mut away: Option<bool> = None;
+    loop {
+        rest = rest.trim_start();
+        let (key, after_key) = parse_json_str_literal(rest)?;
+        rest = after_key.trim_start().strip_prefix(':')?.trim_start();
+        match key {
+            "event" if !seen_event => {
+                let (value, after_val) = parse_json_str_literal(rest)?;
+                seen_event = true;
+                event_ok = value == "presence";
+                rest = after_val.trim_start();
+            }
+            "away" if away.is_none() => {
+                if let Some(after_val) = rest.strip_prefix("true") {
+                    away = Some(true);
+                    rest = after_val.trim_start();
+                } else {
+                    let after_val = rest.strip_prefix("false")?;
+                    away = Some(false);
+                    rest = after_val.trim_start();
+                }
+            }
+            _ => return None,
+        }
+        if rest.is_empty() {
+            break;
+        }
+        rest = rest.strip_prefix(',')?;
+        if rest.trim_start().is_empty() {
+            return None;
+        }
+    }
+    if event_ok { away } else { None }
+}
+
+fn parse_json_str_literal(input: &str) -> Option<(&str, &str)> {
+    let after_open = input.strip_prefix('"')?;
+    let end = after_open.find('"')?;
+    let inner = &after_open[..end];
+    if inner.bytes().any(|b| b == b'\\' || b < 0x20) {
+        return None;
+    }
+    Some((inner, &after_open[end + 1..]))
 }
 
 /// What the periodic check asks of the account service.

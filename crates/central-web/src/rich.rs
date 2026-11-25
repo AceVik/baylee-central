@@ -5,6 +5,26 @@ use leptos::prelude::*;
 
 use crate::words::Piece;
 
+/// Whether a rich-text link opens in a new tab: external HTTPS links and
+/// legal documents (`terms`, `privacy`, `impressum`, `fan-content`,
+/// `notices.txt`).
+fn opens_in_new_tab(url: &str) -> bool {
+    if url.starts_with("https://") {
+        return true;
+    }
+    let path = url.split(['#', '?']).next().unwrap_or(url);
+    !path.contains("/account/")
+        && [
+            "/terms",
+            "/privacy",
+            "/impressum",
+            "/fan-content",
+            "/notices.txt",
+        ]
+        .iter()
+        .any(|suffix| path.ends_with(suffix))
+}
+
 /// A message with tags: `b`, `i`, `code`, `kbd` and `glow` drawn as such, `nb`
 /// as words a line break does not part (a sentence of a title); any other
 /// tag as a link where `href` names one for it, else as its text. Nothing
@@ -21,7 +41,7 @@ pub fn rich(pieces: Vec<Piece>, href: impl Fn(&str) -> Option<String>) -> AnyVie
             Some("glow") => view! { <span class="glow">{piece.text}</span> }.into_any(),
             Some("nb") => view! { <span class="keep">{piece.text}</span> }.into_any(),
             Some(tag) => match href(tag) {
-                Some(url) if url.starts_with("https://") => {
+                Some(url) if opens_in_new_tab(&url) => {
                     view! { <a href=url target="_blank" rel="noopener noreferrer">{piece.text}</a> }
                         .into_any()
                 }
@@ -65,5 +85,34 @@ pub fn icon(paths: &'static str) -> impl IntoView {
             focusable="false"
             inner_html=paths
         ></svg>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::opens_in_new_tab;
+
+    #[test]
+    fn external_and_legal_links_open_in_new_tab() {
+        for url in [
+            "https://example.com/policy",
+            "/de/terms",
+            "/en/privacy",
+            "/en/privacy#email",
+            "/fr/impressum",
+            "/ja/fan-content",
+            "/notices.txt",
+        ] {
+            assert!(opens_in_new_tab(url), "{url} should open in a new tab");
+        }
+        for url in [
+            "/en/download",
+            "/de/gateways",
+            "/en/account/privacy",
+            "/site/impressum/kontakt",
+            "#limits",
+        ] {
+            assert!(!opens_in_new_tab(url), "{url} should stay in the same tab");
+        }
     }
 }

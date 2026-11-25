@@ -63,6 +63,13 @@ pub enum What {
     /// The notice to the account's address that an administrator made a
     /// reset code for it. It carries no code.
     ResetIssued,
+    /// The recovery code backup sent as a ZIP archive attachment.
+    RecoveryBackup {
+        /// Whether the archive was encrypted with a user password.
+        encrypted: bool,
+    },
+    /// A single-use friend invitation link mailed to an optional recipient address.
+    FriendInvite,
 }
 
 /// What a mail carries besides its words.
@@ -84,6 +91,17 @@ enum Kind {
     PasswordChanged,
     ResetIssued {
         hours: u32,
+    },
+    RecoveryBackup {
+        handle: String,
+        encrypted: bool,
+        zip_base64: Zeroizing<String>,
+    },
+    FriendInvite {
+        inviter: String,
+        invite_code: Zeroizing<String>,
+        note: Option<String>,
+        days: u8,
     },
 }
 
@@ -188,6 +206,93 @@ impl Mail {
         Self::new(to, account, lang, Kind::ResetIssued { hours })
     }
 
+    /// The mail carrying a ZIP backup (`zip_base64`, standard base64 of
+    /// `baylee-recovery-code.zip`) of the recovery code for `account`,
+    /// addressed to `to`. `handle` is cleaned for control characters and
+    /// bounded before display; `encrypted` tells the recipient whether a
+    /// user password protects the ZIP archive.
+    #[must_use]
+    pub fn recovery_backup(
+        to: &str,
+        account: [u8; 16],
+        lang: &str,
+        handle: &str,
+        encrypted: bool,
+        zip_base64: Zeroizing<String>,
+    ) -> Self {
+        let handle = handle
+            .chars()
+            .filter(|c| !c.is_control() && !"<>&\"'".contains(*c))
+            .take(40)
+            .collect();
+        Self::new(
+            to,
+            account,
+            lang,
+            Kind::RecoveryBackup {
+                handle,
+                encrypted,
+                zip_base64,
+            },
+        )
+    }
+
+    /// A single-use friend invitation mail from `inviter` containing
+    /// `invite_code` (redacted in `Debug`), valid for `days` (`1..=14`) with
+    /// optional greeting `note`.
+    #[must_use]
+    pub fn friend_invite(
+        to: &str,
+        account: [u8; 16],
+        lang: &str,
+        inviter: &str,
+        invite_code: &str,
+        note: Option<&str>,
+        days: u8,
+    ) -> Self {
+        let inviter = inviter
+            .chars()
+            .filter(|c| !c.is_control() && !"<>&\"'".contains(*c))
+            .take(40)
+            .collect();
+        let note = note
+            .map(|text| {
+                text.trim()
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .take(central_api::social::MAX_INVITE_NOTE)
+                    .collect::<String>()
+            })
+            .filter(|text| !text.is_empty());
+        Self::new(
+            to,
+            account,
+            lang,
+            Kind::FriendInvite {
+                inviter,
+                invite_code: Zeroizing::new(invite_code.to_owned()),
+                note,
+                days: days.clamp(1, central_api::social::MAX_FRIEND_INVITE_DAYS),
+            },
+        )
+    }
+
+    /// The invite link code if this is a [`What::FriendInvite`] mail.
+    #[cfg(test)]
+    pub(crate) fn invite_code(&self) -> Option<&str> {
+        match &self.kind {
+            Kind::FriendInvite { invite_code, .. } => Some(invite_code.as_str()),
+            Kind::Confirm { .. }
+            | Kind::Reset { .. }
+            | Kind::Replaced
+            | Kind::Removed
+            | Kind::ResetDone { .. }
+            | Kind::PasswordChanged
+            | Kind::ResetIssued { .. }
+            | Kind::RecoveryBackup { .. } => None,
+        }
+    }
+
     fn new(to: &str, account: [u8; 16], lang: &str, kind: Kind) -> Self {
         Self {
             to: to.to_owned(),
@@ -219,14 +324,35 @@ impl Mail {
     /// Which mail it is.
     #[must_use]
     pub const fn what(&self) -> What {
-        match self.kind {
+        match &self.kind {
             Kind::Confirm { .. } => What::Confirm,
             Kind::Reset { .. } => What::Reset,
             Kind::Replaced => What::Replaced,
             Kind::Removed => What::Removed,
-            Kind::ResetDone { new_vault } => What::ResetDone { new_vault },
+            Kind::ResetDone { new_vault } => What::ResetDone {
+                new_vault: *new_vault,
+            },
             Kind::PasswordChanged => What::PasswordChanged,
             Kind::ResetIssued { .. } => What::ResetIssued,
+            Kind::RecoveryBackup { encrypted, .. } => What::RecoveryBackup {
+                encrypted: *encrypted,
+            },
+            Kind::FriendInvite { .. } => What::FriendInvite,
+        }
+    }
+
+    /// The base64-encoded ZIP attachment, if this is a recovery-backup mail.
+    pub(crate) fn attachment(&self) -> Option<&str> {
+        match &self.kind {
+            Kind::RecoveryBackup { zip_base64, .. } => Some(zip_base64.as_str()),
+            Kind::Confirm { .. }
+            | Kind::Reset { .. }
+            | Kind::Replaced
+            | Kind::Removed
+            | Kind::ResetDone { .. }
+            | Kind::PasswordChanged
+            | Kind::ResetIssued { .. }
+            | Kind::FriendInvite { .. } => None,
         }
     }
 
@@ -239,7 +365,9 @@ impl Mail {
             | Kind::Removed
             | Kind::ResetDone { .. }
             | Kind::PasswordChanged
-            | Kind::ResetIssued { .. } => None,
+            | Kind::ResetIssued { .. }
+            | Kind::RecoveryBackup { .. }
+            | Kind::FriendInvite { .. } => None,
         }
     }
 
@@ -248,7 +376,7 @@ impl Mail {
     /// an administrator's code too: it tells of the code and carries none.
     #[must_use]
     pub const fn ttl_secs(&self) -> Option<u32> {
-        match self.kind {
+        match &self.kind {
             Kind::Confirm { minutes, .. } | Kind::Reset { minutes, .. } => {
                 Some(minutes.saturating_mul(60))
             }
@@ -256,7 +384,9 @@ impl Mail {
             | Kind::Removed
             | Kind::ResetDone { .. }
             | Kind::PasswordChanged
-            | Kind::ResetIssued { .. } => None,
+            | Kind::ResetIssued { .. }
+            | Kind::RecoveryBackup { .. }
+            | Kind::FriendInvite { .. } => None,
         }
     }
 }
@@ -274,28 +404,50 @@ pub trait Mailer: Send + Sync {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_mail_says_which_it_is_and_prints_nothing_else() {
-        let code = MailCode::generate().unwrap();
-        let reset = ResetCode::generate().unwrap();
-        let account = [7; 16];
-        let mails = [
-            Mail::confirm("player@example.org", account, "de", &code, 15),
-            Mail::reset(
-                "player@example.org",
-                account,
-                "fr",
-                "player.one",
-                &reset,
-                60,
-            ),
+    fn sample_mails(code: &MailCode, reset: &ResetCode, account: [u8; 16]) -> [Mail; 11] {
+        [
+            Mail::confirm("player@example.org", account, "de", code, 15),
+            Mail::reset("player@example.org", account, "fr", "player.one", reset, 60),
             Mail::replaced("player@example.org", account, "pt-br"),
             Mail::removed("player@example.org", account, "klingon"),
             Mail::reset_done("player@example.org", account, "ja", false),
             Mail::reset_done("player@example.org", account, "de", true),
             Mail::password_changed("player@example.org", account, "ko"),
             Mail::reset_issued("player@example.org", account, "zh-hant", 24),
-        ];
+            Mail::recovery_backup(
+                "player@example.org",
+                account,
+                "es",
+                "player#1234",
+                true,
+                Zeroizing::new("UEsDBA==".to_owned()),
+            ),
+            Mail::recovery_backup(
+                "player@example.org",
+                account,
+                "it",
+                "player#1234",
+                false,
+                Zeroizing::new("UEsDBAo=".to_owned()),
+            ),
+            Mail::friend_invite(
+                "player@example.org",
+                account,
+                "ru",
+                "Alice#1a2b",
+                "AAAAAAAAAAAAAAAAAAAAAA",
+                Some("Join us tonight!"),
+                7,
+            ),
+        ]
+    }
+
+    #[test]
+    fn a_mail_says_which_it_is_and_prints_nothing_else() {
+        let code = MailCode::generate().unwrap();
+        let reset = ResetCode::generate().unwrap();
+        let account = [7; 16];
+        let mails = sample_mails(&code, &reset, account);
         let what = [
             What::Confirm,
             What::Reset,
@@ -305,8 +457,23 @@ mod tests {
             What::ResetDone { new_vault: true },
             What::PasswordChanged,
             What::ResetIssued,
+            What::RecoveryBackup { encrypted: true },
+            What::RecoveryBackup { encrypted: false },
+            What::FriendInvite,
         ];
-        let ttl = [Some(900), Some(3600), None, None, None, None, None, None];
+        let ttl = [
+            Some(900),
+            Some(3600),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ];
         let lang = [
             Lang::De,
             Lang::Fr,
@@ -316,6 +483,9 @@ mod tests {
             Lang::De,
             Lang::Ko,
             Lang::ZhHant,
+            Lang::Es,
+            Lang::It,
+            Lang::Ru,
         ];
         for (index, mail) in mails.iter().enumerate() {
             assert_eq!(mail.what(), what[index]);
@@ -329,12 +499,16 @@ mod tests {
                 "example",
                 code.display().as_str(),
                 reset.display().as_str(),
+                "UEsDB",
+                "AAAAAAAAAAAAAAAAAAAAAA",
+                "Join us",
             ] {
                 assert!(!printed.contains(secret), "{printed}");
             }
         }
         assert_eq!(mails[0].code(), Some(code.display().as_str()));
         assert_eq!(mails[1].code(), Some(reset.display().as_str()));
+        assert_eq!(mails[10].invite_code(), Some("AAAAAAAAAAAAAAAAAAAAAA"));
         // A notice carries no code, the one of an administrator's code too.
         assert!(mails[2..].iter().all(|mail| mail.code().is_none()));
     }

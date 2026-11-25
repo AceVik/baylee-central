@@ -379,6 +379,11 @@ history, and adds `registration`, the administrators' switch
 - `LoginStart` and `LoginFinish` belong to one surface: an attempt started on
   `/v1/native` cannot finish on the browser surface, nor the reverse.
 
+- **Refresh, profile details, backup mail, gateways and public showcase (23.11.2026, migration `000048`).**
+  - Browser sessions issue a 15-minute `__Host-central` access cookie alongside a 3-day sliding, single-use `__Host-central-refresh` cookie capped at 30 days (`Request::RefreshSession`, `previous_refresh_digest` reuse detection revokes the session); sensitive operations stay anchored to `COALESCE(proven_at, created_at)`.
+  - Accounts may hold optional private personal details (`first_name`, `last_name`, `birth_date`, age >= 16), managed via `Request::ProfileDetails` / `SetProfileDetails` and exported via `Request::ExportProfileDetails` (keeping wire-frozen `AccountExport` untouched), plus a `public_profile` flag (default `true`) controlling `/{lang}/player/{Name}-{tag}` (`Request::PublicProfile`).
+  - Recovery key steps offer client-side WinZip AE-2 AES-256 ZIP creation + `Request::SendRecoveryBackupMail`, and gateway owners can rename (`OwnerRequest::UpdateGateway`) or soft-delete (`OwnerRequest::DeleteGateway`, fresh password proof < 30 min) their non-official gateways.
+
 **The browser surface.** It is a second listener, `browser.listen` in
 `central.json` (absent means off), behind `baylee.app`'s Caddy as `/api/*`
 with the `Host` header unchanged. It has one route, `POST /api/v1`, which

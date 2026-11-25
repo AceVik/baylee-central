@@ -81,3 +81,43 @@ pub fn labelled(
         </div>
     }
 }
+
+/// Shared password input (`lock-keyhole` prefix icon + `eye` plain-text toggle)
+/// bound to `value`, with an optional warning/hint message shown beneath it.
+#[allow(clippy::too_many_arguments)]
+pub fn password_box(
+    lang: Lang,
+    id: &'static str,
+    label: impl IntoView + 'static,
+    auto: &'static str,
+    value: RwSignal<String>,
+    placeholder: Option<&'static str>,
+    hint_or_warn: Option<AnyView>,
+    max: &'static str,
+) -> impl IntoView {
+    let shown = RwSignal::new(false);
+    let hint_id = format!("{id}-hint");
+    let described = hint_or_warn.is_some().then(|| hint_id.clone());
+    view! {
+        <div class="field">
+            <label for=id>{label}</label>
+            <div class="inset">
+                {mark(glyph::LOCK_KEYHOLE)}
+                <input
+                    id=id
+                    autocomplete=auto
+                    autocapitalize="none"
+                    spellcheck="false"
+                    maxlength=max
+                    placeholder=placeholder.unwrap_or("")
+                    aria-describedby=described
+                    type=move || if shown.get() { "text" } else { "password" }
+                    prop:value=move || value.get()
+                    on:input=move |ev| value.set(event_target_value(&ev))
+                />
+                {eye(lang, shown, id)}
+            </div>
+            {hint_or_warn.map(|content| view! { <p class="hint" id=hint_id>{content}</p> })}
+        </div>
+    }
+}

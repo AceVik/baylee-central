@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@webgpu/types"],
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "newLine": "lf",
+    "removeComments": false,
+    "rootDir": "../ts",
+    "outDir": "../js",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": true
+  },
+  "include": [
+    "../ts/dom-env.d.ts",
+    "../ts/islands-glue.d.ts",
+    "../ts/badges.ts",
+    "../ts/clouds.ts",
+    "../ts/directory.ts",
+    "../ts/hint.ts",
+    "../ts/home.ts",
+    "../ts/islands.ts",
+    "../ts/nav.ts",
+    "../ts/pwa.ts",
+    "../ts/security.ts"
+  ]
+}

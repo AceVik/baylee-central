@@ -608,3 +608,32 @@ impl Request {
         )
     }
 }
+
+/// Ordering key for comparing two competitive ranks (higher key is better).
+#[must_use]
+pub const fn rank_key(
+    rank: Rank,
+) -> (
+    League,
+    std::cmp::Reverse<Option<u8>>,
+    bool,
+    std::cmp::Reverse<Option<u8>>,
+) {
+    (
+        rank.league,
+        std::cmp::Reverse(rank.division),
+        rank.champion_place.is_some(),
+        std::cmp::Reverse(rank.champion_place),
+    )
+}
+
+/// Highest current-season `Track::Player` standing with played games, matching
+/// the Baylee client's portrait frame ranking (`ranked_profile/model.rs`).
+#[must_use]
+pub fn best_player_rank(standings: &[Standing]) -> Option<Rank> {
+    standings
+        .iter()
+        .filter(|standing| standing.track == Track::Player && standing.career.games > 0)
+        .max_by_key(|standing| (rank_key(standing.rank), standing.elo))
+        .map(|standing| standing.rank)
+}

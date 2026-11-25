@@ -145,6 +145,7 @@ async fn migrations_ids_roles_rollback_and_locking() {
     );
 
     support::accounts(&operator).await;
+    verify_friend_invites(&operator).await;
     support::advent_provisioning::run(&operator).await;
     support::tls().await;
     store.close().await.unwrap();
@@ -193,7 +194,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        46
+        50
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -281,11 +282,7 @@ async fn verify_constraints_and_rollback(runtime: &sea_orm::DatabaseConnection) 
     );
 }
 
-/// The history as sea-orm-migration 2.0.4 left it, and a database one migration
-/// behind: the runner reads the one and finishes the other.
-async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
-    // The history has the shape sea-orm-migration 2.0.4 gave it, so a database
-    // that crate migrated is read by this runner as it was written.
+async fn assert_seaql_table_shape(operator: &sea_orm::DatabaseConnection) {
     assert_eq!(
         scalar(
             operator,
@@ -308,10 +305,33 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
         .await,
         1
     );
+}
+
+/// The history as sea-orm-migration 2.0.4 left it, and a database one migration
+/// behind: the runner reads the one and finishes the other.
+async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
+    // The history has the shape sea-orm-migration 2.0.4 gave it, so a database
+    // that crate migrated is read by this runner as it was written.
+    assert_seaql_table_shape(operator).await;
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "ALTER TABLE central_identity.gateway_sids DROP COLUMN ranked_generation,
+            "DROP TABLE central_identity.friend_invites, central_identity.card_search_names, central_identity.card_printings;
+             DROP TABLE central_identity.chat_group_pictures;
+             ALTER TABLE central_identity.chat_members DROP COLUMN admin;
+             ALTER TABLE central_identity.chat_groups DROP COLUMN description;
+             DROP INDEX central_identity.gateways_origin_active;
+             ALTER TABLE central_identity.gateways DROP COLUMN deleted_at, ADD UNIQUE (origin);
+             ALTER TABLE central_identity.accounts DROP COLUMN first_name, DROP COLUMN last_name,
+                 DROP COLUMN birth_date, DROP COLUMN public_profile;
+             ALTER TABLE central_identity.sessions DROP CONSTRAINT session_lifetime,
+                 DROP COLUMN refresh_digest, DROP COLUMN previous_refresh_digest,
+                 DROP COLUMN refresh_expires_at, DROP COLUMN absolute_expires_at,
+                 ADD CONSTRAINT session_lifetime CHECK (
+                     expires_at > created_at
+                     AND (proven_at IS NULL OR proven_at <= created_at)
+                     AND expires_at <= COALESCE(proven_at, created_at) + interval '12 hours');
+             ALTER TABLE central_identity.gateway_sids DROP COLUMN ranked_generation,
                  DROP COLUMN ranked_proof_until, DROP COLUMN ranked_match;
              DROP TRIGGER retire_advent_looks ON central_identity.ranked_matches;
              DROP FUNCTION central_identity.retire_advent_looks();
@@ -355,7 +375,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        46
+        50
     );
     assert_eq!(
         scalar(
@@ -374,4 +394,555 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
         .await,
         1
     );
+}
+
+async fn enroll_registered_and_login(
+    store: &central_postgres::AccountStore,
+    keys: &central_crypto::opaque::server::ServerKeys,
+    name: &str,
+    display_name: &str,
+    invite_code: Option<&str>,
+) -> (
+    central_api::wire::Identity,
+    central_api::Token,
+    central_postgres::Concerns,
+) {
+    use central_api::{Endpoint, Token};
+    use central_crypto::{
+        Context,
+        opaque::{Enrollment, Login},
+        vault::{MasterKey, ObjectContext},
+    };
+    let ticket = Token::generate().unwrap();
+    let identity = store
+        .register_with_invite(name, Some(display_name), &ticket, invite_code)
+        .await
+        .unwrap();
+    let issuer = Endpoint::development("http://127.0.0.1:28780")
+        .unwrap()
+        .issuer();
+    let ctx = Context::new(issuer, identity.account, identity.epoch).unwrap();
+    let (enrollment, request) = Enrollment::start("synthetic strong pass".into(), ctx).unwrap();
+    let response = keys.enrollment_response(ctx, &request).unwrap();
+    let enrolled = enrollment.finish(&response).unwrap();
+    let master = MasterKey::generate().unwrap();
+    let wrapped = enrolled.wrapping_key.wrap(&master).unwrap();
+    let obj = ObjectContext::new(ctx, identity.account, 1).unwrap();
+    let document = master.seal_object(obj, name.as_bytes()).unwrap();
+    let concerns = store
+        .enroll_concerning(
+            &ticket,
+            &enrolled.upload,
+            wrapped.as_bytes(),
+            &document,
+            Some(wrapped.as_bytes()),
+        )
+        .await
+        .unwrap();
+
+    let cred = store.credential(identity).await.unwrap().unwrap();
+    let record =
+        central_crypto::opaque::server::ServerKeys::enrollment_record(&cred.record).unwrap();
+    let (login, lreq) = Login::start("synthetic strong pass".into(), ctx).unwrap();
+    let (attempt, lresp) = keys.start_login(ctx, Some(&record), &lreq).unwrap();
+    let finished = login.finish(&lresp).unwrap();
+    attempt.finish(&finished.finalization).unwrap();
+    let tok = Token::generate().unwrap();
+    store.issue_session(&cred, &tok).await.unwrap();
+    (identity, tok, concerns)
+}
+
+struct InviteOnlyFixture<'a> {
+    operator: &'a sea_orm::DatabaseConnection,
+    store: &'a central_postgres::AccountStore,
+    keys: &'a central_crypto::opaque::server::ServerKeys,
+    inviter: central_api::wire::Identity,
+    inviter_tok: &'a central_api::Token,
+    other_tok: &'a central_api::Token,
+}
+
+async fn verify_invite_only_enrollment(
+    fx: &InviteOnlyFixture<'_>,
+    used_code: &str,
+    active_code: &str,
+) {
+    use central_api::{
+        Endpoint, Error, Token,
+        social::{Relation, SocialRequest, SocialResponse},
+    };
+    use central_crypto::{
+        Context,
+        opaque::Enrollment,
+        vault::{MasterKey, ObjectContext},
+    };
+    use central_postgres::Session;
+
+    fx.operator
+        .execute_unprepared("UPDATE central_identity.registration SET open = false")
+        .await
+        .unwrap();
+    let closed_preview = fx.store.friend_invite_info(active_code).await.unwrap();
+    assert!(!closed_preview.registration_open);
+    assert!(closed_preview.invite_only);
+    assert!(!fx.store.invite_can_register(used_code).await.unwrap());
+    assert!(fx.store.invite_can_register(active_code).await.unwrap());
+
+    let denied_ticket = Token::generate().unwrap();
+    let denied = fx
+        .store
+        .register_with_invite(
+            "invite_test_blocked",
+            Some("InviteBlocked"),
+            &denied_ticket,
+            None,
+        )
+        .await;
+    assert!(matches!(denied, Err(Error::Rejected)));
+
+    let reg_ticket = Token::generate().unwrap();
+    let newbie_id = fx
+        .store
+        .register_with_invite(
+            "invite_test_newbie",
+            Some("InviteNewbie"),
+            &reg_ticket,
+            Some(active_code),
+        )
+        .await
+        .unwrap();
+    // Pending registration reservation must not preview as Active or redeem twice.
+    assert_eq!(
+        fx.store.friend_invite_info(active_code).await.unwrap_err(),
+        Error::Rejected
+    );
+    assert_eq!(
+        fx.store
+            .redeem_friend_invite(Session::Native(fx.other_tok), active_code, false, None)
+            .await
+            .unwrap_err(),
+        Error::Rejected
+    );
+
+    let issuer = Endpoint::development("http://127.0.0.1:28780")
+        .unwrap()
+        .issuer();
+    let ctx = Context::new(issuer, newbie_id.account, newbie_id.epoch).unwrap();
+    let (enrollment, req) = Enrollment::start("synthetic strong pass".into(), ctx).unwrap();
+    let resp = fx.keys.enrollment_response(ctx, &req).unwrap();
+    let enrolled = enrollment.finish(&resp).unwrap();
+    let master = MasterKey::generate().unwrap();
+    let wrapped = enrolled.wrapping_key.wrap(&master).unwrap();
+    let obj = ObjectContext::new(ctx, newbie_id.account, 1).unwrap();
+    let doc = master.seal_object(obj, b"newbie").unwrap();
+    let enroll_concerns = fx
+        .store
+        .enroll_concerning(
+            &reg_ticket,
+            &enrolled.upload,
+            wrapped.as_bytes(),
+            &doc,
+            Some(wrapped.as_bytes()),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        enroll_concerns.pair,
+        Some((fx.inviter.account, newbie_id.account))
+    );
+
+    let SocialResponse::Contacts {
+        contacts: one_friends,
+    } = fx
+        .store
+        .social(Session::Native(fx.inviter_tok), SocialRequest::Contacts)
+        .await
+        .unwrap()
+    else {
+        panic!("contacts expected");
+    };
+    assert!(
+        one_friends
+            .iter()
+            .any(|c| c.person.display_name == "InviteNewbie" && c.relation == Relation::Friend)
+    );
+
+    fx.operator
+        .execute_unprepared("UPDATE central_identity.registration SET open = true")
+        .await
+        .unwrap();
+}
+
+async fn verify_invite_limits_and_expiry(
+    operator: &sea_orm::DatabaseConnection,
+    store: &central_postgres::AccountStore,
+    tok_one: &central_api::Token,
+    tok_two: &central_api::Token,
+) -> (Vec<[u8; 16]>, Vec<String>) {
+    use central_api::{Error, social::FriendInviteStatus};
+    use central_postgres::Session;
+
+    let mut created_codes = Vec::new();
+    let mut created_ids = Vec::new();
+    for idx in 0..10 {
+        let (summary, code, _) = store
+            .create_friend_invite(
+                Session::Native(tok_one),
+                Some(&format!("Invite {idx}")),
+                Some("Hello friend"),
+                None,
+                Some("en"),
+                Some(7),
+            )
+            .await
+            .unwrap();
+        assert_eq!(summary.status, FriendInviteStatus::Active);
+        created_ids.push(summary.id);
+        created_codes.push(code.as_str().to_owned());
+    }
+    assert_eq!(
+        store
+            .create_friend_invite(
+                Session::Native(tok_one),
+                Some("Extra"),
+                None,
+                None,
+                Some("en"),
+                Some(7),
+            )
+            .await
+            .unwrap_err(),
+        Error::Busy
+    );
+
+    let raw_code = created_codes[0].as_str();
+    let leaked_count = operator
+        .query_one_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT count(*)::bigint AS value FROM central_identity.friend_invites WHERE encode(code_hash, 'escape') = $1",
+            vec![raw_code.into()],
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get::<i64>("", "value")
+        .unwrap();
+    assert_eq!(leaked_count, 0);
+
+    assert_eq!(
+        store
+            .list_friend_invites(Session::Native(tok_one))
+            .await
+            .unwrap()
+            .len(),
+        10
+    );
+    store
+        .revoke_friend_invite(Session::Native(tok_one), created_ids[0])
+        .await
+        .unwrap();
+    let revoked_info = store.friend_invite_info(raw_code).await.unwrap();
+    assert_eq!(revoked_info.status, FriendInviteStatus::Revoked);
+    assert!(revoked_info.note.is_none());
+    assert!(revoked_info.invited_email.is_none());
+    assert_eq!(
+        store
+            .revoke_friend_invite(Session::Native(tok_one), created_ids[0])
+            .await
+            .unwrap_err(),
+        Error::Rejected
+    );
+    assert_eq!(
+        store
+            .redeem_friend_invite(
+                Session::Native(tok_one),
+                created_codes[1].as_str(),
+                false,
+                None,
+            )
+            .await
+            .unwrap_err(),
+        Error::Rejected
+    );
+
+    // Expired invite transitions cleanly to Expired and does not count as active.
+    verify_invite_expiry(operator, store, tok_two, created_ids[9], &created_codes[9]).await;
+    (created_ids, created_codes)
+}
+
+async fn verify_invite_expiry(
+    operator: &sea_orm::DatabaseConnection,
+    store: &central_postgres::AccountStore,
+    tok_two: &central_api::Token,
+    expired_id: [u8; 16],
+    expired_code: &str,
+) {
+    use central_api::{Error, social::FriendInviteStatus};
+    use central_postgres::Session;
+
+    operator
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "UPDATE central_identity.friend_invites
+             SET created_at = pg_catalog.clock_timestamp() - interval '2 hours',
+                 expires_at = pg_catalog.clock_timestamp() - interval '1 minute'
+             WHERE id = $1",
+            vec![sea_orm::prelude::Uuid::from_bytes(expired_id).into()],
+        ))
+        .await
+        .unwrap();
+    let expired_info = store.friend_invite_info(expired_code).await.unwrap();
+    assert_eq!(expired_info.status, FriendInviteStatus::Expired);
+    assert!(expired_info.note.is_none());
+    assert!(expired_info.invited_email.is_none());
+    assert_eq!(
+        store
+            .redeem_friend_invite(Session::Native(tok_two), expired_code, false, None)
+            .await
+            .unwrap_err(),
+        Error::Rejected
+    );
+}
+
+async fn verify_stale_session_invite_link_refused(
+    operator: &sea_orm::DatabaseConnection,
+    store: &central_postgres::AccountStore,
+    keys: &central_crypto::opaque::server::ServerKeys,
+    tok_one: &central_api::Token,
+) {
+    use central_postgres::Session;
+
+    let (id_stale, tok_stale, _) =
+        enroll_registered_and_login(store, keys, "invite_test_stale", "InviteStale", None).await;
+    let (_stale_summary, stale_code, _) = store
+        .create_friend_invite(
+            Session::Native(tok_one),
+            Some("Stale session test"),
+            None,
+            Some("stale-target@example.org"),
+            Some("en"),
+            Some(5),
+        )
+        .await
+        .unwrap();
+    operator
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "UPDATE central_identity.sessions
+             SET created_at = created_at - interval '6 minutes',
+                 expires_at = expires_at - interval '6 minutes',
+                 proven_at = NULL
+             WHERE account_id = $1",
+            vec![sea_orm::prelude::Uuid::from_bytes(id_stale.account).into()],
+        ))
+        .await
+        .unwrap();
+    let (_, stale_pending, _) = store
+        .redeem_friend_invite(
+            Session::Native(&tok_stale),
+            stale_code.as_str(),
+            true,
+            Some("en"),
+        )
+        .await
+        .unwrap();
+    assert!(stale_pending.is_none());
+    assert!(
+        !store
+            .save_invite_email_pending(
+                Session::Native(&tok_stale),
+                "stale-target@example.org",
+                "en",
+                [7; 32],
+            )
+            .await
+            .unwrap()
+    );
+}
+
+async fn verify_invite_email_linking(
+    operator: &sea_orm::DatabaseConnection,
+    store: &central_postgres::AccountStore,
+    keys: &central_crypto::opaque::server::ServerKeys,
+    tok_one: &central_api::Token,
+    tok_two: &central_api::Token,
+) -> (String, central_api::Token) {
+    use central_api::social::{FriendInviteStatus, Relation, SocialRequest, SocialResponse};
+    use central_postgres::Session;
+
+    let (_, person_one) = store.social_caller(Session::Native(tok_one)).await.unwrap();
+    let (email_summary, email_code, _) = store
+        .create_friend_invite(
+            Session::Native(tok_one),
+            Some("With email"),
+            Some("Join me"),
+            Some("invited-two@example.org"),
+            Some("de"),
+            Some(5),
+        )
+        .await
+        .unwrap();
+    assert_eq!(email_summary.status, FriendInviteStatus::Active);
+    // Unauthenticated preview must never expose invited_email PII.
+    let active_info = store.friend_invite_info(email_code.as_str()).await.unwrap();
+    assert_eq!(active_info.status, FriendInviteStatus::Active);
+    assert!(active_info.invited_email.is_none());
+
+    // A stale session (>5m since proven_at/created_at) may still redeem friendship
+    // cleanly, but must never link an email onto the account (link_email=true ignored).
+    verify_stale_session_invite_link_refused(operator, store, keys, tok_one).await;
+
+    store
+        .social(
+            Session::Native(tok_two),
+            SocialRequest::Contact {
+                tag: person_one.tag,
+                change: central_api::social::ContactAction::Request,
+            },
+        )
+        .await
+        .unwrap();
+    let (redeemed_inviter, pending_email, concerns) = store
+        .redeem_friend_invite(Session::Native(tok_two), email_code.as_str(), true, None)
+        .await
+        .unwrap();
+    assert_eq!(redeemed_inviter.tag, person_one.tag);
+    assert!(concerns.pair.is_some());
+    assert_eq!(
+        pending_email,
+        Some(["invited-two@example.org".into(), "de".into()])
+    );
+    assert!(
+        store
+            .save_invite_email_pending(
+                Session::Native(tok_two),
+                "invited-two@example.org",
+                "de",
+                [9; 32],
+            )
+            .await
+            .unwrap()
+    );
+    let SocialResponse::Contacts { contacts } = store
+        .social(Session::Native(tok_two), SocialRequest::Contacts)
+        .await
+        .unwrap()
+    else {
+        panic!("contacts expected");
+    };
+    assert!(
+        contacts
+            .iter()
+            .any(|c| c.person.tag == person_one.tag && c.relation == Relation::Friend)
+    );
+    let redeemed_info = store.friend_invite_info(email_code.as_str()).await.unwrap();
+    assert_eq!(redeemed_info.status, FriendInviteStatus::Redeemed);
+    assert!(redeemed_info.redeemed_by.is_none());
+    assert!(redeemed_info.invited_email.is_none());
+    let inviter_list = store
+        .list_friend_invites(Session::Native(tok_one))
+        .await
+        .unwrap();
+    let owner_row = inviter_list
+        .iter()
+        .find(|item| item.id == email_summary.id)
+        .unwrap();
+    assert!(owner_row.redeemed_by.is_some());
+    assert_eq!(
+        owner_row.invited_email.as_deref(),
+        Some("invited-two@example.org")
+    );
+
+    let tok_three = verify_invite_preserves_existing_email(operator, store, keys, tok_one).await;
+    (email_code.as_str().to_owned(), tok_three)
+}
+
+async fn verify_invite_preserves_existing_email(
+    operator: &sea_orm::DatabaseConnection,
+    store: &central_postgres::AccountStore,
+    keys: &central_crypto::opaque::server::ServerKeys,
+    tok_one: &central_api::Token,
+) -> central_api::Token {
+    use central_postgres::Session;
+
+    // Confirmed email on an account must never be overwritten on link_email=true.
+    let (id_three, tok_three, _) =
+        enroll_registered_and_login(store, keys, "invite_test_three", "InviteThree", None).await;
+    operator
+        .execute_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "INSERT INTO central_identity.account_emails (account_id, address, lang) VALUES ($1, 'keep@example.org', 'en')",
+            vec![sea_orm::prelude::Uuid::from_bytes(id_three.account).into()],
+        ))
+        .await
+        .unwrap();
+    let (_, code_three, _) = store
+        .create_friend_invite(
+            Session::Native(tok_one),
+            None,
+            None,
+            Some("overwrite@example.org"),
+            Some("en"),
+            None,
+        )
+        .await
+        .unwrap();
+    let (_, pending_three, _) = store
+        .redeem_friend_invite(
+            Session::Native(&tok_three),
+            code_three.as_str(),
+            true,
+            Some("en"),
+        )
+        .await
+        .unwrap();
+    assert!(pending_three.is_none());
+    assert!(
+        !store
+            .save_invite_email_pending(
+                Session::Native(&tok_three),
+                "overwrite@example.org",
+                "en",
+                [8; 32],
+            )
+            .await
+            .unwrap()
+    );
+    tok_three
+}
+
+async fn verify_friend_invites(operator: &sea_orm::DatabaseConnection) {
+    use central_crypto::opaque::server::ServerKeys;
+    use central_postgres::AccountStore;
+
+    let store =
+        AccountStore::connect_dev(config("central_runtime", "CENTRAL_TEST_RUNTIME_PASSWORD"))
+            .await
+            .unwrap();
+    let keys = ServerKeys::generate();
+
+    let (id_one, tok_one, c_one) =
+        enroll_registered_and_login(&store, &keys, "invite_test_one", "InviteOne", None).await;
+    assert!(c_one.pair.is_none());
+    let (_id_two, tok_two, _) =
+        enroll_registered_and_login(&store, &keys, "invite_test_two", "InviteTwo", None).await;
+
+    let (_created_ids, created_codes) =
+        verify_invite_limits_and_expiry(operator, &store, &tok_one, &tok_two).await;
+    let (email_code, tok_three) =
+        verify_invite_email_linking(operator, &store, &keys, &tok_one, &tok_two).await;
+
+    verify_invite_only_enrollment(
+        &InviteOnlyFixture {
+            operator,
+            store: &store,
+            keys: &keys,
+            inviter: id_one,
+            inviter_tok: &tok_one,
+            other_tok: &tok_three,
+        },
+        email_code.as_str(),
+        created_codes[1].as_str(),
+    )
+    .await;
+    store.close().await.unwrap();
 }

@@ -9,6 +9,8 @@ pub use sea_orm::DatabaseConnection;
 mod accounts;
 /// Trusted private seasonal campaign provisioning.
 pub mod advent_import;
+/// Operator-run Scryfall card catalog provisioning.
+pub mod cards_import;
 mod connection;
 mod legacy;
 mod pending;
@@ -20,9 +22,9 @@ pub use accounts::{
     MAIL_CODE_MINUTES, MAIL_CODE_TRIES, MAILED_RESET_HOURS, MAX_GATEWAY_VERSIONS, MAX_POLLS,
     MAX_SIDS_PER_SESSION, MailedReset, OFFICIAL_STORED, OPEN_IN_ALL, OPEN_PER_ACCOUNT,
     PUSH_ATTEMPTS, PushJob, PushResult, REPORT_BYTES, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY,
-    REVOCATION_PAGE, RankedHostCredential, Redeemed, ReportImport, ReportImportRefusal,
-    RevocationPage, Session, Status, Summary, Swept, TAG_DRAWS, TagDraw, Told, appoint_admin,
-    provision_tower_award_issuer, sweep,
+    REVOCATION_PAGE, RankedHostCredential, RecoveryBackupPrep, Redeemed, RefreshOutcome,
+    ReportImport, ReportImportRefusal, RevocationPage, Session, Status, Summary, Swept, TAG_DRAWS,
+    TagDraw, Told, appoint_admin, provision_tower_award_issuer, sweep,
 };
 /// Donations (`docs/operations.md` §"Donations", migration 000032).
 pub mod donations {

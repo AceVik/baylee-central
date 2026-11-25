@@ -79,11 +79,15 @@ impl BrowserOrigin {
 /// The session cookie's name; `__Host-` makes the browser refuse it unless it
 /// is `Secure`, has `Path=/` and no `Domain`, so no other site sets it.
 const COOKIE: &str = "__Host-central";
+/// Name of the long-lived sliding browser refresh cookie.
+const REFRESH_COOKIE: &str = "__Host-central-refresh";
 /// The cookie's lifetime: the session's cap, 12 hours after the sign-in that
 /// set it. The session itself expires sooner unless it is renewed
 /// (`RenewSession`), and an expired session's cookie finds no session, so a
 /// renewal never has to set the cookie again.
-const COOKIE_SECONDS: u32 = 43_200;
+const COOKIE_SECONDS: u32 = 900;
+/// Sliding browser idle lifetime in seconds (three days).
+const REFRESH_COOKIE_SECONDS: u32 = 259_200;
 /// Largest body: the browser operations are small (the initial document is a
 /// few hundred bytes sealed).
 pub const REQUEST_BYTES: usize = 65_536;
@@ -96,7 +100,7 @@ pub(crate) struct Peer(pub(crate) SocketAddr);
 type StoredPicture = Option<(Vec<u8>, [u8; 32])>;
 
 /// What answers browser requests: the identity service, or a test's stand-in.
-pub(crate) trait Accounts: Send + Sync + 'static {
+pub(crate) trait Accounts: super::ws::PushPeer + Send + Sync + 'static {
     /// `place` is the client address the request came from: the service
     /// counts guesses at passwords and requests without a session by it,
     /// and nothing else follows from it. `seen` is what the listener saw
@@ -136,6 +140,24 @@ pub(crate) trait Accounts: Send + Sync + 'static {
         format: central_picture::Format,
         bytes: Vec<u8>,
     ) -> impl Future<Output = Result<Answer, UploadRefusal>> + Send;
+
+    /// Admit a group picture upload by the session `cookie` for `group`,
+    /// before its body is read.
+    fn admit_group_picture(
+        &self,
+        cookie: &Token,
+        group: [u8; 16],
+    ) -> impl Future<Output = Result<Self::Admitted, UploadRefusal>> + Send;
+
+    /// Convert and store an admitted group picture upload, returning its new
+    /// key and whether it moves.
+    fn store_group_picture(
+        &self,
+        admitted: Self::Admitted,
+        cookie: &Token,
+        format: central_picture::Format,
+        bytes: Vec<u8>,
+    ) -> impl Future<Output = Result<([u8; 16], bool), UploadRefusal>> + Send;
 
     /// A picture's bytes and digest by its key, for anyone.
     fn picture_bytes(
@@ -182,6 +204,24 @@ impl Accounts for IdentityService {
         bytes: Vec<u8>,
     ) -> impl Future<Output = Result<Answer, UploadRefusal>> + Send {
         IdentityService::store_picture(self, admitted, cookie, format, bytes)
+    }
+
+    fn admit_group_picture(
+        &self,
+        cookie: &Token,
+        group: [u8; 16],
+    ) -> impl Future<Output = Result<Self::Admitted, UploadRefusal>> + Send {
+        IdentityService::admit_group_picture(self, cookie, group)
+    }
+
+    fn store_group_picture(
+        &self,
+        admitted: Self::Admitted,
+        cookie: &Token,
+        format: central_picture::Format,
+        bytes: Vec<u8>,
+    ) -> impl Future<Output = Result<([u8; 16], bool), UploadRefusal>> + Send {
+        IdentityService::store_group_picture(self, admitted, cookie, format, bytes)
     }
 
     fn picture_bytes(
@@ -245,12 +285,18 @@ fn routes<A: Accounts>(state: Arc<Browser<A>>) -> Router {
     // A picture's upload: its body's own time, then the worker's.
     let upload = Router::new()
         .route("/api/v1/picture", put(pictures::upload::<A>))
+        .route(
+            "/api/v1/groups/{group}/picture",
+            put(pictures::upload_group::<A>),
+        )
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             pictures::UPLOAD_TIME,
         ));
+    let ws = Router::new().route("/api/v1/ws", get(ws_dial::<A>));
     let api = calls
         .merge(upload)
+        .merge(ws)
         // Nothing of a request to another path or with another method is read.
         .fallback(|| async { (StatusCode::NOT_FOUND, "not found\n") })
         .with_state(Arc::clone(&state))
@@ -365,7 +411,12 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
     };
     let logout = matches!(request, Request::Logout);
     let deletion = matches!(request, Request::DeleteAccountFinish { .. });
-    let cookie = cookie(headers);
+    let is_refresh = matches!(request, Request::RefreshSession);
+    let cookie = if is_refresh {
+        cookie_named(headers, REFRESH_COOKIE)
+    } else {
+        cookie_named(headers, COOKIE)
+    };
     let Ok(result) = tokio::time::timeout(
         ANSWER_TIME,
         state
@@ -378,23 +429,35 @@ async fn call<A: Accounts>(State(state): State<Arc<Browser<A>>>, request: HttpRe
     };
     // A deleted account's session is gone with it.
     let deleted = deletion && result.is_ok();
+    let refresh_rejected = is_refresh && matches!(result, Err(Error::Rejected));
+    let mut clear_cookies = logout || deleted || refresh_rejected;
     let mut response = match result.and_then(|reply| {
         let bytes = central_api::encode(&reply.response)?;
-        Ok((bytes, reply.session))
+        Ok((bytes, reply))
     }) {
-        Ok((bytes, session)) => {
+        Ok((bytes, reply)) => {
+            clear_cookies |= reply.clear_cookies;
             let mut response =
                 ([(header::CONTENT_TYPE, "application/json")], bytes).into_response();
-            if let Some(token) = session {
-                set_cookie(&mut response, Some(&token));
+            if let Some(token) = reply.session {
+                set_cookie(&mut response, COOKIE, Some(&token), COOKIE_SECONDS);
+            }
+            if let Some(refresh) = reply.refresh {
+                set_cookie(
+                    &mut response,
+                    REFRESH_COOKIE,
+                    Some(&refresh),
+                    REFRESH_COOKIE_SECONDS,
+                );
             }
             response
         }
         Err(error) => failure(error),
     };
-    if logout || deleted {
-        // Signing out always clears the cookie, also when the session was gone.
-        set_cookie(&mut response, None);
+    if clear_cookies {
+        // Signing out or a rejected refresh always clears both session cookies.
+        set_cookie(&mut response, COOKIE, None, 0);
+        set_cookie(&mut response, REFRESH_COOKIE, None, 0);
     }
     response
 }
@@ -482,38 +545,85 @@ fn exactly(headers: &HeaderMap, name: impl header::AsHeaderName + Copy, expected
         && values.next().is_none()
 }
 
+/// Same-origin fetch metadata check shared by HTTP and WebSocket CSWSH gates:
+/// allows requests without `Sec-Fetch-Site` (e.g., browser `ws://` upgrades or
+/// stacks that omit Fetch Metadata), requires a single `same-origin` value when
+/// sent, and refuses duplicates or cross-site/same-site values.
+fn same_origin_fetch(headers: &HeaderMap) -> bool {
+    let fetch_site = HeaderName::from_static("sec-fetch-site");
+    let mut sites = headers.get_all(&fetch_site).iter();
+    match (sites.next(), sites.next()) {
+        (None, _) => true,
+        (Some(value), None) => value.as_bytes() == b"same-origin",
+        (Some(_), Some(_)) => false,
+    }
+}
+
 /// The request comes from the website's own page, in a way no other site's
 /// page can produce: the exact `Host` and `Origin`, same-origin fetch metadata
 /// when sent, JSON, the custom header that forces a cross-origin preflight
 /// (which no CORS answer ever grants), and no bearer.
 fn permitted(uri: &Uri, headers: &HeaderMap, site: &BrowserOrigin) -> bool {
-    let fetch_site = HeaderName::from_static("sec-fetch-site");
-    let mut sites = headers.get_all(&fetch_site).iter();
-    let same_origin = match (sites.next(), sites.next()) {
-        (None, _) => true,
-        (Some(value), None) => value.as_bytes() == b"same-origin",
-        (Some(_), Some(_)) => false,
-    };
     uri.scheme().is_none()
         && uri.authority().is_none()
         && exactly(headers, &header::HOST, &site.host)
         && exactly(headers, &header::ORIGIN, &site.origin)
-        && same_origin
+        && same_origin_fetch(headers)
         && exactly(headers, &header::CONTENT_TYPE, "application/json")
         && exactly(headers, &HeaderName::from_static("x-baylee-central"), "1")
         && !headers.contains_key(header::AUTHORIZATION)
 }
 
+/// Strict CSWSH gate for browser WebSocket upgrades (`GET /api/v1/ws`):
+/// requires loopback proxy peer, clean path without scheme/authority/query,
+/// matching `Host` and `Origin`, `same-origin` fetch metadata when sent, and
+/// no bearer.
+fn ws_permitted(request: &HttpRequest, site: &BrowserOrigin) -> bool {
+    let local = request
+        .extensions()
+        .get::<Peer>()
+        .is_some_and(|Peer(peer)| peer.ip().is_loopback());
+    let uri = request.uri();
+    local
+        && uri.scheme().is_none()
+        && uri.authority().is_none()
+        && uri.query().is_none()
+        && exactly(request.headers(), &header::HOST, &site.host)
+        && exactly(request.headers(), &header::ORIGIN, &site.origin)
+        && same_origin_fetch(request.headers())
+        && !request.headers().contains_key(header::AUTHORIZATION)
+}
+
+async fn ws_dial<A: Accounts>(
+    State(state): State<Arc<Browser<A>>>,
+    request: HttpRequest,
+) -> Response {
+    if !ws_permitted(&request, &state.site) {
+        return refused();
+    }
+    let Some(client) = forwarded(request.headers()) else {
+        return Refusal::NoClient.into_response();
+    };
+    let session_cookie = cookie(request.headers());
+    super::ws::dial_browser(Arc::clone(&state.accounts), client, session_cookie, request).await
+}
+
 /// The session cookie, when exactly one well-formed `__Host-central` is sent;
 /// anything else is no session.
 fn cookie(headers: &HeaderMap) -> Option<Token> {
+    cookie_named(headers, COOKIE)
+}
+
+/// Extract a named session or refresh cookie when exactly one well-formed
+/// instance is present.
+fn cookie_named(headers: &HeaderMap, target: &str) -> Option<Token> {
     let mut found = None;
     for value in headers.get_all(header::COOKIE) {
         for pair in value.to_str().ok()?.split(';') {
             let Some((name, value)) = pair.trim_matches(' ').split_once('=') else {
                 continue;
             };
-            if name == COOKIE {
+            if name == target {
                 if found.is_some() {
                     return None;
                 }
@@ -524,19 +634,19 @@ fn cookie(headers: &HeaderMap) -> Option<Token> {
     found
 }
 
-/// Set the session cookie, or clear it with `None`.
-fn set_cookie(response: &mut Response, token: Option<&Token>) {
-    let mut text = Zeroizing::new(String::with_capacity(128));
-    text.push_str(COOKIE);
+/// Append a `Set-Cookie` header for `name`, or clear it when `token` is `None`.
+fn set_cookie(response: &mut Response, name: &str, token: Option<&Token>, max_age: u32) {
+    let mut text = Zeroizing::new(String::with_capacity(144));
+    text.push_str(name);
     text.push('=');
     if let Some(token) = token {
         text.push_str(&token.hex());
     }
     text.push_str("; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=");
-    text.push_str(&token.map_or(0, |_| COOKIE_SECONDS).to_string());
+    text.push_str(&token.map_or(0, |_| max_age).to_string());
     if let Ok(mut value) = HeaderValue::from_str(&text) {
         value.set_sensitive(true);
-        response.headers_mut().insert(header::SET_COOKIE, value);
+        response.headers_mut().append(header::SET_COOKIE, value);
     }
 }
 
@@ -596,11 +706,15 @@ impl Budgets {
                     && self.register_day.charge(client, now, 10, DAY)
             }
             // A challenge for each attempt, with room for a few retries;
-            // one budget for both ways to ask for it.
-            Request::RegisterChallenge | Request::RegisterChallengeFor { .. } => {
+            // one budget for all ways to ask for it.
+            Request::RegisterChallenge
+            | Request::RegisterChallengeFor { .. }
+            | Request::RegisterInviteChallenge { .. } => {
                 self.challenge.charge(client, now, 20, HOUR)
             }
-            Request::Discover { .. } => self.discover.charge(client, now, 30, MINUTE),
+            Request::Discover { .. }
+            | Request::PublicProfile { .. }
+            | Request::FriendInviteInfo { .. } => self.discover.charge(client, now, 30, MINUTE),
             Request::Ranked { request } if request.is_public() => {
                 self.directory.charge(client, now, 60, MINUTE)
             }
@@ -618,12 +732,11 @@ impl Budgets {
             } => self.directory.charge(client, now, 60, MINUTE),
             // A reset needs a code; a few tries an hour leave room for typing it.
             Request::ResetStart { .. } => self.reset.charge(client, now, 10, HOUR),
-            // A reset code by mail (`docs/email.md`): the same few an hour
-            // as on the account listener, whatever the name.
-            Request::ResetMail { .. } => {
-                self.reset_mail
-                    .charge(client, now, super::addresses::RESET_MAIL, HOUR)
-            }
+            // A reset code or recovery backup by mail (`docs/email.md`): the same
+            // few an hour as on the account listener, whatever the name.
+            Request::ResetMail { .. } | Request::SendRecoveryBackupMail { .. } => self
+                .reset_mail
+                .charge(client, now, super::addresses::RESET_MAIL, HOUR),
             // A pairing is a click on "Play in Baylee"; its page asks for the
             // claim about once a second for at most five minutes.
             Request::PairStart => self.pair_start.charge(client, now, 10, HOUR),
@@ -648,7 +761,9 @@ impl Budgets {
         }
         if !matches!(
             request,
-            Request::RegisterChallenge | Request::RegisterChallengeFor { .. }
+            Request::RegisterChallenge
+                | Request::RegisterChallengeFor { .. }
+                | Request::RegisterInviteChallenge { .. }
         ) {
             return Some(Seen::default());
         }
@@ -784,10 +899,20 @@ mod tests {
                         expires_at: 1,
                     },
                     session: Some(Token::from_secret_bytes(Zeroizing::new(SESSION))),
+                    refresh: Some(Token::from_secret_bytes(Zeroizing::new([8; 32]))),
+                    clear_cookies: false,
+                }),
+                (None, Request::RefreshSession) => Ok(BrowserReply {
+                    response: Answer::Renewed { expires_at: 2 },
+                    session: Some(Token::from_secret_bytes(Zeroizing::new([9; 32]))),
+                    refresh: Some(Token::from_secret_bytes(Zeroizing::new([10; 32]))),
+                    clear_cookies: false,
                 }),
                 (None, _) => Ok(BrowserReply {
                     response: Answer::Done,
                     session: None,
+                    refresh: None,
+                    clear_cookies: false,
                 }),
             };
             let stall = self.stall;
@@ -857,6 +982,40 @@ mod tests {
             })
         }
 
+        fn admit_group_picture(
+            &self,
+            cookie: &Token,
+            group: [u8; 16],
+        ) -> impl Future<Output = Result<(), UploadRefusal>> + Send {
+            self.calls.lock().unwrap().push((
+                format!("admit_group_picture {}", group[15]),
+                Some(cookie.digest()),
+            ));
+            std::future::ready(match self.picture {
+                Some(refusal @ (UploadRefusal::Account(_) | UploadRefusal::Blocked)) => {
+                    Err(refusal)
+                }
+                _ => Ok(()),
+            })
+        }
+
+        fn store_group_picture(
+            &self,
+            (): (),
+            cookie: &Token,
+            format: central_picture::Format,
+            bytes: Vec<u8>,
+        ) -> impl Future<Output = Result<([u8; 16], bool), UploadRefusal>> + Send {
+            self.calls.lock().unwrap().push((
+                format!("store_group_picture {format:?} {}", bytes.len()),
+                Some(cookie.digest()),
+            ));
+            std::future::ready(match self.picture {
+                Some(refusal @ UploadRefusal::Picture(_)) => Err(refusal),
+                _ => Ok((PICTURE, false)),
+            })
+        }
+
         fn picture_bytes(
             &self,
             key: [u8; 16],
@@ -870,6 +1029,37 @@ mod tests {
                 Some(error) => Err(error),
                 None => Ok((key == PICTURE).then(|| (b"picture bytes".to_vec(), [0xcd; 32]))),
             })
+        }
+    }
+
+    impl crate::ws::PushPeer for Mock {
+        fn listen_browser(
+            &self,
+            cookie: &Token,
+            place: Place,
+        ) -> impl Future<Output = Result<central_identity::Listener, Error>> + Send {
+            self.places.lock().unwrap().push(place);
+            self.calls
+                .lock()
+                .unwrap()
+                .push(("ws".into(), Some(cookie.digest())));
+            std::future::ready(Err(self.fail.unwrap_or(Error::Rejected)))
+        }
+
+        fn presence(&self, _listener: &central_identity::Listener) -> central_identity::Presence {
+            central_identity::Presence {
+                online: Vec::new(),
+                states: Vec::new(),
+                me: central_api::presence::Choice::Online,
+                tables: std::collections::BTreeMap::new(),
+            }
+        }
+
+        fn listening(
+            &self,
+            _listener: &central_identity::Listener,
+        ) -> impl Future<Output = Result<bool, Error>> + Send {
+            std::future::ready(Ok(true))
         }
     }
 
@@ -1287,6 +1477,7 @@ mod tests {
             nonce: String::new(),
             counters: Vec::new(),
             display_name: None,
+            invite_code: None,
         });
         for forged in 0..5 {
             let hops = format!("203.0.113.{forged}, 198.51.100.20");
@@ -1337,13 +1528,24 @@ mod tests {
         });
         let sent = send(&app, &base(), finish).await;
         assert_eq!(sent.status, StatusCode::OK);
-        assert_eq!(sent.headers.get_all(header::SET_COOKIE).iter().count(), 1);
+        let cookies: Vec<&str> = sent
+            .headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|value| value.to_str().unwrap())
+            .collect();
         assert_eq!(
-            sent.headers[header::SET_COOKIE],
-            format!(
-                "__Host-central={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200",
-                hex(0xab)
-            )
+            cookies,
+            vec![
+                format!(
+                    "__Host-central={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=900",
+                    hex(0xab)
+                ),
+                format!(
+                    "__Host-central-refresh={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=259200",
+                    hex(0x08)
+                ),
+            ]
         );
         assert!(sent.body.starts_with(r#"{"result":"browser_session""#));
         assert!(!sent.body.contains(&hex(0xab)) && !sent.body.contains("token"));
@@ -1382,8 +1584,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn refresh_rotates_both_cookies_and_evicts_on_rejection() {
+        let (app, mock) = listener();
+        let headers = cookie_header(&format!("__Host-central-refresh={}", hex(0x08)));
+        let sent = send(&app, &headers, body(&Request::RefreshSession)).await;
+        assert_eq!(sent.status, StatusCode::OK);
+        assert_eq!(
+            mock.calls.lock().unwrap()[0].1,
+            Some(Token::from_secret_bytes(Zeroizing::new([0x08; 32])).digest())
+        );
+        let cookies: Vec<&str> = sent
+            .headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|value| value.to_str().unwrap())
+            .collect();
+        assert_eq!(
+            cookies,
+            vec![
+                format!(
+                    "__Host-central={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=900",
+                    hex(0x09)
+                ),
+                format!(
+                    "__Host-central-refresh={}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=259200",
+                    hex(0x0a)
+                ),
+            ]
+        );
+        let app = router(
+            Arc::new(Mock {
+                fail: Some(Error::Rejected),
+                ..Mock::default()
+            }),
+            BrowserOrigin::live(),
+        );
+        let sent = send(&app, &headers, body(&Request::RefreshSession)).await;
+        assert_eq!(sent.status, StatusCode::UNAUTHORIZED);
+        let cleared: Vec<&str> = sent
+            .headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .map(|value| value.to_str().unwrap())
+            .collect();
+        assert_eq!(
+            cleared,
+            vec![
+                "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+                "__Host-central-refresh=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn a_deletion_clears_the_cookie_only_once_it_is_done() {
-        let cleared = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
+        let cleared = vec![
+            "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+            "__Host-central-refresh=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+        ];
         let finish = || {
             body(&Request::DeleteAccountFinish {
                 attempt: Token::from_secret_bytes(Zeroizing::new([2; 32])),
@@ -1394,7 +1652,14 @@ mod tests {
         let (app, _) = listener();
         let sent = send(&app, &headers, finish()).await;
         assert_eq!(sent.status, StatusCode::OK);
-        assert_eq!(sent.headers[header::SET_COOKIE], cleared);
+        assert_eq!(
+            sent.headers
+                .get_all(header::SET_COOKIE)
+                .iter()
+                .map(|value| value.to_str().unwrap())
+                .collect::<Vec<_>>(),
+            cleared
+        );
         // A refused deletion (a wrong password) keeps the session and its cookie.
         let app = router(
             Arc::new(Mock {
@@ -1420,7 +1685,10 @@ mod tests {
 
     #[tokio::test]
     async fn signing_out_clears_the_cookie_even_when_the_session_is_gone() {
-        let cleared = "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0";
+        let cleared = vec![
+            "__Host-central=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+            "__Host-central-refresh=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+        ];
         let (app, _) = listener();
         let sent = send(
             &app,
@@ -1429,7 +1697,14 @@ mod tests {
         )
         .await;
         assert_eq!(sent.status, StatusCode::OK);
-        assert_eq!(sent.headers[header::SET_COOKIE], cleared);
+        assert_eq!(
+            sent.headers
+                .get_all(header::SET_COOKIE)
+                .iter()
+                .map(|value| value.to_str().unwrap())
+                .collect::<Vec<_>>(),
+            cleared
+        );
         let mock = Arc::new(Mock {
             fail: Some(Error::Rejected),
             ..Mock::default()
@@ -1437,7 +1712,14 @@ mod tests {
         let app = router(mock.clone(), BrowserOrigin::live());
         let sent = send(&app, &base(), body(&Request::Logout)).await;
         assert_eq!(sent.status, StatusCode::UNAUTHORIZED);
-        assert_eq!(sent.headers[header::SET_COOKIE], cleared);
+        assert_eq!(
+            sent.headers
+                .get_all(header::SET_COOKIE)
+                .iter()
+                .map(|value| value.to_str().unwrap())
+                .collect::<Vec<_>>(),
+            cleared
+        );
         // Errors keep the native route's fixed vocabulary and set no cookie.
         for (error, status) in [
             (Error::Rejected, StatusCode::UNAUTHORIZED),
@@ -1473,6 +1755,7 @@ mod tests {
             nonce: String::new(),
             counters: Vec::new(),
             display_name: None,
+            invite_code: None,
         });
         for _ in 0..5 {
             assert_eq!(
@@ -1717,6 +2000,7 @@ mod tests {
             display_name: None,
             nonce: String::new(),
             counters: Vec::new(),
+            invite_code: None,
         };
         let now = Instant::now();
         for _ in 0..5 {
@@ -2139,6 +2423,7 @@ mod tests {
             nonce: String::new(),
             counters: Vec::new(),
             display_name: None,
+            invite_code: None,
         });
         // answered, malformed, not a browser operation, too large, over budget
         let mut statuses = Vec::new();
@@ -3035,5 +3320,281 @@ mod tests {
             );
             assert_eq!(send(&app, &base(), discover()).await.status, StatusCode::OK);
         }
+
+        async fn put_group(app: &Router, uri: &str, body: Body) -> (StatusCode, String) {
+            let mut builder = HttpRequest::builder().method("PUT").uri(uri);
+            for (name, value) in upload_headers("image/png", 12) {
+                builder = builder.header(name, value);
+            }
+            let response = app
+                .clone()
+                .oneshot(
+                    builder
+                        .extension(Peer(LOOPBACK.parse().unwrap()))
+                        .body(body)
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let status = response.status();
+            let text = String::from_utf8(
+                to_bytes(response.into_body(), 1 << 20)
+                    .await
+                    .unwrap()
+                    .to_vec(),
+            )
+            .unwrap();
+            (status, text)
+        }
+
+        #[tokio::test]
+        async fn group_picture_upload_validates_group_id_and_returns_key_json() {
+            let valid = "019b0000-0000-7000-8000-00000000002a";
+            assert_eq!(
+                super::super::pictures::parse_group_id(valid).map(|id| id[15]),
+                Some(0x2a)
+            );
+            for bad in [
+                "not-a-uuid",
+                "019b0000-0000-4000-8000-00000000002a",
+                "019b0000-0000-7000-0000-00000000002a",
+                "019B0000-0000-7000-8000-00000000002A",
+                "019b000000007000800000000000002a",
+            ] {
+                assert!(
+                    super::super::pictures::parse_group_id(bad).is_none(),
+                    "{bad}"
+                );
+            }
+            let (app, mock) = listener();
+            let (bad_status, _) = put_group(
+                &app,
+                "/api/v1/groups/019b0000-0000-4000-8000-00000000002a/picture",
+                Body::new(Withheld),
+            )
+            .await;
+            assert_eq!(bad_status, StatusCode::UNAUTHORIZED);
+            assert!(mock.calls.lock().unwrap().is_empty());
+
+            let (status, text) = put_group(
+                &app,
+                &format!("/api/v1/groups/{valid}/picture"),
+                Body::from(vec![7; 12]),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{text}");
+            assert_eq!(
+                text,
+                format!(
+                    r#"{{"key":"{}","moving":false}}"#,
+                    central_api::picture::key_hex(&PICTURE)
+                )
+            );
+            let names: Vec<String> = mock
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(n, _)| n.clone())
+                .collect();
+            assert_eq!(
+                names,
+                ["admit_group_picture 42", "store_group_picture Png 12"]
+            );
+        }
+    }
+
+    fn ws_headers(host: &str, origin: &str, cookie: Option<String>) -> Vec<(&'static str, String)> {
+        let mut headers = vec![
+            ("host", host.to_owned()),
+            ("origin", origin.to_owned()),
+            ("sec-fetch-site", "same-origin".to_owned()),
+            ("x-forwarded-for", "198.51.100.7".to_owned()),
+            ("connection", "Upgrade".to_owned()),
+            ("upgrade", "websocket".to_owned()),
+            ("sec-websocket-version", "13".to_owned()),
+            (
+                "sec-websocket-key",
+                base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    b"the sample nonce",
+                ),
+            ),
+        ];
+        if let Some(cookie) = cookie {
+            headers.push(("cookie", cookie));
+        }
+        headers
+    }
+
+    async fn send_ws(
+        app: &Router,
+        uri: &str,
+        peer: &str,
+        headers: &[(&'static str, String)],
+        with_upgrades: bool,
+    ) -> StatusCode {
+        let mut builder = HttpRequest::builder().method("GET").uri(uri);
+        for (name, value) in headers {
+            builder = builder.header(*name, value);
+        }
+        let mut request = builder
+            .extension(Peer(peer.parse().unwrap()))
+            .body(Body::empty())
+            .unwrap();
+        if with_upgrades {
+            request
+                .extensions_mut()
+                .insert(crate::ws::Sockets::new().upgrades);
+        }
+        app.clone().oneshot(request).await.unwrap().status()
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_enforces_cswsh_headers_loopback_peer_and_cookie_auth() {
+        let (app, mock) = listener();
+        let valid_cookie = format!("__Host-central={}", hex(0xab));
+
+        // Bad or missing CSWSH headers or non-loopback peer or query token -> 403 before touching Mock
+        for (uri, peer, mutate) in [
+            (
+                "/api/v1/ws",
+                "203.0.113.5:1234",
+                None::<(&'static str, Option<&'static str>)>,
+            ),
+            ("/api/v1/ws?token=1", LOOPBACK, None),
+            ("/api/v1/ws", LOOPBACK, Some(("origin", None))),
+            (
+                "/api/v1/ws",
+                LOOPBACK,
+                Some(("origin", Some("https://evil.example"))),
+            ),
+            ("/api/v1/ws", LOOPBACK, Some(("host", Some("evil.example")))),
+            (
+                "/api/v1/ws",
+                LOOPBACK,
+                Some(("sec-fetch-site", Some("cross-site"))),
+            ),
+            (
+                "/api/v1/ws",
+                LOOPBACK,
+                Some(("sec-fetch-site", Some("same-site"))),
+            ),
+            (
+                "/api/v1/ws",
+                LOOPBACK,
+                Some(("authorization", Some("Bearer deadbeef"))),
+            ),
+        ] {
+            let mut headers = ws_headers(
+                "baylee.app",
+                "https://baylee.app",
+                Some(valid_cookie.clone()),
+            );
+            if let Some((name, replacement)) = mutate {
+                headers.retain(|(existing, _)| *existing != name);
+                if let Some(value) = replacement {
+                    headers.push((name, value.to_owned()));
+                }
+            }
+            let status = send_ws(&app, uri, peer, &headers, true).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{uri} {peer} {mutate:?}");
+        }
+        assert!(mock.calls.lock().unwrap().is_empty());
+
+        // Duplicate Sec-Fetch-Site -> 403 before touching Mock
+        let mut dup_fetch = ws_headers(
+            "baylee.app",
+            "https://baylee.app",
+            Some(valid_cookie.clone()),
+        );
+        dup_fetch.push(("sec-fetch-site", "same-origin".to_owned()));
+        assert_eq!(
+            send_ws(&app, "/api/v1/ws", LOOPBACK, &dup_fetch, true).await,
+            StatusCode::FORBIDDEN
+        );
+
+        // Missing X-Forwarded-For -> 400 Bad Request
+        let mut no_client = ws_headers(
+            "baylee.app",
+            "https://baylee.app",
+            Some(valid_cookie.clone()),
+        );
+        no_client.retain(|(k, _)| *k != "x-forwarded-for");
+        assert_eq!(
+            send_ws(&app, "/api/v1/ws", LOOPBACK, &no_client, true).await,
+            StatusCode::BAD_REQUEST
+        );
+
+        // Missing / malformed / duplicate __Host-central cookie -> 401 before listen_browser
+        for bad_cookie in [
+            None,
+            Some("theme=dark".to_owned()),
+            Some(format!(
+                "__Host-central={}; __Host-central={}",
+                hex(0xab),
+                hex(0xab)
+            )),
+            Some("__Host-central=not-hex".to_owned()),
+        ] {
+            let headers = ws_headers("baylee.app", "https://baylee.app", bad_cookie);
+            assert_eq!(
+                send_ws(&app, "/api/v1/ws", LOOPBACK, &headers, true).await,
+                StatusCode::UNAUTHORIZED
+            );
+        }
+        assert!(mock.calls.lock().unwrap().is_empty());
+
+        // Valid CSWSH + __Host-central + Upgrades reaches Mock::listen_browser cleanly
+        let headers = ws_headers("baylee.app", "https://baylee.app", Some(valid_cookie));
+        let status = send_ws(&app, "/api/v1/ws", LOOPBACK, &headers, true).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        let calls = mock.calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "ws");
+        assert_eq!(
+            calls[0].1,
+            Some(Token::from_secret_bytes(Zeroizing::new(SESSION)).digest())
+        );
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_allows_absent_sec_fetch_site_with_matching_origin() {
+        let (app, mock) = listener();
+        let mut no_fetch_site = ws_headers(
+            "baylee.app",
+            "https://baylee.app",
+            Some(format!("__Host-central={}", hex(0xab))),
+        );
+        no_fetch_site.retain(|(name, _)| *name != "sec-fetch-site");
+        let status = send_ws(&app, "/api/v1/ws", LOOPBACK, &no_fetch_site, true).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(mock.calls.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn ws_upgrade_accepts_development_loopback_origin_with_host_cookie() {
+        let dev = BrowserOrigin::development("http://127.0.0.1:28794").unwrap();
+        let mock = Arc::new(Mock::default());
+        let app = router(mock.clone(), dev);
+        let headers = ws_headers(
+            "127.0.0.1:28794",
+            "http://127.0.0.1:28794",
+            Some(format!("__Host-central={}", hex(0xab))),
+        );
+        let status = send_ws(&app, "/api/v1/ws", LOOPBACK, &headers, true).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(mock.calls.lock().unwrap().len(), 1);
+
+        // Cross-origin against http://127.0.0.1:28794 still blocked with 403
+        let evil = ws_headers(
+            "127.0.0.1:28794",
+            "http://localhost:28794",
+            Some(format!("__Host-central={}", hex(0xab))),
+        );
+        assert_eq!(
+            send_ws(&app, "/api/v1/ws", LOOPBACK, &evil, true).await,
+            StatusCode::FORBIDDEN
+        );
     }
 }

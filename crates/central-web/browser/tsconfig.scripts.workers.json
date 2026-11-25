@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2024", "webworker"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": [],
+    "rootDir": "../ts",
+    "rootDirs": ["../ts", "../crypto"],
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "newLine": "lf",
+    "removeComments": false,
+    "outDir": "../js",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": true
+  },
+  "include": [
+    "../ts/pow-worker.ts",
+    "../ts/crypto-worker.ts"
+  ]
+}

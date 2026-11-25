@@ -8,15 +8,21 @@
 use std::fmt::Write as _;
 
 use central_api::email::MailCode;
-use central_api::owner::{
-    GatewayScopes, MyGateway, OwnerAnswer, OwnerRequest, SessionInfo, SessionKind, token_text,
+use central_api::owner::{GatewayScopes, OwnerAnswer, OwnerRequest, SessionInfo, SessionKind};
+use central_api::picture::PictureKey;
+use central_api::profile::{
+    MIN_BIRTH_AGE_YEARS, ProfileDetails, PublicBadges, is_at_least_age, parse_iso_date, tag_text,
+    utc_date_from_unix_secs, validate_birth_date, validate_person_name,
 };
+use central_api::ranked::{Rank, Track};
 use central_api::wire::{AccountSource, Request, Response};
 use leptos::prelude::*;
 use serde_json::json;
 
-use super::auth::{Problem, problem_text, sign_in};
+use super::auth::sign_in;
+pub(super) use super::auth::{Problem, problem_text};
 use super::central::{Failure, call};
+use super::chat::glyph;
 use super::crypto::{Crypto, field_bytes};
 use super::{fragment, session};
 use crate::data::Section;
@@ -26,8 +32,7 @@ use crate::words::{self, Lang};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
     /// The account this browser is signed in as (the administration's
-    /// pages know their own row by it).
-    #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
+    /// pages and overview creation date read it).
     pub(super) account: [u8; 16],
     /// The sign-in name, for a password manager.
     pub(super) username: String,
@@ -37,7 +42,6 @@ pub struct Summary {
     recovery: bool,
     /// Whether Central grants this account the administration.
     pub(super) admin: bool,
-    expires_at: i64,
 }
 
 impl Summary {
@@ -58,16 +62,15 @@ enum Load {
 }
 
 async fn summary() -> Load {
-    let Some(stamp) = session::marker() else {
+    let Some(stamp) = session::login_stamp() else {
         return Load::SignedOut;
     };
     let answer = call(&Request::AccountSummary).await;
-    if session::marker().as_deref() != Some(stamp.as_str()) {
+    if session::login_stamp().as_deref() != Some(stamp.as_str()) {
         return Load::SignedOut;
     }
     match answer {
         Ok(Response::AccountSummary {
-            #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
             identity,
             username,
             display_name,
@@ -75,13 +78,11 @@ async fn summary() -> Load {
             source,
             recovery,
             admin,
-            expires_at,
             ..
         }) => {
             // the header names the account on every page from here on
             session::note_name(display_name.as_deref(), tag);
             Load::Ready(Summary {
-                #[cfg(any(not(target_arch = "wasm32"), feature = "admin"))]
                 account: identity.account,
                 username,
                 display_name,
@@ -89,7 +90,6 @@ async fn summary() -> Load {
                 moved: source == AccountSource::Legacy,
                 recovery,
                 admin,
-                expires_at,
             })
         }
         Ok(_) => Load::Failed(Problem::Failed),
@@ -101,28 +101,15 @@ async fn summary() -> Load {
     }
 }
 
-/// A Unix time as the page's language writes a date and time, in UTC.
+/// A Unix time as the page's language writes a date and time in the browser's local timezone.
 pub fn when(lang: Lang, seconds: i64) -> String {
-    let rest = seconds.rem_euclid(86_400);
-    let time = format!("{:02}:{:02}", rest / 3600, rest % 3600 / 60);
-    format!("{}, {time} UTC", day(lang, seconds))
+    super::time::format_datetime_local(lang, seconds)
 }
 
-/// The day of a Unix time as the page's language writes a date, in UTC.
+/// The day of a Unix time as the page's language writes a date in the browser's local timezone.
+#[cfg_attr(not(feature = "admin"), allow(dead_code))]
 pub fn day(lang: Lang, seconds: i64) -> String {
-    let days = seconds.div_euclid(86_400);
-    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    let date = format!("{year:04}-{month:02}-{day:02}");
-    crate::format::date(lang, &date)
+    super::time::format_unix_date_local(lang, seconds)
 }
 
 /// Signs out here: Central ends the session and clears the cookie, the
@@ -138,9 +125,51 @@ async fn sign_out(worker: &str, lang: Lang) {
     session::go(&format!("/{}/", lang.code()));
 }
 
+/// Reads the account's remembered highest rank from the browser's local
+/// session note so overview and profile avatars draw their ranked border
+/// immediately while `own_badges()` is in flight.
+#[cfg(target_arch = "wasm32")]
+fn remembered_rank() -> Option<Rank> {
+    use central_api::ranked::League;
+    let of = session::marker()?;
+    let text = session::read(session::OWN)?;
+    let held: serde_json::Value = serde_json::from_str(&text).ok()?;
+    if held.get("of").and_then(serde_json::Value::as_str) != Some(of.as_str()) {
+        return None;
+    }
+    let rank = held.get("rank")?.as_object()?;
+    let tier = usize::try_from(rank.get("tier")?.as_u64()?).ok()?;
+    let league = if tier == 11 {
+        League::Unranked
+    } else {
+        *League::PLACED.get(tier)?
+    };
+    let division = rank
+        .get("div")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|d| u8::try_from(d).ok())
+        .filter(|&d| d > 0);
+    let champion_place = rank
+        .get("podium")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|p| u8::try_from(p).ok())
+        .filter(|&p| (1..=3).contains(&p));
+    Some(Rank {
+        league,
+        division,
+        champion_place,
+    })
+}
+
+/// On the server there is no remembered rank in local storage.
+#[cfg(not(target_arch = "wasm32"))]
+const fn remembered_rank() -> Option<Rank> {
+    None
+}
+
 /// The password form that signs in again before a change that needs a
 /// fresh sign-in (making a token, exporting).
-fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
+pub(super) fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
     // only an action asks for it, so it takes the focus
     super::focus::when_shown("#reauth-name");
     let password = RwSignal::new(String::new());
@@ -175,100 +204,139 @@ fn reauth(lang: Lang, worker: String, done: Callback<()>) -> impl IntoView {
             <p>{words::reauth_lead(lang)}</p>
             <div class="field">
                 <label for="reauth-name">{words::signin_name(lang)}</label>
-                <input id="reauth-name" type="text" autocomplete="username" autocapitalize="none" on:input=move |ev| username.set(event_target_value(&ev)) />
+                <div class="inset">
+                    {super::field::mark(glyph::USER)}
+                    <input id="reauth-name" type="text" autocomplete="username" autocapitalize="none" on:input=move |ev| username.set(event_target_value(&ev)) />
+                </div>
             </div>
-            <div class="field">
-                <label for="reauth-password">{words::signin_password(lang)}</label>
-                <input id="reauth-password" type="password" autocomplete="current-password"
-                    on:input=move |ev| password.set(event_target_value(&ev)) prop:value=move || password.get() />
-            </div>
+            {super::field::password_box(
+                lang,
+                "reauth-password",
+                words::signin_password(lang),
+                "current-password",
+                password,
+                None,
+                None,
+                "1024",
+            )}
             <p class="error" role="alert">{move || error.get()}</p>
             <button type="submit" class="button" aria-disabled=move || busy.get().then_some("true")>{words::reauth_submit(lang)}</button>
         </form>
     }
 }
 
-/// Open registration's brake (`docs/registration-abuse.md`), for
-/// administrators: closed during an attack, opened again by hand; a change
-/// needs a sign-in under 30 minutes old, so a stale one signs in again here.
-fn registration_switch(lang: Lang, worker: String) -> AnyView {
-    use central_api::admin::{AdminAnswer, AdminRequest};
-
-    let open = RwSignal::new(None::<bool>);
-    let busy = RwSignal::new(false);
-    let again = RwSignal::new(false);
-    let failed = RwSignal::new(false);
-    let read = move || {
-        leptos::task::spawn_local(async move {
-            let request = Request::Admin {
-                request: AdminRequest::Registration,
-            };
-            match call(&request).await {
-                Ok(Response::Admin {
-                    answer: AdminAnswer::Registration { open: now, .. },
-                }) => open.set(Some(now)),
-                _ => failed.set(true),
-            }
-        });
-    };
-    Effect::new(move |_| read());
-    let change = move || {
-        let Some(now) = open.get_untracked() else {
-            return;
-        };
-        busy.set(true);
-        failed.set(false);
-        leptos::task::spawn_local(async move {
-            let request = Request::Admin {
-                request: AdminRequest::SetRegistration { open: !now },
-            };
-            match call(&request).await {
-                Ok(Response::Done) => open.set(Some(!now)),
-                Err(Failure::Rejected) => again.set(true),
-                _ => failed.set(true),
-            }
-            busy.set(false);
-        });
-    };
-    let signed_again = Callback::new(move |()| {
-        again.set(false);
-        super::focus::after_render("#registration-switch");
-        change();
-    });
-    view! {
-        <section class="card" aria-labelledby="registration-title">
-            <h2 id="registration-title">{words::admin_registration(lang)}</h2>
-            <p role="status">{move || match open.get() {
-                Some(true) => words::admin_registration_open(lang),
-                Some(false) => words::admin_registration_closed(lang),
-                None => words::account_loading(lang),
-            }}</p>
-            <p class="meta">{words::admin_registration_lead(lang)}</p>
-            {move || failed.get().then(|| view! { <p class="error" role="alert">{words::push_failed(lang)}</p> })}
-            {move || {
-                if again.get() {
-                    reauth(lang, worker.clone(), signed_again).into_any()
-                } else {
-                    // the label follows the state; the button stays, and the focus on it
-                    let label = move || if open.get() == Some(false) {
-                        words::admin_registration_reopen(lang)
-                    } else {
-                        words::admin_registration_close(lang)
-                    };
-                    view! {
-                        <p><button type="button" class="button button-ghost" id="registration-switch" aria-disabled=move || (busy.get() || open.get().is_none()).then_some("true")
-                            on:click=move |_| if !busy.get_untracked() { change() }>{label}</button></p>
-                    }
-                    .into_any()
-                }
-            }}
-        </section>
+fn uuid_v7_unix_secs(id: &[u8; 16]) -> Option<i64> {
+    if !super::central::uuid_v7(id) {
+        return None;
     }
-    .into_any()
+    let mut millis_bytes = [0_u8; 8];
+    millis_bytes[2..8].copy_from_slice(&id[0..6]);
+    let millis = u64::from_be_bytes(millis_bytes);
+    i64::try_from(millis / 1000).ok()
 }
 
-fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
+fn badge_summary(lang: Lang, badges: &PublicBadges) -> (String, u32, u32, usize) {
+    let career_games: u32 = badges
+        .ranked_standings
+        .iter()
+        .filter(|s| s.track == Track::Player)
+        .map(|s| s.career.games)
+        .sum();
+    let career_wins: u32 = badges
+        .ranked_standings
+        .iter()
+        .filter(|s| s.track == Track::Player)
+        .map(|s| s.career.wins)
+        .sum();
+    let unlocked = badges.ranked_standings.len()
+        + badges.ranked_awards.len()
+        + badges
+            .challenge_badges
+            .iter()
+            .filter(|b| b.tier.is_some())
+            .count()
+        + badges
+            .tower_badges
+            .iter()
+            .filter(|b| b.tier.is_some())
+            .count()
+        + badges
+            .echoes_badges
+            .iter()
+            .filter(|b| b.tier.is_some())
+            .count()
+        + badges
+            .social_badges
+            .iter()
+            .filter(|b| b.tier.is_some())
+            .count();
+    let best_rank = badges.best_rank.map_or_else(
+        || words::rank_league_unranked(lang).to_owned(),
+        |r| super::ui::badges::rank_title(lang, r),
+    );
+    (best_rank, career_games, career_wins, unlocked)
+}
+
+type OverviewBadgeStats = (String, u32, u32, usize);
+
+fn overview_stats(lang: Lang, stats: Memo<Option<OverviewBadgeStats>>) -> impl IntoView {
+    view! {
+        <dl class="overview-stats">
+            <div>
+                <dt>{words::player_best_rank(lang)}</dt>
+                <dd>{move || stats.with(|s| s.as_ref().map_or_else(|| "–".to_owned(), |s| s.0.clone()))}</dd>
+            </div>
+            <div>
+                <dt>{words::player_career_games(lang)}</dt>
+                <dd translate="no">{move || stats.with(|s| s.as_ref().map_or_else(|| "–".to_owned(), |s| s.1.to_string()))}</dd>
+            </div>
+            <div>
+                <dt>{words::player_career_wins(lang)}</dt>
+                <dd translate="no">{move || stats.with(|s| s.as_ref().map_or_else(|| "–".to_owned(), |s| s.2.to_string()))}</dd>
+            </div>
+            <div>
+                <dt>{words::player_badges_count(lang)}</dt>
+                <dd translate="no">{move || stats.with(|s| s.as_ref().map_or_else(|| "–".to_owned(), |s| s.3.to_string()))}</dd>
+            </div>
+        </dl>
+    }
+}
+
+fn home_admin_cards(lang: Lang, code: &'static str) -> impl IntoView {
+    let to = |slug: &'static str, name: &'static str| {
+        view! { <li><a class="button button-ghost" href=format!("/{code}/account/admin{slug}")>{name}</a></li> }
+    };
+    view! {
+        <section class="card admin-card" aria-labelledby="admin-card-title">
+            <h2 id="admin-card-title">{words::account_admin(lang)}</h2>
+            <ul class="admin-links">
+                {to("/overview", words::account_home(lang))}
+                {to("/feedback", words::fb_title(lang))}
+                {to("/pictures", words::admin_pictures_title(lang))}
+                {to("/users", words::admin_accounts(lang))}
+                {to("", words::admin_reset_title(lang))}
+            </ul>
+        </section>
+    }
+}
+
+fn home(lang: Lang, summary: &Summary) -> AnyView {
     let code = lang.code();
+    let badges = RwSignal::new(None::<PublicBadges>);
+    let pic = RwSignal::new(super::picture::remembered_tuple());
+    let initial_rank = remembered_rank();
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            if let Ok(found) = super::central::own_badges().await {
+                session::note_rank(found.best_rank.as_ref());
+                badges.set(Some(found));
+            }
+        });
+        leptos::task::spawn_local(async move {
+            pic.set(super::picture::own_tuple().await);
+        });
+    });
+    let stats = Memo::new(move |_| badges.with(|b| b.as_ref().map(|b| badge_summary(lang, b))));
     let needs = (!summary.recovery).then(|| {
         view! { <li><a href=format!("/{code}/account/profile")>{words::account_needs_code(lang)}</a></li> }
     });
@@ -283,40 +351,18 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
             </section>
         }
     });
-    // only an administrator is led to the administration: what waits there
-    // (the reports, the reported pictures), its overview, the accounts,
-    // and the page that makes reset codes
-    let admin = summary.admin.then(|| {
-        let to = |slug: &'static str, name: &'static str| {
-            view! { <li><a class="button button-ghost" href=format!("/{code}/account/admin{slug}")>{name}</a></li> }
-        };
-        view! {
-            <section class="card admin-card" aria-labelledby="admin-card-title">
-                <h2 id="admin-card-title">{words::account_admin(lang)}</h2>
-                <ul class="admin-links">
-                    {to("/overview", words::account_home(lang))}
-                    {to("/feedback", words::fb_title(lang))}
-                    {to("/pictures", words::admin_pictures_title(lang))}
-                    {to("/users", words::admin_accounts(lang))}
-                    {to("", words::admin_reset_title(lang))}
-                </ul>
-            </section>
-            {registration_switch(lang, worker.to_owned())}
-        }
-    });
-    // who is signed in: the picture, the name with its tag set apart, the
-    // name to sign in with and how long the session lasts
+    let admin = summary.admin.then(|| home_admin_cards(lang, code));
     let named = summary.display_name.clone().zip(summary.tag);
     let face_name = summary
         .display_name
         .clone()
         .unwrap_or_else(|| summary.username.clone());
+    let seed = summary.handle().unwrap_or_else(|| summary.username.clone());
     let handle = match named {
         Some((name, tag)) => view! {
-            <p class="me-handle" id="me-name" translate="no">
-                <bdi class="me-name">{name}</bdi>
-                <span class="me-tag">{format!("#{}", central_api::profile::tag_text(tag))}</span>
-            </p>
+            <div class="me-handle" id="me-name">
+                {super::ui::copy_handle::handle_with_copy(lang, name, tag_text(tag), true)}
+            </div>
         }
         .into_any(),
         None => view! { <p class="me-handle" id="me-name">{words::account_unnamed(lang)}</p> }
@@ -324,21 +370,400 @@ fn home(lang: Lang, summary: &Summary, worker: &str) -> AnyView {
     };
     let role = summary
         .admin
-        .then(|| view! { <span class="me-role">{words::account_admin(lang)}</span> });
+        .then(|| view! { <span class="me-role">{words::admin_pill(lang)}</span> });
+    let member_since = uuid_v7_unix_secs(&summary.account).map_or_else(
+        || "–".to_owned(),
+        |secs| super::time::format_unix_date_local(lang, secs),
+    );
     view! {
         <section class="card me" aria-labelledby="me-name">
-            {super::picture::own_face(&face_name)}
+            {move || super::ui::rank_avatar::rank_avatar(
+                face_name.clone(),
+                &seed,
+                pic.get(),
+                badges.with(|b| b.as_ref().map_or(initial_rank, |b| b.best_rank)),
+                super::ui::rank_avatar::AvatarSize::Large,
+            )}
             <div class="me-text">
                 {handle}
                 <p class="meta">{words::account_signin_name(lang, &summary.username)}{role}</p>
-                <p class="meta">{words::account_until(lang, &when(lang, summary.expires_at))}</p>
             </div>
-            <a class="button button-ghost me-edit" href=format!("/{code}/account/profile")>{words::account_profile(lang)}</a>
+            <div class="me-aside">
+                <p class="me-since">
+                    <span class="me-since-label">{words::admin_created(lang)}</span>
+                    <span aria-hidden="true">{" · "}</span>
+                    <time translate="no">{member_since}</time>
+                </p>
+                <a class="button button-ghost me-edit" href=format!("/{code}/account/profile") title=words::account_profile(lang)>
+                    {glyph::glyph(glyph::PENCIL)}
+                    <span>{words::account_profile(lang)}</span>
+                </a>
+            </div>
+            {overview_stats(lang, stats)}
         </section>
         {attention}
         {admin}
+        {move || badges.with(|b| b.as_ref().map(|b| view! {
+            <section class="card" aria-labelledby="badges-title">
+                <h2 id="badges-title">{words::badges_title(lang)}</h2>
+                {super::ui::badges::badge_wall(lang, b)}
+            </section>
+        }))}
     }
     .into_any()
+}
+
+fn display_name_chooser(
+    lang: Lang,
+    reload: Callback<()>,
+    focus_next: StoredValue<Option<&'static str>>,
+) -> impl IntoView {
+    let chosen = RwSignal::new(String::new());
+    let error = RwSignal::new(None::<&'static str>);
+    let saving = RwSignal::new(false);
+    let save = move |event: leptos::ev::SubmitEvent| {
+        event.prevent_default();
+        if saving.get_untracked() {
+            return;
+        }
+        let name = chosen.get_untracked();
+        if !central_api::profile::choosable(&name) {
+            error.set(Some(words::register_error_display(lang)));
+            return;
+        }
+        saving.set(true);
+        leptos::task::spawn_local(async move {
+            match call(&Request::SetDisplayName { display_name: name }).await {
+                Ok(_) => {
+                    // the form goes with the reload; the new handle takes the focus
+                    focus_next.set_value(Some("#profile-who"));
+                    reload.run(());
+                }
+                Err(Failure::Conflict) => error.set(Some(words::profile_name_taken(lang))),
+                Err(failure) => error.set(Some(problem_text(lang, failure.into()))),
+            }
+            saving.set(false);
+        });
+    };
+    view! {
+        <form class="form" method="post" novalidate=true on:submit=save>
+            <h3>{words::profile_choose_title(lang)}</h3>
+            <div class="field">
+                <label for="profile-name">{words::register_display(lang)}</label>
+                <div class="inset">
+                    {super::field::mark(glyph::ID_CARD)}
+                    <input id="profile-name" type="text" maxlength="16" aria-describedby="profile-name-hint" on:input=move |ev| chosen.set(event_target_value(&ev)) />
+                    <button
+                        type="submit"
+                        class="inset-end"
+                        title=words::profile_name_save(lang)
+                        aria-label=words::profile_name_save(lang)
+                        aria-disabled=move || saving.get().then_some("true")
+                    >
+                        {glyph::glyph(glyph::CHECK)}
+                    </button>
+                </div>
+                <p class="hint" id="profile-name-hint">{words::register_display_hint(lang)}</p>
+            </div>
+            <p class="error" role="alert">{move || error.get()}</p>
+        </form>
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ProfileDetailsState {
+    details: RwSignal<Option<ProfileDetails>>,
+    first_name: RwSignal<String>,
+    last_name: RwSignal<String>,
+    birth_date: RwSignal<Option<String>>,
+    public_profile: RwSignal<bool>,
+    rank: RwSignal<Option<Rank>>,
+}
+
+fn recovery_code_block(lang: Lang, worker: &str, kept: bool) -> AnyView {
+    if kept {
+        return view! { <p>{words::profile_code_kept(lang)}</p> }.into_any();
+    }
+    let asking = RwSignal::new(false);
+    let worker = worker.to_owned();
+    view! {
+        <p>{words::profile_code_missing(lang)}</p>
+        <Show when=move || asking.get() fallback=move || view! {
+            <button type="button" class="button primary" on:click=move |_| asking.set(true)>{words::profile_code_make(lang)}</button>
+        }>
+            {
+                let worker = worker.clone();
+                let lang_code = lang.code();
+                reauth(lang, worker, Callback::new(move |()| session::go(&format!("/{lang_code}/account/profile"))))
+            }
+        </Show>
+    }
+    .into_any()
+}
+
+fn profile_identity_actions(
+    lang: Lang,
+    worker: &str,
+    named: Option<(String, u32)>,
+) -> impl IntoView + use<> {
+    let worker_logout = worker.to_owned();
+    let open_profile = named.map(|(name, tag)| {
+        let href = super::ui::copy_handle::player_path(lang, &name, &tag_text(tag));
+        view! {
+            <a class="button button-ghost" href=href title=words::player_open_profile(lang)>
+                {glyph::glyph(glyph::EXTERNAL_LINK)}
+                <span>{words::player_open_profile(lang)}</span>
+            </a>
+        }
+    });
+    view! {
+        <p class="actions profile-identity-actions">
+            {open_profile}
+            <button
+                type="button"
+                class="button button-ghost"
+                title=words::profile_sign_out(lang)
+                on:click=move |_| {
+                    let worker = worker_logout.clone();
+                    leptos::task::spawn_local(async move { sign_out(&worker, lang).await });
+                }
+            >
+                {glyph::glyph(glyph::LOG_OUT)}
+                <span>{words::profile_sign_out(lang)}</span>
+            </button>
+        </p>
+    }
+}
+
+fn public_profile_row(lang: Lang, state: ProfileDetailsState) -> impl IntoView {
+    let public_busy = RwSignal::new(false);
+    let public_error = RwSignal::new(None::<&'static str>);
+    let toggle_public = move |ev| {
+        if public_busy.get_untracked() || state.details.with_untracked(Option::is_none) {
+            return;
+        }
+        let next = event_target_checked(&ev);
+        state.public_profile.set(next);
+        public_error.set(None);
+        public_busy.set(true);
+        let mut payload = state.details.get_untracked().unwrap_or_default();
+        payload.public_profile = next;
+        leptos::task::spawn_local(async move {
+            match super::central::set_profile_details(payload.clone()).await {
+                Ok(()) => state.details.set(Some(payload)),
+                Err(failure) => {
+                    state.public_profile.set(!next);
+                    public_error.set(Some(problem_text(lang, failure.into())));
+                }
+            }
+            public_busy.set(false);
+        });
+    };
+    view! {
+        <div class="profile-public-row">
+            <div>
+                <label for="profile-public">{words::profile_public_toggle(lang)}</label>
+                <p class="hint" id="profile-public-hint">{words::profile_public_hint(lang)}</p>
+            </div>
+            <input
+                id="profile-public"
+                type="checkbox"
+                role="switch"
+                aria-describedby="profile-public-hint"
+                prop:checked=move || state.public_profile.get()
+                disabled=move || state.details.with(Option::is_none) || public_busy.get()
+                on:change=toggle_public
+            />
+        </div>
+        <p class="error" role="alert">{move || public_error.get()}</p>
+    }
+}
+
+fn profile_identity_card(
+    lang: Lang,
+    worker: &str,
+    summary: &Summary,
+    reload: Callback<()>,
+    focus_next: StoredValue<Option<&'static str>>,
+    state: ProfileDetailsState,
+) -> impl IntoView {
+    let named = summary.display_name.clone().zip(summary.tag);
+    let handle_cell = match named.clone() {
+        Some((name, tag)) => {
+            super::ui::copy_handle::handle_with_copy(lang, name, tag_text(tag), true)
+        }
+        None => view! { <span>{"–"}</span> }.into_any(),
+    };
+    let rank_sig = Signal::derive(move || state.rank.get());
+    let (picture_side, picture_editor) = match summary.display_name.clone() {
+        Some(display_name) => {
+            let handle = summary.handle().unwrap_or_else(|| summary.username.clone());
+            let parts = super::picture::card(lang, display_name, handle, rank_sig);
+            (Some(parts.side), Some(parts.editor))
+        }
+        None => (None, None),
+    };
+    let choose = summary
+        .display_name
+        .is_none()
+        .then(|| display_name_chooser(lang, reload, focus_next));
+    let identity_body = view! {
+        <div class="stack">
+            <dl class="facts">
+                <dt>{words::profile_handle(lang)}</dt>
+                <dd>{handle_cell}</dd>
+                <dt>{words::profile_signin_name(lang)}</dt>
+                <dd translate="no">{summary.username.clone()}</dd>
+                <dt>{words::profile_source(lang)}</dt>
+                <dd>{if summary.moved { words::profile_source_moved(lang) } else { words::profile_source_registered(lang) }}</dd>
+            </dl>
+            {profile_identity_actions(lang, worker, named)}
+            {public_profile_row(lang, state)}
+            <div class="profile-code-block" aria-labelledby="profile-code">
+                <h3 id="profile-code">{words::profile_code_title(lang)}</h3>
+                {recovery_code_block(lang, worker, summary.recovery)}
+            </div>
+        </div>
+    };
+    let content: AnyView = match picture_side {
+        Some(side) => view! {
+            <div class="profile-identity-grid">
+                {side}
+                {identity_body}
+            </div>
+        }
+        .into_any(),
+        None => identity_body.into_any(),
+    };
+    view! {
+        <section class="card profile-merged" aria-labelledby="profile-who">
+            <h2 id="profile-who" tabindex="-1">{words::profile_identity_title(lang)}</h2>
+            {choose}
+            {content}
+            {picture_editor}
+        </section>
+    }
+}
+
+fn person_name_field(
+    id: &'static str,
+    label: &'static str,
+    auto: &'static str,
+    value: RwSignal<String>,
+    saved: RwSignal<bool>,
+) -> impl IntoView {
+    view! {
+        <div class="field">
+            <label for=id>{label}</label>
+            <div class="inset">
+                {super::field::mark(glyph::USER)}
+                <input
+                    id=id
+                    type="text"
+                    maxlength="80"
+                    autocomplete=auto
+                    prop:value=move || value.get()
+                    on:input=move |ev| {
+                        saved.set(false);
+                        value.set(event_target_value(&ev));
+                    }
+                />
+            </div>
+        </div>
+    }
+}
+
+fn profile_personal_card(
+    lang: Lang,
+    worker: &str,
+    username: &str,
+    signed_again: Callback<()>,
+    reload: Callback<()>,
+    handed: StoredValue<Option<MailCode>>,
+    state: ProfileDetailsState,
+) -> impl IntoView {
+    let personal_busy = RwSignal::new(false);
+    let personal_error = RwSignal::new(None::<&'static str>);
+    let personal_saved = RwSignal::new(false);
+    let age_error = Signal::derive(move || {
+        let val = state.birth_date.get()?;
+        let birth = parse_iso_date(&val).ok()?;
+        let today = utc_date_from_unix_secs(super::ui::datepicker::unix_today_secs());
+        (!is_at_least_age(birth, today, MIN_BIRTH_AGE_YEARS))
+            .then(|| words::date_picker_age_error(lang))
+    });
+    let save_personal = move |event: leptos::ev::SubmitEvent| {
+        event.prevent_default();
+        if personal_busy.get_untracked() || state.details.with_untracked(Option::is_none) {
+            return;
+        }
+        personal_saved.set(false);
+        personal_error.set(None);
+        let raw_first = state.first_name.get_untracked();
+        let raw_last = state.last_name.get_untracked();
+        let raw_birth = state.birth_date.get_untracked();
+        let Ok(valid_first) = validate_person_name(Some(&raw_first)) else {
+            personal_error.set(Some(problem_text(lang, Problem::Failed)));
+            return;
+        };
+        let Ok(valid_last) = validate_person_name(Some(&raw_last)) else {
+            personal_error.set(Some(problem_text(lang, Problem::Failed)));
+            return;
+        };
+        let today = utc_date_from_unix_secs(super::ui::datepicker::unix_today_secs());
+        let Ok(valid_birth) = validate_birth_date(raw_birth.as_deref(), today) else {
+            personal_error.set(Some(words::date_picker_age_error(lang)));
+            return;
+        };
+        let payload = ProfileDetails {
+            first_name: valid_first,
+            last_name: valid_last,
+            birth_date: valid_birth,
+            public_profile: state.public_profile.get_untracked(),
+        };
+        personal_busy.set(true);
+        leptos::task::spawn_local(async move {
+            match super::central::set_profile_details(payload.clone()).await {
+                Ok(()) => {
+                    state
+                        .first_name
+                        .set(payload.first_name.clone().unwrap_or_default());
+                    state
+                        .last_name
+                        .set(payload.last_name.clone().unwrap_or_default());
+                    state.birth_date.set(payload.birth_date.clone());
+                    state.details.set(Some(payload));
+                    personal_saved.set(true);
+                }
+                Err(failure) => personal_error.set(Some(problem_text(lang, failure.into()))),
+            }
+            personal_busy.set(false);
+        });
+    };
+    view! {
+        <section class="card" aria-labelledby="profile-personal-title">
+            <h2 id="profile-personal-title">{words::profile_personal_title(lang)}</h2>
+            <form class="form profile-personal-form" method="post" novalidate=true on:submit=save_personal>
+                {person_name_field("profile-first-name", words::profile_first_name(lang), "given-name", state.first_name, personal_saved)}
+                {person_name_field("profile-last-name", words::profile_last_name(lang), "family-name", state.last_name, personal_saved)}
+                {super::ui::datepicker::date_picker(
+                    lang,
+                    "profile-birth-date",
+                    words::profile_birth_date(lang),
+                    state.birth_date,
+                    age_error,
+                )}
+                <p class="error" role="alert">{move || personal_error.get()}</p>
+                <p class="meta" role="status">{move || personal_saved.get().then(|| words::profile_personal_saved(lang))}</p>
+                <p class="actions">
+                    <button type="submit" class="button primary" aria-disabled=move || (state.details.with(Option::is_none) || personal_busy.get()).then_some("true")>
+                        <span>{words::profile_personal_save(lang)}</span>
+                    </button>
+                </p>
+            </form>
+            {super::email::section(lang, worker.to_owned(), username.to_owned(), signed_again, reload, handed)}
+        </section>
+    }
 }
 
 fn profile(
@@ -347,85 +772,58 @@ fn profile(
     summary: &Summary,
     reload: Callback<()>,
     focus_next: StoredValue<Option<&'static str>>,
+    handed: StoredValue<Option<MailCode>>,
+    prefetched_badges: Option<PublicBadges>,
 ) -> AnyView {
-    let chosen = RwSignal::new(String::new());
-    let error = RwSignal::new(None::<&'static str>);
-    let saving = RwSignal::new(false);
-    let choose = summary.display_name.is_none().then(|| {
-        let save = move |event: leptos::ev::SubmitEvent| {
-            event.prevent_default();
-            if saving.get_untracked() {
-                return;
+    let needs_badge_fetch = prefetched_badges.is_none();
+    let initial_rank = prefetched_badges
+        .as_ref()
+        .and_then(|b| b.best_rank)
+        .or_else(remembered_rank);
+    let badges_data = RwSignal::new(prefetched_badges);
+    let state = ProfileDetailsState {
+        details: RwSignal::new(None),
+        first_name: RwSignal::new(String::new()),
+        last_name: RwSignal::new(String::new()),
+        birth_date: RwSignal::new(None),
+        public_profile: RwSignal::new(false),
+        rank: RwSignal::new(initial_rank),
+    };
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            if let Ok(loaded) = super::central::profile_details().await {
+                state
+                    .first_name
+                    .set(loaded.first_name.clone().unwrap_or_default());
+                state
+                    .last_name
+                    .set(loaded.last_name.clone().unwrap_or_default());
+                state.birth_date.set(loaded.birth_date.clone());
+                state.public_profile.set(loaded.public_profile);
+                state.details.set(Some(loaded));
             }
-            let name = chosen.get_untracked();
-            if !central_api::profile::choosable(&name) {
-                error.set(Some(words::register_error_display(lang)));
-                return;
-            }
-            saving.set(true);
+        });
+        if needs_badge_fetch {
             leptos::task::spawn_local(async move {
-                match call(&Request::SetDisplayName { display_name: name }).await {
-                    Ok(_) => {
-                        // the form goes with the reload; the new handle takes the focus
-                        focus_next.set_value(Some("#profile-who"));
-                        reload.run(());
-                    }
-                    Err(Failure::Conflict) => error.set(Some(words::profile_name_taken(lang))),
-                    Err(failure) => error.set(Some(problem_text(lang, failure.into()))),
+                if let Ok(found) = super::central::own_badges().await {
+                    session::note_rank(found.best_rank.as_ref());
+                    state.rank.set(found.best_rank);
+                    badges_data.set(Some(found));
                 }
-                saving.set(false);
             });
-        };
-        view! {
-            <form class="form card" method="post" novalidate=true on:submit=save>
-                <h2>{words::profile_choose_title(lang)}</h2>
-                <div class="field">
-                    <label for="profile-name">{words::register_display(lang)}</label>
-                    <input id="profile-name" type="text" maxlength="16" aria-describedby="profile-name-hint" on:input=move |ev| chosen.set(event_target_value(&ev)) />
-                    <p class="hint" id="profile-name-hint">{words::register_display_hint(lang)}</p>
-                </div>
-                <p class="error" role="alert">{move || error.get()}</p>
-                <button type="submit" class="button" aria-disabled=move || saving.get().then_some("true")>{words::profile_choose_submit(lang)}</button>
-            </form>
         }
     });
-    let code = if summary.recovery {
-        view! { <p>{words::profile_code_kept(lang)}</p> }.into_any()
-    } else {
-        let asking = RwSignal::new(false);
-        let worker = worker.to_owned();
-        view! {
-            <p>{words::profile_code_missing(lang)}</p>
-            <Show when=move || asking.get() fallback=move || view! {
-                <button type="button" class="button primary" on:click=move |_| asking.set(true)>{words::profile_code_make(lang)}</button>
-            }>
-                {
-                    let worker = worker.clone();
-                    let lang_code = lang.code();
-                    reauth(lang, worker, Callback::new(move |()| session::go(&format!("/{lang_code}/account/profile"))))
-                }
-            </Show>
-        }
-        .into_any()
-    };
+    let noop = Callback::new(|()| {});
     view! {
-        {choose}
-        <section class="card" aria-labelledby="profile-who">
-            <h2 id="profile-who" tabindex="-1">{words::profile_who_title(lang)}</h2>
-            <dl class="facts">
-                <dt>{words::profile_handle(lang)}</dt>
-                <dd translate="no">{summary.handle().unwrap_or_else(|| "–".to_owned())}</dd>
-                <dt>{words::profile_signin_name(lang)}</dt>
-                <dd translate="no">{summary.username.clone()}</dd>
-                <dt>{words::profile_source(lang)}</dt>
-                <dd>{if summary.moved { words::profile_source_moved(lang) } else { words::profile_source_registered(lang) }}</dd>
-            </dl>
-        </section>
-        <section class="card" aria-labelledby="profile-code">
-            <h2 id="profile-code">{words::profile_code_title(lang)}</h2>
-            {code}
-        </section>
-        {summary.display_name.is_some().then(|| super::picture::card(lang, summary.handle().unwrap_or_default()))}
+        {profile_identity_card(lang, worker, summary, reload, focus_next, state)}
+        {move || badges_data.with(|b| b.as_ref().map(|b| view! {
+            <section class="card profile-badges" aria-labelledby="profile-badges-title">
+                <h2 id="profile-badges-title">{words::badges_title(lang)}</h2>
+                {super::ui::badges::badge_wall(lang, b)}
+            </section>
+        }))}
+        {profile_personal_card(lang, worker, &summary.username, noop, reload, handed, state)}
+        {super::password::section(lang, worker.to_owned(), summary.username.clone(), noop, reload)}
     }
     .into_any()
 }
@@ -451,26 +849,17 @@ fn session_row(lang: Lang, info: &SessionInfo) -> impl IntoView + use<> {
             <h3>{kind} {current}</h3>
             <dl class="facts">
                 <dt>{words::security_signed_in(lang)}</dt>
-                <dd>{when(lang, info.signed_in_at)}</dd>
+                <dd>{super::time::format_datetime_local(lang, info.signed_in_at)}</dd>
                 <dt>{words::security_ends(lang)}</dt>
-                <dd>{when(lang, info.expires_at)}</dd>
+                <dd>{super::time::format_datetime_local(lang, info.expires_at)}</dd>
                 {gateways}
             </dl>
         </li>
     }
 }
 
-/// The sessions, the password's change (`password::change_form`) and the
-/// account's e-mail address (`email::section`), which takes the code the
-/// confirmation mail's link `handed` over, once. `signed_out` reloads the
-/// area when one of them finds no session.
-fn security(
-    lang: Lang,
-    worker: String,
-    username: String,
-    signed_out: Callback<()>,
-    handed: StoredValue<Option<MailCode>>,
-) -> AnyView {
+/// Active browser and client sessions for this account.
+fn security(lang: Lang, worker: String) -> AnyView {
     let sessions = RwSignal::new(None::<Result<Vec<SessionInfo>, Problem>>);
     let notice = RwSignal::new(None::<&'static str>);
     let load = move || {
@@ -505,27 +894,12 @@ fn security(
             }
         });
     };
-    let leave = {
+    let leave = move |_| {
         let worker = worker.clone();
-        move |_| {
-            let worker = worker.clone();
-            leptos::task::spawn_local(async move { sign_out(&worker, lang).await });
-        }
+        leptos::task::spawn_local(async move { sign_out(&worker, lang).await });
     };
-    // a change ends every other session: the list above is another then
-    let changed = Callback::new(move |()| load());
-    // naming an address signs in once more: this session is a newer one then
-    let email = super::email::section(
-        lang,
-        worker.clone(),
-        username.clone(),
-        super::email::Begin::Read,
-        changed,
-        signed_out,
-        handed,
-    );
     view! {
-        <section aria-labelledby="sessions-title">
+        <section class="card" aria-labelledby="sessions-title">
             <h2 id="sessions-title">{words::security_sessions(lang)}</h2>
             <p>{words::security_lead(lang)}</p>
             {move || sessions.with(|found| match found {
@@ -538,16 +912,16 @@ fn security(
             })}
             <p class="meta" role="status">{move || notice.get()}</p>
             <p class="actions">
-                <button type="button" class="button danger" on:click=end_client>{words::security_end_client(lang)}</button>
-                <button type="button" class="button button-ghost" on:click=leave>{words::security_sign_out(lang)}</button>
+                <button type="button" class="button danger" on:click=end_client>
+                    {glyph::glyph(glyph::LOG_OUT)}
+                    <span>{words::security_end_client(lang)}</span>
+                </button>
+                <button type="button" class="button button-ghost" on:click=leave>
+                    {glyph::glyph(glyph::LOG_OUT)}
+                    <span>{words::security_sign_out(lang)}</span>
+                </button>
             </p>
         </section>
-        <section class="card" aria-labelledby="password-title">
-            <h2 id="password-title">{words::security_password_title(lang)}</h2>
-            <p>{words::security_password_lead(lang)}</p>
-            {super::password::change_form(lang, worker, username, changed, signed_out)}
-        </section>
-        {email}
     }
     .into_any()
 }
@@ -562,7 +936,12 @@ fn download_link(lang: Lang, json: &str) -> impl IntoView + use<> {
             let _ = write!(href, "%{byte:02X}");
         }
     }
-    view! { <a class="button" id="export-save" href=href download="baylee-account.json">{words::privacy_export_save(lang)}</a> }
+    view! {
+        <a class="button" id="export-save" href=href download="baylee-account.json">
+            {glyph::glyph(glyph::DOWNLOAD)}
+            <span>{words::privacy_export_save(lang)}</span>
+        </a>
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -571,6 +950,52 @@ enum Deletion {
     Asking,
     Proven { gateways: Vec<String> },
     Deleted,
+}
+
+fn export_result_view(
+    lang: Lang,
+    result: Option<Result<String, Problem>>,
+    without_email: RwSignal<bool>,
+    picture: RwSignal<Option<PictureKey>>,
+    busy: RwSignal<bool>,
+    run_export: impl Fn() + Clone + 'static,
+) -> AnyView {
+    match result {
+        Some(Ok(json)) => {
+            super::focus::when_shown("#export-save");
+            let lacks = without_email.get().then(|| {
+                view! { <p class="meta" id="export-no-email">{words::privacy_export_no_email(lang)}</p> }
+            });
+            let png = picture.get().map(|key| {
+                view! {
+                    <a class="button button-ghost" id="export-picture" href=super::picture::url(&key, false)
+                        download="baylee-profile-picture.png">
+                        {glyph::glyph(glyph::DOWNLOAD)}
+                        <span>{words::privacy_export_picture(lang)}</span>
+                    </a>
+                }
+            });
+            view! { <div class="actions">{download_link(lang, &json)}{png}</div>{lacks} }.into_any()
+        }
+        Some(Err(problem)) => {
+            super::focus::when_shown("#export-error");
+            view! {
+                <p class="error" id="export-error" role="alert" tabindex="-1">{problem_text(lang, problem)}</p>
+                <button type="button" class="button" on:click=move |_| run_export()>
+                    {glyph::glyph(glyph::DOWNLOAD)}
+                    <span>{words::privacy_export_make(lang)}</span>
+                </button>
+            }
+            .into_any()
+        }
+        None => view! {
+            <button type="button" class="button" disabled=move || busy.get() on:click=move |_| run_export()>
+                {glyph::glyph(glyph::DOWNLOAD)}
+                <span>{words::privacy_export_make(lang)}</span>
+            </button>
+        }
+        .into_any(),
+    }
 }
 
 /// The export, and beside it in the same file what Central holds of the
@@ -582,7 +1007,7 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
     let busy = RwSignal::new(false);
     let generation = RwSignal::new(0_u64);
     let without_email = RwSignal::new(false);
-    let picture = RwSignal::new(None::<central_api::picture::PictureKey>);
+    let picture = RwSignal::new(None::<PictureKey>);
     let needs_reauth = RwSignal::new(false);
     session::on_change(move || {
         generation.update(|value| *value = value.wrapping_add(1));
@@ -596,7 +1021,7 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
         if busy.get_untracked() {
             return;
         }
-        let Some(stamp) = session::marker() else {
+        let Some(stamp) = session::login_stamp() else {
             needs_reauth.set(true);
             return;
         };
@@ -608,7 +1033,7 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
             if generation.get_untracked() != started {
                 return;
             }
-            if session::marker().as_ref() != Some(&stamp) {
+            if session::login_stamp().as_ref() != Some(&stamp) {
                 busy.set(false);
                 return;
             }
@@ -627,7 +1052,7 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
                     if generation.get_untracked() != started {
                         return;
                     }
-                    if session::marker().as_ref() != Some(&stamp) {
+                    if session::login_stamp().as_ref() != Some(&stamp) {
                         busy.set(false);
                         return;
                     }
@@ -647,26 +1072,7 @@ fn export_view(lang: Lang, worker: String) -> impl IntoView {
             <h2 id="export-title">{words::privacy_export_title(lang)}</h2>
             <p>{words::privacy_export_lead(lang)}</p>
             <span class="meta" role="status">{move || busy.get().then(||words::account_loading(lang))}</span>
-            {move || match export.get() {
-                Some(Ok(json)) => {
-                    super::focus::when_shown("#export-save");
-                    let lacks = without_email.get().then(|| {
-                        view! { <p class="meta" id="export-no-email">{words::privacy_export_no_email(lang)}</p> }
-                    });
-                    let png = picture.get().map(|key| view! {
-                        <a class="button button-ghost" id="export-picture" href=super::picture::url(&key, false)
-                            download="baylee-profile-picture.png">{words::privacy_export_picture(lang)}</a>
-                    });
-                    view! { <div class="actions">{download_link(lang, &json)}{png}</div>{lacks} }.into_any()
-                }
-                Some(Err(problem)) => {
-                    super::focus::when_shown("#export-error");
-                    view! { <p class="error" id="export-error" role="alert" tabindex="-1">{problem_text(lang, problem)}</p>
-                        <button type="button" class="button" on:click=move |_| run_export()>{words::privacy_export_make(lang)}</button>
-                    }.into_any()
-                }
-                None => view! { <button type="button" class="button" disabled=move || busy.get() on:click=move |_| run_export()>{words::privacy_export_make(lang)}</button> }.into_any(),
-            }}
+            {move || export_result_view(lang, export.get(), without_email, picture, busy, run_export)}
             <Show when=move || needs_reauth.get()>
                 {reauth(lang, worker.clone(), Callback::new(move |()| { needs_reauth.set(false); run_export(); }))}
             </Show>
@@ -694,12 +1100,43 @@ fn deletion_proven_view(
         <p class="notice" id="delete-last" role="alert" tabindex="-1">{words::privacy_delete_last(lang)}</p>
         {owned}
         <p class="actions">
-            <button type="button" class="button danger" aria-disabled=move || busy.get().then_some("true") on:click=move |_| delete.run(())>{words::privacy_delete_confirm(lang)}</button>
+            <button type="button" class="button danger" aria-disabled=move || busy.get().then_some("true") on:click=move |_| delete.run(())>
+                {glyph::glyph(glyph::TRASH_2)}
+                <span>{words::privacy_delete_action(lang)}</span>
+            </button>
             <button type="button" class="button button-ghost" on:click=move |_| {
                 deletion.set(Deletion::Idle);
                 super::focus::after_render("#delete-start");
             }>{words::privacy_delete_cancel(lang)}</button>
         </p>
+    }
+    .into_any()
+}
+
+fn deletion_asking_view(
+    lang: Lang,
+    password: RwSignal<String>,
+    busy: RwSignal<bool>,
+    prove: impl Fn(leptos::ev::SubmitEvent) + 'static,
+) -> AnyView {
+    super::focus::when_shown("#delete-password");
+    view! {
+        <form class="form" method="post" novalidate=true on:submit=prove>
+            {super::field::password_box(
+                lang,
+                "delete-password",
+                words::privacy_delete_password(lang),
+                "current-password",
+                password,
+                None,
+                None,
+                "1024",
+            )}
+            <button type="submit" class="button danger" aria-disabled=move || busy.get().then_some("true")>
+                {glyph::glyph(glyph::TRASH_2)}
+                <span>{words::privacy_delete_prove(lang)}</span>
+            </button>
+        </form>
     }
     .into_any()
 }
@@ -770,20 +1207,12 @@ fn deletion_view(lang: Lang, worker: String) -> impl IntoView {
             <p>{words::privacy_delete_lead(lang)}</p>
             {move || match deletion.get() {
                 Deletion::Idle => view! {
-                    <button type="button" class="button danger" id="delete-start" on:click=move |_| deletion.set(Deletion::Asking)>{words::privacy_delete_start(lang)}</button>
+                    <button type="button" class="button danger" id="delete-start" on:click=move |_| deletion.set(Deletion::Asking)>
+                        {glyph::glyph(glyph::TRASH_2)}
+                        <span>{words::privacy_delete_start(lang)}</span>
+                    </button>
                 }.into_any(),
-                Deletion::Asking => {
-                    super::focus::when_shown("#delete-password");
-                    view! {
-                        <form class="form" method="post" novalidate=true on:submit=prove.clone()>
-                            <div class="field">
-                                <label for="delete-password">{words::privacy_delete_password(lang)}</label>
-                                <input id="delete-password" type="password" autocomplete="current-password" on:input=move |ev| password.set(event_target_value(&ev)) />
-                            </div>
-                            <button type="submit" class="button danger" aria-disabled=move || busy.get().then_some("true")>{words::privacy_delete_prove(lang)}</button>
-                        </form>
-                    }.into_any()
-                }
+                Deletion::Asking => deletion_asking_view(lang, password, busy, prove.clone()),
                 Deletion::Proven { gateways } => deletion_proven_view(lang, gateways, busy, deletion, delete),
                 Deletion::Deleted => {
                     super::focus::when_shown("#deleted");
@@ -843,14 +1272,7 @@ async fn prove_deletion(
     ))
 }
 
-/// A gateway's part of element ids: its id in hex, unique on the page.
-fn gateway_key(id: &[u8; 16]) -> String {
-    id.iter().fold(String::with_capacity(32), |mut out, byte| {
-        let _ = write!(out, "{byte:02x}");
-        out
-    })
-}
-
+#[cfg_attr(not(feature = "admin"), allow(dead_code))]
 pub(super) fn scope_text(lang: Lang, scopes: GatewayScopes) -> String {
     let mut parts = Vec::with_capacity(2);
     match (scopes.sso, scopes.listing) {
@@ -863,280 +1285,6 @@ pub(super) fn scope_text(lang: Lang, scopes: GatewayScopes) -> String {
         parts.push(words::tokens_ranked(lang));
     }
     parts.join(" · ")
-}
-
-fn gateway_card(
-    lang: Lang,
-    gateway: &MyGateway,
-    revoke: Callback<([u8; 16], [u8; 16])>,
-    mint: Callback<([u8; 16], String, u16, GatewayScopes)>,
-) -> impl IntoView + use<> {
-    let state = match gateway.state {
-        central_api::gateway::GatewayState::Approved => words::gateways_approved(lang),
-        central_api::gateway::GatewayState::Pending => words::gateways_pending(lang),
-        central_api::gateway::GatewayState::Disabled => words::gateways_disabled(lang),
-    };
-    let gateway_id = gateway.id;
-    let tokens = gateway
-        .tokens
-        .iter()
-        .map(|token| {
-            let id = token.id;
-            let live = token.revoked_at.is_none();
-            let what = scope_text(lang, token.scopes);
-            let action = live.then(|| view! {
-                <button type="button" class="button danger" on:click=move |_| revoke.run((gateway_id, id))>{words::tokens_revoke(lang)}</button>
-            });
-            view! {
-                <li class="token">
-                    <p><strong>{token.name.clone()}</strong> " · " {what}</p>
-                    <p class="meta">
-                        {if live { words::tokens_until(lang, &when(lang, token.expires_at)) } else { words::tokens_revoked(lang).to_owned() }}
-                    </p>
-                    {action}
-                </li>
-            }
-        })
-        .collect_view();
-    let id = gateway.id;
-    let name = RwSignal::new(String::new());
-    let days = RwSignal::new(90_u16);
-    let sso = RwSignal::new(true);
-    let listing = RwSignal::new(true);
-    let ranked = RwSignal::new(false);
-    let make = move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        mint.run((
-            id,
-            name.get_untracked(),
-            days.get_untracked(),
-            GatewayScopes {
-                sso: sso.get_untracked(),
-                listing: listing.get_untracked(),
-                ranked: ranked.get_untracked(),
-            },
-        ));
-    };
-    let form_id = format!("token-{}", gateway_key(&gateway.id));
-    view! {
-        <article class="card gateway-own">
-            <h3 id=format!("{form_id}-title") tabindex="-1"><bdi>{gateway.metadata.name.clone()}</bdi></h3>
-            <p class="pills"><span class="pill">{state}</span>{gateway.online.then(|| view! { <span class="pill ok">{words::gws_online(lang)}</span> })}</p>
-            <p><code class="address" translate="no">{gateway.origin.clone()}</code></p>
-            <h4>{words::tokens_title(lang)}</h4>
-            <ul class="tokens">{tokens}</ul>
-            <form class="form" method="post" novalidate=true on:submit=make>
-                <div class="field">
-                    <label for=format!("{form_id}-name")>{words::tokens_name(lang)}</label>
-                    <input id=format!("{form_id}-name") type="text" maxlength="64" on:input=move |ev| name.set(event_target_value(&ev)) />
-                </div>
-                <div class="field">
-                    <label for=format!("{form_id}-days")>{words::tokens_days(lang)}</label>
-                    <select id=format!("{form_id}-days") on:change=move |ev| days.set(event_target_value(&ev).parse().unwrap_or(90))>
-                        <option value="30">{"30"}</option>
-                        <option value="90" selected=true>"90"</option>
-                        <option value="180">{"180"}</option>
-                        <option value="365">{"365"}</option>
-                    </select>
-                </div>
-                <div class="check">
-                    <input id=format!("{form_id}-sso") type="checkbox" checked=true on:change=move |ev| sso.set(event_target_checked(&ev)) />
-                    <label for=format!("{form_id}-sso")>{words::tokens_sso(lang)}</label>
-                </div>
-                <div class="check">
-                    <input id=format!("{form_id}-listing") type="checkbox" checked=true on:change=move |ev| listing.set(event_target_checked(&ev)) />
-                    <label for=format!("{form_id}-listing")>{words::tokens_listing(lang)}</label>
-                </div>
-                <div class="check">
-                    <input id=format!("{form_id}-ranked") type="checkbox" on:change=move |ev| ranked.set(event_target_checked(&ev)) />
-                    <label for=format!("{form_id}-ranked")>{words::tokens_ranked(lang)}</label>
-                </div>
-                <button type="submit" class="button">{words::tokens_make(lang)}</button>
-            </form>
-        </article>
-    }
-}
-
-/// Registering a gateway: its origin and its name.
-fn add_form(
-    lang: Lang,
-    notice: RwSignal<Option<&'static str>>,
-    reload: Callback<()>,
-) -> impl IntoView {
-    let origin = RwSignal::new(String::new());
-    let label = RwSignal::new(String::new());
-    let busy = RwSignal::new(false);
-    let add = move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        if busy.get_untracked() {
-            return;
-        }
-        let (origin_value, name) = (
-            origin.get_untracked().trim().to_owned(),
-            label.get_untracked().trim().to_owned(),
-        );
-        if central_api::gateway::validate_origin(&origin_value, false).is_err() || name.is_empty() {
-            notice.set(Some(words::gateways_invalid(lang)));
-            return;
-        }
-        busy.set(true);
-        leptos::task::spawn_local(async move {
-            match call(&Request::Owner {
-                request: OwnerRequest::AddGateway {
-                    origin: origin_value,
-                    name,
-                },
-            })
-            .await
-            {
-                Ok(_) => {
-                    notice.set(Some(words::gateways_added(lang)));
-                    reload.run(());
-                }
-                Err(Failure::Conflict) => notice.set(Some(words::gateways_taken(lang))),
-                Err(failure) => notice.set(Some(problem_text(lang, failure.into()))),
-            }
-            busy.set(false);
-        });
-    };
-    view! {
-        <form class="form card" method="post" novalidate=true on:submit=add>
-            <h2>{words::gateways_add_title(lang)}</h2>
-            <div class="field">
-                <label for="gateway-origin">{words::gateways_origin(lang)}</label>
-                <input id="gateway-origin" type="url" inputmode="url" placeholder="https://" aria-describedby="gateway-origin-hint" on:input=move |ev| origin.set(event_target_value(&ev)) />
-                <p class="hint" id="gateway-origin-hint">{words::gateways_origin_hint(lang)}</p>
-            </div>
-            <div class="field">
-                <label for="gateway-name">{words::gateways_name(lang)}</label>
-                <input id="gateway-name" type="text" maxlength="80" on:input=move |ev| label.set(event_target_value(&ev)) />
-            </div>
-            <button type="submit" class="button" aria-disabled=move || busy.get().then_some("true")>{words::gateways_add(lang)}</button>
-        </form>
-    }
-}
-
-/// A new token, shown once; kept, the focus goes back to its gateway.
-fn token_box(
-    lang: Lang,
-    shown: RwSignal<Option<String>>,
-    minting: StoredValue<Option<[u8; 16]>>,
-) -> impl IntoView {
-    view! {
-        <Show when=move || shown.with(Option::is_some)>
-            <section class="card secret-box" role="alert" aria-labelledby="token-shown">
-                <h2 id="token-shown" tabindex="-1">{words::tokens_shown_title(lang)}</h2>
-                <p class="eyebrow">{words::code_shown_once(lang)}</p>
-                <p class="secret" translate="no"><code>{move || shown.get().unwrap_or_default()}</code></p>
-                <button type="button" class="button primary" on:click=move |_| {
-                    shown.set(None);
-                    if let Some(gateway) = minting.get_value() {
-                        super::focus::after_render(format!("#token-{}-title", gateway_key(&gateway)));
-                    }
-                }>{words::tokens_kept(lang)}</button>
-            </section>
-        </Show>
-    }
-}
-
-fn gateways(lang: Lang, worker: String) -> AnyView {
-    let list = RwSignal::new(None::<Result<Vec<MyGateway>, Problem>>);
-    let notice = RwSignal::new(None::<&'static str>);
-    let shown = RwSignal::new(None::<String>);
-    let needs_reauth = RwSignal::new(false);
-    // the gateway a token is being made for, to come back to
-    let minting = StoredValue::new(None::<[u8; 16]>);
-    // A reload draws the cards anew, the focused control among them:
-    // `then` names where the focus goes once they are drawn.
-    let load = move |then: Option<String>| {
-        leptos::task::spawn_local(async move {
-            let found = match call(&Request::Owner {
-                request: OwnerRequest::Gateways,
-            })
-            .await
-            {
-                Ok(Response::Owner {
-                    answer: OwnerAnswer::Gateways { gateways },
-                }) => Ok(gateways),
-                Ok(_) => Err(Problem::Failed),
-                Err(failure) => Err(failure.into()),
-            };
-            list.set(Some(found));
-            if let Some(then) = then {
-                super::focus::after_render(then);
-            }
-        });
-    };
-    Effect::new(move |_| load(None));
-    let revoke = Callback::new(move |(gateway, token): ([u8; 16], [u8; 16])| {
-        leptos::task::spawn_local(async move {
-            match call(&Request::Owner {
-                request: OwnerRequest::RevokeToken { token },
-            })
-            .await
-            {
-                Ok(_) => {
-                    notice.set(Some(words::tokens_revoked_now(lang)));
-                    load(Some(format!("#token-{}-title", gateway_key(&gateway))));
-                }
-                Err(failure) => notice.set(Some(problem_text(lang, failure.into()))),
-            }
-        });
-    });
-    let mint = Callback::new(
-        move |(gateway, name, days, scopes): ([u8; 16], String, u16, GatewayScopes)| {
-            if central_api::owner::token_name(&name).is_err() || scopes.validate().is_err() {
-                notice.set(Some(words::tokens_invalid(lang)));
-                return;
-            }
-            minting.set_value(Some(gateway));
-            leptos::task::spawn_local(async move {
-                match call(&Request::Owner {
-                    request: OwnerRequest::CreateToken {
-                        gateway,
-                        name,
-                        scopes,
-                        days,
-                    },
-                })
-                .await
-                {
-                    Ok(Response::Owner {
-                        answer: OwnerAnswer::TokenCreated { token, .. },
-                    }) => {
-                        shown.set(Some(token_text(&token).to_string()));
-                        super::focus::after_render("#token-shown");
-                        load(None);
-                    }
-                    Ok(_) => notice.set(Some(problem_text(lang, Problem::Failed))),
-                    Err(Failure::Rejected) => needs_reauth.set(true),
-                    Err(failure) => notice.set(Some(problem_text(lang, failure.into()))),
-                }
-            });
-        },
-    );
-    view! {
-        {token_box(lang, shown, minting)}
-        <Show when=move || needs_reauth.get()>
-            {reauth(lang, worker.clone(), Callback::new(move |()| {
-                needs_reauth.set(false);
-                notice.set(Some(words::tokens_again(lang)));
-                // signed in again: back to the form that asks to make it again
-                if let Some(gateway) = minting.get_value() {
-                    super::focus::after_render(format!("#token-{}-name", gateway_key(&gateway)));
-                }
-            }))}
-        </Show>
-        <p class="meta" role="status">{move || notice.get()}</p>
-        {move || list.with(|found| match found {
-            None => view! { <p role="status" class="meta">{words::account_loading(lang)}</p> }.into_any(),
-            Some(Err(problem)) => view! { <p class="error" role="alert">{problem_text(lang, *problem)}</p> }.into_any(),
-            Some(Ok(all)) if all.is_empty() => view! { <p>{words::gateways_none(lang)}</p> }.into_any(),
-            Some(Ok(all)) => all.iter().map(|gateway| gateway_card(lang, gateway, revoke, mint)).collect_view().into_any(),
-        })}
-        {add_form(lang, notice, Callback::new(move |()| load(None)))}
-    }
-    .into_any()
 }
 
 /// The account's categories, each a switch.
@@ -1198,14 +1346,146 @@ fn push_switches(
     switches.into_any()
 }
 
-/// Web Push on this device and the account's categories.
-fn notifications(lang: Lang, admin: bool) -> AnyView {
+fn push_install_box(
+    lang: Lang,
+    standalone: RwSignal<bool>,
+    needs_install: RwSignal<bool>,
+) -> impl IntoView {
+    view! {
+        <div class="push-install-box" hidden=move || standalone.get()>
+            <p class="meta">
+                {move || if needs_install.get() {
+                    words::notify_install_needed(lang)
+                } else {
+                    words::pwa_install_tooltip(lang)
+                }}
+            </p>
+            <button
+                type="button"
+                class="button"
+                data-pwa-install=""
+                title=words::pwa_install_tooltip(lang)
+                hidden=true
+            >
+                {glyph::glyph(glyph::DOWNLOAD)}
+                <span>{words::install_app(lang)}</span>
+            </button>
+        </div>
+    }
+}
+
+fn push_permission_row(
+    lang: Lang,
+    perm: RwSignal<String>,
+    needs_install: RwSignal<bool>,
+    request_permission: impl Fn(leptos::ev::MouseEvent) + Copy + 'static,
+) -> AnyView {
+    if needs_install.get() || !super::push::browser::has_notification_api() {
+        return ().into_any();
+    }
+    match perm.get().as_str() {
+        "default" => view! {
+            <div class="push-permission-row">
+                <button type="button" class="button" on:click=request_permission>
+                    {glyph::glyph(glyph::BELL)}
+                    <span>{words::notify_request_permission(lang)}</span>
+                </button>
+            </div>
+        }
+        .into_any(),
+        "granted" => view! {
+            <div class="push-permission-row">
+                <p class="meta" role="status">
+                    {glyph::glyph(glyph::CIRCLE_CHECK)}
+                    <span>{words::notify_permission_granted(lang)}</span>
+                </p>
+            </div>
+        }
+        .into_any(),
+        "denied" => view! {
+            <div class="push-permission-row">
+                <p class="notice" role="status">
+                    {glyph::glyph(glyph::SHIELD_ALERT)}
+                    <span>{words::notify_permission_denied(lang)}</span>
+                </p>
+            </div>
+        }
+        .into_any(),
+        _ => ().into_any(),
+    }
+}
+
+fn toggle_push_device(
+    lang: Lang,
+    now: RwSignal<Option<Result<super::push::Now, Problem>>>,
+    busy: RwSignal<bool>,
+    error: RwSignal<Option<&'static str>>,
+    perm: RwSignal<String>,
+    active: bool,
+    public_key: Option<String>,
+) {
     use super::push::{self, Refusal};
+
+    error.set(None);
+    if active {
+        busy.set(true);
+        leptos::task::spawn_local(async move {
+            if push::disable().await.is_err() {
+                error.set(Some(words::push_failed(lang)));
+            }
+            now.update(|n| {
+                if let Some(Ok(n)) = n {
+                    n.active = false;
+                }
+            });
+            busy.set(false);
+        });
+        return;
+    }
+    let Some(public_key) = public_key else {
+        return;
+    };
+    // the browser asks inside the click, before anything is awaited
+    let asked = push::browser::ask();
+    busy.set(true);
+    leptos::task::spawn_local(async move {
+        match push::enable(asked, lang, &public_key).await {
+            Ok(enabled) => now.update(|n| {
+                if let Some(Ok(n)) = n {
+                    n.enabled = enabled;
+                    n.active = true;
+                }
+                perm.set(push::browser::permission());
+            }),
+            Err(Refusal::Denied) => {
+                perm.set(push::browser::permission());
+                error.set(Some(words::push_denied(lang)));
+            }
+            Err(Refusal::Failed) => error.set(Some(words::push_failed(lang))),
+        }
+        busy.set(false);
+    });
+}
+
+/// Web Push on this device, PWA install guidance, and notification categories.
+fn notifications(lang: Lang, admin: bool) -> AnyView {
+    use super::push;
 
     let now = RwSignal::new(None::<Result<push::Now, Problem>>);
     let busy = RwSignal::new(false);
     let error = RwSignal::new(None::<&'static str>);
+    let perm = RwSignal::new(push::browser::permission());
+    let standalone = RwSignal::new(push::browser::is_standalone());
+    let needs_install = RwSignal::new(push::browser::requires_install());
+    push::browser::on_pwa_change(move |_can, inst| {
+        standalone.set(inst);
+        needs_install.set(push::browser::requires_install());
+        perm.set(push::browser::permission());
+    });
     Effect::new(move |_| {
+        standalone.set(push::browser::is_standalone());
+        needs_install.set(push::browser::requires_install());
+        perm.set(push::browser::permission());
         leptos::task::spawn_local(async move {
             now.set(Some(push::load().await.map_err(Problem::from)));
         });
@@ -1219,52 +1499,37 @@ fn notifications(lang: Lang, admin: bool) -> AnyView {
                 .and_then(|n| n.public_key.clone())
         })
     };
-    let device = move |_| {
-        if busy.get_untracked() || !supported {
+    let request_permission = move |_| {
+        if push::browser::requires_install() || !push::browser::has_notification_api() {
             return;
         }
-        error.set(None);
-        if active() {
-            busy.set(true);
-            leptos::task::spawn_local(async move {
-                if push::disable().await.is_err() {
-                    error.set(Some(words::push_failed(lang)));
-                }
-                now.update(|n| {
-                    if let Some(Ok(n)) = n {
-                        n.active = false;
-                    }
-                });
-                busy.set(false);
-            });
-            return;
-        }
-        let Some(public_key) = key() else {
-            return;
-        };
-        // the browser asks inside the click, before anything is awaited
         let asked = push::browser::ask();
-        busy.set(true);
         leptos::task::spawn_local(async move {
-            match push::enable(asked, lang, &public_key).await {
-                Ok(enabled) => now.update(|n| {
-                    if let Some(Ok(n)) = n {
-                        n.enabled = enabled;
-                        n.active = true;
-                    }
-                }),
-                Err(Refusal::Denied) => error.set(Some(words::push_denied(lang))),
-                Err(Refusal::Failed) => error.set(Some(words::push_failed(lang))),
-            }
-            busy.set(false);
+            let answer = push::browser::answer(asked).await;
+            perm.set(if answer.is_empty() {
+                push::browser::permission()
+            } else {
+                answer
+            });
+            needs_install.set(push::browser::requires_install());
+            standalone.set(push::browser::is_standalone());
         });
+    };
+    let device = move |_| {
+        if !busy.get_untracked() && supported {
+            toggle_push_device(lang, now, busy, error, perm, active(), key());
+        }
     };
     let switches = push_switches(lang, admin, now, busy, error);
     view! {
         <section class="card" aria-labelledby="push-title">
             <h2 id="push-title">{words::push_title(lang)}</h2>
             <p>{words::push_lead(lang)}</p>
-            {(!supported).then(|| view! { <p class="meta">{words::push_unsupported(lang)}</p> })}
+            {push_install_box(lang, standalone, needs_install)}
+            {move || (!supported && !needs_install.get()).then(|| view! {
+                <p class="meta">{words::push_unsupported(lang)}</p>
+            })}
+            {move || push_permission_row(lang, perm, needs_install, request_permission)}
             {move || matches!(now.get(), Some(Ok(ref n)) if n.public_key.is_none())
                 .then(|| view! { <p class="meta">{words::push_unconfigured(lang)}</p> })}
             {move || matches!(now.get(), Some(Err(_))).then(|| view! { <p class="error" role="alert">{words::push_failed(lang)}</p> })}
@@ -1295,6 +1560,18 @@ pub struct Area {
     focus_next: StoredValue<Option<&'static str>>,
     /// The confirmation code a mail's link handed the security page.
     handed: StoredValue<Option<MailCode>>,
+    /// Prefetched badges for the profile page so the showcase renders with
+    /// `Load::Ready` at zero layout shift.
+    badges: StoredValue<Option<PublicBadges>>,
+}
+
+async fn prefetch_profile_badges(section: Section, load: &Load) -> Option<PublicBadges> {
+    if section != Section::Profile || !matches!(load, Load::Ready(_)) {
+        return None;
+    }
+    let loaded = super::central::own_badges().await.ok()?;
+    session::note_rank(loaded.best_rank.as_ref());
+    Some(loaded)
 }
 
 /// The frame of every page of the area but the messenger's: the account
@@ -1313,14 +1590,23 @@ where
     let focus_next = StoredValue::new(None::<&'static str>);
     // A confirmation code the mail's link handed in the address's
     // fragment (`fragment`): gone from the address bar at once, on every
-    // page of the area, and kept on the security page only, until the
-    // e-mail section learns whether an address waits for it. Signed out,
-    // or with the area not read, it is dropped unseen. One that arrives
-    // while the page is open is removed and fills nothing (`fragment::watch`).
+    // page of the area, and kept on the profile page (redirecting legacy
+    // `/account/security#code=...` links automatically) until the e-mail
+    // section consumes it. One that arrives while the page is open is
+    // removed and fills nothing (`fragment::watch`).
     fragment::watch();
-    let handed = StoredValue::new(
-        fragment::code(&fragment::take(), MailCode::parse).filter(|_| section == Section::Security),
-    );
+    let mail_code = fragment::code(&fragment::take(), MailCode::parse);
+    if section == Section::Security
+        && let Some(ref mail_code) = mail_code
+    {
+        session::go(&format!(
+            "/{}/account/profile#code={}",
+            lang.code(),
+            mail_code.display().as_str()
+        ));
+    }
+    let handed = StoredValue::new(mail_code.filter(|_| section == Section::Profile));
+    let badges = StoredValue::new(None::<PublicBadges>);
     let reload = Callback::new(move |()| {
         generation.update(|value| *value = value.wrapping_add(1));
         let started = generation.get_untracked();
@@ -1329,6 +1615,11 @@ where
             if generation.get_untracked() != started {
                 return;
             }
+            let loaded_badges = prefetch_profile_badges(section, &load).await;
+            if generation.get_untracked() != started {
+                return;
+            }
+            badges.set_value(loaded_badges);
             if !matches!(load, Load::Ready(_)) {
                 handed.set_value(None);
             }
@@ -1345,11 +1636,17 @@ where
         reload,
         focus_next,
         handed,
+        badges,
     };
     let code = lang.code();
     move || {
         match state.get() {
-        Load::Loading => view! { <p role="status" class="meta">{words::account_loading(lang)}</p> }.into_any(),
+        Load::Loading => view! {
+            <section class="card account-loading-shell" role="status" aria-label=words::account_loading(lang)>
+                <p class="meta">{words::account_loading(lang)}</p>
+            </section>
+        }
+        .into_any(),
         Load::SignedOut => view! {
             <section class="card app-empty">
                 <p>{words::account_signed_out(lang)}</p>
@@ -1372,20 +1669,25 @@ where
     }
 }
 
+/// The signed-in account island driving overview, profile, security, privacy,
+/// gateways, and notifications views.
 #[island]
 pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
+    super::central::start_refresh_keepalive();
     frame(lang, section, move |summary, area| match section {
-        Section::Home => home(lang, &summary, &worker),
-        Section::Profile => profile(lang, &worker, &summary, area.reload, area.focus_next),
-        Section::Security => security(
+        Section::Home => home(lang, &summary),
+        Section::Profile => profile(
             lang,
-            worker.clone(),
-            summary.username.clone(),
+            &worker,
+            &summary,
             area.reload,
+            area.focus_next,
             area.handed,
+            area.badges.get_value(),
         ),
+        Section::Security => security(lang, worker.clone()),
         Section::Privacy => privacy(lang, worker.clone()),
-        Section::Gateways => gateways(lang, worker.clone()),
+        Section::Gateways => super::gateways::view(lang, worker.clone()),
         Section::Notifications => notifications(lang, summary.admin),
         // The messenger and the administration are islands of their own
         // (`chat::Messenger`, `admin::Administration`, the latter in the

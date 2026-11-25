@@ -35,6 +35,16 @@ impl IdentityService {
                         .await?,
                 }
             }
+            OwnerRequest::UpdateGateway { gateway, name } => {
+                self.store
+                    .update_own_gateway(cookie, gateway, &name)
+                    .await?;
+                return Ok(Response::Done);
+            }
+            OwnerRequest::DeleteGateway { gateway } => {
+                self.store.delete_own_gateway(cookie, gateway).await?;
+                return Ok(Response::Done);
+            }
             OwnerRequest::CreateToken {
                 gateway,
                 name,

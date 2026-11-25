@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 46] = migrations![
+const MIGRATIONS: [Migration; 50] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -82,6 +82,10 @@ const MIGRATIONS: [Migration; 46] = migrations![
     "m20261123_000045_advent_casual_recovery",
     "m20261123_000046_playmat_framing",
     "m20261123_000047_ranked_cosmetics",
+    "m20261123_000048_web_ux_sessions_profile_public",
+    "m20261124_000049_group_profiles_and_admins",
+    "m20261124_000050_card_catalog",
+    "m20261124_000051_friend_invites",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -205,7 +209,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 46);
+        assert_eq!(MIGRATIONS.len(), 50);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -237,7 +241,7 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(46));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(50));
         assert_eq!(
             pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
             Some("m20261119_000033_presence")
@@ -256,5 +260,25 @@ mod tests {
         // a gap: a later one recorded without an earlier
         let gap = recorded(&[all[0], all[2]]);
         assert!(pending(&gap, &MIGRATIONS).is_none());
+    }
+
+    #[test]
+    fn friend_invites_migration_enforces_hashing_uuidv7_and_revokes_public() {
+        let m = MIGRATIONS
+            .last()
+            .expect("friend invites migration is present");
+        assert_eq!(m.name, "m20261124_000051_friend_invites");
+        assert!(
+            m.sql
+                .contains("CREATE TABLE central_identity.friend_invites")
+        );
+        assert!(m.sql.contains("pg_catalog.uuidv7()"));
+        assert!(m.sql.contains("pg_catalog.uuid_extract_version(id) = 7"));
+        assert!(m.sql.contains("code_hash"));
+        assert!(m.sql.contains("redeemed_by <> inviter_id"));
+        assert!(
+            m.sql
+                .contains("REVOKE ALL ON TABLE central_identity.friend_invites FROM PUBLIC")
+        );
     }
 }
