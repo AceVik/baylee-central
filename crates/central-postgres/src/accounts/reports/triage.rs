@@ -192,8 +192,9 @@ fn lines(was: &Triage, next: &Decided) -> Vec<(&'static str, String)> {
 /// Hand `report`'s duplicates on to `original`, of which it became one, each
 /// with its line of history. `handed` counts those of the whole request: a
 /// report token hands on at most [`MAX_HANDED_ON`], which is asked before
-/// anything is written. `report`'s row is locked, and a row with a duplicate
-/// is locked by whoever adds one, so none comes in between.
+/// anything of them is written. `report`'s row is locked for update, and
+/// whoever makes another report a duplicate of it waits for that row (the
+/// foreign key's own lock on it), so none comes in between.
 async fn hand_on(
     tx: &DatabaseTransaction,
     actor: &Actor,

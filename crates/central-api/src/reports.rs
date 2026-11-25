@@ -959,7 +959,9 @@ mod tests {
             claim(&mut report.gateway);
             assert_eq!(report.validate(), Err(Error::Rejected), "{report:?}");
         }
-        report.gateway = GatewaySays::default();
+        // as a script writes it (docs/operations.md)
+        report.gateway = serde_json::from_str("{}").unwrap();
+        assert_eq!(report.gateway, GatewaySays::default());
         report.validate().unwrap();
         report.record.as_mut().unwrap().bytes += 1;
         assert_eq!(report.validate(), Err(Error::Rejected));
