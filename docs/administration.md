@@ -52,7 +52,7 @@ pages are to go.*
   `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`,
   `gateway.ranked_verified`, `gateway.ranked_revoked`,
   `report_token.created`, `report_token.revoked`, and for AI players
-  ([AI players](ai-players.md)) `ai.flagged`, `ai.cleared`, `ai.enabled`,
+  ([AI players](ai-players.md)) `ai.created`, `ai.removed`, `ai.enabled`,
   `ai.disabled`, `ai.changed`, `ai.settings_changed`,
   `ai.runner_token_created`, `ai.runner_token_revoked`) and the
   ids it touched. No name, reason, note or key; a tag change keeps the two
@@ -72,8 +72,9 @@ pages are to go.*
 An administrator appoints and removes administrators (`SetAdmin { account,
 admin }`). Nobody removes their own role, so the last administrator stays;
 only an enrolled account is appointed (a pending or unknown one is
-`Rejected`). The same state again is `Done` and writes nothing. Two
-administrators removing each other at once leave one: both lock the
+`Rejected`), and never an AI player's ([AI players](ai-players.md) §1).
+The same state again is `Done` and writes nothing. Two administrators
+removing each other at once leave one: both lock the
 administrators' account rows in id order, the second sees after the lock
 that it no longer holds the role, and is refused.
 
@@ -88,8 +89,9 @@ username arrives at run time, so the repository names nobody.
 
 A second change, `ResetLogin { account }`, makes a reset code
 ([account reset](account-reset.md), M1 step 2b), audited as
-`account.reset_issued`. The account's confirmed address, if it has one, is
-told afterwards that a code exists, not the code and not who made it
+`account.reset_issued`. It is `Rejected` for an AI player, which has no
+password and is never given one ([AI players](ai-players.md) §2). The
+account's confirmed address, if it has one, is told afterwards that a code exists, not the code and not who made it
 ([e-mail](email.md#notices-that-the-login-changed)).
 
 ## Reads
@@ -158,9 +160,9 @@ writes its audit event in its transaction; reads do not.
   assignments. Re-enabling ordinary directory approval leaves verification off.
 - `RevokeGatewayToken { token }` (`gateway.token_revoked`, with the gateway's
   id): the token stops at once. Revoked already is `Done`.
-- `SetTag { account, tag }` (`account.tag_changed`): an enrolled account
-  gets another tag, 1 to `MAX_TAG`. Tags stay unique (the column's unique
-  index; a taken tag is `Conflict`), so `Name#tag` does. The event's
+- `SetTag { account, tag }` (`account.tag_changed`): an enrolled account,
+  an AI player's too, gets another tag, 1 to `MAX_TAG`. Tags stay unique
+  (the column's unique index; a taken tag is `Conflict`), so `Name#tag` does. The event's
   `detail` holds `{"from": old, "to": new}`, numbers only. Gateways take the
   new tag into their projection at the account's next sign-in there
   (Baylee's `take_profile`). **Earlier whisper threads are gone for the
@@ -280,3 +282,18 @@ administrators on the account overview. The closed beta's keys, which this
 section's earlier plans listed, are gone ([registration
 abuse](registration-abuse.md)); `audit_events.beta_key_id` keeps the ids
 older events name.
+
+## AI players (26 November 2026)
+
+An administrator creates every AI player on the website ([AI
+players](ai-players.md) §1, §5): `CreateAiPlayer { settings, tag }` makes a
+new account with no password, named with the `KI-` prefix, a fair profile
+and the caps, switched off, and answers `AiPlayerCreated { account, tag }`;
+a taken tag is `Conflict`. `SetAiPlayer` changes its label, caps and
+display name, never its kind or profile (`Conflict`). `RemoveAiPlayer`
+removes one that has never been seated and holds no ticket that is not
+closed; after its first match it is `Conflict`, and the AI is switched off
+instead (`SetAiEnabled`). All three need the recent password and write
+`ai.created`, `ai.changed` or `ai.removed` with ids and numbers only. No
+request makes a person's account an AI. `SetAdmin` and `ResetLogin` refuse
+an AI player; `SetTag` serves one.

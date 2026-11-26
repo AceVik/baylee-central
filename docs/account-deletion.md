@@ -108,6 +108,16 @@ OPAQUE proof of the password, as a password change does:
    sessions end with it. The username and tag are free again for a later
    registration.
 
+   An AI player ([AI players](ai-players.md)) deletes nothing of its own:
+   its runner's session is refused `DeleteAccountStart` and the export, as
+   every request but its runner's, and it has no password to prove. An
+   administrator removes one with `RemoveAiPlayer`, only before its first
+   ranked match, through the same `deletion::remove` as a person's
+   deletion: the foreign keys take everything it holds, its runner sessions
+   and their `sid`s with them, and the audit keeps `ai.removed` with the
+   id. After its first match an AI stays and is switched off. The
+   operator's erasure (below) serves an AI account as any other.
+
 What Central cannot delete: what gateways keep about their players (each
 gateway's own notice), backups until they rotate out (12 months), and
 server logs (14 days). Nor the official gateway's copy of a moved account:
