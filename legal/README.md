@@ -170,7 +170,14 @@ and the opponent receive and that boards are public, § 7 how long (until
 the account is deleted; a game's private replay material after it ends,
 usually within minutes, by the daily sweep at the latest), § 9 that the
 rating is computed by a program without a legal or similarly significant
-effect. The terms' § 1 names ranked play with its public boards. The boards
+effect. The terms' § 1 names ranked play with its public boards, and at the
+owner's request ("Passe die AGBs dafür an", 26.11.2026) a new § 4a sets
+its rules: the deck is fixed at the queue, the game runs on verified gateways
+the player approves, a technical break or a disagreement ends it unscored,
+the boards are public, fair play, what a breach may cost (results out,
+ratings corrected, entries removed, exclusion from ranked, with § 6's reasons
+and objection), and seasons and rules may change while earned badges and
+cosmetics stay. The boards
 list every player with a rated game in the season by display name and tag,
 whatever the public-profile switch says, as the owner decided on 26.11.2026
 ("Ja, öffentlich lassen") (`central-postgres`

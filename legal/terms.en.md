@@ -31,7 +31,7 @@ servers ("gateways") and Baylee Central. Baylee Central gives you:
 - ranked play: we pair you with opponents, of similar strength where we
   can, the game runs on verified gateways you approve, and the result counts
   on public boards, on which everyone who plays a rated ranked game in a
-  season appears with display name, tag and results;
+  season appears with display name, tag and results (section 4a);
 - notifications in your browser, if you turn them on.
 
 The service is free. There are no paid features, no ads and no sale of data.
@@ -78,6 +78,41 @@ before they reach us. We cannot read them. As a result:
    running it (for example a legal notice, a privacy notice and terms of
    use). A gateway appears in the directory only after we approve it. We may
    refuse or withdraw approval if a gateway breaks these terms or the law.
+
+## 4a. Ranked play
+
+1. **How it works.** When you join the queue for a ranked game, you fix your
+   deck; it cannot be changed until the game ends. We pair you with an
+   opponent, of similar strength where we can, and with one or two gateways
+   we have verified for ranked play. Before those gateways receive your deck
+   and the game, you approve them and their terms (section 4). We score the
+   result for you and for your deck: Elo rating, placement, league, division
+   and badges. If a game breaks off for technical reasons and cannot be
+   resumed, or the gateways disagree about its course, it ends without being
+   scored.
+2. **Public boards.** Whoever plays a rated ranked game in a season appears
+   on that season's boards with display name, tag, Elo rating, league,
+   division and results, and on the deck board also with an identifier of
+   the deck from which its cards cannot be read. Anyone can see the boards,
+   signed in or not, whether or not your player profile is public. Your
+   opponent sees your display name and tag. If you want to appear on no
+   board, do not play ranked games; your entries are deleted with your
+   account (section 7).
+3. **Fair play.** In ranked games you play yourself, with your own account,
+   without bots, scripts or help from others during the game. In particular
+   you may not arrange, buy or give away results, play several accounts
+   against each other, deliberately stall or leave a game to avoid a score,
+   or exploit faults in the service to influence a score.
+4. **Consequences of a breach.** If someone breaks rule 3, we may take the
+   results concerned out of the scoring, correct Elo ratings and placements,
+   remove entries from the boards and exclude the account from ranked play,
+   to an extent that fits the breach. Section 6 (reasons and objection) and
+   section 7(2) apply accordingly.
+5. **Seasons and rules.** We may start and end seasons and develop the
+   scoring rules further. Badges you reached, and the sleeves and playmats
+   they unlocked, stay yours as long as your account exists, unless they
+   rest on a breach of rule 3. There is no right to an opponent or a
+   verified gateway being free at any time.
 
 ## 5. What is not allowed
 
