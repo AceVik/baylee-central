@@ -1203,7 +1203,8 @@ async fn the_privacy_notice_has_a_part_for_ranked_play() {
             at("tower") < at("ranked") && at("ranked") < at("email"),
             "{lang:?}"
         );
-        assert!(html.contains("Elo"), "{lang:?}");
+        // Russian writes the rating "Эло"
+        assert!(html.contains("Elo") || html.contains("Эло"), "{lang:?}");
     }
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("even with their player profile turned off"));
