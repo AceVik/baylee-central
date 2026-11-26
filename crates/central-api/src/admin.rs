@@ -1,11 +1,12 @@
 //! Central administration (`docs/administration.md`): what an administrator
 //! asks and is answered, on the browser listener only, with a browser session
 //! whose account holds the administrator role. No answer has a field that
-//! could carry a wrapper, a document or any other ciphertext, and two can
+//! could carry a wrapper, a document or any other ciphertext, and three can
 //! carry a secret, each answered once to the change that made it and never
-//! again: a reset code and a new report token.
+//! again: a reset code, a new report token and a new AI runner token.
 use crate::Error;
 use crate::Token;
+use crate::ai_runner::AiRunnerTokenInfo;
 use crate::gateway::{GatewayMetadata, GatewayState};
 use crate::owner::TokenInfo;
 use crate::report_tokens::{ReportScopes, ReportTokenInfo};
@@ -304,6 +305,32 @@ pub enum AdminRequest {
     },
     /// Stop every AI at once (`global_seats` to 0). Audited.
     StopAllAi,
+    /// The AI runner tokens (`docs/ai-players.md` §2): the live ones, and
+    /// those revoked or expired in the last 30 days. Answered with
+    /// [`AdminAnswer::AiRunnerTokens`].
+    AiRunnerTokens,
+    /// Make an AI runner token for a runner machine: a change that hands out
+    /// a credential. Every account must be an AI player. At most
+    /// [`crate::ai_runner::LIVE_TOKENS`] live ones and
+    /// [`crate::ai_runner::TOKENS_PER_DAY`] new ones a day (`Busy`).
+    /// Answered with [`AdminAnswer::AiRunnerTokenCreated`], the only answer
+    /// that carries the token.
+    CreateAiRunnerToken {
+        /// Its name ([`crate::owner::token_name`]).
+        name: String,
+        /// The AI accounts it may play, 1 to
+        /// [`crate::ai_runner::MAX_ACCOUNTS`], each once; fixed for its life.
+        accounts: Vec<[u8; 16]>,
+        /// How many days it lives, 1 to [`crate::owner::MAX_TOKEN_DAYS`].
+        days: u16,
+    },
+    /// Revoke an AI runner token at once, and with it every session it
+    /// minted: a change that needs no fresh sign-in, since it only takes
+    /// exposure away. Audited. `Done` again for one revoked already.
+    RevokeAiRunnerToken {
+        /// The token's id.
+        token: [u8; 16],
+    },
 }
 
 /// Most AI players a listing shows.
@@ -432,7 +459,9 @@ impl AdminRequest {
             | Self::SetAiPlayer { .. }
             | Self::SetAiEnabled { .. }
             | Self::SetAiSettings { .. }
-            | Self::StopAllAi => true,
+            | Self::StopAllAi
+            | Self::CreateAiRunnerToken { .. }
+            | Self::RevokeAiRunnerToken { .. } => true,
             Self::Picture { request } => request.changes(),
             Self::Accounts { .. }
             | Self::Account { .. }
@@ -452,7 +481,8 @@ impl AdminRequest {
             | Self::ReportTokens
             | Self::Registration
             | Self::AiPlayers
-            | Self::AiSettings => false,
+            | Self::AiSettings
+            | Self::AiRunnerTokens => false,
         }
     }
 
@@ -473,7 +503,9 @@ impl AdminRequest {
             // Stopping an AI only takes exposure away (docs/ai-players.md,
             // open question 6): it needs no fresh password, and is audited.
             | Self::SetAiEnabled { enabled: false, .. }
-            | Self::StopAllAi => false,
+            | Self::StopAllAi
+            // So does revoking a runner token (docs/ai-players.md §2).
+            | Self::RevokeAiRunnerToken { .. } => false,
             Self::ReportsBulk { bulk, .. } => matches!(bulk, BulkAction::Purge),
             _ => self.changes(),
         }
@@ -878,6 +910,22 @@ pub enum AdminAnswer {
         /// When they last changed, Unix seconds.
         changed_at: Option<i64>,
     },
+    /// The AI runner tokens.
+    AiRunnerTokens {
+        /// At most [`crate::ai_runner::LISTED_TOKENS`], the live ones first,
+        /// each group newest first.
+        tokens: Vec<AiRunnerTokenInfo>,
+    },
+    /// An AI runner token, shown to the administrator once; Central keeps
+    /// its digest.
+    AiRunnerTokenCreated {
+        /// The token's id.
+        id: [u8; 16],
+        /// The token: [`crate::ai_runner::token_text`] is the form to show.
+        token: Token,
+        /// When it stops working, in Unix seconds.
+        expires_at: i64,
+    },
 }
 
 #[cfg(test)]
@@ -1107,5 +1155,56 @@ mod tests {
         };
         assert_eq!(token.hex().as_str(), hex.as_str());
         assert!(!format!("{token:?}").contains(hex.as_str()));
+    }
+
+    /// An AI runner token's requests: making one is a change that needs a
+    /// fresh sign-in, revoking one is a change that needs none, and only the
+    /// creation answer carries the token.
+    #[test]
+    fn a_runner_token_is_made_fresh_revoked_at_once_and_shown_once() {
+        let request: AdminRequest = crate::decode(
+            br#"{"action":"create_ai_runner_token","name":"runner-1","accounts":[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]],"days":90}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            &request,
+            AdminRequest::CreateAiRunnerToken { days: 90, accounts, .. } if accounts == &[[1; 16]]
+        ));
+        assert!(request.changes() && request.fresh());
+        let revoke = AdminRequest::RevokeAiRunnerToken { token: [0; 16] };
+        assert!(revoke.changes() && !revoke.fresh());
+        let list = AdminRequest::AiRunnerTokens;
+        assert!(!list.changes() && !list.fresh());
+        for bad in [
+            br#"{"action":"create_ai_runner_token","name":"runner-1","days":90}"#.as_slice(),
+            br#"{"action":"create_ai_runner_token","name":"runner-1","accounts":[],"days":90,"digest":"x"}"#,
+            br#"{"action":"create_ai_runner_token","name":"runner-1","accounts":[[1]],"days":90}"#,
+            br#"{"action":"revoke_ai_runner_token"}"#,
+        ] {
+            assert!(
+                crate::decode::<AdminRequest>(bad).is_err(),
+                "{}",
+                String::from_utf8_lossy(bad)
+            );
+        }
+        let token = Token::generate().unwrap();
+        let hex = token.hex();
+        let created = AdminAnswer::AiRunnerTokenCreated {
+            id: [1; 16],
+            token,
+            expires_at: 1_807_776_000,
+        };
+        let text = crate::encode(&created).unwrap();
+        assert!(text.starts_with(br#"{"answer":"ai_runner_token_created","id":[1,"#));
+        let AdminAnswer::AiRunnerTokenCreated { token, .. } = crate::decode(&text).unwrap() else {
+            panic!("another answer");
+        };
+        assert_eq!(token.hex().as_str(), hex.as_str());
+        assert!(!format!("{token:?}").contains(hex.as_str()));
+        let listed = AdminAnswer::AiRunnerTokens { tokens: Vec::new() };
+        assert_eq!(
+            crate::encode(&listed).unwrap(),
+            br#"{"answer":"ai_runner_tokens","tokens":[]}"#
+        );
     }
 }

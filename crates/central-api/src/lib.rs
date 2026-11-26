@@ -5,6 +5,7 @@
 
 pub mod admin;
 pub mod advent;
+pub mod ai_runner;
 pub mod challenges;
 pub mod chat;
 pub mod email;
