@@ -1,5 +1,5 @@
 <!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- updated: 2026-11-26 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -31,6 +31,11 @@ Central bietet dir:
 - ein Profilbild neben deinem Anzeigenamen, wenn du eines setzt;
 - Daily- und Weekly-Aufgaben und Tower-Expeditionen, mit Ranglisten, in
   denen du nur erscheinst, wenn du sie freigibst;
+- Ranglistenpartien: Wir teilen dir Gegner zu, möglichst von ähnlicher
+  Stärke, die Partie läuft auf geprüften Gateways, denen du zustimmst, und
+  das Ergebnis zählt in öffentlichen Ranglisten, in denen jeder, der in
+  einer Saison eine gewertete Ranglistenpartie spielt, mit Anzeigenamen, Tag
+  und Ergebnissen erscheint (Abschnitt 4a);
 - Benachrichtigungen im Browser, wenn du sie einschaltest.
 
 Der Dienst ist kostenlos. Es gibt keine kostenpflichtigen Funktionen,
@@ -89,6 +94,47 @@ lesen. Daraus folgt:
    erscheint im Verzeichnis erst nach unserer Freigabe. Wir dürfen die
    Freigabe verweigern oder entziehen, wenn ein Gateway gegen diese
    Bedingungen oder geltendes Recht verstößt.
+
+## 4a. Ranglistenpartien
+
+1. **Ablauf.** Meldest du dich für eine Ranglistenpartie an, legst du dein
+   Deck fest; bis zum Ende der Partie lässt es sich nicht mehr ändern. Wir
+   teilen dir einen Gegner zu, möglichst von ähnlicher Stärke, und ein oder
+   zwei Gateways, die wir für Ranglistenpartien geprüft haben. Bevor diese
+   Gateways dein Deck und die Partie erhalten, stimmst du ihnen und ihren
+   Bedingungen zu (Abschnitt 4). Das Ergebnis werten wir für dich und für
+   dein Deck: Elo-Zahl, Platzierung, Liga, Division und Abzeichen. Bricht
+   eine Partie aus technischen Gründen ab und lässt sie sich nicht
+   fortsetzen, oder stimmen die Gateways über ihren Verlauf nicht überein,
+   endet sie ohne Wertung.
+2. **Öffentliche Ranglisten.** Wer in einer Saison eine gewertete
+   Ranglistenpartie spielt, erscheint in den Ranglisten dieser Saison mit
+   Anzeigenamen, Tag, Elo-Zahl, Liga, Division und Ergebnissen, auf der
+   Deck-Rangliste dazu mit einer Kennung des Decks, aus der sich seine
+   Karten nicht ablesen lassen. Die Ranglisten kann jeder sehen, auch ohne
+   Anmeldung, und zwar unabhängig davon, ob dein Spielerprofil öffentlich
+   ist. Dein Gegner sieht deinen Anzeigenamen mit Tag. Möchtest du in keiner
+   Rangliste erscheinen, spiel keine Ranglistenpartien; mit deinem Konto
+   werden auch deine Einträge gelöscht (Abschnitt 7).
+3. **Fair spielen.** In Ranglistenpartien spielst du selbst, mit deinem
+   eigenen Konto, ohne Bots, Skripte oder Hilfe anderer während der
+   Partie. Verboten ist insbesondere, Ergebnisse abzusprechen, zu kaufen
+   oder zu verschenken, mit mehreren Konten gegeneinander zu spielen, eine
+   Partie absichtlich zu verschleppen oder zu verlassen, um einer Wertung
+   auszuweichen, und Fehler des Dienstes auszunutzen, um eine Wertung zu
+   beeinflussen.
+4. **Folgen eines Verstoßes.** Verstößt jemand gegen Nummer 3, dürfen wir
+   betroffene Ergebnisse aus der Wertung nehmen, Elo-Zahlen und
+   Platzierungen berichtigen, Einträge aus den Ranglisten entfernen und das
+   Konto von Ranglistenpartien ausschließen, in einem Umfang, der dem
+   Verstoß angemessen ist. Abschnitt 6 (Begründung und Widerspruch) und
+   Abschnitt 7 Nr. 2 gelten entsprechend.
+5. **Saisons und Regeln.** Wir dürfen Saisons beginnen und beenden und die
+   Regeln der Wertung weiterentwickeln. Abzeichen, die du erreicht hast, und
+   die Hüllen und Spielmatten, die du damit freigeschaltet hast, bleiben
+   dir, solange dein Konto besteht, außer sie beruhen auf einem Verstoß nach
+   Nummer 3. Einen Anspruch darauf, dass jederzeit ein Gegner oder ein
+   geprüftes Gateway frei ist, gibt es nicht.
 
 ## 5. Was nicht erlaubt ist
 
