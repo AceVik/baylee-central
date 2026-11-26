@@ -106,6 +106,7 @@ pub(super) async fn run(store: &AccountStore, operator: &DatabaseConnection, key
     ));
     progression(store, operator, &credential, &alice, source).await;
     pagination(store, &credential, &alice, &bob, first.account).await;
+    unrestored(store, keys, &credential, &alice).await;
     deletion_race(store, operator, &credential, other.account).await;
     lifecycle(store, operator, &credential, &alice, issuer, source).await;
 }
@@ -422,4 +423,62 @@ async fn lifecycle(
          +(SELECT count(*) FROM central_identity.tower_award_progress WHERE account_id=$1) AS remaining",
         vec![Uuid::from_bytes(source.account).into()])).await.unwrap().unwrap();
     assert_eq!(row.try_get::<i64>("", "remaining").unwrap(), 0);
+}
+
+/// An account the game client never restored (one that has only used the
+/// website) reads its own zero totals and empty history on both surfaces,
+/// so its download completes; nobody else's receipts reach it, and a
+/// delivery to it still waits for the restore.
+async fn unrestored(store: &AccountStore, keys: &ServerKeys, credential: &Token, alice: &Token) {
+    let identity = enroll(store, keys, "award-web-c", "award_carol").await;
+    let native = login(store, keys, identity).await;
+    let cookie = Token::generate().unwrap();
+    let enrolled = store.credential(identity).await.unwrap().unwrap();
+    store
+        .issue_session(&enrolled, Session::Browser(&cookie))
+        .await
+        .unwrap();
+    let nothing = Progress {
+        duels: 0,
+        victories: 0,
+        clears: 0,
+        flawless: 0,
+    };
+    for session in [Session::Native(&native), Session::Browser(&cookie)] {
+        assert_eq!(store.tower_award_progress(session).await.unwrap(), nothing);
+        let export = store.export_tower_awards(session, None).await.unwrap();
+        assert_eq!(export.progress, nothing);
+        assert!(export.receipts.is_empty() && export.next.is_none());
+    }
+    // Alice's history is hers alone, read by her own session as before.
+    let theirs = store.export_tower_awards(alice.into(), None).await.unwrap();
+    assert!(!theirs.receipts.is_empty());
+    // The surfaces stay apart: the cookie is no native bearer, and the
+    // native bearer no cookie.
+    assert!(
+        store
+            .tower_award_progress(Session::Native(&cookie))
+            .await
+            .is_err()
+    );
+    assert!(
+        store
+            .export_tower_awards(Session::Browser(&native), None)
+            .await
+            .is_err()
+    );
+    // Writing still needs the restore: the delivery is kept for later.
+    assert!(matches!(
+        store
+            .accept_tower_award(credential, ORIGIN, &delivery(identity.account))
+            .await,
+        Err(Error::Conflict)
+    ));
+    let later = Token::generate().unwrap();
+    assert!(
+        store
+            .tower_award_progress(Session::Native(&later))
+            .await
+            .is_err()
+    );
 }

@@ -66,7 +66,9 @@ accepted facts, issuer origins and receipt timestamps, with no issuer credential
 or game record. It is available through the native SDK and the authenticated browser
 listener, separately from the unchanged `AccountExport` response. The website adds
 it to the account download under `tower_echoes`, including the confirmed permanent
-totals. After at most 60 pages (7,680 receipts), it reports `complete: false` and the
+totals; an account the game client never restored gets zero totals and no
+receipts rather than a refusal, so a website-only account's download completes
+(26.11.2026). After at most 60 pages (7,680 receipts), it reports `complete: false` and the
 exclusive `after` cursor instead of silently claiming completeness. Failed or
 malformed pages prevent the combined download; a session change invalidates the
 whole assembly and removes any previously prepared download link from the page.

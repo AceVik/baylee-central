@@ -131,7 +131,11 @@ player sessions, Tower identity grants and the challenge bridge cannot ingest.
 `TowerProgress {}` and `TowerAwardExport { after }` instead require a live,
 surface-bound player session, work on both account surfaces, and return only that
 account's totals or at most 128 receipts. They remain readable when the Tower
-service is unavailable or a new terms version needs acceptance. An issuer cannot
+service is unavailable or a new terms version needs acceptance, and (since
+26.11.2026) for an account whose vault the game client never restored: an
+account that has only used the website reads zero totals and an empty history,
+so its account download completes. Deliveries to such an account still wait
+for the restore. An issuer cannot
 use these operations to read accounts. Existing HTTP body/rate limits apply; none
 of the operations bypasses authentication through an in-memory rate-limit cache.
 
