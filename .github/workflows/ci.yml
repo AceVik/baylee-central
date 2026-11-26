@@ -34,7 +34,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt
+        run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: central-dev
@@ -58,7 +58,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned toolchain and wasm32 target
-        run: rustup toolchain install 1.99.0 --profile minimal --component clippy --target wasm32-unknown-unknown
+        run: rustup toolchain install 1.100.0 --profile minimal --component clippy --target wasm32-unknown-unknown
       - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -85,7 +85,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal
+        run: rustup toolchain install 1.100.0 --profile minimal
       - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -118,7 +118,7 @@ jobs:
       - name: Assert runner supports x86-64-v3 (AVX2)
         run: grep -qw avx2 /proc/cpuinfo
       - name: Install pinned toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal
+        run: rustup toolchain install 1.100.0 --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: central-release-v3
@@ -174,7 +174,7 @@ jobs:
           persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@81891abc19297b21343b15ef67dc61e4aea74fda # v2.1.4
       - name: Install pinned toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal
+        run: rustup toolchain install 1.100.0 --profile minimal
       - name: Cache cargo-audit binary
         id: audit-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -193,7 +193,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - run: rustup toolchain install 1.99.0 --profile minimal
+      - run: rustup toolchain install 1.100.0 --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: central-dev
@@ -212,7 +212,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: rustup toolchain install 1.99.0 --profile minimal
+      - run: rustup toolchain install 1.100.0 --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: central-dev
@@ -238,7 +238,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - run: rustup toolchain install 1.100.0 --profile minimal --target wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: central-wasm
@@ -272,7 +272,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: rustup toolchain install 1.99.0 --profile minimal --target wasm32-unknown-unknown
+      - run: rustup toolchain install 1.100.0 --profile minimal --target wasm32-unknown-unknown
       - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:

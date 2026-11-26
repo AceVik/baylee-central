@@ -49,8 +49,7 @@ pub fn now() -> u64 {
 pub fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
-        .unwrap_or_default()
+        .map_or_default(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
 /// `at` (Unix milliseconds) in the browser's time zone.

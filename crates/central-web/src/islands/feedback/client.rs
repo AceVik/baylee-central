@@ -204,8 +204,7 @@ fn range(v: Option<&Value>) -> Option<(usize, usize)> {
 /// The first 200 objects of `v`, when it is an array.
 fn objects(v: Option<&Value>) -> Vec<&Map<String, Value>> {
     v.and_then(Value::as_array)
-        .map(|a| a.iter().take(200).filter_map(Value::as_object).collect())
-        .unwrap_or_default()
+        .map_or_default(|a| a.iter().take(200).filter_map(Value::as_object).collect())
 }
 
 /// The references, at most 200 of each; `None` when the text names none.
@@ -327,7 +326,7 @@ pub fn log(client: &Map<String, Value>) -> Option<Log> {
     let roster = l
         .get("roster")
         .and_then(Value::as_array)
-        .map(|r| {
+        .map_or_default(|r| {
             r.iter()
                 .take(16)
                 .filter_map(Value::as_object)
@@ -339,13 +338,11 @@ pub fn log(client: &Map<String, Value>) -> Option<Log> {
                     )
                 })
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     let all: Vec<&Map<String, Value>> = l
         .get("lines")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(Value::as_object).collect())
-        .unwrap_or_default();
+        .map_or_default(|a| a.iter().filter_map(Value::as_object).collect());
     let lines = all[all.len().saturating_sub(LOG_LINES)..]
         .iter()
         .map(|x| LogLine {

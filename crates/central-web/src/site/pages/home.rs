@@ -258,8 +258,7 @@ fn title_of(caption: &[crate::words::Piece]) -> String {
         .iter()
         .find(|piece| piece.tag.as_deref() == Some("b"))
         .or_else(|| caption.first())
-        .map(|piece| piece.text.trim_end_matches(':').to_owned())
-        .unwrap_or_default()
+        .map_or_default(|piece| piece.text.trim_end_matches(':').to_owned())
 }
 
 /// The client's screenshots, each opening large in `#shot-viewer` (the

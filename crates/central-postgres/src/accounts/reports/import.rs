@@ -258,8 +258,7 @@ fn history_lines(report: &ImportedReport) -> Vec<(Option<i64>, String, String)> 
     let assignee = report
         .assignee
         .as_deref()
-        .map(|a| format!(", assigned there to {}", chars(a, 64)))
-        .unwrap_or_default();
+        .map_or_default(|a| format!(", assigned there to {}", chars(a, 64)));
     lines.push((
         None,
         "imported".to_owned(),

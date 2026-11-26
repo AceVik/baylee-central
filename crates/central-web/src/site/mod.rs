@@ -331,8 +331,7 @@ impl Assets {
     pub fn integrity(&self, name: &str) -> String {
         self.files
             .get(name)
-            .map(|asset| asset.integrity.clone())
-            .unwrap_or_default()
+            .map_or_default(|asset| asset.integrity.clone())
     }
 
     /// Whether the build wrote `name`.

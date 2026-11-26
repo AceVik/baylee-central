@@ -811,9 +811,7 @@ fn named_select(l: &List, named: Named) -> impl IntoView + use<> {
     } = named;
     let current = Signal::derive(move || l.query.with(|q| now(q).unwrap_or_default()));
     let options = move || {
-        let mut list = l
-            .facets
-            .with(|f| f.as_ref().map(values).unwrap_or_default());
+        let mut list = l.facets.with(|f| f.as_ref().map_or_default(values));
         let chosen = current.get();
         if !chosen.is_empty() && !list.iter().any(|(v, _)| *v == chosen) {
             list.push((chosen.clone(), 0));
@@ -891,20 +889,15 @@ fn channel_select(l: &List) -> impl IntoView + use<> {
 fn token_select(l: &List) -> impl IntoView + use<> {
     let l = *l;
     let lang = l.c.lang;
-    let current = Signal::derive(move || {
-        l.query
-            .with(|q| q.token.map(|id| hex(&id)).unwrap_or_default())
-    });
+    let current = Signal::derive(move || l.query.with(|q| q.token.map_or_default(|id| hex(&id))));
     let options = move || {
         let mut list: Vec<([u8; 16], Option<u64>)> = l.facets.with(|f| {
-            f.as_ref()
-                .map(|f| {
-                    f.tokens
-                        .iter()
-                        .map(|c| (c.value.id, Some(c.count)))
-                        .collect()
-                })
-                .unwrap_or_default()
+            f.as_ref().map_or_default(|f| {
+                f.tokens
+                    .iter()
+                    .map(|c| (c.value.id, Some(c.count)))
+                    .collect()
+            })
         });
         if let Some(chosen) = l.query.with(|q| q.token)
             && !list.iter().any(|(id, _)| *id == chosen)
@@ -1387,9 +1380,9 @@ fn label_menus(l: &List) -> impl IntoView + use<> {
     let datalist = move || {
         l.facets
             .with(|f| {
-                f.as_ref()
-                    .map(|f| f.labels.iter().map(|c| c.value.clone()).collect::<Vec<_>>())
-                    .unwrap_or_default()
+                f.as_ref().map_or_default(|f| {
+                    f.labels.iter().map(|c| c.value.clone()).collect::<Vec<_>>()
+                })
             })
             .into_iter()
             .map(|label| view! { <option value=label></option> })

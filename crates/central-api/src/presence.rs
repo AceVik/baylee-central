@@ -241,9 +241,7 @@ impl Shown {
     /// breaks a reader: it only says less.
     #[must_use]
     pub fn read<'a>(online: &'a [String], states: Option<&str>) -> Vec<(&'a str, Self)> {
-        let letters: Vec<char> = states
-            .map(|states| states.chars().collect())
-            .unwrap_or_default();
+        let letters: Vec<char> = states.map_or_default(|states| states.chars().collect());
         let matched = letters.len() == online.len();
         online
             .iter()

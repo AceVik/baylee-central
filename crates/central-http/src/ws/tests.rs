@@ -614,9 +614,7 @@ async fn a_client_s_close_is_answered_and_ends_the_socket() {
     // its code comes back as it was sent, and no code is answered with 1000
     for (sent_code, answered) in [(Some(4001_u16), 4001_u16), (None, 1000)] {
         let mut socket = opened(SHORT).await;
-        let payload = sent_code
-            .map(|code| code.to_be_bytes().to_vec())
-            .unwrap_or_default();
+        let payload = sent_code.map_or_default(|code| code.to_be_bytes().to_vec());
         socket
             .client
             .write_all(&sent(0x88, &payload))

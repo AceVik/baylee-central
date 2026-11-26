@@ -236,8 +236,7 @@ pub async fn import_legacy(
         let legacy_id = rows
             .iter()
             .rfind(|row| row.username == pair[1])
-            .map(|row| row.legacy_id.clone())
-            .unwrap_or_default();
+            .map_or_default(|row| row.legacy_id.clone());
         return Err(ImportRefusal::Duplicate { legacy_id });
     }
     if legacy_digest(&rows) != digest {

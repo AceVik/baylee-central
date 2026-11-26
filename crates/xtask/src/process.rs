@@ -78,13 +78,11 @@ impl Watched {
         let stdout = self
             .stdout
             .take()
-            .map(|t| t.join().unwrap_or_default())
-            .unwrap_or_default();
+            .map_or_default(|t| t.join().unwrap_or_default());
         let stderr = self
             .stderr
             .take()
-            .map(|t| t.join().unwrap_or_default())
-            .unwrap_or_default();
+            .map_or_default(|t| t.join().unwrap_or_default());
         Ok((status, stdout, stderr))
     }
 
