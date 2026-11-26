@@ -279,14 +279,32 @@ pub enum AdminRequest {
     },
     /// Every AI player (`docs/ai-players.md`), at most [`AI_PLAYERS`].
     AiPlayers,
-    /// Flag an account as an AI player, change one, or clear the flag
-    /// (`None`). Flagging and clearing are refused after the account's first
-    /// ranked match; the kind and the profile never change. Audited.
+    /// Create an AI player (`docs/ai-players.md` §1): a new account with no
+    /// password, named with an AI prefix, switched off. The only way an
+    /// account becomes an AI; a person's account never does. Audited.
+    /// Answered with [`AdminAnswer::AiPlayerCreated`]; `Conflict` for a
+    /// taken tag.
+    CreateAiPlayer {
+        /// The settings, the display name among them.
+        settings: AiPlayerSettings,
+        /// Its tag, or none to draw one.
+        tag: Option<u32>,
+    },
+    /// Change an AI player's label, limits or display name. The kind and
+    /// the profile never change (`Conflict`). Audited.
     SetAiPlayer {
         /// Account ID.
         account: [u8; 16],
-        /// The settings, or none to clear.
-        settings: Option<AiPlayerSettings>,
+        /// The settings, with the kind and profile it has.
+        settings: AiPlayerSettings,
+    },
+    /// Remove an AI player that has never been seated and holds no open
+    /// ticket: its account goes with everything it holds, its runner
+    /// sessions among them. After its first match an AI stays and is
+    /// switched off instead (`Conflict`). Audited.
+    RemoveAiPlayer {
+        /// Account ID.
+        account: [u8; 16],
     },
     /// Switch an AI player on or off. Off takes it out of every new match
     /// at once; its running matches end normally. Audited.
@@ -421,9 +439,10 @@ pub struct AdminAiPlayer {
     pub games_today: u32,
     /// Formats it offers a deck for now.
     pub offers: Vec<crate::ranked::Format>,
-    /// Its last password sign-in, Unix seconds.
+    /// Its runner's last sign-in, the last exchange of a runner token
+    /// for it (`docs/ai-players.md` §2), Unix seconds.
     pub last_sign_in: Option<i64>,
-    /// When it was flagged, Unix seconds.
+    /// When it was created, Unix seconds.
     pub set_at: i64,
 }
 
@@ -456,7 +475,9 @@ impl AdminRequest {
             | Self::CreateReportToken { .. }
             | Self::RevokeReportToken { .. }
             | Self::SetRegistration { .. }
+            | Self::CreateAiPlayer { .. }
             | Self::SetAiPlayer { .. }
+            | Self::RemoveAiPlayer { .. }
             | Self::SetAiEnabled { .. }
             | Self::SetAiSettings { .. }
             | Self::StopAllAi
@@ -898,10 +919,17 @@ pub enum AdminAnswer {
         /// An upload block in force, if any.
         block: Option<crate::picture::UploadBlock>,
     },
-    /// Every AI player, oldest flag first.
+    /// Every AI player, oldest first.
     AiPlayers {
         /// At most [`AI_PLAYERS`].
         players: Vec<AdminAiPlayer>,
+    },
+    /// An AI player just created, switched off.
+    AiPlayerCreated {
+        /// Its account ID.
+        account: [u8; 16],
+        /// Its tag.
+        tag: u32,
     },
     /// The settings for every AI.
     AiSettings {
