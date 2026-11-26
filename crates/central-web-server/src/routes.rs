@@ -288,10 +288,7 @@ fn header_text<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 
 /// The data as it is now; replacing it never changes this one.
 fn snapshot(app: &App) -> Arc<Snapshot> {
-    app.data
-        .read()
-        .map(|data| Arc::clone(&data))
-        .unwrap_or_default()
+    app.data.read().map_or_default(|data| Arc::clone(&data))
 }
 
 fn page(app: &App, headers: &HeaderMap, page: Page, lang: Lang) -> Response {

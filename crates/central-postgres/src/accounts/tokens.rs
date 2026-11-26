@@ -164,8 +164,7 @@ impl AccountStore {
                         .map_err(|_| Error::Unavailable)?,
                     // an audience is an origin, which holds no space
                     gateways: gateways
-                        .map(|text| text.split(' ').map(str::to_owned).collect())
-                        .unwrap_or_default(),
+                        .map_or_default(|text| text.split(' ').map(str::to_owned).collect()),
                 })
             })
             .collect()

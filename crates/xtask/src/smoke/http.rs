@@ -37,9 +37,7 @@ fn connect(port: u16) -> Result<TcpStream> {
 fn get(port: u16, path: &str, host: Option<&str>, origin: Option<&str>) -> Result<Response> {
     let mut stream = connect(port)?;
     let host = host.map_or_else(|| format!("127.0.0.1:{port}"), str::to_owned);
-    let origin = origin
-        .map(|o| format!("Origin: {o}\r\n"))
-        .unwrap_or_default();
+    let origin = origin.map_or_default(|o| format!("Origin: {o}\r\n"));
     let request =
         format!("GET {path} HTTP/1.1\r\nHost: {host}\r\n{origin}Connection: close\r\n\r\n");
     stream

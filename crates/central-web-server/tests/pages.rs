@@ -112,8 +112,7 @@ fn check_notices(html: &str, lang: Lang, page: Page) {
     let notice = central_web::words::fan_content(lang)
         .into_iter()
         .next()
-        .map(|piece| piece.text)
-        .unwrap_or_default();
+        .map_or_default(|piece| piece.text);
     assert!(
         notice.contains("Baylee") && html.contains(notice.trim()),
         "{code} {page:?}: the Fan Content notice"

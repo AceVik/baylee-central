@@ -64,10 +64,8 @@ pub fn to_csv(reports: &[ReportSummary], name: &dyn Fn([u8; 16]) -> String) -> S
             iso(r.updated_at),
             r.kind.as_str().to_owned(),
             r.status.as_str().to_owned(),
-            r.priority
-                .map(|p| p.as_str().to_owned())
-                .unwrap_or_default(),
-            r.assignee.map(name).unwrap_or_default(),
+            r.priority.map_or_default(|p| p.as_str().to_owned()),
+            r.assignee.map_or_default(name),
             r.labels.join(" "),
             // a direct report came through no gateway of its own, and a
             // report token's through none: its name is no gateway's
@@ -80,12 +78,12 @@ pub fn to_csv(reports: &[ReportSummary], name: &dyn Fn([u8; 16]) -> String) -> S
             r.reporter.clone(),
             r.build.clone().unwrap_or_default(),
             r.crash.clone().unwrap_or_default(),
-            r.record_bytes.map(|b| b.to_string()).unwrap_or_default(),
-            r.issue.map(|i| i.to_string()).unwrap_or_default(),
+            r.record_bytes.map_or_default(|b| b.to_string()),
+            r.issue.map_or_default(|i| i.to_string()),
             r.notes.to_string(),
             r.excerpt.clone(),
-            r.token.map(|_| r.gateway.clone()).unwrap_or_default(),
-            r.token.map(|id| hex(&id)).unwrap_or_default(),
+            r.token.map_or_default(|_| r.gateway.clone()),
+            r.token.map_or_default(|id| hex(&id)),
         ];
         lines.push(cells.iter().map(|c| field(c)).collect::<Vec<_>>().join(","));
     }

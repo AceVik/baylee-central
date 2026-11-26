@@ -147,7 +147,7 @@ makes it and proves it:
   module's layout, so a build on macOS differs from CI's in every function
   although no path or flag does (measured 21.10.2026: the crate's
   disambiguator `Csl73WTcpK3im` on Linux, `CsgacuhQaamlp` on macOS). Remapping
-  cannot change that, and cargo's `trim-paths` is not stable in 1.99. The
+  cannot change that, and cargo's `trim-paths` is not stable in 1.100. The
   build is reproducible on that host: two machines' builds there are equal.
 
 From any other machine, the same task runs in the pinned Rust image
@@ -155,7 +155,7 @@ From any other machine, the same task runs in the pinned Rust image
 the host's so neither replaces the other's binaries:
 
 ```bash
-docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work -e CARGO_TARGET_DIR=target/linux-amd64 rust:1.99.0-bookworm@sha256:114c7a4425406451c2866b6aafe69fe29b1b298832db1277d411ac73c82d04d6 bash -c 'rustup target add wasm32-unknown-unknown && cargo xtask wasm'
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work -e CARGO_TARGET_DIR=target/linux-amd64 rust:1.100.0-bookworm@sha256:75d26c23c24cc6ea1cdabf0714a6bff8fd7bf3248716043fd7ae86dac7f41b94 bash -c 'rustup target add wasm32-unknown-unknown && cargo xtask wasm'
 ```
 
 (`cargo xtask wasm --check` in its place compares instead of writing.) On a
@@ -183,6 +183,13 @@ emulation of x86-64 (QEMU emulation crashed `rustc`), and `cargo xtask wasm
 --check` passed in the same container. The resulting WASM SHA-256 is
 `7983d3ec71c4702ab124660038d92a0a0b3f76c40bfa644e440fcc8574f46025`; CI's
 `wasm` job checks it again on its own runner.
+
+The 2026-11-26 bundle is the same source built by Rust 1.100.0, the
+toolchain move of that day: on x86-64 Linux (glibc), CI's host, with
+`cargo xtask wasm` and then `cargo xtask wasm --check`, which passed. Only
+the module changed (613 689 to 614 363 bytes); the glue and both type files
+are equal. The resulting WASM SHA-256 is
+`286fff87f401ee1d90b3509bc5b526a8efec3a073ae19903aab8b4523c7ab1fe`.
 
 The 2026-11-12 bundle (`reset_start`, `reset_keep`, `reset_new`,
 `password_start`, `password_finish`) was built the same way, with the

@@ -924,9 +924,8 @@ impl Open {
         let conv = Memo::new(move |_| {
             id.with_value(|id| rows.with(|r| r.iter().find(|c| c.id == *id).cloned()))
         });
-        let members = Memo::new(move |_| {
-            conv.with(|c| c.as_ref().map(|c| c.members(own)).unwrap_or_default())
-        });
+        let members =
+            Memo::new(move |_| conv.with(|c| c.as_ref().map_or_default(|c| c.members(own))));
         let messages = Memo::new(move |_| {
             id.with_value(|id| {
                 ctl.shown.with(|s| {
