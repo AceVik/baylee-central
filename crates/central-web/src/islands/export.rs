@@ -1,6 +1,6 @@
 //! Merge the separately paginated records of play (Daily and Weekly tasks,
-//! the Tower's runs, the Echoes receipts) into the account's downloadable
-//! file. No page of the site shows them, the game client does; the download
+//! the Tower's runs, the Echoes receipts, ranked play) into the account's
+//! downloadable file. No page of the site shows them, the game client does; the download
 //! carries what Central keeps of them. So it does the account's chosen
 //! status (`docs/push-socket.md` §"Status"), which Central's export leaves
 //! out for the released clients that decode it strictly.
@@ -10,6 +10,7 @@ use super::{
 };
 use central_api::{challenges as api, wire};
 mod echoes;
+mod ranked;
 mod tower;
 
 async fn request(request: api::Request) -> Result<api::Response, Failure> {
@@ -61,6 +62,9 @@ pub(crate) async fn merged(file: &str) -> Result<String, Failure> {
     file.as_object_mut()
         .ok_or(Failure::Malformed)?
         .insert("tower_echoes".into(), echoes::receipts().await?);
+    file.as_object_mut()
+        .ok_or(Failure::Malformed)?
+        .insert("ranked".into(), ranked::datasets().await?);
     let wire::Response::Presence { choice } = call(&wire::Request::Presence).await? else {
         return Err(Failure::Malformed);
     };

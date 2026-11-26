@@ -30,7 +30,10 @@ Central cannot read the encrypted data, so an export has two halves:
   does not know would fail that read. A test in `central-api` holds the
   released fields (a frozen copy of the released types decodes it).
   `Request::Presence` reads the choice, and the website's download adds it
-  as `presence`.
+  as `presence`. Ranked play (ratings, deck versions, receipts, matches,
+  queue tickets, badges, unlocks and Champion places) is read the same way
+  with `Ranked::Export` and added as `ranked`
+  ([ranked](ranked.md#own-data-in-the-account-download)).
 - **The encrypted half** is read and decrypted by the client: the account
   document and every private object, through the existing `ReadDocument`,
   `ListObjects` and `ReadObject`. `central-client` gains `Session::export`

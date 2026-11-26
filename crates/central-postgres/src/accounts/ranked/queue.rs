@@ -3,6 +3,53 @@
 use super::{Error, api, column, matchmaking, scoring, statement, unavailable, uuid};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
+/// Hours a ticket is kept after its waiting ended, or after its match ended,
+/// before the operator's daily sweep deletes it (`docs/ranked.md`
+/// §"Publication and storage"). The runtime marks a ticket closed only on
+/// its account's next queue request, so the sweep goes by those times, not
+/// by the mark: a ticket left `waiting` past its expiry or `assigned` to an
+/// ended match is just as closed. What still reads an ended ticket:
+/// the hourly admission cap counts the account's tickets of the last hour,
+/// the sparse-queue check those of the last two minutes, a `Join` retried
+/// after a lost answer finds its own key instead of queueing anew, and
+/// `Status` shows the last match's result from it. A day covers each with a
+/// wide margin. Nothing settles from an ended ticket: a match's consent check
+/// reads its tickets only while the match is playing (they stay), a seat
+/// token needs a live match, rematch spacing reads `ranked_matches`, and the
+/// replica sweep finds ended matches by their own rows. Once the ticket
+/// is gone, `Status` says `Idle` (the receipt stays) and a retry of that key
+/// is a new request.
+pub const CLOSED_TICKET_HOURS: i32 = 24;
+/// Rows one delete takes; the sweep repeats it until a batch comes back short.
+const SWEEP_BATCH: i64 = 4096;
+
+/// Delete tickets ended longer than [`CLOSED_TICKET_HOURS`] ago, in bounded
+/// batches, under the operator's login (the runtime cannot delete one). A
+/// ticket of a match that has not ended stays, whatever its age.
+pub(in crate::accounts) async fn sweep(db: &DatabaseTransaction) -> Result<u64, Error> {
+    let mut deleted = 0;
+    loop {
+        let batch = db
+            .execute_raw(statement(
+                "DELETE FROM central_identity.ranked_tickets t WHERE (t.account_id,t.request_id) IN (
+                   SELECT o.account_id,o.request_id FROM central_identity.ranked_tickets o
+                   WHERE o.expires_at<pg_catalog.clock_timestamp()-pg_catalog.make_interval(hours => $1)
+                     AND NOT EXISTS (SELECT 1 FROM central_identity.ranked_matches m WHERE m.id=o.match_id
+                       AND (m.finished_at IS NULL
+                         OR m.finished_at>=pg_catalog.clock_timestamp()-pg_catalog.make_interval(hours => $1)))
+                   LIMIT $2 FOR UPDATE OF o SKIP LOCKED)",
+                vec![CLOSED_TICKET_HOURS.into(), SWEEP_BATCH.into()],
+            ))
+            .await
+            .map_err(unavailable)?
+            .rows_affected();
+        deleted += batch;
+        if batch < u64::try_from(SWEEP_BATCH).unwrap_or(u64::MAX) {
+            return Ok(deleted);
+        }
+    }
+}
+
 const FIELDS: &str =
     "request_id,account_id,state,replicable,season_id,format,commitment,queue_elo,match_id,
     floor(extract(epoch FROM created_at))::bigint AS at";

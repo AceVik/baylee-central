@@ -33,6 +33,41 @@ These are engineering passes, not independent external audits. Separate agent
 reviews and their scope are recorded below. Release still needs independent review
 and operational/legal gates.
 
+## Ranked export and closed-ticket pruning, 26 November 2026
+
+Design pass: the assets are one account's ranked history and, in the same rows,
+its opponents' commitments, decks, ratings and operator decisions. Hostile callers
+considered: another account's live session, a request naming a foreign key, a
+malformed or replayed page, a never-restored website account, an old client.
+Invariants: the account comes only from the session; every query is keyed by it;
+another account's columns are reduced away in SQL, not in Rust; a page is checked
+before its key is followed; `AccountExport` and the released clients' decoding do
+not change. For pruning, nothing that settles or authorizes may read a closed ticket
+the sweep can delete.
+
+Implementation pass: `Ranked::Export` runs in a read-only repeatable-read transaction
+and resolves the account like the challenge export (a live session with a credential).
+A match row is projected to this seat's commitment, claim and operator decisions.
+A receipt carries the opponent's public account ID and leaves out `elo_gap` and
+`opponent_established`. Deck versions are named by their public ID, never their private
+hash. Page sizes keep the largest possible page under three quarters of the wire limit
+(a unit test builds it). The prune runs only in the operator's sweep. The runtime role
+has no DELETE on `ranked_tickets`, and none was granted. It is measured from the later
+of the end of waiting and the match's end, not from the closed mark, which the runtime
+sets only on the account's next queue request; a ticket of a match still reserved or
+playing is never pruned.
+
+Adversarial pass: the PostgreSQL suite seeds both sides of one game. It checks that
+neither account's download holds the other's commitment, cards, deck version, consent
+or the receipt's opponent evidence. The opponent's ID appears exactly once, on the
+receipt. Another account's session, an unknown token, no session, a key of another
+dataset and a non-v7 key are refused or see nothing. The native session and the
+cookie read identical rows. The sweep deletes exactly the tickets past the day,
+including one left waiting and one left assigned to an old match, and keeps a fresh
+waiting one, an hour-old one and an old one whose match ended just now.
+A second sweep deletes nothing. This is the implementing agent's engineering review,
+not an independent audit.
+
 ## Session tokens, 6 November 2026
 
 Design pass: assets are the Ed25519 signing key, the Central token and each session's capability.
