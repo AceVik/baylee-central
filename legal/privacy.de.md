@@ -229,10 +229,11 @@ entscheidest du.
 - Aufgaben, Expeditionen und Ranglisteneinträge bleiben bis zur Löschung
   deines Kontos; einen Ranglisteneintrag nimmst du jederzeit zurück, indem
   du die Freigabe ausschaltest.
-- Ranglistenpartien mit ihren Ergebnissen, deine Anmeldungen zur
-  Warteschlange, Elo-Zahlen, Deck-Fingerabdrücke, Abzeichen und
-  freigeschalteten Hüllen und Spielmatten bleiben bis zur Löschung deines
-  Kontos. Eröffnung, Decks, Spielentscheidungen und Bedenkzeiten einer
+- Ranglistenpartien mit ihren Ergebnissen, Elo-Zahlen, Deck-Fingerabdrücke,
+  Abzeichen und freigeschalteten Hüllen und Spielmatten bleiben bis zur
+  Löschung deines Kontos. Anmeldungen zur Warteschlange löschen wir täglich,
+  sobald sie einen Tag alt sind, gerechnet ab dem Ende ihrer Wartezeit oder
+  ihrer Partie. Eröffnung, Decks, Spielentscheidungen und Bedenkzeiten einer
   Partie löschen wir nach ihrem Ende, in der Regel nach wenigen Minuten,
   spätestens am folgenden Tag.
 - Was beim Koppeln eines Geräts anfällt, löschen wir, sobald die Kopplung
