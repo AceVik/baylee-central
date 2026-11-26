@@ -145,6 +145,20 @@ fn league_number(league: League) -> i16 {
         .unwrap_or(-1)
 }
 
+/// People, AI players or both (docs/ai-players.md section 6), as a predicate
+/// on the ladder row `r`.
+const fn players_filter(players: central_api::ranked::ai::BoardPlayers) -> &'static str {
+    match players {
+        central_api::ranked::ai::BoardPlayers::Everyone => "",
+        central_api::ranked::ai::BoardPlayers::People => {
+            " AND NOT EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=r.account_id)"
+        }
+        central_api::ranked::ai::BoardPlayers::Ai => {
+            " AND EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=r.account_id)"
+        }
+    }
+}
+
 /// One board page's selection, as the request names it.
 pub(super) struct Page {
     pub(super) format: Format,
@@ -188,16 +202,7 @@ pub(super) async fn board(
         (_, Some(_)) => "r.league=$3 AND r.division=$4",
         _ => "r.league=$3",
     };
-    // People, AI players or both (docs/ai-players.md section 6).
-    let who = match players {
-        central_api::ranked::ai::BoardPlayers::Everyone => "",
-        central_api::ranked::ai::BoardPlayers::People => {
-            " AND NOT EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=r.account_id)"
-        }
-        central_api::ranked::ai::BoardPlayers::Ai => {
-            " AND EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=r.account_id)"
-        }
-    };
+    let who = players_filter(players);
     let rows = src.rows(
         track,
         &format!("r.season_id=$1 AND r.format=$2 AND {eligible}{who}"),

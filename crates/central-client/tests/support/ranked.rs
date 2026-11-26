@@ -28,6 +28,7 @@ pub(super) fn public(http: &Http, account: Id, name: &str, tag: u32) {
                 league: League::Gold,
                 division: Some(2),
                 after: None,
+                players: central_api::ranked::ai::BoardPlayers::Everyone,
             };
             let Response::Board {
                 season,
