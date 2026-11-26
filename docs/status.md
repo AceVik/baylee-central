@@ -576,3 +576,29 @@ processor before a read token goes to one, drafted and waiting for the
 owner; the nine languages besides English and German for a speaker to
 read, which does not hold the change back; the migration's production run
 through its own gate.
+
+## Erasure by id and the step after a restore, 26 November 2026
+
+For `baylee-backup`, which restores an older backup and must then delete
+again the accounts deleted since (Art. 17), Central has two operator modes
+under the migrator login ([operations](operations.md#after-a-restore),
+[account deletion](account-deletion.md#the-operators-erasure-26112026)):
+
+- `--after-restore-stdin` moves every gateway's revocation stream 2^40 past
+  its last number and drops what is held, so every gateway ends the Central
+  sessions it holds at its next catch-up, without a restart;
+- `--erase-accounts-stdin` erases up to 1,024 accounts by id, each as its
+  own deletion does, plus its legacy store row and an `account.erased`
+  audit event; idempotent, an administrator or open move not refused;
+- `--modes` names the modes of a build; a mode that is none ends with 2.
+
+No migration, no grant and no route. Tests: the store's erasure against
+the real roles (every table empty of the account, its gateways told, the
+audit kept, again absent, a restored administrator and open move and a
+bare reservation erased, a deletion and an appointment racing it, the
+runtime unable), the step (refused whole at the bound, a racing session end
+covered, every stream past its last with nothing below, nothing to push,
+numbering going on), and the launcher (bad lists refused before a
+connection, nothing echoed, every named mode dispatched). Open:
+`baylee-backup` calling them, and a production deploy of a Central that
+has them (production ran migration 000014 on 25.11.2026).

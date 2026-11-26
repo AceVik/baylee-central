@@ -185,6 +185,54 @@ gateways into the new document (Baylee `baylee_account::Account::login`).
   ([operations](operations.md#deleting-and-exporting-accounts)); keying
   terms by registration is a later change.
 
+## The operator's erasure (26.11.2026)
+
+A backup holds accounts for up to twelve months. Restored, an older backup
+brings back every account deleted since it was made, so the deletion must be
+done again (Art. 17): `baylee-backup` keeps the ids of the accounts that
+vanished between its runs and hands them to Central after a restore. Central
+had no way for the operator to delete an account by its id; the gateway has
+`DELETE /admin/accounts/{id}`. Central's is an operator mode of
+`central-service`, not a route: `--erase-accounts-stdin`
+([operations](operations.md#after-a-restore)).
+
+- **Who:** the operator, under the migrator login from the file the operator
+  keeps, as `--appoint-admin-stdin` and `--sweep-stdin` run. That login owns
+  every table already, so the mode adds no authority; no listener reaches
+  it, and no token or grant was added. An administrator on the website
+  cannot erase an account.
+- **What:** each id in its own transaction, as the person's own deletion:
+  the account row locked (`FOR UPDATE`, the lock the Tower award store's
+  ingestion takes too), the other owners' gateways it administers move
+  their list's revision, and the row goes; the foreign keys take the rest,
+  its sessions among them, each `sid` of them a revocation its gateway
+  hears. The shared tail is one function
+  (`central-postgres`'s `deletion::remove`). Two things more: the legacy
+  store's row of the account's old id (its old password's hash and its
+  source), which only the migrator may delete, and an audit event
+  `account.erased` with the operator as its actor and the account's id,
+  which no longer resolves.
+- **Nothing is refused for the account's state.** A restored backup can
+  show an account as an administrator, or with its move still open, which
+  the person had left before deleting it; its own deletion refuses both.
+  An erased administrator can leave Central without one: the mode says how
+  many are left, and the operator appoints another.
+- **Idempotent.** An id with no account is counted as absent, without an
+  event. A run stopped by a failure keeps what it erased; the same list runs
+  again. One that waits on the account's lock while the account's own
+  deletion commits finds it absent.
+- **Live parts.** A running service does not hear of an erasure: the
+  account's sockets learn that their session ended at their next check,
+  within 70 seconds, and its friends' clients read their contacts within
+  the minute ([push socket](push-socket.md#what-it-does-not-do)). After a
+  restore the mode runs before Central starts, and there is nothing live.
+- **Found on the way, not changed:** a moved account whose legacy row's
+  deletion at the move's close was lost, then deleted by its owner, leaves
+  that row until the legacy store's deadline: the sweep finds a closed
+  move's row through the account, which is gone. The operator's erasure
+  deletes it; the person's own deletion cannot, since the runtime has
+  nothing in the legacy store.
+
 ## What the clients need
 
 - M4 (website): an export page (the metadata as a JSON download; the

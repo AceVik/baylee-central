@@ -387,6 +387,10 @@ reach. `GatewayHeartbeat`, and a `GatewayPulse` likewise, answers
 floor }`: one fresh message for the next numbers, or none; the last number; the lowest held, or
 `last + 1`. The stream is the credential's, never the request's. With `after + 1 < floor` a
 gateway may have missed something it cannot learn, and ends every Central session it holds.
+After a restore of an older backup the operator moves every stream far past its last number and
+drops what is held (`--after-restore-stdin`, [operations](operations.md#after-a-restore)), so
+that every gateway that had read a number is in that case, whether it was behind the backup's
+numbers or ahead of them.
 
 **The push** is what makes a revocation prompt. `RegisterInvalidate { path }`, under the SSO
 credential or the bridge, is sent when a gateway links and at a sign-in until it has been

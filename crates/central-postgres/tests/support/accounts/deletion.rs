@@ -11,7 +11,7 @@ use sea_orm::{
 };
 use std::time::Duration;
 
-async fn sql(db: &impl ConnectionTrait, query: &str, values: Vec<Value>) {
+pub(super) async fn sql(db: &impl ConnectionTrait, query: &str, values: Vec<Value>) {
     db.execute_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         query,
@@ -21,7 +21,7 @@ async fn sql(db: &impl ConnectionTrait, query: &str, values: Vec<Value>) {
     .unwrap();
 }
 
-async fn count(db: &impl ConnectionTrait, query: &str, values: Vec<Value>) -> i64 {
+pub(super) async fn count(db: &impl ConnectionTrait, query: &str, values: Vec<Value>) -> i64 {
     db.query_one_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         query,
@@ -34,12 +34,16 @@ async fn count(db: &impl ConnectionTrait, query: &str, values: Vec<Value>) -> i6
     .unwrap()
 }
 
-fn id(identity: Identity) -> Value {
+pub(super) fn id(identity: Identity) -> Value {
     Uuid::from_bytes(identity.account).into()
 }
 
 /// A moved account, restored and closed, with a native session.
-async fn moved(store: &AccountStore, keys: &ServerKeys, name: &str) -> (Identity, Token) {
+pub(super) async fn moved(
+    store: &AccountStore,
+    keys: &ServerKeys,
+    name: &str,
+) -> (Identity, Token) {
     let identity = enroll(store, keys, name, name).await;
     let native = login(store, keys, identity).await;
     store.confirm_restore(&native, 1).await.unwrap();
@@ -48,7 +52,7 @@ async fn moved(store: &AccountStore, keys: &ServerKeys, name: &str) -> (Identity
 }
 
 /// A registered and approved gateway of the session's account.
-async fn gateway(
+pub(super) async fn gateway(
     store: &AccountStore,
     operator: &DatabaseConnection,
     session: &Token,
@@ -89,7 +93,7 @@ async fn gateway(
     gateway
 }
 
-async fn admin_revision(operator: &DatabaseConnection, gateway: [u8; 16]) -> i64 {
+pub(super) async fn admin_revision(operator: &DatabaseConnection, gateway: [u8; 16]) -> i64 {
     count(
         operator,
         "SELECT admin_revision AS n FROM central_identity.gateways WHERE id = $1",
@@ -384,7 +388,7 @@ async fn fill(store: &AccountStore, operator: &DatabaseConnection, keys: &Server
 
 /// The rows a store call cannot easily make: objects, a reset code, an
 /// archive, an acceptance and an audit event.
-async fn rows(operator: &DatabaseConnection, account: &Value) {
+pub(super) async fn rows(operator: &DatabaseConnection, account: &Value) {
     sql(
         operator,
         "INSERT INTO central_identity.private_objects (account_id, revision, document)
@@ -535,7 +539,7 @@ async fn everything(store: &AccountStore, operator: &DatabaseConnection, keys: &
 /// How many rows of each column name the account, its gateway or its
 /// sessions: every uuid column of the schema (apart from the audit and who
 /// granted a role, which keep ids on purpose), and the session digests.
-async fn naming(
+pub(super) async fn naming(
     operator: &DatabaseConnection,
     account: &Value,
     own: [u8; 16],

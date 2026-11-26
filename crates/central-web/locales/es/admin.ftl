@@ -171,6 +171,7 @@ admin-audit-admin-granted = Rol de administrador concedido
 admin-audit-admin-removed = Rol de administrador quitado
 admin-audit-reset-issued = Código de restablecimiento generado
 admin-audit-tag-changed = Etiqueta cambiada
+admin-audit-account-erased = Cuenta eliminada por el operador
 admin-audit-gateway-approved = Gateway aprobado
 admin-audit-gateway-disabled = Gateway desactivado
 admin-audit-token-revoked = Token de gateway revocado

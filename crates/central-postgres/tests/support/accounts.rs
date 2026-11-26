@@ -18,6 +18,7 @@ mod chat;
 mod deletion;
 mod donations;
 mod email;
+mod erasure;
 mod gateways;
 mod kinds;
 mod legacy_store;
@@ -173,6 +174,7 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     admin::run(&store, operator, &keys).await;
     reset::run(&store, operator, &keys).await;
     deletion::run(&store, operator, &keys).await;
+    erasure::run(&store, operator, &keys).await;
     pairing::run(&store, operator, &keys).await;
     reports::run(&store, operator, &keys).await;
     chat::run(&store, operator, &keys).await;
@@ -187,6 +189,8 @@ pub(crate) async fn run(operator: &DatabaseConnection) {
     donations::run(&store, operator).await;
     // Last: its sweep deletes every unenrolled legacy reservation.
     legacy_store::run(&store, operator, &keys).await;
+    // After all: it moves every gateway's revocation stream.
+    erasure::step(&store, operator, &keys).await;
     store.close().await.unwrap();
 }
 

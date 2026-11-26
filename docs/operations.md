@@ -21,7 +21,12 @@ or Tower economy inside Central.
 
 `central-service` takes exactly one mode argument and no other argument. Every
 secret arrives as one bounded JSON document on standard input (at most 128 KiB),
-never in argv or the environment. Unknown fields fail closed.
+never in argv or the environment. Unknown fields fail closed. Anything else
+than one known mode prints the usage and ends with status 2, which no mode
+ends with (since 26.11.2026; status 1 before). `--modes` prints the modes
+this build knows as one JSON line, `{"modes": ["--dev", …]}`, reads nothing
+and connects to nothing, so that a tool can ask before it relies on one; a
+build older than it ends `--modes` with its usage and status 1.
 
 - `--accounts-stdin` serves the live native account protocol. The endpoint is
   always `https://central.baylee.app`, and the official gateway is the compiled
@@ -46,6 +51,9 @@ never in argv or the environment. Unknown fields fail closed.
   it stops anything.
 - `--migrate-stdin` applies pending migrations once under the migration login
   and exits. Input: `database` only. The service never migrates by itself.
+- `--after-restore-stdin` and `--erase-accounts-stdin`, under the migration
+  login, are the operator's two steps after a restore of an older backup
+  ([below](#after-a-restore)).
 - `--legacy-import-stdin` and `--legacy-deadline-stdin` import the official
   gateway's legacy accounts once and set the legacy store's deadline, under the
   migration login ([the legacy store](#the-legacy-store)).
@@ -709,7 +717,77 @@ no grant. What stays the operator's:
   ```
 
 - **Backups** keep a deleted account until they rotate out, at most 12
-  months, as the privacy notice says.
+  months, as the privacy notice says. A restored backup brings deleted
+  accounts back; they are erased again by id ([below](#after-a-restore)).
+- **An erasure by id,** after a restore, or on a request whose sender the
+  operator has verified as the account's holder: `--erase-accounts-stdin`
+  ([below](#after-a-restore)).
+
+## After a restore
+
+*26.11.2026.* A restored backup is an earlier state of Central's database, and
+two things in it are wrong for the present: the accounts deleted since the
+backup are back, and every gateway's revocation stream stands at the backup's
+number, behind what the gateways have read. `baylee-backup` runs both steps
+after `pg_restore` and before it starts Central again, in this order, under
+the migration document as the deploy hook's migration does:
+
+```sh
+systemd-run --wait --collect --quiet --pipe -p User=central -p Group=central \
+    /opt/baylee-central/bin/central-service --after-restore-stdin \
+    < /etc/baylee-central/migrate.json
+```
+
+**`--after-restore-stdin`** takes the migration document as it is. In one
+transaction it moves every gateway's revocation stream 2^40 past its last
+number (`central_postgres::RESTORE_STEP`) and drops the numbers still held, so
+that each stream's lowest number is its last plus one. A gateway that had
+read any number then finds, at its next catch-up (within 30 seconds), that it
+missed something it cannot learn, ends every Central session it holds, and
+goes on from there; its players present fresh tokens, which Central gives
+only to live sessions ([gateway registry](gateway-registry.md#revocations)).
+No gateway needs a restart. Streams are made for the official gateway and
+for every registered gateway that had none, since a gateway may have read
+numbers the backup never saw. 2^40 revocations at one gateway in the twelve
+months a backup is kept would be 35,000 a second; a stream that would pass
+2^53 - 1 refuses the whole step (8,191 restores from 0). Central's own
+sessions stay: a backup holds none (`baylee-backup` leaves `sessions`, the
+`sid`s and the revocations out), and ending them would make a mistaken run
+cost everyone their password instead of a fresh token. It prints
+`{"streams": N}` on standard output and ends with 0, or a line on standard
+error and 1. Run again, it moves every stream once more, which costs the
+gateways' players a fresh token and nothing else.
+
+**`--erase-accounts-stdin`** takes the migration document with the ids to
+erase ([account deletion](account-deletion.md#the-operators-erasure-26112026)):
+
+```json
+{"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
+  "password": "…", "ca_certificate": "…"},
+ "accounts": ["0193…-…", "…"]}
+```
+
+1 to 1,024 ids (`ERASE_BATCH`; a longer list goes in batches), each a UUID in
+its hyphenated text form, in either case; a repeated one counts once. The
+whole document is checked before anything is erased, and one id that is no
+UUID refuses it all. Each account is erased in its own transaction, as its
+own deletion does, with its legacy store row and an `account.erased` audit
+event; an administrator and an open move are not refused. An id with no
+account counts as absent. It prints
+`{"erased": N, "absent": M, "administrators": K}` on standard output, never
+an id, and ends with 0 once every id is erased or absent; `K` is how many
+administrators are left, and at 0 it says on standard error to appoint one
+(`--appoint-admin-stdin`, [above](#administration)). A failure ends it with
+1 and says on standard error how far it got; what it erased stays erased,
+and the same list runs again. Keep the ids out of shell history and logs:
+`baylee-backup`, which runs as root, reads `migrate.json` itself and writes
+the document to the mode's standard input.
+
+Both steps are safe with Central running, too: a revocation numbered while the
+step waits is covered by it, and an erased account's sockets learn within 70
+seconds that their session ended. What a restore undoes beyond this (revoked
+gateway tokens, role changes, used reset codes and friend invites) the
+operator does again by hand; `baylee-backup`'s report lists it.
 
 ## Gateways and their tokens
 

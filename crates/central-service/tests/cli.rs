@@ -86,6 +86,9 @@ fn bad_reserved_environment_is_rejected_without_echoing_values() {
     }
 }
 
+/// The usage: every mode, in the order `--modes` names them.
+const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --after-restore-stdin | --erase-accounts-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key | --modes";
+
 #[test]
 fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
     for arguments in [
@@ -108,16 +111,18 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--generate-secrets", "PRIVATE_ARG_CANARY"],
         &["--generate-token-key", "PRIVATE_ARG_CANARY"],
         &["--check-accounts-stdin", "PRIVATE_ARG_CANARY"],
+        &["--after-restore-stdin", "PRIVATE_ARG_CANARY"],
+        &["--erase-accounts-stdin", "--dev"],
+        &["--modes", "PRIVATE_ARG_CANARY"],
         &["--DEV"],
+        &["--erase-accounts-stdin=PRIVATE_ARG_CANARY"],
     ] {
         let output = run_invalid(arguments, None);
+        assert_eq!(output.status.code(), Some(2), "{arguments:?}");
         assert_eq!(output.stdout, b"");
         let stderr = String::from_utf8(output.stderr).unwrap();
         assert!(!stderr.contains("PRIVATE_ARG_CANARY"));
-        assert_eq!(
-            stderr.trim(),
-            "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key"
-        );
+        assert_eq!(stderr.trim(), USAGE);
     }
 }
 
@@ -141,6 +146,14 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
             "central: sweep rejected configuration or failed",
         ),
         (
+            "--after-restore-stdin",
+            "central: the revocation streams were not moved: configuration rejected or failed",
+        ),
+        (
+            "--erase-accounts-stdin",
+            "central: erasure rejected its input or failed after 0 accounts erased and 0 not found; run the same list again",
+        ),
+        (
             "--advent-import-stdin",
             "Advent import refused. Verify the private package, worker and staging role.",
         ),
@@ -150,15 +163,97 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         ),
     ] {
         let output = run_invalid(&[mode], None);
+        assert_eq!(output.status.code(), Some(1), "{mode}");
         assert_eq!(output.stdout, b"");
         assert_eq!(String::from_utf8(output.stderr).unwrap().trim(), message);
         let output = run_with_stdin(mode, br#"{"database":{"password":"PRIVATE_DB_CANARY"}}"#);
-        assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1), "{mode}");
         assert_eq!(output.stdout, b"");
         let stderr = String::from_utf8(output.stderr).unwrap();
         assert!(!stderr.contains("PRIVATE_DB_CANARY"));
         assert_eq!(stderr.trim(), message);
     }
+}
+
+/// `--modes` names every mode, reads nothing and connects to nothing; each
+/// mode it names is one the launcher runs, never the usage.
+#[test]
+fn the_modes_are_named_and_each_one_runs() {
+    let output = run_with_stdin("--modes", b"PRIVATE_STDIN_CANARY");
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stderr, b"");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(stdout.lines().count(), 1);
+    let named: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let modes: Vec<&str> = named["modes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|mode| mode.as_str().unwrap())
+        .collect();
+    assert_eq!(named.as_object().unwrap().len(), 1);
+    assert_eq!(
+        format!("usage: central-service {}", modes.join(" | ")),
+        USAGE
+    );
+    // `--dev` would listen; the others refuse empty input or need none.
+    for mode in modes.iter().filter(|&&mode| mode != "--dev") {
+        let output = run_invalid_or_done(mode);
+        assert_ne!(output.status.code(), Some(2), "{mode}");
+        assert!(
+            !String::from_utf8_lossy(&output.stderr).contains("usage:"),
+            "{mode}"
+        );
+    }
+}
+
+/// A mode run with empty standard input, which every mode with input refuses.
+fn run_invalid_or_done(mode: &str) -> Output {
+    run_with_stdin(mode, b"")
+}
+
+/// Erasure checks every id before it connects: one that is no UUID, an empty
+/// list or one past the batch refuses all, and the input is never echoed.
+#[test]
+fn erasure_refuses_a_bad_list_before_it_connects() {
+    let database = r#""database":{"host":"127.0.0.1","port":1,"name":"central","user":"central_migrator","password":"PRIVATE_DB_CANARY","ca_certificate":"x"}"#;
+    let message = "central: erasure rejected its input or failed after 0 accounts erased and 0 not found; run the same list again";
+    let good = "0193a5b2-7c41-7d3e-9f00-0123456789ab";
+    let past: Vec<String> = (0..=1024)
+        .map(|n| format!("\"00000000-0000-7000-8000-{n:012x}\""))
+        .collect();
+    for accounts in [
+        "[]".to_owned(),
+        format!(r#"["{good}","PRIVATE_ID_CANARY"]"#),
+        format!(r#"["{good}",7]"#),
+        format!("[{}]", past.join(",")),
+        format!(r#""{good}""#),
+    ] {
+        let output = run_with_stdin(
+            "--erase-accounts-stdin",
+            format!(r#"{{{database},"accounts":{accounts}}}"#).as_bytes(),
+        );
+        assert_eq!(output.status.code(), Some(1));
+        assert_eq!(output.stdout, b"");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(!stderr.contains("CANARY"), "{stderr}");
+        assert_eq!(stderr.trim(), message);
+    }
+    // An unknown field refuses too, whatever it holds.
+    let output = run_with_stdin(
+        "--erase-accounts-stdin",
+        format!(r#"{{{database},"accounts":["{good}"],"force":"PRIVATE_FIELD_CANARY"}}"#)
+            .as_bytes(),
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(!String::from_utf8(output.stderr).unwrap().contains("CANARY"));
+    let output = run_with_stdin(
+        "--after-restore-stdin",
+        format!(r#"{{{database},"accounts":["PRIVATE_FIELD_CANARY"]}}"#).as_bytes(),
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout, b"");
+    assert!(!String::from_utf8(output.stderr).unwrap().contains("CANARY"));
 }
 
 /// The reports' copy refuses what is not its migration document, and says

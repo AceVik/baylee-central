@@ -203,7 +203,7 @@ pub(super) fn read_settings() -> Result<Zeroizing<Vec<u8>>, ()> {
     Ok(bytes)
 }
 
-fn parse<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, ()> {
+pub(super) fn parse<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, ()> {
     serde_json::from_slice(bytes).map_err(|_| ())
 }
 

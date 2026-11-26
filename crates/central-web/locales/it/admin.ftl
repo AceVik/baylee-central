@@ -171,6 +171,7 @@ admin-audit-admin-granted = Reso amministratore
 admin-audit-admin-removed = Ruolo di amministratore rimosso
 admin-audit-reset-issued = Codice di reimpostazione creato
 admin-audit-tag-changed = Tag modificato
+admin-audit-account-erased = Account eliminato dal gestore
 admin-audit-gateway-approved = Gateway approvato
 admin-audit-gateway-disabled = Gateway disattivato
 admin-audit-token-revoked = Token del gateway revocato

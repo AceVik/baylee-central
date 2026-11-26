@@ -171,6 +171,7 @@ admin-audit-admin-granted = 设为管理员
 admin-audit-admin-removed = 移除管理员角色
 admin-audit-reset-issued = 生成重置码
 admin-audit-tag-changed = 更改标签
+admin-audit-account-erased = 运营者删除了账号
 admin-audit-gateway-approved = 批准 Gateway
 admin-audit-gateway-disabled = 停用 Gateway
 admin-audit-token-revoked = 吊销 Gateway 令牌
