@@ -547,7 +547,10 @@ fn slice_digest(bytes: &[u8]) -> Result<[u8; 32], Error> {
     bytes.try_into().map_err(|_| Error::Unavailable)
 }
 
-async fn delete_session_tx(tx: &impl sea_orm::ConnectionTrait, digest: &[u8]) -> Result<(), Error> {
+pub(super) async fn delete_session_tx(
+    tx: &impl sea_orm::ConnectionTrait,
+    digest: &[u8],
+) -> Result<(), Error> {
     tx.execute_raw(statement(
         "DELETE FROM central_identity.push_subscriptions WHERE session_digest = $1",
         vec![digest.to_vec().into()],

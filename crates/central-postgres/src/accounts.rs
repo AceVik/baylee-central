@@ -13,6 +13,8 @@ use sea_orm::{
 mod admin;
 mod advent;
 pub(crate) mod ai;
+mod ai_runner;
+pub use ai_runner::RunnerSession;
 mod challenges;
 mod deletion;
 mod donations;

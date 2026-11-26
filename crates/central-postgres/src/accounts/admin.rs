@@ -72,6 +72,10 @@ pub enum Action {
     AiChanged,
     /// The settings for every AI changed; the detail holds the new numbers.
     AiSettingsChanged,
+    /// An administrator made an AI runner token; the event names it by id.
+    AiRunnerTokenCreated,
+    /// An administrator revoked an AI runner token and ended its sessions.
+    AiRunnerTokenRevoked,
 }
 
 impl Action {
@@ -103,6 +107,8 @@ impl Action {
             Self::AiDisabled => "ai.disabled",
             Self::AiChanged => "ai.changed",
             Self::AiSettingsChanged => "ai.settings_changed",
+            Self::AiRunnerTokenCreated => "ai.runner_token_created",
+            Self::AiRunnerTokenRevoked => "ai.runner_token_revoked",
         }
     }
 }

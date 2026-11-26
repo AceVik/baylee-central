@@ -349,7 +349,9 @@ mod tests {
     /// from before writes, keep the one-session rule.
     #[test]
     fn ai_runner_tokens_migration_keeps_people_s_one_session_rule() {
-        let m = MIGRATIONS.last().expect("runner tokens migration is present");
+        let m = MIGRATIONS
+            .last()
+            .expect("runner tokens migration is present");
         assert_eq!(m.name, "m20261126_000054_ai_runner_tokens");
         for said in [
             "CREATE TABLE central_identity.ai_runner_tokens",
@@ -369,7 +371,11 @@ mod tests {
         ] {
             assert!(m.sql.contains(said), "{said}");
         }
-        for table in ["ai_runner_tokens", "ai_runner_accounts", "ai_runner_signins"] {
+        for table in [
+            "ai_runner_tokens",
+            "ai_runner_accounts",
+            "ai_runner_signins",
+        ] {
             let revoke = format!("REVOKE ALL ON central_identity.{table} FROM PUBLIC");
             assert!(m.sql.contains(&revoke), "{table}");
         }

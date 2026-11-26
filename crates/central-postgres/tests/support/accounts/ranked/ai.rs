@@ -14,7 +14,7 @@ use central_api::wire::GatewayPurpose;
 use central_postgres::{RankedHostCredential::Registered, Session, appoint_admin};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
-fn join(key: u8, ai: AiOpponents) -> Request {
+pub(super) fn join(key: u8, ai: AiOpponents) -> Request {
     Request::Replicate {
         request: api::replica::SeatRequest::Join {
             key: id(key),
@@ -25,7 +25,7 @@ fn join(key: u8, ai: AiOpponents) -> Request {
     }
 }
 
-fn settings(profile: &str, name: &str) -> AiPlayerSettings {
+pub(super) fn settings(profile: &str, name: &str) -> AiPlayerSettings {
     AiPlayerSettings {
         kind: AiKind::House,
         profile: profile.into(),
@@ -36,7 +36,7 @@ fn settings(profile: &str, name: &str) -> AiPlayerSettings {
     }
 }
 
-async fn sql(db: &DatabaseConnection, text: &str, values: Vec<sea_orm::Value>) {
+pub(super) async fn sql(db: &DatabaseConnection, text: &str, values: Vec<sea_orm::Value>) {
     db.execute_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         text,
@@ -46,7 +46,7 @@ async fn sql(db: &DatabaseConnection, text: &str, values: Vec<sea_orm::Value>) {
     .unwrap();
 }
 
-async fn count(db: &DatabaseConnection, text: &str, values: Vec<sea_orm::Value>) -> i64 {
+pub(super) async fn count(db: &DatabaseConnection, text: &str, values: Vec<sea_orm::Value>) -> i64 {
     db.query_one_raw(Statement::from_sql_and_values(
         DbBackend::Postgres,
         text,
@@ -60,7 +60,7 @@ async fn count(db: &DatabaseConnection, text: &str, values: Vec<sea_orm::Value>)
 }
 
 /// A person's waiting ticket, made 61 seconds older.
-async fn waited(db: &DatabaseConnection, person: [u8; 16]) {
+pub(super) async fn waited(db: &DatabaseConnection, person: [u8; 16]) {
     sql(
         db,
         "UPDATE central_identity.ranked_tickets SET created_at = created_at - interval '61 seconds'
@@ -70,7 +70,11 @@ async fn waited(db: &DatabaseConnection, person: [u8; 16]) {
     .await;
 }
 
-async fn ai(store: &AccountStore, token: &Token, request: AiRequest) -> Result<AiResponse, Error> {
+pub(super) async fn ai(
+    store: &AccountStore,
+    token: &Token,
+    request: AiRequest,
+) -> Result<AiResponse, Error> {
     match store
         .ranked(Some(token.into()), Request::Ai { request })
         .await?
@@ -80,7 +84,7 @@ async fn ai(store: &AccountStore, token: &Token, request: AiRequest) -> Result<A
     }
 }
 
-async fn person(
+pub(super) async fn person(
     store: &AccountStore,
     keys: &ServerKeys,
     name: &str,

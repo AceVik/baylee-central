@@ -309,11 +309,9 @@ async fn assert_seaql_table_shape(operator: &sea_orm::DatabaseConnection) {
 
 /// The history as sea-orm-migration 2.0.4 left it, and a database one migration
 /// behind: the runner reads the one and finishes the other.
-async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
-    // The history has the shape sea-orm-migration 2.0.4 gave it, so a database
-    // that crate migrated is read by this runner as it was written.
-    assert_seaql_table_shape(operator).await;
-    // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
+/// Migration 000054 undone, the newest first, for [`history_as_sea_orm_left_it`]:
+/// the runner tokens' tables and columns, and the one-session rule as 000007 left it.
+async fn undo_runner_tokens(operator: &sea_orm::DatabaseConnection) {
     operator
         .execute_unprepared(
             "ALTER TABLE central_identity.sessions DROP COLUMN runner_token;
@@ -321,8 +319,21 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
              CREATE UNIQUE INDEX sessions_one_per_account ON central_identity.sessions(account_id, kind);
              DROP TABLE central_identity.ai_runner_signins, central_identity.ai_runner_accounts,
                         central_identity.ai_runner_tokens;
-             ALTER TABLE central_identity.audit_events DROP COLUMN ai_runner_token_id;
-             DROP TABLE central_identity.ai_matches, central_identity.ranked_ticket_ai,
+             ALTER TABLE central_identity.audit_events DROP COLUMN ai_runner_token_id;",
+        )
+        .await
+        .unwrap();
+}
+
+async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
+    // The history has the shape sea-orm-migration 2.0.4 gave it, so a database
+    // that crate migrated is read by this runner as it was written.
+    assert_seaql_table_shape(operator).await;
+    // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
+    undo_runner_tokens(operator).await;
+    operator
+        .execute_unprepared(
+            "DROP TABLE central_identity.ai_matches, central_identity.ranked_ticket_ai,
                         central_identity.ai_offers, central_identity.ai_settings, central_identity.ai_players;
              DROP INDEX central_identity.gateway_sids_ai_match, central_identity.gateway_sids_one_each,
                         central_identity.gateway_sids_one_ranked;
