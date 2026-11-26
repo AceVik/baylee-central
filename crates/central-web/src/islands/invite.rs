@@ -370,6 +370,29 @@ fn invite_preview_head(lang: Lang, preview: &FriendInvitePreview) -> AnyView {
     .into_any()
 }
 
+/// The client's link that takes this invite up (Baylee `docs/client.md`,
+/// "Taking up an invite from a link"): `baylee://invite/` and the code, for
+/// a canonical code only, the one spelling the client reads. The client
+/// asks Central who made the invite and asks the person before it accepts;
+/// signed out, it signs in first.
+fn client_link(code: &str) -> Option<String> {
+    valid_friend_invite_code(code).then(|| format!("baylee://invite/{code}"))
+}
+
+/// "Open in Baylee": the invite handed to the installed client.
+fn open_in_client(lang: Lang, code: &str) -> Option<AnyView> {
+    let href = client_link(code)?;
+    Some(
+        view! {
+            <a class="button quiet" href=href>
+                {glyph(glyph::EXTERNAL_LINK)}
+                <span>{words::gws_open_client(lang)}</span>
+            </a>
+        }
+        .into_any(),
+    )
+}
+
 fn signed_out_actions(lang: Lang, code: &str, invite_only: bool) -> AnyView {
     let lcode = lang.code();
     let signup_href = format!(
@@ -394,6 +417,7 @@ fn signed_out_actions(lang: Lang, code: &str, invite_only: bool) -> AnyView {
                 {glyph(glyph::FORWARD)}
                 <span>{words::invite_page_signin(lang)}</span>
             </a>
+            {open_in_client(lang, code)}
         </div>
     }
     .into_any()
@@ -427,6 +451,7 @@ fn signed_in_actions(
                 </div>
             }
         });
+    let in_client = open_in_client(lang, &code);
     let accept_code = code;
     view! {
         {opt_in}
@@ -446,6 +471,7 @@ fn signed_in_actions(
                 {glyph(glyph::CHECK)}
                 <span>{words::invite_page_accept(lang)}</span>
             </button>
+            {in_client}
             <button
                 type="button"
                 class="button quiet"
@@ -590,6 +616,26 @@ mod tests {
             normalize_invite_code("AAAAAAAAAAAAAAAAAAAAAA"),
             "AAAAAAAAAAAAAAAAAAAAAA"
         );
+    }
+
+    /// The client reads exactly `baylee://invite/<code>` for a canonical
+    /// code (Baylee `client-core::deeplink`, the same vector there): the
+    /// page offers the link for such a code and for nothing else.
+    #[test]
+    fn the_client_link_is_the_canonical_code_only() {
+        assert_eq!(
+            client_link("Zm9vYmFyLWJheWxlZS0xMA").as_deref(),
+            Some("baylee://invite/Zm9vYmFyLWJheWxlZS0xMA")
+        );
+        for bad in [
+            "",
+            "Zm9vYmFyLWJheWxlZS0xMB",
+            "Zm9vYmFyLWJheWxlZS0xM",
+            "Zm9vYmFyLWJheWxlZS0xMA/",
+            "Zm9vYmFyLWJheWxlZS0xMA?x",
+        ] {
+            assert_eq!(client_link(bad), None, "{bad}");
+        }
     }
 
     #[test]

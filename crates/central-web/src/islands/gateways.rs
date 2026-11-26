@@ -42,6 +42,10 @@ fn gateway_key(id: &[u8; 16]) -> String {
     })
 }
 
+/// The client's link that proposes `origin` (Baylee `docs/client.md`, "Links
+/// from the website"): `baylee://gateway/add?origin=` and the origin,
+/// percent-encoded. The client drops any other spelling without a word,
+/// `baylee://gateway?origin=` among them.
 fn deeplink_for(origin: &str) -> String {
     let encoded: String = origin
         .bytes()
@@ -53,7 +57,7 @@ fn deeplink_for(origin: &str) -> String {
             }
         })
         .collect();
-    format!("baylee://gateway?origin={encoded}")
+    format!("baylee://gateway/add?origin={encoded}")
 }
 
 #[derive(Clone, Copy)]
@@ -1017,5 +1021,20 @@ fn token_box(
                 </div>
             </section>
         </Show>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::deeplink_for;
+
+    /// The client reads `baylee://gateway/add?origin=` and drops every
+    /// other spelling without a word (Baylee `client-core::deeplink`).
+    #[test]
+    fn a_gateway_link_is_the_one_the_client_reads() {
+        assert_eq!(
+            deeplink_for("https://gateway.example.org"),
+            "baylee://gateway/add?origin=https%3A%2F%2Fgateway.example.org"
+        );
     }
 }
