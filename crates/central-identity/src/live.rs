@@ -1263,7 +1263,9 @@ impl super::IdentityService {
         };
         self.answered(told.as_ref(), Some(token), &answer).await;
         let status = status?;
-        self.require_terms(Some(token), surface).await?;
+        // No AI account holds a push socket: its runner polls, and an AI has no
+        // friends, presence or news to be told (`docs/ai-players.md` §2).
+        self.require_terms(Some(token), surface, true).await?;
         let account = status.identity.account;
         let (listener, reading) = self
             .live

@@ -2,7 +2,7 @@
 //! a runner machine; it trades itself for native sessions of the AI accounts
 //! it lists, at most four at once for an account; two of them hold a seat in
 //! two matches at once; a revocation ends every session it minted.
-use super::ai::{ai, count, join, person, settings, sql, waited};
+use super::ai::{ai, count, created, forget, join, person, sql, waited};
 use super::{AccountStore, DatabaseConnection, Error, ORIGIN, ServerKeys, Token, api, id, login};
 use super::{queue, ready, replicas, setup_gateway};
 use central_api::ranked::ai::{AiOpponents, Offer, Request as AiRequest, Response as AiResponse};
@@ -17,33 +17,10 @@ struct Admin {
     cookie: Token,
 }
 
-/// An AI account, made the one way there is until the creation path lands:
-/// an enrolled person's account, restored and moved, that never played,
-/// flagged by an administrator and switched on. Its password session ends
-/// here, so every session it holds afterwards is a runner's. The creation
-/// path replaces this helper and nothing else.
-async fn ai_account(
-    store: &AccountStore,
-    keys: &ServerKeys,
-    admin: &Admin,
-    name: &str,
-    display: &str,
-) -> [u8; 16] {
-    let (token, account, _) = person(store, keys, name).await;
-    store
-        .set_ai_player(
-            &admin.cookie,
-            account,
-            Some(&settings("house:expert", display)),
-        )
-        .await
-        .unwrap();
-    store
-        .set_ai_enabled(&admin.cookie, account, true)
-        .await
-        .unwrap();
-    store.logout(&token).await.unwrap();
-    account
+/// An AI account as an administrator creates it, switched on: it has no
+/// password, so every session it ever holds is a runner's.
+async fn ai_account(store: &AccountStore, admin: &Admin, display: &str) -> [u8; 16] {
+    created(store, &admin.cookie, display).await
 }
 
 /// The runner sessions `account` holds.
@@ -109,8 +86,8 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     let pia = person(store, keys, "rt-fixture-pia").await;
     let quinn = person(store, keys, "rt-fixture-quinn").await;
     let (_, outsider, outsider_identity) = person(store, keys, "rt-fixture-out").await;
-    let bot = ai_account(store, keys, &admin, "rt-fixture-bot", "KI-Runner-A").await;
-    let other = ai_account(store, keys, &admin, "rt-fixture-bot2", "KI-Runner-B").await;
+    let bot = ai_account(store, &admin, "KI-Runner-A").await;
+    let other = ai_account(store, &admin, "KI-Runner-B").await;
 
     let (token, token_id) = making(store, db, &admin, [bot, other, outsider]).await;
     let minted = exchanging(store, db, &token, [bot, other, outsider]).await;
@@ -134,6 +111,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
             .await
             .unwrap();
     }
+    forget(db, &[bot, other]).await;
     sql(
         db,
         "DELETE FROM central_identity.accounts WHERE username_key LIKE 'rt-fixture-%'",

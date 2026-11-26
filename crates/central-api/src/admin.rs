@@ -358,13 +358,14 @@ pub const AI_PLAYERS: usize = 64;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AiPlayerSettings {
-    /// The kind of mind; fixed once flagged.
+    /// The kind of mind; fixed when the AI is created.
     pub kind: crate::ranked::ai::AiKind,
-    /// The runner's key for the mind, such as `house:expert`; fixed once flagged.
+    /// The runner's key for the mind, such as `house:expert`; fixed when the
+    /// AI is created.
     pub profile: String,
     /// The public label.
     pub label: String,
-    /// Matches at once, 1 to 16.
+    /// Matches at once, 1 to [`crate::ranked::ai::MAX_GAMES`].
     pub max_games: u8,
     /// Games a UTC day; required for a language model.
     pub daily_games: Option<u32>,
@@ -412,7 +413,7 @@ impl AiPlayerSettings {
         self.kind.as_str().is_some()
             && crate::ranked::ai::ranked_profile(&self.profile)
             && crate::ranked::ai::valid_label(&self.label)
-            && (1..=16).contains(&self.max_games)
+            && (1..=crate::ranked::ai::MAX_GAMES).contains(&self.max_games)
             && self.daily_games.is_none_or(|games| games <= 10_000)
             && (self.kind != crate::ranked::ai::AiKind::Model || self.daily_games.is_some())
             && crate::profile::ai_name(&self.display_name)

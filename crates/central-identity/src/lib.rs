@@ -22,6 +22,7 @@ use tokio::sync::Semaphore;
 
 mod admin;
 mod advent;
+mod ai_gate;
 mod ai_runner;
 mod challenge;
 mod challenges;
@@ -1238,6 +1239,99 @@ mod tests {
             })
             .collect();
         assert_eq!(named.len(), 80, "every operation is in one of the lists");
+    }
+
+    /// Every operation is decided for an AI account's session
+    /// (`ai_gate.rs`): a service's credential acts on no session, what
+    /// needs the terms or takes the cookie acts on one, the website's own
+    /// operations are never the runner's, and outside ranked play the
+    /// runner keeps exactly its session, the terms and a gateway token, which
+    /// the store gives an AI for a ranked match alone (`RankedToken` and the
+    /// ranked requests are `surface_tests.rs`'s).
+    #[test]
+    fn every_operation_is_decided_for_an_ai_session() {
+        use ai_gate::ForAi;
+        let operation = |request: &Request| {
+            let text = String::from_utf8(central_api::encode(request).unwrap()).unwrap();
+            let start = text.find(r#""operation":""#).unwrap() + 13;
+            text[start..].split('"').next().unwrap().to_owned()
+        };
+        let all: Vec<Request> = served().into_iter().chain(refused()).collect();
+        for request in &all {
+            let (for_ai, name) = (ForAi::of(request), operation(request));
+            if credential_operation(request) {
+                assert_eq!(for_ai, ForAi::NoSession, "{name}");
+            }
+            if terms::needs_acceptance(request) || uses_session(request) {
+                assert_ne!(for_ai, ForAi::NoSession, "{name}");
+            }
+            if browser_only(request) {
+                assert_ne!(for_ai, ForAi::Allowed, "{name}");
+            }
+        }
+        let allowed: std::collections::BTreeSet<String> = all
+            .iter()
+            .filter(|request| !matches!(request, Request::Ranked { .. }))
+            .filter(|request| ForAi::of(request) == ForAi::Allowed)
+            .map(operation)
+            .collect();
+        let runner = [
+            "accept_terms",
+            "gateway_terms",
+            "gateway_token",
+            "logout",
+            "renew_session",
+            "session_status",
+            "terms",
+            "terms_status",
+        ];
+        assert_eq!(
+            allowed,
+            runner.into_iter().map(String::from).collect(),
+            "a runner session's operations outside ranked play"
+        );
+        // The families an AI is refused, each named.
+        for refused in [
+            Request::Email {
+                request: central_api::email::EmailRequest::Status,
+            },
+            Request::SetKeyCheck { check: vec![] },
+            Request::AccountExport,
+            Request::DeleteAccountStart { login: vec![] },
+            Request::Presence,
+            Request::ReadDocument,
+            Request::ChangePasswordStart {
+                login: vec![],
+                registration: vec![],
+            },
+            Request::Social {
+                request: central_api::social::SocialRequest::Contacts,
+            },
+            Request::TowerToken {},
+        ] {
+            assert_eq!(
+                ForAi::of(&refused),
+                ForAi::Refused,
+                "{}",
+                operation(&refused)
+            );
+        }
+        for served in [
+            Request::ResetMail {
+                username: "synthetic".into(),
+                lang: "en".into(),
+            },
+            Request::Discover {
+                username: "synthetic".into(),
+            },
+        ] {
+            assert_eq!(
+                ForAi::of(&served),
+                ForAi::NoSession,
+                "{}",
+                operation(&served)
+            );
+        }
     }
 
     #[test]

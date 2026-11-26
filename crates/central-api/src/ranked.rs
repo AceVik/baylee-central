@@ -500,7 +500,7 @@ pub enum Request {
         /// Exclusive key returned by the previous page.
         after: Option<export::Key>,
     },
-    /// An AI runner's operations, on the native session of a flagged account.
+    /// An AI runner's operations, on the native session of an AI account.
     Ai {
         /// The operation.
         request: ai::Request,

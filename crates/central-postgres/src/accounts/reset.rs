@@ -12,8 +12,11 @@ use central_api::wire::ResetVault;
 use central_crypto::{opaque::server::ServerKeys, vault::WrappedMasterKey};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
 
-/// An account whose login may be reset: enrolled, its move finished.
-const RESETTABLE: &str = "credential IS NOT NULL AND (source = 'registered' OR legacy_closed)";
+/// An account whose login may be reset: enrolled, its move finished, and
+/// no AI player, which has no password to reset and is never given one
+/// (`docs/ai-players.md` §2). The statements name the table `accounts`.
+const RESETTABLE: &str = "credential IS NOT NULL AND (source = 'registered' OR legacy_closed)
+    AND NOT EXISTS (SELECT 1 FROM central_identity.ai_players ai WHERE ai.account_id = accounts.id)";
 
 /// Hours an administrator's reset code lasts: it is handed over by a person.
 pub const ISSUED_RESET_HOURS: i32 = 24;
@@ -83,7 +86,7 @@ async fn lock_administrators(tx: &DatabaseTransaction) -> Result<(), Error> {
 /// The one statement that makes `digest` the reset code of `target`, for an
 /// administrator's code and a mailed one alike, so both refuse the same
 /// accounts: one that is not enrolled, one whose move is not finished, an
-/// administrator's. A mailed code has [`MAILABLE`] to meet as well. Returns
+/// administrator's, an AI player's. A mailed code has [`MAILABLE`] to meet as well. Returns
 /// the expiry in Unix seconds, or `None` when the account is refused.
 async fn issue(
     tx: &DatabaseTransaction,
@@ -134,7 +137,8 @@ impl AccountStore {
     /// minutes old; the account must be enrolled, its move finished, and
     /// neither an administrator's nor the actor's own. Returns the expiry
     /// in Unix seconds, and the account's confirmed address as it stands
-    /// in this transaction, to be told that a code exists.
+    /// in this transaction, to be told that a code exists. An AI player is
+    /// refused: it has no password, and a code would give it one.
     ///
     /// # Errors
     /// `Rejected` without an administrator's fresh browser session and for a

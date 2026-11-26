@@ -1,9 +1,19 @@
-//! AI players (`docs/ai-players.md`): the flag an administrator sets, the
-//! settings for every AI, and the badge every reply naming one carries.
+//! AI players (`docs/ai-players.md`): the accounts an administrator creates
+//! as AIs, the settings for every AI, and the badge every reply naming one
+//! carries.
 use super::{AccountStore, Action, Error, Token, statement};
 use central_api::admin::{AI_PLAYERS, AdminAiPlayer, AiPlayerSettings, AiSettings};
 use central_api::ranked::ai::{AiBadge, AiKind};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
+
+mod lifecycle;
+
+/// An `accounts` row, named `accounts` in its statement, that is no AI
+/// player: the condition the sessionless flows put on the account they
+/// name (sign-in, discovery, every reset), so that an AI's login name and
+/// credential answer as an unknown name's (`docs/ai-players.md` §2).
+pub(crate) const NO_AI: &str = "NOT EXISTS (SELECT 1 FROM central_identity.ai_players ai
+    WHERE ai.account_id = accounts.id)";
 
 fn unavailable(_: impl Sized) -> Error {
     Error::Unavailable
@@ -111,7 +121,8 @@ async fn audit(
 }
 
 /// Whether the account has ever been seated or holds a ticket that is not
-/// closed: after that its flag stays as it is (`docs/ai-players.md` section 1).
+/// closed: after that an AI stays for the account's life and is switched off
+/// instead of removed (`docs/ai-players.md` section 1).
 async fn has_played(tx: &DatabaseTransaction, account: Uuid) -> Result<bool, Error> {
     Ok(tx
         .query_one_raw(statement(
@@ -156,79 +167,8 @@ fn player(row: &QueryResult) -> Result<AdminAiPlayer, Error> {
     })
 }
 
-/// Flag an enrolled account that has never played and is no administrator.
-async fn flag(
-    tx: &DatabaseTransaction,
-    actor: Uuid,
-    account: Uuid,
-    settings: &AiPlayerSettings,
-    kind: &str,
-    daily: Option<i32>,
-) -> Result<(), Error> {
-    let administrator = tx
-        .query_one_raw(statement(
-            "SELECT 1 AS one FROM central_identity.account_roles WHERE account_id = $1",
-            vec![account.into()],
-        ))
-        .await
-        .map_err(unavailable)?
-        .is_some();
-    if administrator || has_played(tx, account).await? {
-        return Err(Error::Conflict);
-    }
-    tx.execute_raw(statement(
-        "INSERT INTO central_identity.ai_players
-           (account_id, kind, profile, label, max_games, daily_games, set_by, changed_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)",
-        vec![
-            account.into(),
-            kind.into(),
-            settings.profile.clone().into(),
-            settings.label.clone().into(),
-            i16::from(settings.max_games).into(),
-            daily.into(),
-            actor.into(),
-        ],
-    ))
-    .await
-    .map_err(unavailable)?;
-    // An AI signs in natively only: its website session and any
-    // pairing in flight end here (each sid revoked by the trigger).
-    for sql in [
-        "DELETE FROM central_identity.sessions WHERE account_id = $1 AND kind = 'browser'",
-        "DELETE FROM central_identity.pairings WHERE account_id = $1",
-    ] {
-        tx.execute_raw(statement(sql, vec![account.into()]))
-            .await
-            .map_err(unavailable)?;
-    }
-    Ok(())
-}
-
-/// Clear the flag, before the account's first match only.
-async fn clear(
-    tx: &DatabaseTransaction,
-    actor: Uuid,
-    account: Uuid,
-    flagged: bool,
-) -> Result<(), Error> {
-    if !flagged {
-        return Err(Error::Rejected);
-    }
-    if has_played(tx, account).await? {
-        return Err(Error::Conflict);
-    }
-    tx.execute_raw(statement(
-        "DELETE FROM central_identity.ai_players WHERE account_id = $1",
-        vec![account.into()],
-    ))
-    .await
-    .map_err(unavailable)?;
-    audit(tx, actor, Action::AiCleared, Some(account), None).await
-}
-
 impl AccountStore {
-    /// Every AI player, oldest flag first, for the administrator behind `browser`.
+    /// Every AI player, oldest first, for the administrator behind `browser`.
     ///
     /// # Errors
     /// `Rejected` without an administrator's live browser session; storage failure.
@@ -259,91 +199,6 @@ impl AccountStore {
             .await
             .map_err(unavailable)?;
         rows.iter().map(player).collect()
-    }
-
-    /// Flag `account` as an AI player, change one, or clear the flag
-    /// (`settings` none), for a fresh administrator. Flagging ends the
-    /// account's browser session and pairings; flagging and clearing are
-    /// refused once the account has been seated or holds a live ticket; the
-    /// kind and the profile never change. Audited.
-    ///
-    /// # Errors
-    /// `Rejected` for settings out of bounds, an unknown or unenrolled
-    /// account, an unfair profile, clearing a person; `Conflict` for an administrator, an
-    /// account that has played, a changed kind or profile; storage failure.
-    pub async fn set_ai_player(
-        &self,
-        browser: &Token,
-        account: [u8; 16],
-        settings: Option<&AiPlayerSettings>,
-    ) -> Result<(), Error> {
-        if settings.is_some_and(|s| !s.valid()) {
-            return Err(Error::Rejected);
-        }
-        let account = Uuid::from_bytes(account);
-        let (tx, actor) = self.acting_administrator(browser).await?;
-        tx.query_one_raw(statement(
-            "SELECT id FROM central_identity.accounts WHERE id = $1 AND credential IS NOT NULL
-             FOR UPDATE",
-            vec![account.into()],
-        ))
-        .await
-        .map_err(unavailable)?
-        .ok_or(Error::Rejected)?;
-        let current = tx
-            .query_one_raw(statement(
-                "SELECT kind, profile FROM central_identity.ai_players WHERE account_id = $1
-                 FOR UPDATE",
-                vec![account.into()],
-            ))
-            .await
-            .map_err(unavailable)?;
-        let Some(settings) = settings else {
-            clear(&tx, actor, account, current.is_some()).await?;
-            return tx.commit().await.map_err(unavailable);
-        };
-        let kind = settings.kind.as_str().ok_or(Error::Rejected)?;
-        let daily = settings
-            .daily_games
-            .map(i32::try_from)
-            .transpose()
-            .map_err(|_| Error::Rejected)?;
-        let action = if let Some(row) = current {
-            if get::<String>(&row, "kind")? != kind
-                || get::<String>(&row, "profile")? != settings.profile
-            {
-                return Err(Error::Conflict);
-            }
-            tx.execute_raw(statement(
-                "UPDATE central_identity.ai_players SET label = $2, max_games = $3,
-                   daily_games = $4, changed_at = pg_catalog.clock_timestamp(), changed_by = $5
-                 WHERE account_id = $1",
-                vec![
-                    account.into(),
-                    settings.label.clone().into(),
-                    i16::from(settings.max_games).into(),
-                    daily.into(),
-                    actor.into(),
-                ],
-            ))
-            .await
-            .map_err(unavailable)?;
-            Action::AiChanged
-        } else {
-            flag(&tx, actor, account, settings, kind, daily).await?;
-            Action::AiFlagged
-        };
-        tx.execute_raw(statement(
-            "UPDATE central_identity.accounts SET display_name = $2,
-               display_name_at = pg_catalog.clock_timestamp()
-             WHERE id = $1 AND display_name IS DISTINCT FROM $2",
-            vec![account.into(), settings.display_name.clone().into()],
-        ))
-        .await
-        .map_err(unavailable)?;
-        let detail = format!("{{\"max_games\":{}}}", settings.max_games);
-        audit(&tx, actor, action, Some(account), Some(detail)).await?;
-        tx.commit().await.map_err(unavailable)
     }
 
     /// Switch an AI player on or off. Switching off takes it out of every new

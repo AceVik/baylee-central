@@ -97,7 +97,9 @@ impl IdentityService {
             // AI players (`docs/ai-players.md`): the store checks the
             // administrator, the fresh sign-in where one is needed, and audits.
             request @ (AdminRequest::AiPlayers
+            | AdminRequest::CreateAiPlayer { .. }
             | AdminRequest::SetAiPlayer { .. }
+            | AdminRequest::RemoveAiPlayer { .. }
             | AdminRequest::SetAiEnabled { .. }
             | AdminRequest::AiSettings
             | AdminRequest::SetAiSettings { .. }
@@ -185,10 +187,23 @@ impl IdentityService {
                     changed_at,
                 }
             }
+            AdminRequest::CreateAiPlayer { settings, tag } => {
+                let (account, tag) = self.store.create_ai_player(cookie, &settings, tag).await?;
+                AdminAnswer::AiPlayerCreated { account, tag }
+            }
             AdminRequest::SetAiPlayer { account, settings } => {
-                self.store
-                    .set_ai_player(cookie, account, settings.as_ref())
-                    .await?;
+                self.store.set_ai_player(cookie, account, &settings).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::RemoveAiPlayer { account } => {
+                // Its runner sessions went by cascade: their push sockets end
+                // as a revoked token's do, and what was kept of where the
+                // account signed in and who followed it goes with it.
+                for digest in self.store.remove_ai_player(cookie, account).await? {
+                    self.live.ended(&digest);
+                }
+                self.changed(account, None);
+                self.live.deleted(&account);
                 return Ok(Response::Done);
             }
             AdminRequest::SetAiEnabled { account, enabled } => {

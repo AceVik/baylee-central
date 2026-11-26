@@ -72,15 +72,15 @@ enum Heard {
 }
 
 /// An open push socket.
-struct Socket {
+pub(super) struct Socket {
     stream: TcpStream,
 }
 
 /// The answer to a dial that was not upgraded: its status and head.
 #[derive(Debug)]
-struct Refused {
-    status: u16,
-    head: String,
+pub(super) struct Refused {
+    pub(super) status: u16,
+    pub(super) head: String,
 }
 
 /// Dial with `lines` (each ending in CRLF) after the request line and `Host`.
@@ -143,7 +143,7 @@ fn handshake(bearer: Option<&str>, extra: &str) -> String {
     lines
 }
 
-fn dial(http: &Http, bearer: &str) -> Result<Socket, Refused> {
+pub(super) fn dial(http: &Http, bearer: &str) -> Result<Socket, Refused> {
     dial_with(
         http.address,
         "GET /v1/ws HTTP/1.1",

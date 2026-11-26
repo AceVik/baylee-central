@@ -336,3 +336,82 @@ fn playing_waits_for_the_terms_and_seeing_or_leaving_does_not() {
         assert!(!terms::needs_acceptance(&request), "{}", name(&request));
     }
 }
+
+/// A runner session's ranked requests (`ai_gate.rs`, `docs/ai-players.md`
+/// §2): the reads, its own AI requests and what a seat needs to play its
+/// match. A person's search, a deck preview, the ranked export, a
+/// replicated seat's move, tasks, Tower and events are refused; a host's
+/// and Tower's credentials act on no session.
+#[test]
+fn an_ai_session_plays_its_seats_and_nothing_else() {
+    use ai_gate::ForAi;
+    let runner = public_ladder().into_iter().chain([
+        ranked(ranked::Request::OwnProfile { season: None }),
+        ranked(ranked::Request::Status),
+        ranked(ranked::Request::Ai {
+            request: ranked::ai::Request::Work,
+        }),
+        ranked(ranked::Request::Ai {
+            request: ranked::ai::Request::Offer { offers: vec![] },
+        }),
+        seat(replica::SeatRequest::Status { match_id: ID }),
+        seat(replica::SeatRequest::Hosts { match_id: ID }),
+        seat(replica::SeatRequest::Participants { match_id: ID }),
+        seat(replica::SeatRequest::RelayRoute { fence: FENCE }),
+        seat(replica::SeatRequest::Relay {
+            fence: FENCE,
+            call: replica::relay::Call::Admit {},
+        }),
+        seat(replica::SeatRequest::Presence {
+            fence: FENCE,
+            connected: true,
+        }),
+        seat(replica::SeatRequest::ApproveHosts {
+            fence: FENCE,
+            hosts: vec![approval()],
+        }),
+        seat(replica::SeatRequest::DeclineHost {
+            fence: FENCE,
+            host: approval(),
+        }),
+        Request::RankedToken {
+            gateway: "https://play.example".into(),
+            fence: FENCE,
+        },
+    ]);
+    for request in runner {
+        assert_eq!(ForAi::of(&request), ForAi::Allowed, "{}", name(&request));
+    }
+    let refused = own_export()
+        .into_iter()
+        .chain(task_reads())
+        .chain(task_uses())
+        .chain(
+            client_only()
+                .into_iter()
+                .filter(|request| !matches!(request, Request::RankedToken { .. })),
+        )
+        .chain(playing_ladder().into_iter().filter(|request| {
+            !matches!(
+                request,
+                Request::Ranked {
+                    request: ranked::Request::Replicate {
+                        request: replica::SeatRequest::ApproveHosts { .. }
+                    }
+                }
+            )
+        }))
+        .chain([
+            ranked(ranked::Request::PreviewDeck {
+                format: ranked::Format::Standard,
+                pool: vec![],
+            }),
+            ranked(ranked::Request::Cancel { key: ID }),
+        ]);
+    for request in refused {
+        assert_eq!(ForAi::of(&request), ForAi::Refused, "{}", name(&request));
+    }
+    for request in services() {
+        assert_eq!(ForAi::of(&request), ForAi::NoSession, "{}", name(&request));
+    }
+}

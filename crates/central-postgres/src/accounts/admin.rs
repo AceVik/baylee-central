@@ -60,15 +60,15 @@ pub enum Action {
     PictureBlocked,
     /// An administrator lifted an account's upload block.
     PictureUnblocked,
-    /// An account was flagged as an AI player (`docs/ai-players.md`).
-    AiFlagged,
-    /// An AI player's flag was cleared before its first match.
-    AiCleared,
+    /// An administrator created an AI player (`docs/ai-players.md`).
+    AiCreated,
+    /// An administrator removed an AI player before its first match.
+    AiRemoved,
     /// An AI player was switched on.
     AiEnabled,
     /// An AI player was switched off.
     AiDisabled,
-    /// An AI player's label, name, caps or fairness changed.
+    /// An AI player's label, name or caps changed.
     AiChanged,
     /// The settings for every AI changed; the detail holds the new numbers.
     AiSettingsChanged,
@@ -101,8 +101,8 @@ impl Action {
             Self::PictureRemoved => "picture.removed",
             Self::PictureBlocked => "picture.blocked",
             Self::PictureUnblocked => "picture.unblocked",
-            Self::AiFlagged => "ai.flagged",
-            Self::AiCleared => "ai.cleared",
+            Self::AiCreated => "ai.created",
+            Self::AiRemoved => "ai.removed",
             Self::AiEnabled => "ai.enabled",
             Self::AiDisabled => "ai.disabled",
             Self::AiChanged => "ai.changed",
@@ -1105,8 +1105,12 @@ pub async fn appoint_admin(db: &DatabaseConnection, name: &str) -> Result<Appoin
     let tx = db.begin().await.map_err(|_| Error::Unavailable)?;
     let account: Uuid = tx
         .query_one_raw(statement(
-            "SELECT id FROM central_identity.accounts WHERE username_key = $1 AND credential IS NOT NULL
-             FOR UPDATE",
+            &format!(
+                "SELECT id FROM central_identity.accounts WHERE username_key = $1 AND credential IS NOT NULL
+                 -- an AI never opens the administration
+                 AND {} FOR UPDATE",
+                super::ai::NO_AI
+            ),
             vec![name.into()],
         ))
         .await

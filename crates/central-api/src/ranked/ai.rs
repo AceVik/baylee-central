@@ -119,7 +119,7 @@ pub struct AiBadge {
 }
 
 /// Profiles that see hidden cards. They never play Ranked: every ranked AI
-/// is a fair remote seat (owner, 26.11.2026), so none may be flagged.
+/// is a fair remote seat (owner, 26.11.2026), so none is created with one.
 pub const UNFAIR_PROFILES: [&str; 1] = ["house:seer"];
 
 /// Whether `profile` may play Ranked: a valid key that is not unfair.
@@ -168,7 +168,13 @@ pub struct Offer {
 /// Most offers at once: one for each format.
 pub const MAX_OFFERS: usize = 3;
 
-/// The runner's operations, on a native session of a flagged account.
+/// The most matches one AI plays at once, whatever its `max_games`: the
+/// bound of [`AiPlayerSettings`](crate::admin::AiPlayerSettings) and of
+/// [`Response::Work`]'s list, which an administrator's lower `max_games`
+/// does not shorten while more are live.
+pub const MAX_GAMES: u8 = 16;
+
+/// The runner's operations, on a native session of an AI account.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
@@ -209,7 +215,8 @@ pub enum Response {
     Work {
         /// Its settings.
         settings: Settings,
-        /// Live matches (reserved or playing), at most `max_games`.
+        /// Every live match (reserved or playing), at most [`MAX_GAMES`]: more
+        /// than `max_games` while an administrator has just lowered it.
         assignments: Vec<Assignment>,
     },
 }

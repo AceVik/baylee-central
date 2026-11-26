@@ -154,17 +154,13 @@ impl AccountStore {
     ) -> Result<Issued, Error> {
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = transaction.query_one_raw(statement(
-            "SELECT wrapped_master, username_key, source = 'registered' AND tag IS NULL AS untagged
+            &format!("SELECT wrapped_master, username_key, source = 'registered' AND tag IS NULL AS untagged
              FROM central_identity.accounts WHERE id = $1
-             AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
+             AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL
+             -- an AI player signs in through its runner's token alone (docs/ai-players.md §2)
+             AND {} FOR UPDATE", super::ai::NO_AI),
             vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
-        // An AI player signs in natively only (docs/ai-players.md section 1).
-        if session.kind() == "browser"
-            && super::ai::flagged(&transaction, uuid(credential.identity.account)).await?
-        {
-            return Err(Error::Rejected);
-        }
         if row
             .try_get::<bool>("", "untagged")
             .map_err(|_| Error::Unavailable)?

@@ -24,8 +24,8 @@ pub use accounts::{
     OFFICIAL_STORED, OPEN_IN_ALL, OPEN_PER_ACCOUNT, PUSH_ATTEMPTS, PushJob, PushResult,
     REPORT_BYTES, RESET_MAIL_GAP_MINUTES, RESET_MAILS_A_DAY, RESTORE_STEP, REVOCATION_PAGE,
     RankedHostCredential, RecoveryBackupPrep, Redeemed, RefreshOutcome, ReportCaller, ReportImport,
-    ReportImportRefusal, ReportToken, RevocationPage, RunnerSession, Session, Status, Summary,
-    Swept, TAG_DRAWS, TagDraw, Told, administrators, appoint_admin, erase_account,
+    ReportImportRefusal, ReportToken, RevocationPage, RunnerSession, Session, SessionGate, Status,
+    Summary, Swept, TAG_DRAWS, TagDraw, Told, administrators, appoint_admin, erase_account,
     provision_tower_award_issuer, step_revocations, sweep,
 };
 /// Donations (`docs/operations.md` §"Donations", migration 000032).
