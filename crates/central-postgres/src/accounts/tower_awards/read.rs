@@ -6,7 +6,7 @@ use super::{
 impl AccountStore {
     /// Read only the live session owner's permanent v2 projection.
     /// # Errors
-    /// Wrong/expired session, incomplete account restoration or storage failure.
+    /// Wrong/expired session or storage failure.
     pub async fn tower_award_progress(&self, session: Session<'_>) -> Result<Progress, Error> {
         let tx = self
             .db
@@ -24,7 +24,7 @@ impl AccountStore {
 
     /// Export a bounded page of this live session owner's permanent receipt history.
     /// # Errors
-    /// Invalid cursor/session, incomplete account restoration or storage failure.
+    /// Invalid cursor/session or storage failure.
     pub async fn export_tower_awards(
         &self,
         session: Session<'_>,
@@ -77,13 +77,18 @@ impl AccountStore {
     }
 }
 
+/// The session's own account, for reads of its own rows only. A vault the
+/// game client never restored does not stop them: an account that has only
+/// used the website reads its zero totals and empty history, and its
+/// download completes (`docs/tower-echoes.md`). Deliveries still need a
+/// restored account (`write.rs`).
 async fn caller(db: &impl ConnectionTrait, session: Session<'_>) -> Result<Uuid, Error> {
     let row = db
         .query_one_raw(statement(
             "SELECT a.id FROM central_identity.accounts a JOIN central_identity.sessions s
          ON s.account_id=a.id AND s.credential_revision=a.credential_revision
          WHERE s.digest=$1 AND s.kind=$2 AND s.expires_at>pg_catalog.clock_timestamp()
-         AND a.restored AND a.credential IS NOT NULL
+         AND a.credential IS NOT NULL
          AND (s.kind='browser' OR COALESCE(s.proven_at,s.created_at)+interval '12 hours'>pg_catalog.clock_timestamp())",
             vec![session.digest().to_vec().into(), session.kind().into()],
         ))
