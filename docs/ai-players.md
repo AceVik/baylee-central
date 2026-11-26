@@ -638,7 +638,7 @@ Built on branch `claude/ai-players`, Stage 1 without the runner token:
 - **Migration 000053** and its exact grants (`ops/grants.sql`, the startup
   check). The previous binary runs over the migrated schema: its own store
   suite, at the commit with the migration and the grants alone (the store and
-  its startup check as before), is to pass; see "Evidence" below.
+  its startup check as before): see "Evidence" below.
 - **`central-api`**: `AiOpponents` on `SeatRequest::Join`, `BoardPlayers` on
   `Request::Board`, `ranked::ai` (`AiBadge`, `AiKind`, `Offer`, the runner's
   `Request` and `Response`), the badge fields of §6, the administration's
@@ -664,13 +664,17 @@ owner's decision makes that path go), the refusals of social requests,
 deletion, Tower, password, reset and recovery for AI accounts, the website's
 administration page and badges, and the operator docs.
 
-**Evidence (26.11.2026).** CI on `691b168e` passed every job: `postgres`
-(the whole store suite with the AI path on Linux), `lint`, `test`, `wasm`,
-`build-release`, `dependencies`, `secrets`, `web`. On the owner's Mac the
-store suite passed every existing check and the AI path once its deadline
-was raised locally (the five minutes there include the build). Other runs
-there stopped at timing-sensitive checks under a shared CPU (a clock read
-179 s for 180 s), not at anything of this change. The previous binary over
-the migrated schema (`350eaefe`, the migration and grants alone) ran the
-store suite green up to the same timing check; a full green run of it is
-still owed and is the next step's first check.
+**Evidence (26.11.2026).** CI run 45866255892, on the tip before the
+rebase onto `main` (`691b168e`; `85c8fc7c` after it), passed `postgres`
+(the whole store suite with the AI path, on Linux), `lint`, `test`, `wasm`,
+`build-release`, `verify`, `dependencies`, `secrets` and `web`; `site` was
+still running when the next push cancelled it. On the owner's Mac the store
+suite passed every existing check and the AI path once its deadline was
+raised locally (the five minutes there include the build); other runs there
+stopped at timing-sensitive checks under a shared CPU (a clock read 179 s
+for 180 s), not at anything of this change. The previous binary over the
+migrated schema: at the commit with the migration and the grants alone
+(`11d20bc7` after the rebase), its startup check accepted the schema and its
+store suite ran green up to that same clock check. That run used the
+migration before `fair` was removed; a full green run is still owed and is
+the next step's first check.

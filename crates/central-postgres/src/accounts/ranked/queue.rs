@@ -102,13 +102,14 @@ async fn join(
     if crate::accounts::ai::flagged(db, me).await? {
         return Err(Error::Rejected);
     }
-    let consented = super::fill_in::consent(db, me, key).await?;
-    let same_choice = consented == ai.as_str().map(|accepts| accepts == "any");
+    // A retry's choice is read after its ticket, which committed with it, so
+    // the loser of two identical Joins at once sees the winner's choice.
+    let wanted = ai.as_str().map(|accepts| accepts == "any");
     if let Some(existing) = ticket(db, me, Some(key)).await? {
         return if column::<bool>(&existing, "replicable")? == replicable
             && column::<String>(&existing, "format")? == format.as_str()
             && column::<Vec<u8>>(&existing, "commitment")? == deck
-            && same_choice
+            && super::fill_in::consent(db, me, key).await? == wanted
         {
             Ok(())
         } else {
@@ -132,10 +133,13 @@ async fn join(
                 if column::<bool>(&row, "replicable")? == replicable
                     && column::<Uuid>(&row, "request_id")? == key
                     && column::<String>(&row, "format")? == format.as_str()
-                    && column::<Vec<u8>>(&row, "commitment")? == deck
-                    && same_choice =>
+                    && column::<Vec<u8>>(&row, "commitment")? == deck =>
             {
-                Ok(())
+                if super::fill_in::consent(db, me, key).await? == wanted {
+                    Ok(())
+                } else {
+                    Err(Error::Conflict)
+                }
             }
             Some(row) if column::<String>(&row, "state")? != "closed" => Err(Error::Conflict),
             _ => Err(Error::Busy),

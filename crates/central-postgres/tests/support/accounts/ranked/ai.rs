@@ -271,13 +271,22 @@ async fn seating(
         .await
         .unwrap();
     // A search that accepts an AI shows when one may come; before 60 s none does.
+    // Two identical Joins at once, with the client's default choice, are one;
+    // the same key with another choice is not.
+    let (left, right) = tokio::join!(
+        queue(store, pia, join(92, AiOpponents::Local)),
+        queue(store, pia, join(92, AiOpponents::Local))
+    );
+    assert_eq!(left.as_ref().unwrap(), right.as_ref().unwrap());
+    assert_eq!(
+        queue(store, pia, join(92, AiOpponents::Any)).await,
+        Err(Error::Conflict)
+    );
     let QueueState::Waiting {
         ai_fill_in_at: Some(due),
         queued_at,
         ..
-    } = queue(store, pia, join(92, AiOpponents::Local))
-        .await
-        .unwrap()
+    } = left.unwrap()
     else {
         panic!("pia waits with a countdown");
     };
