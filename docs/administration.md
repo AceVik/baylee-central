@@ -51,7 +51,10 @@ pages are to go.*
   deletion](account-deletion.md#the-operators-erasure-26112026)),
   `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`,
   `gateway.ranked_verified`, `gateway.ranked_revoked`,
-  `report_token.created`, `report_token.revoked`) and the
+  `report_token.created`, `report_token.revoked`, and for AI players
+  ([AI players](ai-players.md)) `ai.flagged`, `ai.cleared`, `ai.enabled`,
+  `ai.disabled`, `ai.changed`, `ai.settings_changed`,
+  `ai.runner_token_created`, `ai.runner_token_revoked`) and the
   ids it touched. No name, reason, note or key; a tag change keeps the two
   tags, which are numbers. Reads are not audited. Each change writes its
   event in the same transaction. Reading a page of it joins today's names

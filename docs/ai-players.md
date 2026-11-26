@@ -1,6 +1,6 @@
 # AI players
 
-*Design pass only, 26 November 2026. Nothing described here is built.*
+*Design pass of 26 November 2026. The implementation pass is under way; what it built is recorded at the end.*
 
 The owner approved "AI players" on 26.11.2026: accounts that are always
 labelled as AI and otherwise play Ranked like people (Baylee's
@@ -148,9 +148,12 @@ yields, so admission, the seat claim and the relay need no change. In one
 transaction, in this order:
 
 1. the token row by digest, live (not revoked, not expired) and listing
-   `account`, `FOR SHARE`; the fetched digest is compared with the presented
-   one in constant time as well. A revocation waits for the exchange and then
-   ends its session too; an exchange that waited for a revocation finds no row;
+   `account`, `FOR NO KEY UPDATE`; the fetched digest is compared with the
+   presented one in constant time as well. A revocation waits for the
+   exchange and then ends its session too; an exchange that waited for a
+   revocation finds no row. Not `FOR SHARE`: step 5 updates the same row, and
+   two exchanges of one token that each held a share would wait for each
+   other there. So exchanges of one token run one after the other;
 2. the account row `FOR UPDATE`, which must be enrolled and an AI player.
    `enabled` is not asked: a switched-off AI still rolls over to end its
    running matches (§5);
@@ -562,6 +565,28 @@ prove it. The migration is forward-only. Like every migration it is tested for a
 000052, a failing DDL and privileges
 ([database development](database-development.md)).
 
+**The runner token's migration**, `m20261126_000054_ai_runner_tokens` (§2),
+creates three tables:
+
+- `ai_runner_tokens`: `id` (UUIDv7), `name` (1 to 64 bytes), `digest` (32
+  bytes, unique), `created_by` (an account id without a reference),
+  `created_at`, `expires_at` (at most 366 days after it), `revoked_at`,
+  `revoked_by` and `last_used_at`;
+- `ai_runner_accounts (token_id, account_id)`: a token's fixed list, gone
+  with the token or with the account's `ai_players` row;
+- `ai_runner_signins`: one row per exchange (token, account, time), indexed
+  by token and time for the pruning and by account and time for reading.
+
+Of the existing tables it changes two. `sessions` gains `runner_token`, with
+a foreign key `(runner_token, account_id)` into `ai_runner_accounts`
+(`ON DELETE CASCADE`), a CHECK that only a native session has one, and an
+index; `sessions_one_per_account` (`UNIQUE (account_id, kind)` since
+migration 000007) becomes partial, `WHERE runner_token IS NULL`.
+`audit_events` gains `ai_runner_token_id`. No grant of an existing table
+changes: `sessions` and `audit_events` have table-wide grants, which cover a
+new column. The previous binary writes sessions without the column, so they
+fall under the old rule, and its startup check passes over the new tables.
+
 **The runtime's grants**, exact, in `ops/grants.sql` and the startup check
 (`accounts/grants.rs`):
 
@@ -572,6 +597,9 @@ prove it. The migration is forward-only. Like every migration it is tested for a
 | `ai_offers` | `SELECT, INSERT, DELETE`; `UPDATE (session_digest, commitment, renewed_at, expires_at)` |
 | `ranked_ticket_ai` | `SELECT, INSERT` |
 | `ai_matches` | `SELECT, INSERT` |
+| `ai_runner_tokens` | `SELECT`; `INSERT (name, digest, created_by, created_at, expires_at)`; `UPDATE (revoked_at, revoked_by, last_used_at)`. No token is deleted. |
+| `ai_runner_accounts` | `SELECT, INSERT` |
+| `ai_runner_signins` | `SELECT, INSERT, DELETE` |
 
 **Central's crates:**
 
@@ -580,7 +608,15 @@ prove it. The migration is forward-only. Like every migration it is tested for a
   - `ranked::Request::Ai` with `Offer`, `Work` and `Carousel`;
   - `AiBadge` and `AiKind` and the fields of §6;
   - the `AdminRequest`s of §5 and their answers;
-  - `PROTOCOL_VERSION` `3`.
+  - `PROTOCOL_VERSION` `3`;
+  - `ai_runner`: the token's text form (`bat_`), its bounds
+    (`MAX_SESSIONS` 4, `MAX_ACCOUNTS` 16, `LIVE_TOKENS` 32, `TOKENS_PER_DAY`
+    32, `LISTED_TOKENS` 64, `EXCHANGES_PER_HOUR` 12), `validate_new` and
+    `AiRunnerTokenInfo`;
+  - `wire::Request::AiRunnerSession` and `wire::Response::AiRunnerSession`;
+  - `AdminRequest::AiRunnerTokens`, `CreateAiRunnerToken` and
+    `RevokeAiRunnerToken`, answered with `AdminAnswer::AiRunnerTokens` and
+    `AiRunnerTokenCreated`.
 - `central-postgres`:
   - `queue.rs`: the fill-in call and the refusal of an AI's Join;
   - `matchmaking.rs`: flagged accounts left out of `candidate`, a second
@@ -592,10 +628,17 @@ prove it. The migration is forward-only. Like every migration it is tested for a
   - `boards/standings.rs`, `boards.rs`, `profiles.rs` and `participants.rs`:
     the badge;
   - the refusals of §1;
+  - `ai_runner.rs`: the exchange, and the administration's list, making and
+    revocation of runner tokens;
   - `grants.rs`.
+- `central-identity`: the exchange's dispatch (native listener, no bearer),
+  each AI account's 12 exchanges an hour, and the administration's runner
+  token requests.
 - `central-http`: protocol `2` and `3`, the version passed to the reads, and
-  and the runner token's exchange.
-- `central-client`: the runner's calls and Join's `ai`.
+  the exchange's address budgets (60 an hour, and no store asked after 30
+  refusals in an hour).
+- `central-client`: the runner's calls, Join's `ai`, and
+  `ai_runner_session`, which answers a `Session` without a master key.
 - `central-web`: the administration's AI page, and the badge on the player
   page and the boards.
 - Docs: `ranked.md`, `administration.md`, `operations.md` (the credential
@@ -710,12 +753,12 @@ Built on branch `claude/ai-players`, Stage 1 without the runner token:
   an AI's Join, browser sign-in, lobby admission and administrator role.
 - **`central-client`**: `Session::ai` for the runner, and Join's `ai`.
 
-Not yet built: the runner token (§2: issuance, exchange, up to four
-sessions, revocation), the creation path for AI accounts (until it lands,
-an administrator flags an enrolled account that has never played; the
+Not yet built: the creation path for AI accounts (until it lands, an
+administrator flags an enrolled account that has never played; the
 owner's decision makes that path go), the refusals of social requests,
-deletion, Tower, password, reset and recovery for AI accounts, the website's
-administration page and badges, and the operator docs.
+deletion, Tower, address, password, reset and recovery for AI accounts, the
+website's administration page and badges, and the operator docs. The runner
+token is the next section.
 
 **Evidence (26.11.2026).** CI run 45866255892, on the tip before the
 rebase onto `main` (`691b168e`; `85c8fc7c` after it), passed `postgres`
@@ -731,3 +774,103 @@ migrated schema: at the commit with the migration and the grants alone
 store suite ran green up to that same clock check. That run used the
 migration before `fair` was removed; a full green run is still owed and is
 the next step's first check.
+
+### The runner token (26 November 2026)
+
+Built as §2 says, with one change to step 1 (below):
+
+- **Migration 000054** (`m20261126_000054_ai_runner_tokens`): the tables
+  and columns of §9, and their exact grants in `ops/grants.sql` and the
+  startup check. Committed alone first (`dcc1a658`), with the store and its
+  startup check as before, so that the previous binary's suite runs over the
+  new schema: see "Evidence" below.
+- **`central-api`**: `ai_runner` (`TOKEN_PREFIX` `bat_`, `token_text`,
+  `parse_token_text`, the bounds, `validate_new`, `AiRunnerTokenInfo` with
+  `AiRunnerAccount`), `wire::Request::AiRunnerSession { token, account }`
+  and `wire::Response::AiRunnerSession { token, identity, expires_at }`,
+  which `omit_ai` passes unchanged, and `AdminRequest::AiRunnerTokens`,
+  `CreateAiRunnerToken { name, accounts, days }` (a change with a fresh
+  sign-in) and `RevokeAiRunnerToken { token }` (a change without one),
+  answered with `AdminAnswer::AiRunnerTokens { tokens }` and
+  `AiRunnerTokenCreated { id, token, expires_at }`, the third answer that
+  carries a secret.
+- **`central-postgres`**: `accounts/ai_runner.rs`, the exchange in one
+  transaction in §2's order, the list, the making (every account an AI
+  player, kept by `FOR KEY SHARE` until the listing is written; the live and
+  daily caps under the administrators' locks) and the revocation (the update
+  first, then the token's sessions in a statement of their own, so that it
+  sees the session of an exchange it waited for). The audit's
+  `ai.runner_token_created` and `ai.runner_token_revoked` hold the actor and
+  `ai_runner_token_id` and nothing else.
+- **`central-identity`**: the exchange on the native listener only, refused
+  with a bearer of either kind; each AI account's 12 exchanges an hour, read
+  before the store and spent after a success; the sessions an exchange or a
+  revocation ends are told to the push sockets. Every list of requests names
+  the exchange, as one without a session, like `LoginStart`.
+- **`central-http`**: 60 exchanges an hour from an address, and after 30
+  refused ones in an hour the store is not asked again from it, counted as
+  refused report tokens are.
+- **`central-client`**: `ai_runner_session(transport, &token, account)`,
+  which sends the exchange without a bearer, ends at once a session answered
+  for another account, and answers a `Session` with no master key
+  (`Session::is_runner`); every operation that needs the key, or a restore,
+  refuses before it sends anything. `central_client::ai_runner` re-exports
+  the text form and `MAX_SESSIONS`.
+
+**The change: `FOR NO KEY UPDATE`, not `FOR SHARE`.** Step 5 updates the
+token's row. Two exchanges of one token that each held a share would wait
+for each other there, and PostgreSQL would end one as a deadlock. The row is
+taken for update in step 1 instead: a revocation still waits for the
+exchange, and exchanges of one token run one after the other. §2 says so
+now; the store suite runs two exchanges of one token at once.
+
+**Tests.** Unit tests: the text form (round trip, a paste's whitespace,
+another prefix, case, length or character refused, and no gateway's or
+report token's text read as one), a new token's bounds, the listing's
+shape, the admin and wire shapes, the store's choice of the sessions an
+exchange ends, the account's hourly budget, the address budgets, the
+client's checks of the answer and the refusals of a session without a
+master key, the migration's content. The store suite
+(`tests/support/accounts/ranked/ai_runner.rs`): an exchange mints a native
+session that renews, reads its status and runs `Work`; an unlisted AI, a
+person, an unknown account, an unknown token and an expired one are all the
+same `Rejected` and mint nothing; two exchanges at once both mint; the fifth
+live session ends the oldest and an expired one goes first, never more than
+four; two runner sessions of one AI are seated by fill-in in two matches and
+each holds its match's ranked sid at once; a revocation needs no fresh
+sign-in, ends all four sessions with their sids (each revoked at its host),
+and the token mints nothing after; making one needs a fresh sign-in; a
+person's second native sign-in still replaces the first; the runtime's
+grants on the three tables. The SDK suite
+(`central-client/tests/support/ai_runner.rs`) runs the same through both
+listeners: the website makes and revokes, the exchange is refused with
+either kind of bearer and on the website's listener, and the thirteenth
+exchange in an hour is `Busy`. Until the creation path lands, the AI
+accounts in both are made by one helper each (`ai_account`), which the
+next step rewrites.
+
+**Evidence (26.11.2026),** on the owner's Mac under a load average of 40 to
+75 from other sessions. `cargo clippy --all-targets --all-features -D
+warnings` over `central-api`, `-client`, `-identity`, `-http`, `-postgres`
+and `-migration`, and their tests: `central-api` 194, `central-client` 26
+and 5, `central-http` 173 and 7, `central-identity` 158,
+`central-migration` 7, `central-postgres` 46, all green. The store suite
+(`cargo xtask postgres --store-only`) at `7c11f3ab`: green in 829 s, with
+the suite's five-minute deadline raised locally and not committed; one run
+before it stopped at a connection timeout ahead of every account test. The
+previous binary over the migrated schema, at `dcc1a658` (the migration and
+the grants alone): its startup check accepted the schema, and its store
+suite ran green through the sessions, ranked (with the AI path), advent,
+gateway, one-session, objects, terms, registration, password,
+administration, reset, deletion, pairing and report checks before it
+stopped at a statement timeout in the chat suite; a second run stopped at
+the clock check that read 179 s for 180 s under the same load. Neither is
+in code this pass touched. The SDK suite compiles; it runs in CI.
+
+**Open before this is deployed.** A runner session counts as a fresh
+sign-in where Central asks for one by the session's age: naming an e-mail
+address, setting the key check, an export. With the address, a thief could
+ask for a reset code by mail and set a password for the AI account. §1's
+refusals of the address, reset, recovery, pairing and deletion flows for an
+AI account close this; they are the next steps, and until they land, §2's
+"what a thief gains" does not hold.

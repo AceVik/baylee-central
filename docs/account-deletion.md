@@ -101,8 +101,12 @@ OPAQUE proof of the password, as a password change does:
    and since migration 000026 its e-mail address and one that waits.
    Audit events stay: they name only ids, which no longer resolve. So do the
    report tokens a former administrator made or revoked (migration 000052):
-   they hold the account's id, and stopped working with the role. The
-   username and tag are free again for a later registration.
+   they hold the account's id, and stopped working with the role. The AI
+   runner tokens an administrator made or revoked (migration 000054) hold
+   the id as well, and keep working: they play AI accounts and open no
+   administration. An AI account leaves every token's list, and its runner
+   sessions end with it. The username and tag are free again for a later
+   registration.
 
 What Central cannot delete: what gateways keep about their players (each
 gateway's own notice), backups until they rotate out (12 months), and
