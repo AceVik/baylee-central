@@ -176,12 +176,12 @@ pub(super) async fn due(
         .await
         .map_err(unavailable)?
         .is_some();
-    Ok(available
+    available
         .then(|| {
             column::<i64>(ticket, "at")
                 .map(|at| at.saturating_add(i64::from(settings.fill_in_after)))
         })
-        .transpose()?)
+        .transpose()
 }
 
 /// Seat an AI against this still-waiting ticket when every rule allows it.
@@ -269,76 +269,92 @@ pub(super) async fn seat(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
         else {
             continue;
         };
-        let replicable: bool = column(ticket, "replicable")?;
-        let Some(host) = super::replication::routing::allocate_single(
-            db,
-            replicable,
-            i16::from(settings.host_reserve),
-        )
-        .await?
-        else {
-            return Ok(());
-        };
-        let ai_first: bool = column(
-            &db.query_one_raw(statement(
-                "SELECT pg_catalog.random() < 0.5 AS first",
-                vec![],
-            ))
-            .await
-            .map_err(unavailable)?
-            .ok_or(Error::Unavailable)?,
-            "first",
-        )?;
-        let person_deck: Vec<u8> = column(ticket, "commitment")?;
-        let ai_deck: Vec<u8> = column(&offer, "commitment")?;
-        let (a, b, deck_a, deck_b) = if ai_first {
-            (id, me, ai_deck, person_deck)
-        } else {
-            (me, id, person_deck, ai_deck)
-        };
-        let Some(matched) = db
-            .query_one_raw(statement(
-                "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,
-                   commitment_a,commitment_b,host_id,ranked_epoch,origin)
-                 SELECT s.id,$2,$3,$4,$5,$6,$7,$8,$9 FROM central_identity.ranked_seasons s WHERE s.id=$1
-                 AND s.starts_at<=pg_catalog.clock_timestamp()
-                 AND (s.ends_at IS NULL OR s.ends_at>pg_catalog.clock_timestamp()) RETURNING id",
-                vec![
-                    column::<Uuid>(ticket, "season_id")?.into(),
-                    format.clone().into(),
-                    a.into(),
-                    b.into(),
-                    deck_a.into(),
-                    deck_b.into(),
-                    host.id.into(),
-                    host.epoch.into(),
-                    host.origin.into(),
-                ],
-            ))
-            .await
-            .map_err(unavailable)?
-        else {
-            return Ok(());
-        };
-        let matched: Uuid = column(&matched, "id")?;
-        db.execute_raw(statement(
-            "INSERT INTO central_identity.ai_matches(match_id, arranged, ai_seats) VALUES ($1, 'fill_in', $2)",
-            vec![matched.into(), if ai_first { 1_i16 } else { 2_i16 }.into()],
+        return place(db, ticket, id, &offer, settings.host_reserve).await;
+    }
+    Ok(())
+}
+
+/// Make the match between the waiting person and the chosen AI: one host
+/// that keeps `reserve` slots, a drawn seat order, the record of how the
+/// match was made, and the person's ticket assigned.
+async fn place(
+    db: &DatabaseTransaction,
+    ticket: &QueryResult,
+    id: Uuid,
+    offer: &QueryResult,
+    reserve: u8,
+) -> Result<(), Error> {
+    let me: Uuid = column(ticket, "account_id")?;
+    let key: Uuid = column(ticket, "request_id")?;
+    let format: String = column(ticket, "format")?;
+    let replicable: bool = column(ticket, "replicable")?;
+    let Some(host) = super::replication::routing::allocate_single(
+        db,
+        replicable,
+        i16::from(settings.host_reserve),
+    )
+    .await?
+    else {
+        return Ok(());
+    };
+    let ai_first: bool = column(
+        &db.query_one_raw(statement(
+            "SELECT pg_catalog.random() < 0.5 AS first",
+            vec![],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Unavailable)?,
+        "first",
+    )?;
+    let person_deck: Vec<u8> = column(ticket, "commitment")?;
+    let ai_deck: Vec<u8> = column(offer, "commitment")?;
+    let (a, b, deck_a, deck_b) = if ai_first {
+        (id, me, ai_deck, person_deck)
+    } else {
+        (me, id, person_deck, ai_deck)
+    };
+    let Some(matched) = db
+        .query_one_raw(statement(
+            "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,
+               commitment_a,commitment_b,host_id,ranked_epoch,origin)
+             SELECT s.id,$2,$3,$4,$5,$6,$7,$8,$9 FROM central_identity.ranked_seasons s WHERE s.id=$1
+             AND s.starts_at<=pg_catalog.clock_timestamp()
+             AND (s.ends_at IS NULL OR s.ends_at>pg_catalog.clock_timestamp()) RETURNING id",
+            vec![
+                column::<Uuid>(ticket, "season_id")?.into(),
+                format.clone().into(),
+                a.into(),
+                b.into(),
+                deck_a.into(),
+                deck_b.into(),
+                host.id.into(),
+                host.epoch.into(),
+                host.origin.into(),
+            ],
+        ))
+        .await
+        .map_err(unavailable)?
+    else {
+        return Ok(());
+    };
+    let matched: Uuid = column(&matched, "id")?;
+    db.execute_raw(statement(
+        "INSERT INTO central_identity.ai_matches(match_id, arranged, ai_seats) VALUES ($1, 'fill_in', $2)",
+        vec![matched.into(), if ai_first { 1_i16 } else { 2_i16 }.into()],
+    ))
+    .await
+    .map_err(unavailable)?;
+    let changed = db
+        .execute_raw(statement(
+            "UPDATE central_identity.ranked_tickets SET state='assigned', match_id=$1
+             WHERE account_id=$2 AND request_id=$3 AND state='waiting'",
+            vec![matched.into(), me.into(), key.into()],
         ))
         .await
         .map_err(unavailable)?;
-        let changed = db
-            .execute_raw(statement(
-                "UPDATE central_identity.ranked_tickets SET state='assigned', match_id=$1
-                 WHERE account_id=$2 AND request_id=$3 AND state='waiting'",
-                vec![matched.into(), me.into(), key.into()],
-            ))
-            .await
-            .map_err(unavailable)?;
-        if changed.rows_affected() != 1 {
-            return Err(Error::Conflict);
-        }
-        return Ok(());
+    if changed.rows_affected() != 1 {
+        return Err(Error::Conflict);
     }
     Ok(())
 }

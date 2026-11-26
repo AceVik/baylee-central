@@ -158,17 +158,75 @@ async fn assigned_match(
     Ok((id, generation, aliases[usize::from(first != account)]))
 }
 
+/// What a grant's purpose asks of the account.
+struct Scope<'a> {
+    account: Uuid,
+    stream: &'a str,
+    registered: bool,
+    purpose: GatewayPurpose,
+    fence: Option<central_api::ranked::replica::Fence>,
+    ai_seat: bool,
+    /// The account has no legacy move under way.
+    unmoved: bool,
+}
+
+/// The ranked match, generation and seat alias a grant binds, or none for
+/// another purpose. An AI player is admitted to its ranked seats only, each
+/// named by its fence: no lobby, no gateway administration
+/// (`docs/ai-players.md` section 1).
+async fn ranked_scope(
+    tx: &DatabaseTransaction,
+    scope: Scope<'_>,
+) -> Result<(Option<Uuid>, Option<i64>, [u8; 16]), Error> {
+    if scope.ai_seat && scope.purpose != GatewayPurpose::Ranked {
+        return Err(Error::Rejected);
+    }
+    if scope.purpose != GatewayPurpose::Ranked {
+        return Ok((None, None, scope.account.into_bytes()));
+    }
+    if !scope.unmoved {
+        return Err(Error::Rejected);
+    }
+    let named = scope
+        .fence
+        .filter(|_| scope.ai_seat)
+        .map(|f| Uuid::from_bytes(f.match_id));
+    if scope.ai_seat && named.is_none() {
+        return Err(Error::Rejected);
+    }
+    let (id, generation, alias) =
+        assigned_match(tx, scope.account, scope.stream, scope.registered, named).await?;
+    if !scope.fence.is_some_and(|f| {
+        f.match_id == id.into_bytes()
+            && i64::try_from(f.generation).ok() == Some(generation.unwrap_or(0))
+    }) {
+        return Err(Error::Conflict);
+    }
+    Ok((Some(id), generation, alias))
+}
+
 /// Reuse the SID for a refresh. A new ranked game gets its own revocable session.
+/// A ranked `sid`'s match and generation, and whether an AI seat holds it.
+#[derive(Clone, Copy)]
+struct RankedSid {
+    matched: Option<Uuid>,
+    generation: Option<i64>,
+    ai_seat: bool,
+}
+
 async fn held_sid(
     tx: &DatabaseTransaction,
     digest: &[u8],
     stream: &str,
     purpose: GatewayPurpose,
-    ranked_match: Option<Uuid>,
-    generation: Option<i64>,
+    ranked: RankedSid,
     fresh: [u8; 16],
-    ai_seat: bool,
 ) -> Result<[u8; 16], Error> {
+    let RankedSid {
+        matched: ranked_match,
+        generation,
+        ai_seat,
+    } = ranked;
     let found = tx
         .query_one_raw(statement(
             "SELECT sid FROM central_identity.gateway_sids
@@ -356,34 +414,20 @@ impl AccountStore {
         let closed: bool = row
             .try_get("", "legacy_closed")
             .map_err(|_| Error::Unavailable)?;
-        // An AI player is admitted to its ranked seats only: no lobby, no
-        // gateway administration (docs/ai-players.md section 1).
         let ai_seat = super::ai::flagged(&tx, account).await?;
-        if ai_seat && purpose != GatewayPurpose::Ranked {
-            return Err(Error::Rejected);
-        }
-        let (ranked_match, ranked_generation, subject) = if purpose == GatewayPurpose::Ranked {
-            if legacy_id.is_some() && !closed {
-                return Err(Error::Rejected);
-            }
-            let named = fence
-                .filter(|_| ai_seat)
-                .map(|f| Uuid::from_bytes(f.match_id));
-            if ai_seat && named.is_none() {
-                return Err(Error::Rejected);
-            }
-            let (id, generation, alias) =
-                assigned_match(&tx, account, stream, registered, named).await?;
-            if !fence.is_some_and(|f| {
-                f.match_id == id.into_bytes()
-                    && i64::try_from(f.generation).ok() == Some(generation.unwrap_or(0))
-            }) {
-                return Err(Error::Conflict);
-            }
-            (Some(id), generation, alias)
-        } else {
-            (None, None, account.into_bytes())
-        };
+        let (ranked_match, ranked_generation, subject) = ranked_scope(
+            &tx,
+            Scope {
+                account,
+                stream,
+                registered,
+                purpose,
+                fence,
+                ai_seat,
+                unmoved: legacy_id.is_none() || closed,
+            },
+        )
+        .await?;
         if registered && ranked_match.is_none() {
             tx.query_one_raw(statement(
                 &format!(
@@ -403,17 +447,12 @@ impl AccountStore {
             // Admission needs a closed move; the official gateway has no Central admins.
             return Err(Error::Rejected);
         }
-        let sid = held_sid(
-            &tx,
-            &digest,
-            stream,
-            purpose,
-            ranked_match,
-            ranked_generation,
-            fresh,
+        let ranked = RankedSid {
+            matched: ranked_match,
+            generation: ranked_generation,
             ai_seat,
-        )
-        .await?;
+        };
+        let sid = held_sid(&tx, &digest, stream, purpose, ranked, fresh).await?;
         let (display_name, tag, terms) = if ranked_match.is_some() {
             (None, None, None)
         } else {
