@@ -9,6 +9,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod boards;
 mod credentials;
+mod export;
 mod grants;
 mod replicas;
 mod scoring;
@@ -348,6 +349,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         .unwrap();
     replicas::run(store, db, keys, [(a.account, &alice), (b.account, &bob)]).await;
     boards::run(store, db).await;
+    export::run(store, db, keys).await;
     // Removing our two fixture accounts also removes the gateway owned by the first,
     // its approval and every account-scoped ticket. Other suites share this instance.
     db.execute_raw(Statement::from_sql_and_values(

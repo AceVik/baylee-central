@@ -61,6 +61,21 @@ The active season is the unique database interval containing the current time. S
 
 The authority receives account and opponent identifiers, timestamps, match/host identifiers, deck commitments, normalized card-identity digests and copy counts, confirmed outcomes and rating history. Normalized identities are derived from public card data and can be compared by the authority. Deck names, personal notes, reorderable cosmetics, encrypted library objects and seat tokens have no field in the public ranked protocol. Ranked account rows reference the account with erasure cascades. For the administrative procedure see [gateway verification](gateway-registry.md).
 
+### Own data in the account download
+
+`Ranked::Export { table, after }` pages through the session's own ranked rows, on both listeners. It needs no acceptance of the current terms, and the account comes from the session alone. Released clients never send it. `AccountExport` is unchanged. The website's account download adds the result as `ranked`, with one `{entries, complete, after}` object per dataset. A dataset stops at 7,680 rows and then reports `complete: false` and its `after` key. Pages are checked before their key is followed (`ranked::export::validate_page`). A malformed page fails the whole download.
+
+| Dataset | Key, page | Contents |
+| --- | --- | --- |
+| `seasons` | season ID, 8 | Season metadata. For each format the stored player rating: career games, wins, losses and draws; rank (Unranked before ten games, without the boards' inactivity clamp); Elo and queue Elo; the rating model's score, placement estimate and upset allowance in thousandths of a point; first and last game. Also the season's badge peaks and its Champion place, with the deck's public ID when a deck earned it. |
+| `decks` | public deck ID, 6 | Each rated version with its format, card-identity digests and combined copies, total copies, Elo, reference Elo, initial-reference flag and first season. Per season: career counts, season games, rank, Elo, first and last game. |
+| `receipts` | match ID, 30 | Format, settlement time, won/lost/drawn, the opponent's public account ID, Elo after the game and its change, player rank before and after, and the played deck's settlement. |
+| `matches` | match ID, 30 | Season, format, this account's seat, own deck commitment and claim, host ID and origin, state, engine game ID, own result, reservation and end. Also this seat's own decisions about the named operators: host, origin, epoch, approved or declined, and the accepted terms version. |
+| `tickets` | request key, 30 | Every ticket Central still keeps: season, format, own deck commitment, queue Elo, protection choice, state, match ID, admission and end of waiting. |
+| `cosmetics` | league and division, 30 | Each unlocked division set and when it was earned. |
+
+The opponent appears only as its public account ID on a settled receipt. Settlement gives both players a rating row, and with it a public profile under that ID. This also holds for an opponent without a display name. The export never carries the opponent's commitment, deck, ratings or seat, and never its operator decisions. It also leaves out the receipt's `opponent_established` and `elo_gap` columns, which describe the opponent. Host aliases, journals, witnesses, seeds, clocks, start fingerprints, ranked tokens and credentials have no field in it. The private deck version hash is replaced by the deck's public ID. An account that never played gets empty, complete datasets.
+
 ## Replicated games
 
 Central prefers a pair of recently available verified gateways with the same rules and engine compatibility commitment, capacity for a duel and different registered owners. The primary serves the table. The standby replays the same opening and the ordered decisions independently. Both players stay signed in to their home gateway. If Central can allocate only one compatible operator at the initial assignment, the participants see single-host protection. A replicated match keeps its two-host settlement requirement throughout recovery.

@@ -42,6 +42,7 @@ async function setup(page: Page) {
         const receipts = body.after ? [receipt(state.mode === "repeated" ? 128 : 129)] : Array.from({ length: 128 }, (_, i) => receipt(i + 1));
         return json({ result: "tower_award_export", export: { progress, receipts, next: body.after ? null : id(128) } });
       }
+      case "ranked": return json({ result: "ranked", response: { export: { entries: [], after: null } } });
       case "presence": return json({ result: "presence", choice: "afk" });
       default: return route.fulfill({ status: 401, body: "rejected\n" });
     }

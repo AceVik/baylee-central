@@ -145,6 +145,10 @@ function central(seen: Body[], w: World) {
         return json({ result: "tower_award_export", export: { progress: ECHOES.progress, receipts: [], next: null } });
       case "presence":
         return json({ result: "presence", choice: "afk" });
+      case "ranked":
+        return body.request && "export" in body.request
+          ? json({ result: "ranked", response: { export: { entries: [], after: null } } })
+          : refused(401);
       case "challenges":
         if (body.request?.action === "tower") return json({ result: "challenges", response: { answer: "tower", response: { answer: "export", entries: [], after: null } } });
         return body.request?.action === "export"
@@ -178,6 +182,8 @@ const CHALLENGES = {
   attempts: { entries: [], complete: true, after: null },
 };
 const ECHOES = { progress: { duels: 0, victories: 0, clears: 0, flawless: 0 }, receipts: [], complete: true, after: null };
+const RANKED_TABLES = ["seasons", "decks", "receipts", "matches", "tickets", "cosmetics"];
+const RANKED = { ...Object.fromEntries(RANKED_TABLES.map((table) => [table, { entries: [], complete: true, after: null }])), complete: true };
 
 /** The sign-in once more, canned: the stand-in's OPAQUE answers are none. */
 const WORKER = `
@@ -689,6 +695,7 @@ test("the export's file holds the address beside the export, or the page says th
     { operation: "challenges", request: { action: "export", table: "attempts", after: null } },
     ...["runs", "actions", "participation"].map((table) => ({ operation: "challenges", request: { action: "tower", request: { action: "export", table, after: null } } })),
     { operation: "tower_award_export", after: null },
+    ...RANKED_TABLES.map((table) => ({ operation: "ranked", request: { export: { table, after: null } } })),
     { operation: "presence" },
   ]);
   expect(after.filter((body) => body.operation === "picture").map((body) => body.request?.action).sort()).toEqual(["mine", "reports"]);
@@ -698,7 +705,7 @@ test("the export's file holds the address beside the export, or the page says th
   const tower = { ...Object.fromEntries(["runs", "actions", "participation"].map((table) => [table, { entries: [], complete: true, after: null }])), complete: true };
   // the chosen status, which Central's export leaves out for the released
   // clients, is read on its own
-  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES, presence: "afk", email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
+  expect(whole).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES, ranked: RANKED, presence: "afk", email: { address: OLD, confirmed_at: THEN, pending: NEW, pending_until: THEN + 900 } });
   await expect(page.locator("#export-no-email")).toHaveCount(0);
   await sound(page);
 
@@ -710,7 +717,7 @@ test("the export's file holds the address beside the export, or the page says th
   await page.getByRole("button", { name: "Prepare the export" }).click();
   await expect(page.locator("#export-save")).toBeFocused();
   await expect(page.locator("#export-no-email")).toHaveText("The e-mail address could not be read, as it is not in this file.");
-  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES, presence: "afk" });
+  expect(await file()).toEqual({ ...EXPORT, challenges: CHALLENGES, tower, tower_echoes: ECHOES, ranked: RANKED, presence: "afk" });
   expect(await page.evaluate(() => localStorage.getItem("baylee-central-session"))).not.toBeNull();
   await sound(page);
 });

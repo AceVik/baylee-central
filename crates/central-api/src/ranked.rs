@@ -1,6 +1,7 @@
 //! Shared competitive ladder protocol. Only Central assigns matches and publishes scores.
 use serde::{Deserialize, Serialize};
 
+pub mod export;
 mod proof;
 pub mod replica;
 pub use proof::SeatProof;
@@ -474,6 +475,14 @@ pub enum Request {
         /// Exclusive continuation.
         before: Option<Id>,
     },
+    /// Page through the authenticated account's own ranked data, for its
+    /// download; on either listener, without the terms.
+    Export {
+        /// Dataset.
+        table: export::Table,
+        /// Exclusive key returned by the previous page.
+        after: Option<export::Key>,
+    },
 }
 
 /// Ranked reply. Public views never contain queue or game credentials.
@@ -525,6 +534,13 @@ pub enum Response {
         items: Vec<Season>,
         /// Exclusive continuation.
         next: Option<Id>,
+    },
+    /// At most [`export::Table::page_size`] of the account's own rows.
+    Export {
+        /// Ascending by key.
+        entries: Vec<export::Entry>,
+        /// Next exclusive key; none after the last page.
+        after: Option<export::Key>,
     },
 }
 

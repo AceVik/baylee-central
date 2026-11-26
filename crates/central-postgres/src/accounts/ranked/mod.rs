@@ -7,6 +7,7 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrai
 
 pub(super) mod boards;
 mod credentials;
+mod export;
 mod host;
 mod matchmaking;
 pub(super) mod privacy;
@@ -76,6 +77,21 @@ impl AccountStore {
             let preview = scoring::preview(&db, me, *format, pool).await?;
             db.commit().await.map_err(unavailable)?;
             return Ok(api::Response::DeckPreview { preview });
+        }
+        if let api::Request::Export { table, after } = request {
+            // One snapshot for the page and the rows its parents own.
+            let db = self
+                .db
+                .begin_with_config(
+                    Some(sea_orm::IsolationLevel::RepeatableRead),
+                    Some(sea_orm::AccessMode::ReadOnly),
+                )
+                .await
+                .map_err(unavailable)?;
+            let me = export::owner(&db, session.ok_or(Error::Rejected)?).await?;
+            let response = export::page(&db, me, table, after).await?;
+            db.commit().await.map_err(unavailable)?;
+            return Ok(response);
         }
         let db = self.db.begin().await.map_err(unavailable)?;
         let response = match request {

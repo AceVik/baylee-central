@@ -89,6 +89,25 @@ fn own_ladder() -> Vec<Request> {
     ]
 }
 
+/// The account's own ranked rows, for its download: every dataset and a
+/// continuation of each.
+fn own_export() -> Vec<Request> {
+    ranked::export::Table::ALL
+        .into_iter()
+        .flat_map(|table| {
+            let key = match table {
+                ranked::export::Table::Decks => ranked::export::Key::Deck([1; 32]),
+                ranked::export::Table::Cosmetics => ranked::export::Key::Step {
+                    league: 1,
+                    division: 3,
+                },
+                _ => ranked::export::Key::Id(ID),
+            };
+            [None, Some(key)].map(|after| ranked(ranked::Request::Export { table, after }))
+        })
+        .collect()
+}
+
 /// Ladder operations that begin or continue playing.
 fn playing_ladder() -> Vec<Request> {
     vec![
@@ -261,6 +280,21 @@ fn the_website_reads_the_public_ladder_and_takes_no_seat() {
     for request in own_ladder().into_iter().chain(playing_ladder()) {
         assert!(!browser_operation(&request), "{}", name(&request));
         assert!(!browser_only(&request), "{}", name(&request));
+    }
+}
+
+#[test]
+fn the_ranked_export_is_the_signed_in_account_s_on_both_listeners_without_the_terms() {
+    for request in own_export() {
+        assert!(browser_operation(&request), "{}", name(&request));
+        // The account comes from the session, never from the request.
+        assert!(uses_session(&request), "{}", name(&request));
+        assert!(!browser_only(&request), "{}", name(&request));
+        assert!(!terms::needs_acceptance(&request), "{}", name(&request));
+        let Request::Ranked { request } = &request else {
+            unreachable!()
+        };
+        assert!(!request.is_public());
     }
 }
 
