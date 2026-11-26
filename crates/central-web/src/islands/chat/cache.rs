@@ -170,8 +170,7 @@ fn load_store(now: f64) -> PersistedCardStore {
         let raw = leptos::web_sys::window()
             .and_then(|w| w.local_storage().ok().flatten())
             .and_then(|s| s.get_item(CARD_CACHE_KEY).ok().flatten());
-        raw.map(|text| parse_persisted_store(&text, now))
-            .unwrap_or_default()
+        raw.map_or_default(|text| parse_persisted_store(&text, now))
     }
     #[cfg(not(target_arch = "wasm32"))]
     {

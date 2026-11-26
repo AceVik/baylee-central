@@ -613,12 +613,11 @@ mod browser {
                 let online: Vec<String> = val
                     .get("online")
                     .and_then(Value::as_array)
-                    .map(|arr| {
+                    .map_or_default(|arr| {
                         arr.iter()
                             .filter_map(|v| v.as_str().map(str::to_owned))
                             .collect()
-                    })
-                    .unwrap_or_default();
+                    });
                 let states = val.get("states").and_then(Value::as_str).unwrap_or("");
                 let me = val.get("me").and_then(Value::as_str);
                 let presence = state.borrow().presence;

@@ -510,8 +510,7 @@ fn content(site: &mut Site, baylee: &Path) -> Result<()> {
             .args(["describe", "--tags", "--abbrev=0"]),
         "git describe failed in BAYLEE_SRC",
     )
-    .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
-    .unwrap_or_default();
+    .map_or_default(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned());
     let number = |key: &str| sets["totals"][key].as_u64().unwrap_or(0);
     let cards = json!({
         "stats": {

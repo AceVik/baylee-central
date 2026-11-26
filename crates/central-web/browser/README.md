@@ -18,7 +18,7 @@ checks for them. It was `web/` until 13.11.2026.
 
 ## Commands
 
-Node 22.18 or newer (CI uses 24.21.0), in this folder:
+Node 22.18 or newer (CI uses 26.13.1), in this folder:
 
 ```bash
 npm ci

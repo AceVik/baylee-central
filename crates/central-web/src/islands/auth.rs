@@ -1574,9 +1574,7 @@ fn submit_registration(state: RegisterState, worker: &str, pow: &str) {
 
 #[island]
 pub fn Register(lang: Lang, worker: String, pow: String) -> impl IntoView {
-    let initial_invite = query_param("invite")
-        .map(|raw| normalize_invite_code(&raw))
-        .unwrap_or_default();
+    let initial_invite = query_param("invite").map_or_default(|raw| normalize_invite_code(&raw));
     let state = RegisterState {
         lang,
         step: RwSignal::new(Step::Form),

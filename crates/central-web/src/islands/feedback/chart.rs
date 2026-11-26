@@ -76,14 +76,8 @@ fn columns(lang: Lang, days: &[Day]) -> impl IntoView + use<> {
             }
         })
         .collect_view();
-    let first = days
-        .first()
-        .map(|d| format::date(lang, &d.date))
-        .unwrap_or_default();
-    let last = days
-        .last()
-        .map(|d| format::date(lang, &d.date))
-        .unwrap_or_default();
+    let first = days.first().map_or_default(|d| format::date(lang, &d.date));
+    let last = days.last().map_or_default(|d| format::date(lang, &d.date));
     view! {
         <div class="fb-chart-plot">
             <span class="fb-chart-max meta" aria-hidden="true">{words::number(lang, max)}</span>

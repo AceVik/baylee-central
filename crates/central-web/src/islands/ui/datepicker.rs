@@ -501,8 +501,7 @@ pub fn date_picker(
     let init_draft = init_raw
         .as_deref()
         .and_then(time::parse_iso_date)
-        .map(|(y, m, d)| format_for_input(lang, y, m, d))
-        .unwrap_or_default();
+        .map_or_default(|(y, m, d)| format_for_input(lang, y, m, d));
 
     let state = PickerState {
         id,

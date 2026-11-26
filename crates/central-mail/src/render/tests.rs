@@ -83,10 +83,7 @@ fn expected_links(mail: &Mail, lang: Lang) -> Vec<String> {
             format!("invite/{code}")
         }
     };
-    let fragment = mail
-        .code()
-        .map(|code| format!("#code={code}"))
-        .unwrap_or_default();
+    let fragment = mail.code().map_or_default(|code| format!("#code={code}"));
     vec![
         format!("{SITE}/{}/{button}{fragment}", lang.code()),
         format!("{SITE}/{}/", lang.code()),
