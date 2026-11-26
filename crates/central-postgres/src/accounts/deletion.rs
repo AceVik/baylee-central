@@ -7,7 +7,7 @@
 //! audit stays: it names ids only.
 use super::{AccountStore, Credential, Error, Session, admin, number, statement, uuid};
 use central_api::admin::OwnedGateway;
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{ConnectionTrait, DatabaseTransaction, TransactionTrait, prelude::Uuid};
 
 /// The live session `$1` of kind `$2` of an account that can be deleted, as
 /// a condition on `accounts a` joined to `sessions s`: enrolled, its move
@@ -128,25 +128,38 @@ impl AccountStore {
         .await
         .map_err(|_| Error::Unavailable)?
         .ok_or(Error::Rejected)?;
-        tx.execute_raw(statement(
-            "UPDATE central_identity.gateways SET admin_revision = admin_revision + 1
-             WHERE owner_id <> $1 AND id IN (SELECT gateway_id FROM central_identity.gateway_admins
-                 WHERE account_id = $1)",
+        remove(&tx, account).await?;
+        tx.commit().await.map_err(|_| Error::Unavailable)
+    }
+}
+
+/// What every deletion of an account does once its row is locked in `tx`
+/// (`FOR UPDATE`), the person's own and the operator's erasure alike: the
+/// gateways of other owners that it administers move their list's revision,
+/// so their owners reread the list, and the account row goes. The foreign
+/// keys take everything else that names it.
+///
+/// # Errors
+/// Reports storage failure, and a row that was not there to delete.
+pub(super) async fn remove(tx: &DatabaseTransaction, account: Uuid) -> Result<(), Error> {
+    tx.execute_raw(statement(
+        "UPDATE central_identity.gateways SET admin_revision = admin_revision + 1
+         WHERE owner_id <> $1 AND id IN (SELECT gateway_id FROM central_identity.gateway_admins
+             WHERE account_id = $1)",
+        vec![account.into()],
+    ))
+    .await
+    .map_err(|_| Error::Unavailable)?;
+    let deleted = tx
+        .execute_raw(statement(
+            "DELETE FROM central_identity.accounts WHERE id = $1",
             vec![account.into()],
         ))
         .await
-        .map_err(|_| Error::Unavailable)?;
-        let deleted = tx
-            .execute_raw(statement(
-                "DELETE FROM central_identity.accounts WHERE id = $1 AND credential_revision = $2",
-                vec![account.into(), credential.revision.into()],
-            ))
-            .await
-            .map_err(|_| Error::Unavailable)?
-            .rows_affected();
-        if deleted != 1 {
-            return Err(Error::Unavailable);
-        }
-        tx.commit().await.map_err(|_| Error::Unavailable)
+        .map_err(|_| Error::Unavailable)?
+        .rows_affected();
+    if deleted != 1 {
+        return Err(Error::Unavailable);
     }
+    Ok(())
 }

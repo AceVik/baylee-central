@@ -17,8 +17,33 @@ mod mail;
 mod production;
 mod push;
 mod reports_import;
+mod restore;
 
-const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key";
+/// Every mode, in the order the usage names them; `--modes` prints them.
+const MODES: [&str; 18] = [
+    "--dev",
+    "--dev-accounts-stdin",
+    "--accounts-stdin",
+    "--check-accounts-stdin",
+    "--migrate-stdin",
+    "--appoint-admin-stdin",
+    "--sweep-stdin",
+    "--after-restore-stdin",
+    "--erase-accounts-stdin",
+    "--legacy-import-stdin",
+    "--legacy-deadline-stdin",
+    "--import-reports-stdin",
+    "--advent-import-stdin",
+    "--ranked-cosmetics-import-stdin",
+    "--cards-ingest-stdin",
+    "--generate-secrets",
+    "--generate-token-key",
+    "--modes",
+];
+
+/// A mode that is not one, or an argument after it: the usage, and this
+/// status, which no mode ends with.
+const USAGE_STATUS: u8 = 2;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -38,6 +63,8 @@ async fn main() -> ExitCode {
         Some("--migrate-stdin") => return production::run_migration().await,
         Some("--appoint-admin-stdin") => return production::run_appoint_admin().await,
         Some("--sweep-stdin") => return production::run_sweep().await,
+        Some("--after-restore-stdin") => return restore::run_after_restore().await,
+        Some("--erase-accounts-stdin") => return restore::run_erase().await,
         Some("--legacy-import-stdin") => return legacy::run_import().await,
         Some("--legacy-deadline-stdin") => return legacy::run_deadline().await,
         Some("--import-reports-stdin") => return reports_import::run().await,
@@ -47,9 +74,10 @@ async fn main() -> ExitCode {
         Some("--check-accounts-stdin") => return production::run_check(),
         Some("--generate-secrets") => return production::generate_secrets(),
         Some("--generate-token-key") => return production::generate_token_key(),
+        Some("--modes") => return modes(),
         _ => {
-            eprintln!("{USAGE}");
-            return ExitCode::FAILURE;
+            eprintln!("usage: central-service {}", MODES.join(" | "));
+            return ExitCode::from(USAGE_STATUS);
         }
     }
     let mut values = Vec::new();
@@ -89,4 +117,16 @@ async fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+/// The modes this build knows, as one JSON line, so that a tool can ask
+/// before it relies on one (an older build ends `--modes` with its usage).
+fn modes() -> ExitCode {
+    match serde_json::to_string(&serde_json::json!({ "modes": MODES })) {
+        Ok(line) => {
+            println!("{line}");
+            ExitCode::SUCCESS
+        }
+        Err(_) => ExitCode::FAILURE,
+    }
 }

@@ -171,6 +171,7 @@ admin-audit-admin-granted = Назначен администратором
 admin-audit-admin-removed = Роль администратора снята
 admin-audit-reset-issued = Создан код сброса
 admin-audit-tag-changed = Тег изменён
+admin-audit-account-erased = Аккаунт удалён оператором
 admin-audit-gateway-approved = Gateway одобрен
 admin-audit-gateway-disabled = Gateway отключён
 admin-audit-token-revoked = Токен Gateway отозван

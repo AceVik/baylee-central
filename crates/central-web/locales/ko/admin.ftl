@@ -171,6 +171,7 @@ admin-audit-admin-granted = 관리자로 지정됨
 admin-audit-admin-removed = 관리자 역할 제거됨
 admin-audit-reset-issued = 재설정 코드 생성됨
 admin-audit-tag-changed = 태그 변경됨
+admin-audit-account-erased = 운영자가 계정 삭제함
 admin-audit-gateway-approved = Gateway 승인됨
 admin-audit-gateway-disabled = Gateway 비활성화됨
 admin-audit-token-revoked = Gateway 토큰 폐기됨

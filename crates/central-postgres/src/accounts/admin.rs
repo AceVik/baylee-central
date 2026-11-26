@@ -28,6 +28,9 @@ pub enum Action {
     AdminRemoved,
     /// A reset code was made for an account.
     ResetIssued,
+    /// The operator erased an account by its id (`--erase-accounts-stdin`);
+    /// the event names the id, which no longer resolves.
+    AccountErased,
     /// An account was given another tag; the detail holds both.
     TagChanged,
     /// A gateway was approved, or enabled again.
@@ -67,6 +70,7 @@ impl Action {
             Self::AdminGranted => "account.admin_granted",
             Self::AdminRemoved => "account.admin_removed",
             Self::ResetIssued => "account.reset_issued",
+            Self::AccountErased => "account.erased",
             Self::TagChanged => "account.tag_changed",
             Self::GatewayApproved => "gateway.approved",
             Self::GatewayDisabled => "gateway.disabled",

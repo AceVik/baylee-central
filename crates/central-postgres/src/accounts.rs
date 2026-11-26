@@ -16,6 +16,7 @@ mod challenges;
 mod deletion;
 mod donations;
 mod email;
+mod erasure;
 mod export;
 mod gateways;
 mod grants;
@@ -53,6 +54,10 @@ pub use donations::{
 };
 pub use email::{
     EMAIL_FRESH_MINUTES, Email, MAIL_CODE_MINUTES, MAIL_CODE_TRIES, RecoveryBackupPrep, Told,
+};
+pub use erasure::{
+    ERASE_BATCH, Erased, MAX_REVOCATION, RESTORE_STEP, administrators, erase_account,
+    step_revocations,
 };
 pub use legacy::LegacyMove;
 pub use migration::Status;

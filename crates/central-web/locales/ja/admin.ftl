@@ -171,6 +171,7 @@ admin-audit-admin-granted = 管理者に設定
 admin-audit-admin-removed = 管理者ロールの解除
 admin-audit-reset-issued = リセットコードの作成
 admin-audit-tag-changed = タグの変更
+admin-audit-account-erased = 運営者によるアカウントの削除
 admin-audit-gateway-approved = Gateway の承認
 admin-audit-gateway-disabled = Gateway の無効化
 admin-audit-token-revoked = Gateway トークンの失効

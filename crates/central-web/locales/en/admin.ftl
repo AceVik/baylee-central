@@ -171,6 +171,7 @@ admin-audit-admin-granted = Made administrator
 admin-audit-admin-removed = Administrator role removed
 admin-audit-reset-issued = Reset code made
 admin-audit-tag-changed = Tag changed
+admin-audit-account-erased = Account erased by the operator
 admin-audit-gateway-approved = Gateway approved
 admin-audit-gateway-disabled = Gateway disabled
 admin-audit-token-revoked = Gateway token revoked

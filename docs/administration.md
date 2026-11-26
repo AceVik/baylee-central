@@ -47,6 +47,8 @@ pages are to go.*
   administrator's account id, or the operator), the action from a closed
   list in `central-postgres` (`Action`: `account.admin_granted`,
   `account.admin_removed`, `account.reset_issued`, `account.tag_changed`,
+  `account.erased` (the operator's, [account
+  deletion](account-deletion.md#the-operators-erasure-26112026)),
   `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`,
   `gateway.ranked_verified`, `gateway.ranked_revoked`,
   `report_token.created`, `report_token.revoked`) and the

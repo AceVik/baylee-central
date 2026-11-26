@@ -8791,3 +8791,70 @@ files, and were not read by a speaker (the owner, 25.11.2026: they do not hold t
 privacy policy's change for hosted AI agents that read reports (version 2026-11-26, reports.md
 §"Decided by the owner") is drafted in a pull request of its own and waits for the owner. These
 passes are by the implementing agent and are not an independent audit.
+
+## Erasure by id and the step after a restore, 26 November 2026
+
+`baylee-backup` restores an older backup and must then delete again the accounts deleted since
+(Art. 17), and Central's revocation streams must not stand behind what the gateways have read.
+Two operator modes of `central-service` do it ([operations](operations.md#after-a-restore),
+[account deletion](account-deletion.md#the-operators-erasure-26112026)).
+
+Design pass: the assets are the personal data an erasure must take, all of it; the gateways'
+certainty that every end of a session reaches them; and the migrator login. The callers are the
+operator's tool running as root with the migration document, a running Central beside it, the
+person's own deletion racing it, and a list that is wrong (malformed, too long, ids of the other
+service). Invariants: no new authority (no listener, token, grant or migration: the migrator owns
+every table already); the whole list is checked before anything is erased; each erasure is one
+transaction under the account row's lock, the lock the person's own deletion and the award store's
+ingestion take; an id with no account is absent and no failure; nothing printed names an id; after
+the step no gateway that had read a number, behind the backup's numbers or ahead of them, can miss
+that it must end every Central session it holds.
+
+Implementation pass: the erasure and the person's deletion share their tail
+(`deletion::remove`), so a table that names an account is taken by both or by neither. The
+document is one bounded read (128 KiB), `deny_unknown_fields`, wiped on drop; the ids are 1 to
+1,024 UUIDs in the hyphenated text form, read by a parser of its own that takes hex digits only (a
+number parser would let a sign through). The step locks every stream in origin order, as a
+session's end does, so the two cannot wait on each other in a circle, and refuses as a whole a
+stream that would pass 2^53 - 1. A usage error now ends with 2, which no mode ends with, and
+`--modes` lets a tool see whether a build has a mode at all.
+
+Adversarial pass, what it found and what changed:
+
+- A restored account whose move was still open would have left the legacy store's row of its old
+  id, its old password's hash and its source, from which it could be moved in again: the erasure
+  deletes that row. The same pass found a gap that is older and not changed here: a moved account
+  whose row's deletion at the move's close was lost, then deleted by its owner, keeps the row until
+  the legacy store's deadline, since the sweep finds a closed move's row through the account
+  ([account deletion](account-deletion.md#the-operators-erasure-26112026)).
+- A step that only raised each stream's number would hide the gap from every gateway once Central
+  had run between the restore and the step: the numbers held from then sit below the new last, so
+  a gateway's `after + 1` does not fall below the lowest held. The step drops what is held; a test
+  ends a session while the step waits on its stream's lock and finds the number covered.
+- Streams are made when a gateway first holds a session, so one the backup never saw would have
+  started at 0 behind a gateway that had read further: the step makes streams for the official
+  gateway and every registered one.
+- A failed mode and a build that does not have it both ended with 1, so a tool could not tell an
+  older Central: hence `--modes` and status 2. An older build still ends `--modes` with 1, which
+  the tool reads as "not there".
+- The self-deletion refusals (an administrator, an open move) would make a restored state that the
+  person had left block their erasure: the erasure does not refuse them, and says how many
+  administrators are left.
+
+Evidence: `central-service`'s launcher tests (every named mode dispatched and none the usage; bad
+lists, unknown fields and the usage refused before a connection, without echoing a canary; the
+exact statuses) and its unit tests of the id parser; `central-web`'s test that every audited
+action has its words; the PostgreSQL suite against the real roles of `cargo xtask postgres`,
+whose new part erases an account with a row in every table that can name it (each emptied, its
+gateways told, the other owner's list revision moved, the audit kept with the operator's event),
+erases again as absent without an event, erases a restored administrator with an open move and a
+legacy row and a bare reservation, loses neither race (a deletion committing first leaves it
+absent; an appointment committing first is erased with it), refuses under the runtime login
+without a trace, and steps the streams (refused whole at the bound with nothing changed; every
+stream one step past its last with nothing below it; a racing end covered; nothing due to be
+pushed; a session that stayed keeps its `sid`, and its end is the next number).
+
+Not done here: nothing ran on the server; `baylee-backup` does not call the modes yet (its own
+thread changes it); production's Central predates them. A gateway registered only after the backup
+is unknown to the restored Central until it registers again, and its new link starts from 0. These
+passes are by the implementing agent and are not an independent audit.

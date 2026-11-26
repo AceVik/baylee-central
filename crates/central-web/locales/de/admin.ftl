@@ -171,6 +171,7 @@ admin-audit-admin-granted = Zum Administrator gemacht
 admin-audit-admin-removed = Administratorrolle entzogen
 admin-audit-reset-issued = Reset-Code ausgestellt
 admin-audit-tag-changed = Tag geändert
+admin-audit-account-erased = Konto vom Betreiber gelöscht
 admin-audit-gateway-approved = Gateway freigegeben
 admin-audit-gateway-disabled = Gateway abgeschaltet
 admin-audit-token-revoked = Gateway-Token widerrufen
