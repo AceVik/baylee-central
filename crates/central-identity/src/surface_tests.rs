@@ -50,6 +50,7 @@ fn public_ladder() -> Vec<Request> {
             league: ranked::League::Gold,
             division: None,
             after: None,
+            players: ranked::ai::BoardPlayers::Everyone,
         }),
         ranked(ranked::Request::Profile {
             target: ranked::ProfileTarget::Account(ID),
@@ -120,6 +121,7 @@ fn playing_ladder() -> Vec<Request> {
             key: ID,
             format: ranked::Format::Standard,
             deck: [1; 32],
+            ai: ranked::ai::AiOpponents::Local,
         }),
         seat(replica::SeatRequest::ApproveHosts {
             fence: FENCE,

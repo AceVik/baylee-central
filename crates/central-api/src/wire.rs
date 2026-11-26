@@ -1327,6 +1327,85 @@ pub enum Response {
     },
 }
 
+impl Response {
+    /// Leave out every field protocol 3 added (AI players' badges and the
+    /// fill-in time), for a caller of protocol 2, whose types refuse a field
+    /// they do not know. Every answer is named, so a new one does not compile
+    /// until it is decided here.
+    pub fn omit_ai(&mut self) {
+        match self {
+            Self::Ranked { response } => response.omit_ai(),
+            Self::PublicProfile { profile } => profile.ai = None,
+            Self::AdventHost { .. }
+            | Self::Advent { .. }
+            | Self::TowerToken { .. }
+            | Self::TowerIdentity { .. }
+            | Self::TowerAward { .. }
+            | Self::TowerProgress { .. }
+            | Self::TowerAwardExport { .. }
+            | Self::RankedHost { .. }
+            | Self::Challenges { .. }
+            | Self::ChallengeHost { .. }
+            | Self::Notifications { .. }
+            | Self::Social { .. }
+            | Self::Email { .. }
+            | Self::SessionStatus { .. }
+            | Self::Renewed { .. }
+            | Self::ObjectState { .. }
+            | Self::Object { .. }
+            | Self::Objects { .. }
+            | Self::GatewayRegistered { .. }
+            | Self::GatewayDirectory { .. }
+            | Self::PublicFigures { .. }
+            | Self::PublicFunding { .. }
+            | Self::GatewayAdmins { .. }
+            | Self::Discovery { .. }
+            | Self::RegisterChallenge { .. }
+            | Self::RegisterWork { .. }
+            | Self::RegistrationClosed
+            | Self::LoginChallenge { .. }
+            | Self::Session { .. }
+            | Self::BrowserSession { .. }
+            | Self::BrowserStatus { .. }
+            | Self::Enrollment { .. }
+            | Self::EnrollmentChallenge { .. }
+            | Self::ResetChallenge { .. }
+            | Self::PasswordChallenge { .. }
+            | Self::DeleteChallenge { .. }
+            | Self::AccountExport { .. }
+            | Self::Document { .. }
+            | Self::LegacyEnrollment { .. }
+            | Self::LegacySnapshot { .. }
+            | Self::LegacySourcePage { .. }
+            | Self::LegacyStatus { .. }
+            | Self::GatewayToken { .. }
+            | Self::GatewayHeartbeat { .. }
+            | Self::GatewayRevocations { .. }
+            | Self::Done
+            | Self::Terms { .. }
+            | Self::TermsStatus { .. }
+            | Self::TermsPublished { .. }
+            | Self::Owner { .. }
+            | Self::GatewayStatus { .. }
+            | Self::Admin { .. }
+            | Self::AccountSummary { .. }
+            | Self::KeyCheck { .. }
+            | Self::Presence { .. }
+            | Self::PairStarted { .. }
+            | Self::PairClaimed { .. }
+            | Self::PairAccepted { .. }
+            | Self::Pending
+            | Self::Approved
+            | Self::PairSession { .. }
+            | Self::MyPicture { .. }
+            | Self::MyPictureReports { .. }
+            | Self::ProfileDetails { .. }
+            | Self::OwnBadges { .. }
+            | Self::FriendInviteInfo { .. } => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

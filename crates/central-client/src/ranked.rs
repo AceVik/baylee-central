@@ -55,6 +55,7 @@ fn responds(request: &api::Request, reply: &api::Response, owner: Option<api::Id
         (Q::PreviewDeck { format, .. }, A::DeckPreview { preview }) => preview.format == *format,
         (Q::Join { .. } | Q::Cancel { .. } | Q::Status, A::Queue { .. })
         | (Q::Seasons { .. }, A::Seasons { .. }) => true,
+        (Q::Ai { request }, A::Ai { response }) => ai_responds(request, response, owner),
         (
             Q::Board {
                 season,
@@ -103,7 +104,59 @@ fn responds(request: &api::Request, reply: &api::Response, owner: Option<api::Id
     }
 }
 
+/// An AI runner's answer fits its question: offers answered as offers, and
+/// work only for this account's own seats, at most `max_games` of them.
+fn ai_responds(
+    request: &api::ai::Request,
+    reply: &api::ai::Response,
+    owner: Option<api::Id>,
+) -> bool {
+    use api::ai::{Request as Q, Response as A};
+    match (request, reply) {
+        (Q::Offer { offers }, A::Offered { until }) => offers.is_empty() == until.is_none(),
+        (
+            Q::Work,
+            A::Work {
+                settings,
+                assignments,
+            },
+        ) => {
+            owner.is_some()
+                && assignments.len() <= usize::from(settings.max_games)
+                && assignments
+                    .iter()
+                    .all(|a| Some(a.account) == owner && a.seat < 2)
+        }
+        _ => false,
+    }
+}
+
 impl Session {
+    /// An AI runner's operation on this account, which an administrator
+    /// flagged as an AI player (`docs/ai-players.md` section 4): its standing
+    /// offers, or its settings and live matches.
+    ///
+    /// # Errors
+    /// Rejects foreign endpoints, an unflagged account, offers beyond one per
+    /// format or while switched off, and mismatched replies.
+    pub fn ai(
+        &self,
+        transport: &impl Transport,
+        request: api::ai::Request,
+    ) -> Result<api::ai::Response, Error> {
+        if let api::ai::Request::Offer { offers } = &request
+            && offers.len() > api::ai::MAX_OFFERS
+        {
+            return Err(Error::Rejected);
+        }
+        let api::Response::Ai { response } =
+            self.ranked(transport, api::Request::Ai { request })?
+        else {
+            return Err(Error::Rejected);
+        };
+        Ok(response)
+    }
+
     /// Preview the explicitly selected pool in this account's private deck history.
     ///
     /// # Errors
@@ -175,6 +228,7 @@ mod tests {
             tag: None,
             formats: vec![],
             awards: vec![],
+            ai: None,
         };
         assert!(responds(&request, &reply, Some(owner)));
         assert!(!responds(&request, &reply, None));

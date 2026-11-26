@@ -165,7 +165,7 @@ GRANT SELECT, INSERT, UPDATE (place) ON central_identity.ranked_badge_peaks TO c
 -- AI players (docs/ai-players.md): an administrator flags, changes, switches
 -- and clears; the kind, the profile and who flagged never change. A runner
 -- renews its offers; a person's consent and how a match was made are written once.
-GRANT SELECT, INSERT, DELETE, UPDATE (label, fair, enabled, max_games, daily_games, changed_at, changed_by)
+GRANT SELECT, INSERT, DELETE, UPDATE (label, enabled, max_games, daily_games, changed_at, changed_by)
   ON central_identity.ai_players TO central_runtime;
 GRANT SELECT, UPDATE (fill_in_after, drain_minutes, global_seats, host_reserve, carousel_games,
   carousel_daily, changed_at, changed_by) ON central_identity.ai_settings TO central_runtime;

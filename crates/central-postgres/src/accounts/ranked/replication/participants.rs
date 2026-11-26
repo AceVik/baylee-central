@@ -12,10 +12,11 @@ pub(super) async fn read(
 ) -> Result<rpc::SeatResponse, Error> {
     let rows = db
         .query_all_raw(statement(
-            "SELECT a.display_name, a.tag
+            "SELECT a.display_name, a.tag, p.kind AS ai_kind, p.label AS ai_label
          FROM central_identity.ranked_matches m
          CROSS JOIN LATERAL (VALUES (0,m.account_a),(1,m.account_b)) AS s(seat,account_id)
          JOIN central_identity.accounts a ON a.id=s.account_id
+         LEFT JOIN central_identity.ai_players p ON p.account_id=s.account_id
          WHERE m.id=$1 AND $2 IN (m.account_a,m.account_b)
            AND m.state IN ('reserved','playing')
          ORDER BY s.seat",
@@ -33,5 +34,9 @@ pub(super) async fn read(
     Ok(rpc::SeatResponse::Participants {
         match_id: *id.as_bytes(),
         seats: [handle(first)?, handle(second)?],
+        ai: [
+            crate::accounts::ai::badge_of(first)?,
+            crate::accounts::ai::badge_of(second)?,
+        ],
     })
 }

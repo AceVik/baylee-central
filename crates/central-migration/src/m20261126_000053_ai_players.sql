@@ -11,7 +11,6 @@ CREATE TABLE central_identity.ai_players (
     profile text NOT NULL CHECK (profile ~ '^[a-z]{1,12}:[a-z0-9_.-]{1,48}$'),
     label text NOT NULL CHECK (pg_catalog.char_length(label) BETWEEN 1 AND 40
         AND label !~ '[[:cntrl:]]' AND label = pg_catalog.btrim(label)),
-    fair boolean NOT NULL DEFAULT true,
     enabled boolean NOT NULL DEFAULT false,
     max_games smallint NOT NULL DEFAULT 1 CHECK (max_games BETWEEN 1 AND 16),
     daily_games integer CHECK (daily_games BETWEEN 0 AND 10000),
@@ -20,7 +19,10 @@ CREATE TABLE central_identity.ai_players (
     changed_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
     changed_by uuid,
     -- a language model plays only within a daily cap
-    CONSTRAINT ai_model_capped CHECK (kind <> 'model' OR daily_games IS NOT NULL)
+    CONSTRAINT ai_model_capped CHECK (kind <> 'model' OR daily_games IS NOT NULL),
+    -- every ranked AI is a fair remote seat; the level that sees hidden
+    -- cards never plays Ranked (owner, 26.11.2026)
+    CONSTRAINT ai_fair_only CHECK (profile <> 'house:seer')
 );
 REVOKE ALL ON central_identity.ai_players FROM PUBLIC;
 

@@ -117,7 +117,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('ranked_publications', ARRAY['SELECT','INSERT'], ARRAY['published_on','finalized']),
              ('ranked_champions', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place']),
-             ('ai_players', ARRAY['SELECT','INSERT','DELETE'], ARRAY['label','fair','enabled','max_games','daily_games','changed_at','changed_by']),
+             ('ai_players', ARRAY['SELECT','INSERT','DELETE'], ARRAY['label','enabled','max_games','daily_games','changed_at','changed_by']),
              ('ai_settings', ARRAY['SELECT'], ARRAY['fill_in_after','drain_minutes','global_seats','host_reserve','carousel_games','carousel_daily','changed_at','changed_by']),
              ('ai_offers', ARRAY['SELECT','INSERT','DELETE'], ARRAY['session_digest','commitment','renewed_at','expires_at']),
              ('ranked_ticket_ai', ARRAY['SELECT','INSERT'], NULL),

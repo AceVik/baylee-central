@@ -344,6 +344,9 @@ pub enum SeatRequest {
         format: Format,
         #[doc = "Frozen playable deck commitment."]
         deck: Digest,
+        #[doc = "AI opponents this search accepts; absent is none."]
+        #[serde(default, skip_serializing_if = "super::ai::AiOpponents::is_none")]
+        ai: super::ai::AiOpponents,
     },
     /// Read current authority and certified position for this player's match.
     Status {
@@ -394,6 +397,9 @@ pub enum SeatResponse {
         match_id: Id,
         #[doc = "Only explicitly published handles."]
         seats: [Option<String>; 2],
+        #[doc = "AI badges in seat order; protocol 3 only."]
+        #[serde(default, skip_serializing_if = "no_badges")]
+        ai: [Option<super::ai::AiBadge>; 2],
     },
     /// The caller's existing ranked queue shape.
     Queue {
@@ -412,6 +418,25 @@ pub enum SeatResponse {
         #[doc = "Assigned journal position."]
         position: u64,
     },
+}
+
+fn no_badges(badges: &[Option<super::ai::AiBadge>; 2]) -> bool {
+    badges.iter().all(Option::is_none)
+}
+
+impl SeatResponse {
+    /// Leave out what a client of protocol 2 cannot read.
+    pub fn omit_ai(&mut self) {
+        match self {
+            Self::Participants { ai, .. } => *ai = [None, None],
+            Self::Queue { state } => state.omit_ai(),
+            Self::Relayed { .. }
+            | Self::RelayRoute { .. }
+            | Self::Hosts { .. }
+            | Self::Status { .. }
+            | Self::Receipt { .. } => {}
+        }
+    }
 }
 
 /// Independently verified host operations.

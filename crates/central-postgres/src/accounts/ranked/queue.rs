@@ -95,11 +95,20 @@ async fn join(
     format: api::Format,
     deck: &[u8; 32],
     replicable: bool,
+    ai: api::ai::AiOpponents,
 ) -> Result<(), Error> {
+    // An AI plays only where Central seats it, never in people's queue
+    // (docs/ai-players.md section 4), so no person who refused one meets it.
+    if crate::accounts::ai::flagged(db, me).await? {
+        return Err(Error::Rejected);
+    }
+    let consented = super::fill_in::consent(db, me, key).await?;
+    let same_choice = consented == ai.as_str().map(|accepts| accepts == "any");
     if let Some(existing) = ticket(db, me, Some(key)).await? {
         return if column::<bool>(&existing, "replicable")? == replicable
             && column::<String>(&existing, "format")? == format.as_str()
             && column::<Vec<u8>>(&existing, "commitment")? == deck
+            && same_choice
         {
             Ok(())
         } else {
@@ -123,13 +132,23 @@ async fn join(
                 if column::<bool>(&row, "replicable")? == replicable
                     && column::<Uuid>(&row, "request_id")? == key
                     && column::<String>(&row, "format")? == format.as_str()
-                    && column::<Vec<u8>>(&row, "commitment")? == deck =>
+                    && column::<Vec<u8>>(&row, "commitment")? == deck
+                    && same_choice =>
             {
                 Ok(())
             }
             Some(row) if column::<String>(&row, "state")? != "closed" => Err(Error::Conflict),
             _ => Err(Error::Busy),
         };
+    }
+    if let Some(accepts) = ai.as_str() {
+        db.execute_raw(statement(
+            "INSERT INTO central_identity.ranked_ticket_ai(account_id, request_id, accepts)
+             VALUES ($1, $2, $3)",
+            vec![me.into(), key.into(), accepts.into()],
+        ))
+        .await
+        .map_err(unavailable)?;
     }
     Ok(())
 }
@@ -139,6 +158,7 @@ pub(super) async fn handle(
     me: Uuid,
     request: &api::Request,
     replicable: bool,
+    ai: api::ai::AiOpponents,
 ) -> Result<api::QueueState, Error> {
     let key = match request {
         api::Request::Join { key, .. } | api::Request::Cancel { key } => {
@@ -167,7 +187,7 @@ pub(super) async fn handle(
     retire(db, me).await?;
     match request {
         api::Request::Join { key, format, deck } => {
-            join(db, me, uuid(*key), *format, deck, replicable).await?;
+            join(db, me, uuid(*key), *format, deck, replicable, ai).await?;
         }
         api::Request::Cancel { key } => {
             db.execute_raw(statement(
@@ -201,6 +221,11 @@ pub(super) async fn handle(
     }
     matchmaking::pair(db, &row).await?;
     let row = ticket(db, me, key).await?.ok_or(Error::Unavailable)?;
+    if column::<String>(&row, "state")? == "waiting" {
+        super::fill_in::seat(db, &row).await?;
+        let row = ticket(db, me, key).await?.ok_or(Error::Unavailable)?;
+        return render(db, me, &row).await;
+    }
     render(db, me, &row).await
 }
 
@@ -218,16 +243,22 @@ async fn render(
             key,
             format,
             queued_at: column(row, "at")?,
+            ai_fill_in_at: super::fill_in::due(db, row).await?,
         });
     }
     let Some(id) = column::<Option<Uuid>>(row, "match_id")? else {
         return Ok(api::QueueState::Idle);
     };
     let row=db.query_one_raw(statement(
-        "SELECT state,origin,host_id,account_a,commitment_a,commitment_b,game_id,outcome FROM central_identity.ranked_matches WHERE id=$1",
+        "SELECT state,origin,host_id,account_a,account_b,commitment_a,commitment_b,game_id,outcome FROM central_identity.ranked_matches WHERE id=$1",
         vec![id.into()]
     )).await.map_err(unavailable)?.ok_or(Error::Unavailable)?;
     let seat = u8::from(column::<Uuid>(&row, "account_a")? != me);
+    let opponent_ai = crate::accounts::ai::badge(
+        db,
+        column(&row, if seat == 0 { "account_b" } else { "account_a" })?,
+    )
+    .await?;
     match column::<String>(&row, "state")?.as_str() {
         "reserved" | "playing" => Ok(api::QueueState::Assigned {
             key,
@@ -249,6 +280,7 @@ async fn render(
                 .try_into()
                 .map_err(unavailable)?,
                 game: column::<Option<Uuid>>(&row, "game_id")?.map(Uuid::into_bytes),
+                opponent_ai,
             },
         }),
         "finished" => {
@@ -264,6 +296,7 @@ async fn render(
                 before,
                 after,
                 deck,
+                opponent_ai,
             })
         }
         "void" => Ok(api::QueueState::Idle),

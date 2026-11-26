@@ -125,6 +125,47 @@ pub(in crate::accounts::ranked) async fn allocate(
     }
 }
 
+/// One host for a match with an AI seat, never a pair (`docs/ai-players.md`
+/// section 3): it must keep `reserve` slots free for people after this match,
+/// and offer a compatibility digest when the person's ticket is `replicable`.
+/// The reserve is checked again once the host is locked.
+pub(in crate::accounts::ranked) async fn allocate_single(
+    db: &DatabaseTransaction,
+    compatible: bool,
+    reserve: i16,
+) -> Result<Option<Host>, Error> {
+    let room = format!(
+        "{OFFERS} AND h.capacity - load.games > $1{}",
+        if compatible {
+            " AND h.compatibility IS NOT NULL"
+        } else {
+            ""
+        }
+    );
+    let Some(first) = db
+        .query_one_raw(statement(
+            &format!("{room} ORDER BY {ORDER} LIMIT 1"),
+            vec![reserve.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+    else {
+        return Ok(None);
+    };
+    let id: Uuid = column(&first, "host_id")?;
+    if lock(db, id, None).await?.len() != 1 {
+        return Ok(None);
+    }
+    db.query_one_raw(statement(
+        &format!("{room} AND h.host_id = $2"),
+        vec![reserve.into(), id.into()],
+    ))
+    .await
+    .map_err(unavailable)?
+    .map(|row| host(&row))
+    .transpose()
+}
+
 pub(super) async fn replacement(
     db: &DatabaseTransaction,
     primary: Uuid,

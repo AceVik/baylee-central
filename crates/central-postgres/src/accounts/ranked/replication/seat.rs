@@ -148,8 +148,14 @@ pub(in crate::accounts::ranked) async fn seat(
     match request {
         rpc::SeatRequest::RelayRoute { fence } => super::relay::route(db, me, fence).await,
         rpc::SeatRequest::Relay { .. } => Err(Error::Rejected),
-        rpc::SeatRequest::Join { key, format, deck } => Ok(rpc::SeatResponse::Queue {
-            state: queue::handle(db, me, &api::Request::Join { key, format, deck }, true).await?,
+        rpc::SeatRequest::Join {
+            key,
+            format,
+            deck,
+            ai,
+        } => Ok(rpc::SeatResponse::Queue {
+            state: queue::handle(db, me, &api::Request::Join { key, format, deck }, true, ai)
+                .await?,
         }),
         rpc::SeatRequest::Status { match_id } => Ok(rpc::SeatResponse::Status {
             status: seat_status(db, host::valid(match_id)?, me).await?,

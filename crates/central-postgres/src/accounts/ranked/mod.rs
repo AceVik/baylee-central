@@ -5,9 +5,11 @@ use super::{AccountStore, Error, Session, statement, uuid};
 use central_api::ranked as api;
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrait, prelude::Uuid};
 
+mod ai;
 pub(super) mod boards;
 mod credentials;
 mod export;
+mod fill_in;
 mod host;
 mod matchmaking;
 pub(super) mod privacy;
@@ -100,7 +102,17 @@ impl AccountStore {
             api::Request::Join { .. } | api::Request::Status | api::Request::Cancel { .. } => {
                 let me = actor(&db, session.ok_or(Error::Rejected)?, true).await?;
                 api::Response::Queue {
-                    state: queue::handle(&db, me, &request, false).await?,
+                    state: queue::handle(&db, me, &request, false, api::ai::AiOpponents::None)
+                        .await?,
+                }
+            }
+            api::Request::Ai { request } => {
+                let Some(session @ Session::Native(_)) = session else {
+                    return Err(Error::Rejected);
+                };
+                let me = actor(&db, session, true).await?;
+                api::Response::Ai {
+                    response: ai::handle(&db, me, session.digest(), &request).await?,
                 }
             }
             api::Request::Replicate { request } => {

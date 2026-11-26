@@ -7,6 +7,7 @@ use central_api::{
 use central_postgres::RankedHostCredential::{Official, Registered};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
+mod ai;
 mod boards;
 mod credentials;
 mod export;
@@ -40,6 +41,7 @@ fn join(key: u8, deck: u8) -> Request {
             key: id(key),
             format: Format::Standard,
             deck: [deck; 32],
+            ai: api::ai::AiOpponents::None,
         },
     }
 }
@@ -362,6 +364,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     ))
     .await
     .unwrap();
+    ai::run(store, db, keys).await;
 }
 
 async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {

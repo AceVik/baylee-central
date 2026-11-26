@@ -373,12 +373,14 @@ impl AccountStore {
             })
             .transpose()?;
         let badges = collect_badges(&tx, account).await?;
+        let ai = super::ai::badge(&tx, account).await?;
         tx.commit().await.map_err(|_| Error::Unavailable)?;
         Ok(PublicProfile {
             display_name,
             tag,
             picture,
             badges,
+            ai,
         })
     }
 }

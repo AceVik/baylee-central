@@ -276,6 +276,128 @@ pub enum AdminRequest {
         /// The action.
         request: crate::picture::PictureAdmin,
     },
+    /// Every AI player (`docs/ai-players.md`), at most [`AI_PLAYERS`].
+    AiPlayers,
+    /// Flag an account as an AI player, change one, or clear the flag
+    /// (`None`). Flagging and clearing are refused after the account's first
+    /// ranked match; the kind and the profile never change. Audited.
+    SetAiPlayer {
+        /// Account ID.
+        account: [u8; 16],
+        /// The settings, or none to clear.
+        settings: Option<AiPlayerSettings>,
+    },
+    /// Switch an AI player on or off. Off takes it out of every new match
+    /// at once; its running matches end normally. Audited.
+    SetAiEnabled {
+        /// Account ID.
+        account: [u8; 16],
+        /// On or off.
+        enabled: bool,
+    },
+    /// The settings for every AI.
+    AiSettings,
+    /// Change the settings for every AI. Audited.
+    SetAiSettings {
+        /// The new settings.
+        settings: AiSettings,
+    },
+    /// Stop every AI at once (`global_seats` to 0). Audited.
+    StopAllAi,
+}
+
+/// Most AI players a listing shows.
+pub const AI_PLAYERS: usize = 64;
+
+/// What an administrator sets for an AI player.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AiPlayerSettings {
+    /// The kind of mind; fixed once flagged.
+    pub kind: crate::ranked::ai::AiKind,
+    /// The runner's key for the mind, such as `house:expert`; fixed once flagged.
+    pub profile: String,
+    /// The public label.
+    pub label: String,
+    /// Matches at once, 1 to 16.
+    pub max_games: u8,
+    /// Games a UTC day; required for a language model.
+    pub daily_games: Option<u32>,
+    /// The display name, which begins with an AI prefix ([`crate::profile::ai_name`]).
+    pub display_name: String,
+}
+
+/// The settings for every AI.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AiSettings {
+    /// Seconds a search waits before an AI may fill it, 30 to 600.
+    pub fill_in_after: u16,
+    /// Minutes an AI's session must have left before its cap, 30 to 600.
+    pub drain_minutes: u16,
+    /// AI seats at once, 0 to 16; a match between two AIs takes two.
+    pub global_seats: u8,
+    /// Slots each host keeps for people, 0 to 64.
+    pub host_reserve: u8,
+    /// Matches between two AIs at once, 0 to 8.
+    pub carousel_games: u8,
+    /// Matches between two AIs a UTC day, 0 to 10,000.
+    pub carousel_daily: u32,
+}
+
+impl AiSettings {
+    /// Whether every value is in its range.
+    #[must_use]
+    pub const fn valid(&self) -> bool {
+        self.fill_in_after >= 30
+            && self.fill_in_after <= 600
+            && self.drain_minutes >= 30
+            && self.drain_minutes <= 600
+            && self.global_seats <= 16
+            && self.host_reserve <= 64
+            && self.carousel_games <= 8
+            && self.carousel_daily <= 10_000
+    }
+}
+
+impl AiPlayerSettings {
+    /// Whether the settings are in their bounds. The kind must be a known one.
+    #[must_use]
+    pub fn valid(&self) -> bool {
+        self.kind.as_str().is_some()
+            && crate::ranked::ai::ranked_profile(&self.profile)
+            && crate::ranked::ai::valid_label(&self.label)
+            && (1..=16).contains(&self.max_games)
+            && self.daily_games.is_none_or(|games| games <= 10_000)
+            && (self.kind != crate::ranked::ai::AiKind::Model || self.daily_games.is_some())
+            && crate::profile::ai_name(&self.display_name)
+    }
+}
+
+/// One AI player as the administration lists it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminAiPlayer {
+    /// Account ID.
+    pub account: [u8; 16],
+    /// Display name.
+    pub display_name: Option<String>,
+    /// Tag.
+    pub tag: Option<u32>,
+    /// Its settings.
+    pub settings: AiPlayerSettings,
+    /// Switched on.
+    pub enabled: bool,
+    /// Matches reserved or playing now.
+    pub live_matches: u32,
+    /// Matches made for it today (UTC).
+    pub games_today: u32,
+    /// Formats it offers a deck for now.
+    pub offers: Vec<crate::ranked::Format>,
+    /// Its last password sign-in, Unix seconds.
+    pub last_sign_in: Option<i64>,
+    /// When it was flagged, Unix seconds.
+    pub set_at: i64,
 }
 
 impl AdminRequest {
@@ -306,7 +428,11 @@ impl AdminRequest {
             | Self::SetReportsSeen { .. }
             | Self::CreateReportToken { .. }
             | Self::RevokeReportToken { .. }
-            | Self::SetRegistration { .. } => true,
+            | Self::SetRegistration { .. }
+            | Self::SetAiPlayer { .. }
+            | Self::SetAiEnabled { .. }
+            | Self::SetAiSettings { .. }
+            | Self::StopAllAi => true,
             Self::Picture { request } => request.changes(),
             Self::Accounts { .. }
             | Self::Account { .. }
@@ -324,7 +450,9 @@ impl AdminRequest {
             | Self::ReportAdmins
             | Self::ReportViews
             | Self::ReportTokens
-            | Self::Registration => false,
+            | Self::Registration
+            | Self::AiPlayers
+            | Self::AiSettings => false,
         }
     }
 
@@ -341,7 +469,11 @@ impl AdminRequest {
             | Self::RemoveReportNote { .. }
             | Self::SaveReportView { .. }
             | Self::DeleteReportView { .. }
-            | Self::SetReportsSeen { .. } => false,
+            | Self::SetReportsSeen { .. }
+            // Stopping an AI only takes exposure away (docs/ai-players.md,
+            // open question 6): it needs no fresh password, and is audited.
+            | Self::SetAiEnabled { enabled: false, .. }
+            | Self::StopAllAi => false,
             Self::ReportsBulk { bulk, .. } => matches!(bulk, BulkAction::Purge),
             _ => self.changes(),
         }
@@ -733,6 +865,18 @@ pub enum AdminAnswer {
         notice: Option<crate::picture::PictureNotice>,
         /// An upload block in force, if any.
         block: Option<crate::picture::UploadBlock>,
+    },
+    /// Every AI player, oldest flag first.
+    AiPlayers {
+        /// At most [`AI_PLAYERS`].
+        players: Vec<AdminAiPlayer>,
+    },
+    /// The settings for every AI.
+    AiSettings {
+        /// The settings.
+        settings: AiSettings,
+        /// When they last changed, Unix seconds.
+        changed_at: Option<i64>,
     },
 }
 

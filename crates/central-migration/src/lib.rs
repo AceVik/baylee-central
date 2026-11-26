@@ -314,6 +314,7 @@ mod tests {
         for said in [
             "CREATE TABLE central_identity.ai_players",
             "CONSTRAINT ai_model_capped CHECK (kind <> 'model' OR daily_games IS NOT NULL)",
+            "CONSTRAINT ai_fair_only CHECK (profile <> 'house:seer')",
             "max_games smallint NOT NULL DEFAULT 1 CHECK (max_games BETWEEN 1 AND 16)",
             "global_seats smallint NOT NULL DEFAULT 8 CHECK (global_seats BETWEEN 0 AND 16)",
             "INSERT INTO central_identity.ai_settings (singleton) VALUES (true)",

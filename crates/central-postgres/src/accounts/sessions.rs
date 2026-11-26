@@ -159,6 +159,12 @@ impl AccountStore {
              AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
             vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
+        // An AI player signs in natively only (docs/ai-players.md section 1).
+        if session.kind() == "browser"
+            && super::ai::flagged(&transaction, uuid(credential.identity.account)).await?
+        {
+            return Err(Error::Rejected);
+        }
         if row
             .try_get::<bool>("", "untagged")
             .map_err(|_| Error::Unavailable)?

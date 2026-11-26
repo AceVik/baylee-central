@@ -1,6 +1,7 @@
 //! Shared competitive ladder protocol. Only Central assigns matches and publishes scores.
 use serde::{Deserialize, Serialize};
 
+pub mod ai;
 pub mod export;
 mod proof;
 pub mod replica;
@@ -206,6 +207,9 @@ pub struct Row {
     pub tag: Option<u32>,
     /// Standing within the selected ladder.
     pub standing: Standing,
+    /// The AI badge of an AI account; protocol 3 only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai: Option<ai::AiBadge>,
 }
 
 /// Exclusive keyset cursor, stable for ties in score.
@@ -330,6 +334,9 @@ pub struct Assignment {
     pub deck: [u8; 32],
     /// Bound game session after both seats have claimed.
     pub game: Option<Id>,
+    /// The opponent's AI badge when the opponent is an AI; protocol 3 only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opponent_ai: Option<ai::AiBadge>,
 }
 
 /// Private reservation available only to the selected game host.
@@ -378,6 +385,10 @@ pub enum QueueState {
         format: Format,
         /// Admission time, Unix seconds.
         queued_at: i64,
+        /// The earliest Unix second an AI opponent may be seated, while the
+        /// search accepts one and one is available; protocol 3 only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ai_fill_in_at: Option<i64>,
     },
     /// A verified host reserved both seats.
     Assigned {
@@ -408,6 +419,9 @@ pub enum QueueState {
         before: Rank,
         /// Rank after this result.
         after: Rank,
+        /// The opponent's AI badge when the opponent was an AI; protocol 3 only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        opponent_ai: Option<ai::AiBadge>,
     },
 }
 
@@ -462,6 +476,9 @@ pub enum Request {
         division: Option<u8>,
         /// Exclusive continuation.
         after: Option<Cursor>,
+        /// People, AI players or both; protocol 3, absent is everyone.
+        #[serde(default, skip_serializing_if = "ai::BoardPlayers::is_everyone")]
+        players: ai::BoardPlayers,
     },
     /// Read a public competitive profile.
     Profile {
@@ -482,6 +499,11 @@ pub enum Request {
         table: export::Table,
         /// Exclusive key returned by the previous page.
         after: Option<export::Key>,
+    },
+    /// An AI runner's operations, on the native session of a flagged account.
+    Ai {
+        /// The operation.
+        request: ai::Request,
     },
 }
 
@@ -527,6 +549,9 @@ pub enum Response {
         formats: Vec<Standing>,
         /// Earned distinctions.
         awards: Vec<Award>,
+        /// The AI badge of an AI account; protocol 3 only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ai: Option<ai::AiBadge>,
     },
     /// Page of season metadata.
     Seasons {
@@ -542,6 +567,41 @@ pub enum Response {
         /// Next exclusive key; none after the last page.
         after: Option<export::Key>,
     },
+    /// An AI runner's answer.
+    Ai {
+        /// The answer.
+        response: ai::Response,
+    },
+}
+
+impl QueueState {
+    /// Leave out what a client of protocol 2 cannot read.
+    pub fn omit_ai(&mut self) {
+        match self {
+            Self::Idle => {}
+            Self::Waiting { ai_fill_in_at, .. } => *ai_fill_in_at = None,
+            Self::Assigned { assignment, .. } => assignment.opponent_ai = None,
+            Self::Finished { opponent_ai, .. } => *opponent_ai = None,
+        }
+    }
+}
+
+impl Response {
+    /// Leave out what a client of protocol 2 cannot read. Every answer is
+    /// named, so a new one does not compile until it is decided here.
+    pub fn omit_ai(&mut self) {
+        match self {
+            Self::Replica { response } => response.omit_ai(),
+            Self::Queue { state } => state.omit_ai(),
+            Self::Board { entries, .. } => entries.iter_mut().for_each(|row| row.ai = None),
+            Self::Profile { ai, .. } => *ai = None,
+            // Nothing protocol 3 added is in these answers.
+            Self::DeckPreview { .. }
+            | Self::Seasons { .. }
+            | Self::Export { .. }
+            | Self::Ai { .. } => {}
+        }
+    }
 }
 
 /// Restricted operations for a verified host credential.

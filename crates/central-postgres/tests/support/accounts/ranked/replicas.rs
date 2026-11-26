@@ -113,6 +113,7 @@ impl Table<'_> {
                         key: super::id(key + offset),
                         format: api::Format::Highlander,
                         deck: [offset + 1; 32],
+                        ai: api::ai::AiOpponents::None,
                     },
                 )
                 .await

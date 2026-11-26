@@ -12,6 +12,7 @@ use sea_orm::{
 
 mod admin;
 mod advent;
+pub(crate) mod ai;
 mod challenges;
 mod deletion;
 mod donations;

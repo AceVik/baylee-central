@@ -110,6 +110,36 @@ impl IdentityService {
             }
             // Profile pictures (`docs/profile-pictures.md`, `pictures.rs`).
             AdminRequest::Picture { request } => return self.picture_admin(request, cookie).await,
+            // AI players (`docs/ai-players.md`): the store checks the
+            // administrator, the fresh sign-in where one is needed, and audits.
+            AdminRequest::AiPlayers => AdminAnswer::AiPlayers {
+                players: self.store.admin_ai_players(cookie).await?,
+            },
+            AdminRequest::SetAiPlayer { account, settings } => {
+                self.store
+                    .set_ai_player(cookie, account, settings.as_ref())
+                    .await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetAiEnabled { account, enabled } => {
+                self.store.set_ai_enabled(cookie, account, enabled).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::AiSettings => {
+                let (settings, changed_at) = self.store.admin_ai_settings(cookie).await?;
+                AdminAnswer::AiSettings {
+                    settings,
+                    changed_at,
+                }
+            }
+            AdminRequest::SetAiSettings { settings } => {
+                self.store.set_ai_settings(cookie, Some(&settings)).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::StopAllAi => {
+                self.store.set_ai_settings(cookie, None).await?;
+                return Ok(Response::Done);
+            }
             AdminRequest::SetTag { account, tag } => {
                 return self.set_tag(cookie, account, tag).await;
             }
