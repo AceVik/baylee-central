@@ -105,7 +105,9 @@ fn responds(request: &api::Request, reply: &api::Response, owner: Option<api::Id
 }
 
 /// An AI runner's answer fits its question: offers answered as offers, and
-/// work only for this account's own seats, at most `max_games` of them.
+/// work only for this account's own seats, at most [`api::ai::MAX_GAMES`] of
+/// them: an administrator who lowers `max_games` below the live matches
+/// does not shorten the list, whose matches still have to be played.
 fn ai_responds(
     request: &api::ai::Request,
     reply: &api::ai::Response,
@@ -114,15 +116,9 @@ fn ai_responds(
     use api::ai::{Request as Q, Response as A};
     match (request, reply) {
         (Q::Offer { offers }, A::Offered { until }) => offers.is_empty() == until.is_none(),
-        (
-            Q::Work,
-            A::Work {
-                settings,
-                assignments,
-            },
-        ) => {
+        (Q::Work, A::Work { assignments, .. }) => {
             owner.is_some()
-                && assignments.len() <= usize::from(settings.max_games)
+                && assignments.len() <= usize::from(api::ai::MAX_GAMES)
                 && assignments
                     .iter()
                     .all(|a| Some(a.account) == owner && a.seat < 2)
@@ -133,11 +129,11 @@ fn ai_responds(
 
 impl Session {
     /// An AI runner's operation on this account, which an administrator
-    /// flagged as an AI player (`docs/ai-players.md` section 4): its standing
+    /// created as an AI player (`docs/ai-players.md` section 4): its standing
     /// offers, or its settings and live matches.
     ///
     /// # Errors
-    /// Rejects foreign endpoints, an unflagged account, offers beyond one per
+    /// Rejects foreign endpoints, a person's account, offers beyond one per
     /// format or while switched off, and mismatched replies.
     pub fn ai(
         &self,
@@ -240,5 +236,50 @@ mod tests {
             &reply,
             Some(owner)
         ));
+    }
+
+    /// An administrator lowered `max_games` to one under two live matches:
+    /// the runner still reads both, and never more than the hard maximum.
+    #[test]
+    fn work_lists_every_live_match_up_to_the_hard_maximum() {
+        let owner = [1; 16];
+        let seat = |n: u8| api::Assignment {
+            match_id: [n; 16],
+            host_id: [2; 16],
+            origin: "https://play.example".into(),
+            format: api::Format::Standard,
+            account: owner,
+            seat: n % 2,
+            deck: [3; 32],
+            game: None,
+            opponent_ai: None,
+        };
+        let work = |count: u8| api::Response::Ai {
+            response: api::ai::Response::Work {
+                settings: api::ai::Settings {
+                    badge: api::ai::AiBadge {
+                        kind: api::ai::AiKind::House,
+                        label: "Haus-KI".into(),
+                    },
+                    profile: "house:expert".into(),
+                    enabled: true,
+                    max_games: 1,
+                },
+                assignments: (0..count).map(seat).collect(),
+            },
+        };
+        let request = api::Request::Ai {
+            request: api::ai::Request::Work,
+        };
+        for count in [0, 2, api::ai::MAX_GAMES] {
+            assert!(responds(&request, &work(count), Some(owner)), "{count}");
+        }
+        assert!(!responds(
+            &request,
+            &work(api::ai::MAX_GAMES + 1),
+            Some(owner)
+        ));
+        assert!(!responds(&request, &work(2), Some([9; 16])));
+        assert!(!responds(&request, &work(2), None));
     }
 }

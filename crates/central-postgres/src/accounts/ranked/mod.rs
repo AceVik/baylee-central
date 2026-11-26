@@ -110,7 +110,9 @@ impl AccountStore {
                 let Some(session @ Session::Native(_)) = session else {
                     return Err(Error::Rejected);
                 };
-                let me = actor(&db, session, true).await?;
+                // An offer writes under the session; the work only reads.
+                let offer = matches!(request, api::ai::Request::Offer { .. });
+                let me = actor(&db, session, offer).await?;
                 api::Response::Ai {
                     response: ai::handle(&db, me, session.digest(), &request).await?,
                 }

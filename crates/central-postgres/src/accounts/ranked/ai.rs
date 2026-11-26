@@ -2,7 +2,7 @@
 //! (`docs/ai-players.md` section 4): standing offers and its live matches.
 use super::{Error, api, column, statement, unavailable};
 use crate::accounts::ai::{LIVE, badge};
-use api::ai::{AiBadge, AiKind, MAX_OFFERS, Offer, Request, Response, Settings};
+use api::ai::{AiBadge, AiKind, MAX_GAMES, MAX_OFFERS, Offer, Request, Response, Settings};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
 /// How long an offer stands without renewal.
@@ -14,10 +14,17 @@ pub(super) async fn handle(
     session: [u8; 32],
     request: &Request,
 ) -> Result<Response, Error> {
+    // Only an offer locks the AI's row, so that a switch-off waits for it
+    // and then withdraws what it stored; the work reads it as it stands.
     let row = db
         .query_one_raw(statement(
-            "SELECT kind, label, profile, enabled, max_games
-             FROM central_identity.ai_players WHERE account_id = $1 FOR SHARE",
+            if matches!(request, Request::Offer { .. }) {
+                "SELECT kind, label, profile, enabled, max_games
+                 FROM central_identity.ai_players WHERE account_id = $1 FOR SHARE"
+            } else {
+                "SELECT kind, label, profile, enabled, max_games
+                 FROM central_identity.ai_players WHERE account_id = $1"
+            },
             vec![me.into()],
         ))
         .await
@@ -77,7 +84,9 @@ async fn offer(
     Ok(Response::Offered { until })
 }
 
-/// The account's settings and its live matches, as a person's assignments.
+/// The account's settings and every live match, as a person's assignments:
+/// all of them, up to [`MAX_GAMES`], even while an administrator has just
+/// lowered `max_games` below how many are live.
 async fn work(db: &DatabaseTransaction, me: Uuid, row: &QueryResult) -> Result<Response, Error> {
     let max: i16 = column(row, "max_games")?;
     let kind: String = column(row, "kind")?;
@@ -97,9 +106,9 @@ async fn work(db: &DatabaseTransaction, me: Uuid, row: &QueryResult) -> Result<R
                    m.commitment_a, m.commitment_b, m.game_id
                  FROM central_identity.ranked_matches m
                  WHERE $1 IN (m.account_a, m.account_b) AND {LIVE}
-                 ORDER BY m.created_at, m.id LIMIT 16"
+                 ORDER BY m.created_at, m.id LIMIT $2"
             ),
-            vec![me.into()],
+            vec![me.into(), i64::from(MAX_GAMES).into()],
         ))
         .await
         .map_err(unavailable)?;
