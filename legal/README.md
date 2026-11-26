@@ -172,7 +172,8 @@ usually within minutes, by the daily sweep at the latest), § 9 that the
 rating is computed by a program without a legal or similarly significant
 effect. The terms' § 1 names ranked play with its public boards. The boards
 list every player with a rated game in the season by display name and tag,
-whatever the public-profile switch says (`central-postgres`
+whatever the public-profile switch says, as the owner decided on 26.11.2026
+("Ja, öffentlich lassen") (`central-postgres`
 `ranked::boards::standings`); the texts and the profile switch's hint say
 so, and the basis is the contract (Art. 6(1)(b)), since a public ladder is
 what ranked play offers. The website's privacy page has a part of its own
