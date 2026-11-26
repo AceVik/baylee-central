@@ -209,11 +209,12 @@ you sign in there or entrust a ranked game to them is your decision.
   browser that showed it may keep a copy for up to an hour.
 - Challenges, expeditions and leaderboard entries stay until you delete your
   account; you withdraw a leaderboard entry at any time by switching it off.
-- Ranked games with their results, your entries in the queue, Elo ratings,
-  deck fingerprints, badges and unlocked sleeves and playmats stay until you
-  delete your account. A game's opening, decks, decisions and decision time
-  are deleted after it ends, usually within minutes, at the latest the
-  following day.
+- Ranked games with their results, Elo ratings, deck fingerprints, badges and
+  unlocked sleeves and playmats stay until you delete your account. Entries
+  in the queue are deleted daily once they are a day old, counted from the
+  end of their wait or of their game. A game's opening, decks, decisions and
+  decision time are deleted after it ends, usually within minutes, at the
+  latest the following day.
 - What pairing a device leaves is deleted once the pairing is redeemed, at
   the latest after five minutes.
 - Bug and crash reports are deleted once the bug is dealt with, after three

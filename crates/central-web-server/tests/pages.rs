@@ -1209,6 +1209,8 @@ async fn the_privacy_notice_has_a_part_for_ranked_play() {
     assert!(english.contains("even with their player profile turned off"));
     assert!(english.contains("so the gateway does not see your IP address"));
     assert!(english.contains("usually within minutes, at the latest the following day"));
+    assert!(english.contains("Central deletes queue entries daily once they are a day old"));
+    assert!(english.contains("These data are part of your account's data export."));
     let (_, _, german) = get(&app, "/de/privacy", &[]).await;
     assert!(german.contains("auch wenn sein Spielerprofil abgeschaltet ist"));
     assert!(german.contains("das Gateway sieht dabei nicht deine IP-Adresse"));

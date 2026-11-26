@@ -188,3 +188,11 @@ for it (`privacy-ranked`, eleven languages, the nine beside German and
 English machine translations). Ranked data is not yet in the account's data
 export. Written by the implementing agent; the owner's review is still to
 come.
+
+**Ranked retention and export (`updated: 2026-11-26`, same version).** Once
+closed queue tickets are pruned (the daily sweep deletes them a day after
+their wait or their game ended, AceVik/baylee-central#101), § 7 says so
+instead of "until the account is deleted", and the website's ranked part
+names the daily deletion and that ranked data is in the account's data
+export (#101 adds it). Published together with #101; written by the
+implementing agent, the owner's review is still to come.
