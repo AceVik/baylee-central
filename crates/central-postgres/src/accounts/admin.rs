@@ -1121,11 +1121,15 @@ pub struct Swept {
     /// and what went back first added to their platform's sums
     /// (`docs/operations.md` §"Donations").
     pub donations: u64,
+    /// Closed ranked queue tickets older than [`super::CLOSED_TICKET_HOURS`]
+    /// (`docs/ranked.md` §"Publication and storage").
+    pub tickets: u64,
 }
 
 /// Delete audit events older than [`AUDIT_YEARS`], the digests of expired
-/// reset codes, expired pairings, the reports whose retention is over and
-/// the e-mail addresses whose code is over, and fold the donations older
+/// reset codes, expired pairings, the reports whose retention is over,
+/// the e-mail addresses whose code is over and the closed ranked queue
+/// tickets older than [`super::CLOSED_TICKET_HOURS`], and fold the donations older
 /// than [`super::DONATION_DAYS`] into their sums, under the operator's
 /// (migrator's) login, as the privacy notice allows; all or none.
 ///
@@ -1167,6 +1171,7 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
     let addresses = super::email::sweep(&tx).await?;
     let picture_reports = super::pictures::sweep(&tx).await?;
     let donations = super::donations::sweep(&tx).await?;
+    let tickets = super::ranked::sweep_tickets(&tx).await?;
     tx.commit().await.map_err(|_| Error::Unavailable)?;
     Ok(Swept {
         events,
@@ -1176,5 +1181,6 @@ pub async fn sweep(db: &DatabaseConnection) -> Result<Swept, Error> {
         addresses,
         picture_reports,
         donations,
+        tickets,
     })
 }

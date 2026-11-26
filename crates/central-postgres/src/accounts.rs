@@ -33,7 +33,7 @@ mod password;
 mod pictures;
 mod profiles;
 mod ranked;
-pub use ranked::RankedHostCredential;
+pub use ranked::{CLOSED_TICKET_HOURS, RankedHostCredential};
 mod recovery;
 mod registration;
 mod report_tokens;

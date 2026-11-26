@@ -659,7 +659,8 @@ repository and of shell history: the file holds it.
 
 The audit keeps administrators' and the operator's actions for three years;
 a daily timer deletes older events, the digests of expired reset codes,
-expired pairings and e-mail addresses whose confirmation code has ended,
+expired pairings, e-mail addresses whose confirmation code has ended and
+ranked queue tickets closed for a day ([ranked](ranked.md#publication-and-storage)),
 with the migration document
 (`/etc/baylee-central/migrate.json`), under the same `systemd-run` user as
 the deploy hook's migration:

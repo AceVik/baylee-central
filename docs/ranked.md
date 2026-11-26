@@ -61,6 +61,15 @@ The active season is the unique database interval containing the current time. S
 
 The authority receives account and opponent identifiers, timestamps, match/host identifiers, deck commitments, normalized card-identity digests and copy counts, confirmed outcomes and rating history. Normalized identities are derived from public card data and can be compared by the authority. Deck names, personal notes, reorderable cosmetics, encrypted library objects and seat tokens have no field in the public ranked protocol. Ranked account rows reference the account with erasure cascades. For the administrative procedure see [gateway verification](gateway-registry.md).
 
+Central keeps ratings, deck versions, receipts, matches, badges, cosmetic unlocks and Champion places until the account is deleted. Closed queue tickets are the exception. The operator's daily sweep (`--sweep-stdin`) deletes a closed ticket 24 hours after its waiting ended, or 24 hours after its match ended when it had one (`CLOSED_TICKET_HOURS`). It deletes in batches of 4,096 until a batch comes back short. Open tickets are never pruned. A day is far longer than anything that still reads a closed ticket:
+
+- the admission cap of 24 tickets an hour, which counts the last hour's tickets;
+- the sparse-queue check, which counts the last two minutes';
+- a `Join` retried after a lost answer, which finds its own key instead of queueing again;
+- `Status`, which shows the last match's result from its ticket.
+
+Nothing settles from a closed ticket. A match's consent check reads its tickets only while they are assigned. Rematch spacing reads `ranked_matches`. After pruning, `Status` answers `Idle`; the receipt stays. A retry of that key after the day is a new request: it is still the single ticket the account may hold, and the client shows it as waiting and can cancel it.
+
 ### Own data in the account download
 
 `Ranked::Export { table, after }` pages through the session's own ranked rows, on both listeners. It needs no acceptance of the current terms, and the account comes from the session alone. Released clients never send it. `AccountExport` is unchanged. The website's account download adds the result as `ranked`, with one `{entries, complete, after}` object per dataset. A dataset stops at 7,680 rows and then reports `complete: false` and its `after` key. Pages are checked before their key is followed (`ranked::export::validate_page`). A malformed page fails the whole download.

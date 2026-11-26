@@ -12,6 +12,8 @@ mod host;
 mod matchmaking;
 pub(super) mod privacy;
 mod queue;
+pub use queue::CLOSED_TICKET_HOURS;
+pub(super) use queue::sweep as sweep_tickets;
 pub(super) mod replication;
 mod rules;
 mod scoring;

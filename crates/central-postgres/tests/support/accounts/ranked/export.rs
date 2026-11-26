@@ -1,6 +1,6 @@
 //! The account download's ranked rows: the session's own and nothing of the
 //! opponent's but its public account ID, paged and checked as the website
-//! checks them.
+//! checks them; then the daily sweep's pruning of closed queue tickets.
 use super::{AccountStore, DatabaseConnection, Error, ServerKeys, Token, enroll, login};
 use central_api::ranked::{
     self as api, DeckResult, Format, League, PoolEntry, Rank, Record, Request, Response, Track,
@@ -521,6 +521,15 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     }
     refusals(store, &mine_token).await;
 
+    sweep(db).await;
+    let tickets = download(store, (&mine_token).into()).await;
+    assert_eq!(
+        rows(&tickets, Table::Tickets).len(),
+        3 + usize::from(EXTRA_TICKETS)
+    );
+    // The receipt outlives its ticket.
+    assert_eq!(rows(&tickets, Table::Receipts).len(), 1);
+
     run_sql(
         db,
         "DELETE FROM central_identity.accounts WHERE id IN ($1,$2,$3)",
@@ -566,4 +575,33 @@ async fn refusals(store: &AccountStore, mine_token: &Token) {
             Error::Rejected
         );
     }
+}
+
+/// The operator's daily sweep deletes closed tickets a day after their
+/// waiting or their match ended; open tickets and younger ones stay.
+async fn sweep(db: &DatabaseConnection) {
+    let left = |key: u8| {
+        one(
+            db,
+            "SELECT count(*)::bigint AS n FROM central_identity.ranked_tickets WHERE request_id=$1",
+            vec![Uuid::from_bytes(v7(key)).into()],
+        )
+    };
+    let swept = central_postgres::sweep(db).await.unwrap();
+    assert_eq!(swept.tickets, 3, "mine two and theirs one");
+    for (key, kept) in [
+        (1, true),
+        (2, false),
+        (3, false),
+        (4, true),
+        (5, true),
+        (6, false),
+    ] {
+        assert_eq!(
+            left(key).await.try_get::<i64>("", "n").unwrap(),
+            i64::from(kept),
+            "ticket {key}"
+        );
+    }
+    assert_eq!(central_postgres::sweep(db).await.unwrap().tickets, 0);
 }

@@ -310,7 +310,7 @@ pub enum TicketState {
     Waiting,
     /// Seated in a match.
     Assigned,
-    /// Done.
+    /// Done; Central deletes it a day later.
     Closed,
 }
 

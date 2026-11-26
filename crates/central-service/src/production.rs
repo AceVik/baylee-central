@@ -519,8 +519,9 @@ async fn appoint() -> Result<Appointed, ()> {
 
 /// Delete audit events older than three years, expired reset codes, expired
 /// pairings, reports past their retention, e-mail addresses whose code is
-/// over and what the legacy store no longer needs under the migrator
-/// login, which a daily timer runs (`docs/operations.md`).
+/// over, closed ranked queue tickets older than a day and what the legacy
+/// store no longer needs under the migrator login, which a daily timer runs
+/// (`docs/operations.md`).
 pub(super) async fn run_sweep() -> ExitCode {
     if let Ok((swept, legacy)) = swept().await {
         eprintln!(
@@ -535,6 +536,11 @@ pub(super) async fn run_sweep() -> ExitCode {
             "central: {} donations older than {} days added to their sums and deleted",
             swept.donations,
             central_postgres::donations::DONATION_DAYS
+        );
+        eprintln!(
+            "central: {} closed ranked queue tickets older than {} hours deleted",
+            swept.tickets,
+            central_postgres::CLOSED_TICKET_HOURS
         );
         eprintln!(
             "central: {} moved and {} expired legacy accounts and {} unused legacy reservations deleted",
