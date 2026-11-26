@@ -32,6 +32,7 @@ The native client enters Standard, Baylee Highlander or two-player Commander thr
 | --- | --- |
 | Read seasons, division boards or public profiles | Anyone, including a signed-out native client. The native and browser listeners apply the directory rate budget. |
 | Read your own placement progress | An authenticated session. The account comes from that session. Before the first confirmed game, each format shows Unranked at 0/10, including for accounts without a public handle. |
+| Export your own ranked rows for the account download | An authenticated native or browser session, the only non-public ranked operation the browser listener serves. The account comes from that session; no acceptance of the current terms is needed ([below](#own-data-in-the-account-download)). |
 | Join, inspect or cancel a ticket | The live native Central session for its own account. A join requires acceptance of the current terms. |
 | Enable a ranked host | A Central administrator using the existing fresh web administration session. Directory approval and ranked verification are separate stored decisions. |
 | Advertise capacity or claim, start, finish or void a game | A verified host using its registered host credential, a named token explicitly granted the ranked scope, or the official bridge. Operations on a match also require its assigned host and current verification epoch. |
@@ -60,6 +61,30 @@ Read a board by season, format, player/deck track, league and optional division.
 The active season is the unique database interval containing the current time. Season boundaries are exclusive at the end. History, first-match age and career totals survive a rollover. The public profile distinguishes season results, career totals and awarded badges. A closed season has its own board.
 
 The authority receives account and opponent identifiers, timestamps, match/host identifiers, deck commitments, normalized card-identity digests and copy counts, confirmed outcomes and rating history. Normalized identities are derived from public card data and can be compared by the authority. Deck names, personal notes, reorderable cosmetics, encrypted library objects and seat tokens have no field in the public ranked protocol. Ranked account rows reference the account with erasure cascades. For the administrative procedure see [gateway verification](gateway-registry.md).
+
+Central keeps ratings, deck versions, receipts, matches, badges, cosmetic unlocks and Champion places until the account is deleted. Queue tickets are the exception. The operator's daily sweep (`--sweep-stdin`) deletes a ticket 24 hours after its waiting ended, or 24 hours after its match ended when it had one (`CLOSED_TICKET_HOURS`). It deletes in batches of 4,096 until a batch comes back short. Central marks a ticket closed only on its account's next queue request. The sweep therefore goes by those times, not by the mark: a ticket still marked waiting a day after its four minutes, or still marked assigned a day after its match ended, is deleted too. A ticket whose match is still reserved or playing stays. A day is far longer than anything that still reads an ended ticket:
+
+- the admission cap of 24 tickets an hour, which counts the last hour's tickets;
+- the sparse-queue check, which counts the last two minutes';
+- a `Join` retried after a lost answer, which finds its own key instead of queueing again;
+- `Status`, which shows the last match's result from its ticket.
+
+Nothing settles from an ended ticket. A match's consent check reads its tickets only while the match is playing, and those are kept. A seat token needs a reserved or playing match. Rematch spacing reads `ranked_matches`. After pruning, `Status` answers `Idle`; the receipt stays. A retry of that key after the day is a new request: it is still the single ticket the account may hold, and the client shows it as waiting and can cancel it.
+
+### Own data in the account download
+
+`Ranked::Export { table, after }` pages through the session's own ranked rows, on both listeners. It needs no acceptance of the current terms, and the account comes from the session alone. Released clients never send it. `AccountExport` is unchanged. The website's account download adds the result as `ranked`, with one `{entries, complete, after}` object per dataset. A dataset stops at 7,680 rows and then reports `complete: false` and its `after` key. Pages are checked before their key is followed (`ranked::export::validate_page`). A malformed page fails the whole download.
+
+| Dataset | Key, page | Contents |
+| --- | --- | --- |
+| `seasons` | season ID, 8 | Season metadata. For each format the stored player rating: career games, wins, losses and draws; rank (Unranked before ten games, without the boards' inactivity clamp); Elo and queue Elo; the rating model's score, placement estimate and upset allowance in thousandths of a point; first and last game. Also the season's badge peaks and its Champion place, with the deck's public ID when a deck earned it. |
+| `decks` | public deck ID, 6 | Each rated version with its format, card-identity digests and combined copies, total copies, Elo, reference Elo, initial-reference flag and first season. Per season: career counts, season games, rank, Elo, first and last game. |
+| `receipts` | match ID, 30 | Format, settlement time, won/lost/drawn, the opponent's public account ID, Elo after the game and its change, player rank before and after, and the played deck's settlement. |
+| `matches` | match ID, 30 | Season, format, this account's seat, own deck commitment and claim, host ID and origin, state, engine game ID, own result, reservation and end. Also this seat's own decisions about the named operators: host, origin, epoch, approved or declined, and the accepted terms version. |
+| `tickets` | request key, 30 | Every ticket Central still keeps: season, format, own deck commitment, queue Elo, protection choice, state, match ID, admission and end of waiting. |
+| `cosmetics` | league and division, 30 | Each unlocked division set and when it was earned. |
+
+The opponent appears only as its public account ID on a settled receipt. Settlement gives both players a rating row, and with it a public profile under that ID. This also holds for an opponent without a display name. The export never carries the opponent's commitment, deck, ratings or seat, and never its operator decisions. It also leaves out the receipt's `opponent_established` and `elo_gap` columns, which describe the opponent. Host aliases, journals, witnesses, seeds, clocks, start fingerprints, ranked tokens and credentials have no field in it. The private deck version hash is replaced by the deck's public ID. An account that never played gets empty, complete datasets.
 
 ## Replicated games
 

@@ -138,7 +138,11 @@ pub struct BrowserReply {
 #[must_use]
 pub fn browser_operation(request: &Request) -> bool {
     match request {
-        Request::Ranked { request } => request.is_public(),
+        // The public ladder, and the account's own ranked data for its
+        // download; seats and queue tickets stay the game client's.
+        Request::Ranked { request } => {
+            request.is_public() || matches!(request, central_api::ranked::Request::Export { .. })
+        }
         Request::TowerProgress {}
         | Request::TowerAwardExport { .. }
         | Request::Challenges { .. }
@@ -274,6 +278,9 @@ fn uses_session(request: &Request) -> bool {
         request,
         Request::TowerProgress {}
             | Request::TowerAwardExport { .. }
+            | Request::Ranked {
+                request: central_api::ranked::Request::Export { .. }
+            }
             | Request::Challenges { .. }
             | Request::Notifications { .. }
             | Request::Social { .. }
