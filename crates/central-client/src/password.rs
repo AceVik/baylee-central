@@ -30,6 +30,8 @@ impl Session {
         new: String,
     ) -> Result<(), Error> {
         self.same_endpoint(transport)?;
+        // A runner's session has no key to wrap again: refused before anything is sent.
+        self.master()?;
         if new.chars().count() < MIN_PASSWORD_CHARS {
             return Err(Error::Rejected);
         }
@@ -58,7 +60,7 @@ impl Session {
             .map_err(|_| Error::Rejected)?;
         let wrapped = enrolled
             .wrapping_key
-            .wrap(&self.master)
+            .wrap(self.master()?)
             .map_err(|_| Error::Unavailable)?;
         let sent = wrapped.as_bytes().to_vec();
         let answer = transport.exchange(

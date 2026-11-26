@@ -195,17 +195,18 @@ impl Session {
     /// check already set is left as it is.
     ///
     /// # Errors
-    /// Transport failures and a refusal other than "already set".
+    /// Transport failures, a runner's session, which has no master key, and a
+    /// refusal other than "already set".
     pub fn ensure_key_check(&self, transport: &impl Transport) -> Result<(), Error> {
         self.same_endpoint(transport)?;
+        let master = self.master()?;
         if matches!(
             transport.exchange(&Request::KeyCheckStatus, Some((&self.token).into()))?,
             Response::KeyCheck { set: true }
         ) {
             return Ok(());
         }
-        let check = self
-            .master
+        let check = master
             .key_check(context(&self.endpoint, self.identity)?)
             .map_err(|_| Error::Rejected)?;
         match transport.exchange(

@@ -186,7 +186,8 @@ impl Session {
     /// afterwards. `username` is the account's, as for [`reset`].
     ///
     /// # Errors
-    /// As [`reset`], and `Rejected` when `username` is another account's.
+    /// As [`reset`], and `Rejected` when `username` is another account's or for a
+    /// runner's session, which holds no master key to keep.
     pub fn redeem_reset(
         &self,
         transport: &impl Transport,
@@ -195,6 +196,7 @@ impl Session {
         new: String,
     ) -> Result<(), Error> {
         self.same_endpoint(transport)?;
+        let master = self.master()?;
         let registered = start(
             transport,
             &self.endpoint,
@@ -204,6 +206,6 @@ impl Session {
             self.identity.epoch,
             new,
         )?;
-        finish(transport, registered, &self.master, ResetVault::Keep)
+        finish(transport, registered, master, ResetVault::Keep)
     }
 }
