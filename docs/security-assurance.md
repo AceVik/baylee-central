@@ -23,6 +23,11 @@ recorded in [the challenge assurance record](challenge-assurance.md). Its three
 engineering improvement rounds precede the independent PR review; neither is
 a production release approval.
 
+AI players, accounts an administrator marks as an AI that fill a lonely
+person's ranked search, have had the design pass only:
+[AI players](ai-players.md) (26.11.2026). Nothing of it is built; the
+implementation and adversarial passes are recorded there with the code.
+
 1. Design: identify assets, caller trust, failure modes and invariants before code.
 2. Implementation: inspect boundaries, default-deny behavior, resource limits,
    secrets/diagnostics, ownership, cancellation and dependencies.
