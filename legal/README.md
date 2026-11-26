@@ -1,6 +1,6 @@
 # Legal texts of Baylee Central
 
-**Status: the terms and the privacy policy are at version 2026-11-25** (the
+**Status: the terms and the privacy policy are at version 2026-11-25** (ranked play added on 26.11.2026, below; the
 minimum age, below; before it 2026-11-19). The
 privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
 reviewed by the owner on 19.11.2026; the status his later decision of the same
@@ -152,3 +152,31 @@ age box, the date picker's warning and the profile's birth-date check
 privacy page says the same in its eleven languages, the nine beside German
 and English machine translations. Written by the implementing agent; the
 owner's review of these sentences is still to come.
+
+**Ranked play, in the same version 2026-11-25 (`updated: 2026-11-26`).**
+Ranked play ([global ranked play](../docs/ranked.md)) was in neither text,
+and the privacy policy said Central sees nothing of what is played on a
+gateway (Baylee #316). Version 2026-11-25 is merged but not yet published,
+so, as on 12.11.2026, the version stays and only `updated` changes (an
+acceptance holds the text's digest too, so anyone who accepted the earlier
+text is asked again in any case): the
+privacy policy's § 3 gains an item for ranked play (the queue, the pairing,
+the decks as card fingerprints and counts, ratings, placement, league,
+badges and cosmetics; the game's opening, decks, decisions and clocks while
+it runs; the relay that keeps the player's address from the game's
+gateway; the public boards), the sentence on gateways names ranked play and
+challenge results as the exception, § 6 adds what a ranked game's gateways
+and the opponent receive and that boards are public, § 7 how long (until
+the account is deleted; a game's private replay material after it ends,
+usually within minutes, by the daily sweep at the latest), § 9 that the
+rating is computed by a program without a legal or similarly significant
+effect. The terms' § 1 names ranked play with its public boards. The boards
+list every player with a rated game in the season by display name and tag,
+whatever the public-profile switch says (`central-postgres`
+`ranked::boards::standings`); the texts and the profile switch's hint say
+so, and the basis is the contract (Art. 6(1)(b)), since a public ladder is
+what ranked play offers. The website's privacy page has a part of its own
+for it (`privacy-ranked`, eleven languages, the nine beside German and
+English machine translations). Ranked data is not yet in the account's data
+export. Written by the implementing agent; the owner's review is still to
+come.

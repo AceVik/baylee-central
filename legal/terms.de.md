@@ -1,5 +1,5 @@
 <!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- updated: 2026-11-26 -->
 
 # Nutzungsbedingungen für Baylee-Konten
 
@@ -31,6 +31,11 @@ Central bietet dir:
 - ein Profilbild neben deinem Anzeigenamen, wenn du eines setzt;
 - Daily- und Weekly-Aufgaben und Tower-Expeditionen, mit Ranglisten, in
   denen du nur erscheinst, wenn du sie freigibst;
+- Ranglistenpartien: Wir teilen dir Gegner zu, möglichst von ähnlicher
+  Stärke, die Partie läuft auf geprüften Gateways, denen du zustimmst, und
+  das Ergebnis zählt in öffentlichen Ranglisten, in denen jeder, der in
+  einer Saison eine gewertete Ranglistenpartie spielt, mit Anzeigenamen, Tag
+  und Ergebnissen erscheint;
 - Benachrichtigungen im Browser, wenn du sie einschaltest.
 
 Der Dienst ist kostenlos. Es gibt keine kostenpflichtigen Funktionen,

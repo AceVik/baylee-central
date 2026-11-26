@@ -1141,7 +1141,7 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("An e-mail address is optional. An account needs none."));
     assert!(english.contains("you need no e-mail address"));
-    assert!(english.contains("As of 25 November 2026"));
+    assert!(english.contains("As of 26 November 2026"));
     // The minimum age (owner, 25.11.2026), and a consent under 16 (Art. 8).
     assert!(english.contains("You may create an account from the age of 13."));
     assert!(english.contains("If you are under 16, a consent counts only with"));
@@ -1184,7 +1184,35 @@ async fn the_privacy_notice_says_who_sees_an_account_online() {
             "Deine Wahl (online, abwesend, offline) speichert Central mit deinem Account"
         )
     );
-    assert!(german.contains("Stand: 25. November 2026"));
+    assert!(german.contains("Stand: 26. November 2026"));
+}
+
+/// The privacy notice tells of ranked play in a part of its own, after the
+/// Tower's, in the contents too: that its boards are public whether or not
+/// the player profile is, that a game's gateways see an alias and the relay,
+/// and how long a game's private replay material stays (`docs/ranked.md`).
+#[tokio::test]
+async fn the_privacy_notice_has_a_part_for_ranked_play() {
+    let app = app(true);
+    for lang in Lang::ALL {
+        let (_, _, html) = get(&app, &format!("/{}/privacy", lang.code()), &[]).await;
+        assert_eq!(count(&html, "<h2 id=\"ranked\">"), 1, "{lang:?}");
+        assert_eq!(count(&html, "href=\"#ranked\""), 1, "{lang:?}");
+        let at = |id: &str| html.find(&format!("<h2 id=\"{id}\">")).expect("a part");
+        assert!(
+            at("tower") < at("ranked") && at("ranked") < at("email"),
+            "{lang:?}"
+        );
+        assert!(html.contains("Elo"), "{lang:?}");
+    }
+    let (_, _, english) = get(&app, "/en/privacy", &[]).await;
+    assert!(english.contains("even with their player profile turned off"));
+    assert!(english.contains("so the gateway does not see your IP address"));
+    assert!(english.contains("usually within minutes, at the latest the following day"));
+    let (_, _, german) = get(&app, "/de/privacy", &[]).await;
+    assert!(german.contains("auch wenn sein Spielerprofil abgeschaltet ist"));
+    assert!(german.contains("das Gateway sieht dabei nicht deine IP-Adresse"));
+    assert!(german.contains("meist nach wenigen Minuten, spätestens am folgenden Tag"));
 }
 
 /// Central's figures (the accounts, and what a gateway says is happening

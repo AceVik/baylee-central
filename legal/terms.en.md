@@ -1,5 +1,5 @@
 <!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- updated: 2026-11-26 -->
 
 # Terms of use for Baylee accounts
 
@@ -28,6 +28,10 @@ servers ("gateways") and Baylee Central. Baylee Central gives you:
 - a profile picture beside your display name, if you set one;
 - daily and weekly challenges and Tower expeditions, with leaderboards you
   appear on only if you enable them;
+- ranked play: we pair you with opponents, of similar strength where we
+  can, the game runs on verified gateways you approve, and the result counts
+  on public boards, on which everyone who plays a rated ranked game in a
+  season appears with display name, tag and results;
 - notifications in your browser, if you turn them on.
 
 The service is free. There are no paid features, no ads and no sale of data.

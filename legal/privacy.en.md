@@ -1,5 +1,5 @@
 <!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- updated: 2026-11-26 -->
 
 # Baylee Central privacy policy
 
@@ -31,7 +31,7 @@ data protection officer, as none is required.
 
 ## 3. What we process, why, and on what basis
 
-- **Username, account ID, creation time, display name and tag** – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. Your public player profile at `/{lang}/player/{Name}-{tag}` (display name, tag, profile picture, ranked standings and earned badges) is visible by default and can be turned off at any time in your Profile settings. *Art. 6(1)(b) GDPR (contract)*
+- **Username, account ID, creation time, display name and tag** – running and showing your account. Other players see your display name and tag, never your username; an account moved from the official gateway keeps the name and tag it had there. Your public player profile at `/{lang}/player/{Name}-{tag}` (display name, tag, profile picture, ranked standings and earned badges) is visible by default and can be turned off at any time in your Profile settings. This does not affect your entries on the boards of ranked play (see there). *Art. 6(1)(b) GDPR (contract)*
 - **Optional personal profile details (first name, last name, date of birth)** – stored exclusively for you in your private profile settings and never shown publicly or to other players or gateways. Date of birth is validated for the minimum age of 13. These fields are included in your data export and deleted when your account is deleted. *Art. 6(1)(b) GDPR*
 - **Roles (administrator)** – administering Baylee Central. *Art. 6(1)(b) GDPR*
 - **The time of your last sign-in with your password** (no address) – administering accounts and noticing misuse. *Art. 6(1)(f) GDPR (our interest in secure operation)*
@@ -43,6 +43,7 @@ data protection officer, as none is required.
 - **Encrypted objects (settings, gateway list, deck backups, chat history) with size, revision and time** – backup across devices. *Art. 6(1)(b) GDPR*
 - **Profile picture (optional):** a square picture of 256 × 256 pixels (AVIF and PNG, and for a moving picture an animation of at most 100 frames) without the photo's details (such as place, camera or time), its fingerprint (SHA-256) and when you set it, under a random key – showing it beside your display name; anyone can see it at its address, signed in or not. *Art. 6(1)(b) GDPR.* Reports about a picture (the reporting account, the picture's fingerprint, the reason, an optional note, the time; the person whose picture it is never learns who reported it) and the count of your uploads (ten an hour, thirty a day) – removing unlawful and abusive pictures. *Art. 6(1)(f) GDPR (our interest in a service free of such content)*
 - **Daily and weekly challenges and Tower expeditions:** attempts, results, hints used, chosen upgrades, remaining lives and badge progress; from the official gateway, a game's result and measured time – offering and scoring the challenges. Your display name, tag and result appear on a leaderboard only if you enable it for that challenge or season. *Art. 6(1)(b) GDPR*
+- **Ranked play:** your entries in the queue (format, season, your Elo rating at that moment and a fingerprint of your deck); the games we pair you for (opponent, the gateways they run on, your approval of those gateways and their terms, times, result); your decks as fingerprints of the cards with their counts, never a deck name or notes; per format, season and deck your Elo rating, games, wins, losses and draws, placement progress, league and division, and your badges and the sleeves and playmats they unlock – pairing opponents, having the game played and scored on verified gateways, keeping the boards. While a game runs we also hold its opening, both decks, both players' decisions and their decision time, so that a second gateway can replay and check it or take it over after an outage. Your connection to the game runs through Baylee Central; the game's gateway sees our IP address there, not yours. The boards of every season are public: anyone, signed in or not, sees there everyone who played a rated ranked game that season, with display name, tag, Elo rating, league, division, games, wins, losses and draws, on the deck board with an identifier of the deck from which its cards cannot be read. This holds even if you turned your player profile off; whoever wants to appear on none of these boards does not play ranked games. *Art. 6(1)(b) GDPR*
 - **The versions of our terms and of the terms of the gateways you play on that you accepted, with the time** – proof of acceptance, showing new versions. *Art. 6(1)(b) and (c) GDPR*
 - **Listed gateways, their addresses, description and administrators** – gateway directory and management. *Art. 6(1)(b) GDPR*
 - **Bug reports you send, with the attachments you leave ticked** (directly or through a gateway) – finding and fixing bugs. *Art. 6(1)(f) GDPR (our interest in a game without bugs)*
@@ -58,9 +59,10 @@ Our legitimate interest in the last item is secure and undisturbed
 operation. Sign-in attempts are counted to slow down password guessing;
 these counters live only in memory.
 
-Baylee Central does not see what you play on gateways: games, decks on
+Baylee Central does not otherwise see what you play on gateways: games, decks on
 gateways, game chat delivery and replays are processed by the gateway concerned
-under its own privacy notice, the gateway we run ourselves included.
+under its own privacy notice, the gateway we run ourselves included. Ranked
+games and the results of challenges are the exception, as described above.
 
 ## 4. What the Baylee app connects to by itself
 
@@ -150,14 +152,20 @@ only after you choose to enable notifications; OS/browser settings can block del
   never your encrypted data, which we cannot read.
 - **Gateways:** when you sign in to a gateway, it receives your account ID,
   your display name and tag, and the confirmation that you are signed in, but
-  not your password or your encrypted data.
+  not your password or your encrypted data. The gateways that host a ranked
+  game receive, instead of your account ID, an identifier for that game and
+  that gateway only, together with your deck and the game itself, and only
+  after you approved them and their current terms; a gateway that takes over
+  an interrupted game only after you approve it again.
 - **Other players:** your contacts and the members of your groups see your
   display name and tag and the messages you send them; your friends also see
   that you are online, and whether you are away, playing or sitting at a
   table, and at which table if you share it, while the Baylee app is
   connected to Central and you did not choose
   "offline" (section 5a). Anyone can see your profile picture, signed in or not, and
-  your entry on a leaderboard you enable.
+  your entry on a leaderboard you enable, and your entries on the boards of
+  ranked play (section 3). Your opponent in a ranked game sees your display
+  name and tag.
 - **Authorities** receive data only where we are legally obliged.
 
 Data is transferred to countries outside the European Economic Area only if
@@ -165,7 +173,7 @@ you enable notifications: your browser's push provider (Google, Mozilla or
 Apple, USA) then carries them, on the basis of the European Commission's
 adequacy decision on the EU-US Data Privacy Framework, as far as the provider
 is certified under it. Gateways run by others can be in any country; whether
-you sign in there is your decision.
+you sign in there or entrust a ranked game to them is your decision.
 
 ## 7. How long we keep data
 
@@ -201,6 +209,11 @@ you sign in there is your decision.
   browser that showed it may keep a copy for up to an hour.
 - Challenges, expeditions and leaderboard entries stay until you delete your
   account; you withdraw a leaderboard entry at any time by switching it off.
+- Ranked games with their results, your entries in the queue, Elo ratings,
+  deck fingerprints, badges and unlocked sleeves and playmats stay until you
+  delete your account. A game's opening, decks, decisions and decision time
+  are deleted after it ends, usually within minutes, at the latest the
+  following day.
 - What pairing a device leaves is deleted once the pairing is redeemed, at
   the latest after five minutes.
 - Bug and crash reports are deleted once the bug is dealt with, after three
@@ -246,7 +259,10 @@ message to the contact details in the legal notice is enough.
 
 Without a username and password no account can exist; everything else is
 optional. Offline you play without any account. There is no automated
-decision-making or profiling within the meaning of Art. 22 GDPR.
+decision-making or profiling within the meaning of Art. 22 GDPR. A program
+computes your Elo rating, league and division and the choice of your
+opponents in ranked play from your results; it rates only how you do in the
+game and has no legal or similarly significant effect on you.
 
 ## 10. Changes
 

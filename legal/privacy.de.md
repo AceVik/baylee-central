@@ -1,5 +1,5 @@
 <!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-25 -->
+<!-- updated: 2026-11-26 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -32,7 +32,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 
 ## 3. Was wir verarbeiten, wozu und auf welcher Grundlage
 
-- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. Über `/{lang}/player/{Name}-{Tag}` ist dein öffentliches Spielerprofil (Anzeigename, Tag, Profilbild, Ranked-Platzierungen und verdiente Abzeichen) standardmäßig sichtbar; im Profil kannst du das jederzeit abschalten. *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
+- **Benutzername, Konto-ID, Erstellungszeitpunkt, Anzeigename und Tag** – dein Konto führen und anzeigen. Andere Spieler sehen deinen Anzeigenamen und Tag, nie deinen Benutzernamen; ein vom offiziellen Gateway umgezogenes Konto behält den Namen und Tag, die es dort hatte. Über `/{lang}/player/{Name}-{Tag}` ist dein öffentliches Spielerprofil (Anzeigename, Tag, Profilbild, Ranked-Platzierungen und verdiente Abzeichen) standardmäßig sichtbar; im Profil kannst du das jederzeit abschalten. Deine Einträge in den Ranglisten der Ranglistenpartien betrifft das nicht (siehe dort). *Art. 6 Abs. 1 lit. b DSGVO (Vertrag)*
 - **Freiwillige persönliche Angaben im Profil (Vorname, Nachname, Geburtsdatum)** – nur für dich selbst in deinen Profileinstellungen gespeichert und einsehbar (niemals öffentlich, nie für andere Spieler oder Gateways sichtbar). Wir prüfen beim Geburtsdatum lediglich das Mindestalter von 13 Jahren. Die Angaben werden mit deinem Export bereitgestellt und mit deinem Konto gelöscht. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Rollen (Administrator)** – Verwaltung von Baylee Central. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Zeitpunkt deiner letzten Anmeldung mit Passwort** (keine Adresse) – Konten verwalten und Missbrauch bemerken. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem sicheren Betrieb)*
@@ -44,6 +44,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 - **verschlüsselte Objekte (Einstellungen, Gateway-Liste, Deck-Sicherungen, Chat-Verlauf) mit Größe, Stand und Zeitpunkt** – geräteübergreifende Sicherung. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Profilbild (freiwillig):** ein quadratisches Bild mit 256 × 256 Pixeln (AVIF und PNG, bei einem bewegten Bild eine Animation aus höchstens 100 Einzelbildern) ohne die Angaben des Fotos (etwa Ort, Kamera oder Zeit), sein Fingerabdruck (SHA-256) und wann du es gesetzt hast, unter einem zufälligen Schlüssel – es neben deinem Anzeigenamen zeigen; jeder kann es unter seiner Adresse sehen, auch ohne Anmeldung. *Art. 6 Abs. 1 lit. b DSGVO.* Meldungen über ein Bild (meldender Account, Fingerabdruck des Bilds, Grund, freiwilliger Hinweis, Zeitpunkt; die Person, deren Bild es ist, erfährt nie, wer gemeldet hat) und die Zahl deiner hochgeladenen Bilder (zehn in der Stunde, dreißig am Tag) – rechtswidrige und missbräuchliche Bilder entfernen. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem Dienst ohne solche Inhalte)*
 - **Daily- und Weekly-Aufgaben und Tower-Expeditionen:** Versuche, Ergebnisse, genutzte Hinweise, gewählte Verbesserungen, verbleibende Leben und Abzeichen-Fortschritt; vom offiziellen Gateway Ergebnis und gemessene Zeit einer Partie – die Aufgaben anbieten und auswerten. In einer Rangliste erscheinen dein Anzeigename, Tag und Ergebnis nur, wenn du sie für diese Aufgabe oder Saison freigibst. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Ranglistenpartien (Ranked):** deine Anmeldungen zur Warteschlange (Format, Saison, deine Elo-Zahl in diesem Moment und ein Fingerabdruck deines Decks); die Partien, die wir dir zuteilen (Gegner, die Gateways, auf denen sie laufen, deine Zustimmung zu ihnen und ihren Bedingungen, Zeitpunkte, Ergebnis); deine Decks als Fingerabdrücke der Karten mit ihrer Anzahl, nie Deckname oder Notizen; je Format, Saison und Deck Elo-Zahl, Partien, Siege, Niederlagen und Unentschieden, Platzierungsfortschritt, Liga und Division, dazu deine Abzeichen und die Hüllen und Spielmatten, die du damit freischaltest – Gegner zuteilen, die Partie auf geprüften Gateways austragen und werten, Ranglisten führen. Solange eine Partie läuft, verwahren wir außerdem ihre Eröffnung, beide Decks, die Spielentscheidungen und die Bedenkzeiten beider Spieler, damit ein zweites Gateway sie nachspielen und prüfen oder nach einem Ausfall übernehmen kann. Deine Verbindung zur Partie läuft über Baylee Central; das Gateway der Partie sieht darüber unsere IP-Adresse, nicht deine. Die Ranglisten jeder Saison sind öffentlich: Jeder, auch ohne Anmeldung, sieht dort jeden, der in dieser Saison eine gewertete Ranglistenpartie gespielt hat, mit Anzeigenamen, Tag, Elo-Zahl, Liga, Division, Partien, Siegen, Niederlagen und Unentschieden, auf der Deck-Rangliste mit einer Kennung des Decks, aus der sich seine Karten nicht ablesen lassen. Das gilt auch, wenn du dein Spielerprofil abgeschaltet hast; wer in keiner dieser Ranglisten erscheinen möchte, spielt keine Ranglistenpartien. *Art. 6 Abs. 1 lit. b DSGVO*
 - **angenommene Fassungen unserer Bedingungen und der Bedingungen der Gateways, auf denen du spielst, mit Zeitpunkt** – Nachweis der Annahme, Anzeige neuer Fassungen. *Art. 6 Abs. 1 lit. b und c DSGVO*
 - **eingetragene Gateways, ihre Adressen, Beschreibung und Administratoren** – Gateway-Verzeichnis und Verwaltung. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Fehlerberichte, die du sendest, mit den Anhängen, die du angehakt lässt** (direkt oder über ein Gateway) – Fehler finden und beheben. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem fehlerfreien Spiel)*
@@ -59,10 +60,11 @@ Unser berechtigtes Interesse beim letzten Punkt ist der sichere und
 störungsfreie Betrieb. Anmeldeversuche werden gezählt, um das Erraten von
 Passwörtern zu bremsen; diese Zähler liegen nur im Arbeitsspeicher.
 
-Was du auf Gateways spielst, sieht Baylee Central nicht: Spiele, Decks auf
+Was du sonst auf Gateways spielst, sieht Baylee Central nicht: Spiele, Decks auf
 Gateways, Spielchat-Zustellung und Replays verarbeitet das jeweilige Gateway nach
 seinen eigenen Datenschutzhinweisen, auch das Gateway, das wir selbst
-betreiben.
+betreiben. Ausgenommen sind Ranglistenpartien und die Ergebnisse von
+Aufgaben, wie oben beschrieben.
 
 ## 4. Was die Baylee-App selbst verbindet
 
@@ -163,14 +165,21 @@ Zustellung verhindern.
   verschlüsselten Daten, die wir nicht lesen können.
 - **Gateways:** Meldest du dich an einem Gateway an, erhält es deine Konto-ID,
   deinen Anzeigenamen und Tag sowie die Bestätigung, dass du angemeldet bist,
-  nicht aber dein Passwort oder deine verschlüsselten Daten.
+  nicht aber dein Passwort oder deine verschlüsselten Daten. Die Gateways,
+  die eine Ranglistenpartie austragen, erhalten statt deiner Konto-ID eine
+  Kennung nur für diese Partie und dieses Gateway, dazu dein Deck und die
+  Partie selbst, und zwar erst, nachdem du ihnen und ihren aktuellen
+  Bedingungen zugestimmt hast; ein Gateway, das eine unterbrochene Partie
+  übernimmt, erst nach deiner erneuten Zustimmung.
 - **Andere Spieler:** Deine Kontakte und die Mitglieder deiner Gruppen sehen
   deinen Anzeigenamen mit Tag und die Nachrichten, die du ihnen schickst;
   deine Freunde außerdem, solange die Baylee-App mit Central verbunden ist
   und du nicht „offline“ gewählt hast, dass du online bist und ob du
   abwesend bist, spielst oder an einem Tisch sitzt, und an welchem Tisch,
   wenn du ihn teilst (Abschnitt 5a). Dein Profilbild kann jeder sehen, auch
-  ohne Anmeldung, ebenso deinen Eintrag in einer Rangliste, die du freigibst.
+  ohne Anmeldung, ebenso deinen Eintrag in einer Rangliste, die du freigibst,
+  und deine Einträge in den Ranglisten der Ranglistenpartien (Abschnitt 3).
+  Dein Gegner in einer Ranglistenpartie sieht deinen Anzeigenamen mit Tag.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
 Eine Übermittlung in Länder außerhalb des Europäischen Wirtschaftsraums
@@ -179,7 +188,8 @@ sie der Push-Anbieter deines Browsers (Google, Mozilla oder Apple, USA).
 Grundlage ist der Angemessenheitsbeschluss der EU-Kommission zum
 EU-US-Datenschutzrahmen (Data Privacy Framework), soweit der Anbieter danach
 zertifiziert ist. Gateways anderer Betreiber können in jedem Land stehen; ob
-du dich dort anmeldest, entscheidest du.
+du dich dort anmeldest oder ihnen eine Ranglistenpartie anvertraust,
+entscheidest du.
 
 ## 7. Wie lange wir Daten speichern
 
@@ -219,6 +229,12 @@ du dich dort anmeldest, entscheidest du.
 - Aufgaben, Expeditionen und Ranglisteneinträge bleiben bis zur Löschung
   deines Kontos; einen Ranglisteneintrag nimmst du jederzeit zurück, indem
   du die Freigabe ausschaltest.
+- Ranglistenpartien mit ihren Ergebnissen, deine Anmeldungen zur
+  Warteschlange, Elo-Zahlen, Deck-Fingerabdrücke, Abzeichen und
+  freigeschalteten Hüllen und Spielmatten bleiben bis zur Löschung deines
+  Kontos. Eröffnung, Decks, Spielentscheidungen und Bedenkzeiten einer
+  Partie löschen wir nach ihrem Ende, in der Regel nach wenigen Minuten,
+  spätestens am folgenden Tag.
 - Was beim Koppeln eines Geräts anfällt, löschen wir, sobald die Kopplung
   eingelöst ist, spätestens nach fünf Minuten.
 - Fehler- und Absturzberichte löschen wir, wenn der Fehler erledigt ist,
@@ -267,7 +283,10 @@ Kontaktdaten im Impressum genügt.
 Ohne Benutzername und Passwort kann kein Konto entstehen; alle anderen
 Angaben sind freiwillig. Offline spielst du ganz ohne Konto. Eine
 automatisierte Entscheidungsfindung oder Profilbildung im Sinne von Art. 22
-DSGVO findet nicht statt.
+DSGVO findet nicht statt. Deine Elo-Zahl, Liga und Division und die Wahl
+deiner Gegner in Ranglistenpartien berechnet ein Programm aus deinen
+Ergebnissen; das bewertet nur dein Abschneiden im Spiel und hat keine
+rechtliche oder ähnlich erhebliche Wirkung für dich.
 
 ## 10. Änderungen
 
