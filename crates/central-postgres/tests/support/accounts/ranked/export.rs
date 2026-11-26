@@ -233,7 +233,7 @@ async fn standings(db: &DatabaseConnection, season: Uuid, me: Uuid, them: Uuid) 
 }
 
 /// Mine: one waiting, closed ones of every age, and enough recent ones for
-/// two pages. Theirs: one old closed.
+/// two pages. Theirs: an old closed one and one left assigned to an old match.
 async fn tickets(
     db: &DatabaseConnection,
     season: Uuid,
@@ -256,6 +256,8 @@ async fn tickets(
         // an hour old: kept (the hourly admission cap counts it)
         (me, 0x11, 5, "closed", None, "1 hour"),
         (them, 0x22, 6, "closed", None, "30 hours"),
+        // never marked closed, but its match ended two days ago: pruned
+        (them, 0x22, 7, "assigned", Some(old), "3 days"),
     ];
     for (account, deck, key, state, match_id, age) in rows {
         run_sql(
@@ -507,7 +509,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         (receipt.verdict, receipt.opponent),
         (Verdict::Lost, a.account)
     );
-    assert_eq!(rows(&other, Table::Tickets).len(), 1);
+    assert_eq!(rows(&other, Table::Tickets).len(), 2);
     assert!(
         rows(&other, Table::Matches)
             .iter()
@@ -521,7 +523,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     }
     refusals(store, &mine_token).await;
 
-    sweep(db).await;
+    sweep(db, f.season, Uuid::from_bytes(c.account)).await;
     let tickets = download(store, (&mine_token).into()).await;
     assert_eq!(
         rows(&tickets, Table::Tickets).len(),
@@ -577,9 +579,19 @@ async fn refusals(store: &AccountStore, mine_token: &Token) {
     }
 }
 
-/// The operator's daily sweep deletes closed tickets a day after their
-/// waiting or their match ended; open tickets and younger ones stay.
-async fn sweep(db: &DatabaseConnection) {
+/// The operator's daily sweep deletes tickets a day after their waiting or
+/// their match ended, marked closed or not; younger ones and the fresh
+/// waiting one stay.
+async fn sweep(db: &DatabaseConnection, season: Uuid, stranger: Uuid) {
+    // Waiting, never marked closed, its four minutes two days past: pruned.
+    run_sql(
+        db,
+        "INSERT INTO central_identity.ranked_tickets(account_id,request_id,season_id,format,commitment,
+           queue_elo,created_at,expires_at)
+         VALUES ($1,$2,$3,'standard',$4,1500,now()-interval '2 days',now()-interval '2 days'+interval '4 minutes')",
+        vec![stranger.into(), Uuid::from_bytes(v7(8)).into(), season.into(), vec![0x55u8; 32].into()],
+    )
+    .await;
     let left = |key: u8| {
         one(
             db,
@@ -588,7 +600,7 @@ async fn sweep(db: &DatabaseConnection) {
         )
     };
     let swept = central_postgres::sweep(db).await.unwrap();
-    assert_eq!(swept.tickets, 3, "mine two and theirs one");
+    assert_eq!(swept.tickets, 5, "mine two, theirs two, the stranger's one");
     for (key, kept) in [
         (1, true),
         (2, false),
@@ -596,6 +608,8 @@ async fn sweep(db: &DatabaseConnection) {
         (4, true),
         (5, true),
         (6, false),
+        (7, false),
+        (8, false),
     ] {
         assert_eq!(
             left(key).await.try_get::<i64>("", "n").unwrap(),

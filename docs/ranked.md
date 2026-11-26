@@ -32,6 +32,7 @@ The native client enters Standard, Baylee Highlander or two-player Commander thr
 | --- | --- |
 | Read seasons, division boards or public profiles | Anyone, including a signed-out native client. The native and browser listeners apply the directory rate budget. |
 | Read your own placement progress | An authenticated session. The account comes from that session. Before the first confirmed game, each format shows Unranked at 0/10, including for accounts without a public handle. |
+| Export your own ranked rows for the account download | An authenticated native or browser session, the only non-public ranked operation the browser listener serves. The account comes from that session; no acceptance of the current terms is needed ([below](#own-data-in-the-account-download)). |
 | Join, inspect or cancel a ticket | The live native Central session for its own account. A join requires acceptance of the current terms. |
 | Enable a ranked host | A Central administrator using the existing fresh web administration session. Directory approval and ranked verification are separate stored decisions. |
 | Advertise capacity or claim, start, finish or void a game | A verified host using its registered host credential, a named token explicitly granted the ranked scope, or the official bridge. Operations on a match also require its assigned host and current verification epoch. |
@@ -61,14 +62,14 @@ The active season is the unique database interval containing the current time. S
 
 The authority receives account and opponent identifiers, timestamps, match/host identifiers, deck commitments, normalized card-identity digests and copy counts, confirmed outcomes and rating history. Normalized identities are derived from public card data and can be compared by the authority. Deck names, personal notes, reorderable cosmetics, encrypted library objects and seat tokens have no field in the public ranked protocol. Ranked account rows reference the account with erasure cascades. For the administrative procedure see [gateway verification](gateway-registry.md).
 
-Central keeps ratings, deck versions, receipts, matches, badges, cosmetic unlocks and Champion places until the account is deleted. Closed queue tickets are the exception. The operator's daily sweep (`--sweep-stdin`) deletes a closed ticket 24 hours after its waiting ended, or 24 hours after its match ended when it had one (`CLOSED_TICKET_HOURS`). It deletes in batches of 4,096 until a batch comes back short. Open tickets are never pruned. A day is far longer than anything that still reads a closed ticket:
+Central keeps ratings, deck versions, receipts, matches, badges, cosmetic unlocks and Champion places until the account is deleted. Queue tickets are the exception. The operator's daily sweep (`--sweep-stdin`) deletes a ticket 24 hours after its waiting ended, or 24 hours after its match ended when it had one (`CLOSED_TICKET_HOURS`). It deletes in batches of 4,096 until a batch comes back short. Central marks a ticket closed only on its account's next queue request. The sweep therefore goes by those times, not by the mark: a ticket still marked waiting a day after its four minutes, or still marked assigned a day after its match ended, is deleted too. A ticket whose match is still reserved or playing stays. A day is far longer than anything that still reads an ended ticket:
 
 - the admission cap of 24 tickets an hour, which counts the last hour's tickets;
 - the sparse-queue check, which counts the last two minutes';
 - a `Join` retried after a lost answer, which finds its own key instead of queueing again;
 - `Status`, which shows the last match's result from its ticket.
 
-Nothing settles from a closed ticket. A match's consent check reads its tickets only while they are assigned. Rematch spacing reads `ranked_matches`. After pruning, `Status` answers `Idle`; the receipt stays. A retry of that key after the day is a new request: it is still the single ticket the account may hold, and the client shows it as waiting and can cancel it.
+Nothing settles from an ended ticket. A match's consent check reads its tickets only while the match is playing, and those are kept. A seat token needs a reserved or playing match. Rematch spacing reads `ranked_matches`. After pruning, `Status` answers `Idle`; the receipt stays. A retry of that key after the day is a new request: it is still the single ticket the account may hold, and the client shows it as waiting and can cancel it.
 
 ### Own data in the account download
 
