@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(order(1500, &[busy, idle]), vec![1, 0]);
         let other = ai(0, AiKind::House, 1500, 0, 0);
         assert_eq!(order(1500, &[idle, other]), vec![1, 0]);
-        assert!(order(1500, &[]).is_empty());
+        assert_eq!(order(1500, &[]), Vec::<usize>::new());
         // Extreme ratings never overflow.
         let low = ai(3, AiKind::House, i32::MIN, 3, i64::MAX);
         assert_eq!(order(i32::MAX, &[low]).len(), 1);

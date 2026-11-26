@@ -288,12 +288,8 @@ async fn place(
     let key: Uuid = column(ticket, "request_id")?;
     let format: String = column(ticket, "format")?;
     let replicable: bool = column(ticket, "replicable")?;
-    let Some(host) = super::replication::routing::allocate_single(
-        db,
-        replicable,
-        i16::from(settings.host_reserve),
-    )
-    .await?
+    let Some(host) =
+        super::replication::routing::allocate_single(db, replicable, i16::from(reserve)).await?
     else {
         return Ok(());
     };

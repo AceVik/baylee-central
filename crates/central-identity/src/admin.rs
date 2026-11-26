@@ -25,16 +25,7 @@ impl IdentityService {
                     .await?;
                 AdminAnswer::Accounts { accounts, more }
             }
-            AdminRequest::Account { account } => {
-                let (account, recovery, gateways, audit) =
-                    self.store.admin_account(cookie, account).await?;
-                AdminAnswer::Account {
-                    account,
-                    recovery,
-                    gateways,
-                    audit,
-                }
-            }
+            AdminRequest::Account { account } => self.account_answer(cookie, account).await?,
             AdminRequest::Audit { account, before } => {
                 let page = self.store.admin_audit(cookie, account, before).await?;
                 AdminAnswer::Audit {
@@ -112,34 +103,12 @@ impl IdentityService {
             AdminRequest::Picture { request } => return self.picture_admin(request, cookie).await,
             // AI players (`docs/ai-players.md`): the store checks the
             // administrator, the fresh sign-in where one is needed, and audits.
-            AdminRequest::AiPlayers => AdminAnswer::AiPlayers {
-                players: self.store.admin_ai_players(cookie).await?,
-            },
-            AdminRequest::SetAiPlayer { account, settings } => {
-                self.store
-                    .set_ai_player(cookie, account, settings.as_ref())
-                    .await?;
-                return Ok(Response::Done);
-            }
-            AdminRequest::SetAiEnabled { account, enabled } => {
-                self.store.set_ai_enabled(cookie, account, enabled).await?;
-                return Ok(Response::Done);
-            }
-            AdminRequest::AiSettings => {
-                let (settings, changed_at) = self.store.admin_ai_settings(cookie).await?;
-                AdminAnswer::AiSettings {
-                    settings,
-                    changed_at,
-                }
-            }
-            AdminRequest::SetAiSettings { settings } => {
-                self.store.set_ai_settings(cookie, Some(&settings)).await?;
-                return Ok(Response::Done);
-            }
-            AdminRequest::StopAllAi => {
-                self.store.set_ai_settings(cookie, None).await?;
-                return Ok(Response::Done);
-            }
+            request @ (AdminRequest::AiPlayers
+            | AdminRequest::SetAiPlayer { .. }
+            | AdminRequest::SetAiEnabled { .. }
+            | AdminRequest::AiSettings
+            | AdminRequest::SetAiSettings { .. }
+            | AdminRequest::StopAllAi) => return self.ai_admin(request, cookie).await,
             AdminRequest::SetTag { account, tag } => {
                 return self.set_tag(cookie, account, tag).await;
             }
@@ -200,5 +169,58 @@ impl IdentityService {
             }
             _ => Err(Error::Rejected),
         }
+    }
+
+    /// AI players (`docs/ai-players.md`): the store checks the administrator,
+    /// the fresh sign-in where one is needed, and writes the audit.
+    async fn ai_admin(&self, request: AdminRequest, cookie: &Token) -> Result<Response, Error> {
+        let answer = match request {
+            AdminRequest::AiPlayers => AdminAnswer::AiPlayers {
+                players: self.store.admin_ai_players(cookie).await?,
+            },
+            AdminRequest::AiSettings => {
+                let (settings, changed_at) = self.store.admin_ai_settings(cookie).await?;
+                AdminAnswer::AiSettings {
+                    settings,
+                    changed_at,
+                }
+            }
+            AdminRequest::SetAiPlayer { account, settings } => {
+                self.store
+                    .set_ai_player(cookie, account, settings.as_ref())
+                    .await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetAiEnabled { account, enabled } => {
+                self.store.set_ai_enabled(cookie, account, enabled).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetAiSettings { settings } => {
+                self.store.set_ai_settings(cookie, Some(&settings)).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::StopAllAi => {
+                self.store.set_ai_settings(cookie, None).await?;
+                return Ok(Response::Done);
+            }
+            _ => return Err(Error::Rejected),
+        };
+        Ok(Response::Admin { answer })
+    }
+
+    /// One account as the administration shows it.
+    async fn account_answer(
+        &self,
+        cookie: &Token,
+        account: [u8; 16],
+    ) -> Result<AdminAnswer, Error> {
+        let (account, recovery, gateways, audit) =
+            self.store.admin_account(cookie, account).await?;
+        Ok(AdminAnswer::Account {
+            account,
+            recovery,
+            gateways,
+            audit,
+        })
     }
 }
