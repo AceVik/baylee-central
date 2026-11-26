@@ -35,8 +35,8 @@ Invariants:
    person's ticket of the same season, format and kind waits, no AI is
    seated.
 6. One AI account plays at most its `max_games` matches at once, all AI
-   accounts together at most `global_games`, and an AI match never takes the
-   host slots kept for people.
+   seats together number at most `global_seats`, and an AI match never takes
+   the host slots kept for people.
 7. From the commit of an administrator's switch-off, the AI gets no new
    match. Its running matches end normally.
 8. The runner holds no new kind of credential.
@@ -93,15 +93,15 @@ kind as a code), never the label or a name ([administration](administration.md)
 
 Global settings live in a one-row table, `ai_settings`, like registration's
 switch: `fill_in_after` (seconds, 30 to 600, default 60), `drain_minutes`
-(default 120, §2), `global_games` (AI matches at once, 0 to 32, default 8;
-0 stops every AI), `host_reserve` (slots each host keeps for people, default
+(default 120, §2), `global_seats` (AI seats at once, where a match between
+two AIs takes two; 0 to 16, default 8; 0 stops every AI), `host_reserve` (slots each host keeps for people, default
 2), `carousel_games` and `carousel_daily` (default 0, §7), `changed_at`,
 `changed_by`.
 
 *Weighed and set aside:* a new account `source` would touch every path that
 reads it. A flag column on `accounts` would put AI state on the most-read
 table and still need the settings somewhere else. A table of its own is
-enough, and it keeps the migration off existing tables (§9).
+enough, and it keeps `accounts` and its grants as they are (§9).
 
 ## 2. How the runner signs in
 
@@ -130,8 +130,9 @@ revokes the seat at its host. Consequences:
 - A runner restart is a new sign-in. A match whose AI seat returns within the
   host's reconnect window goes on: `host::claim` checks the newly presented
   `sid` and sets `claimed_*` only once, so a seat can claim again with a fresh
-  proof. Other matches end as the host's rules say. A deploy switches the AIs
-  off first and waits.
+  proof. Whether the host takes the seat back under the new `sid` is the game
+  repository's behaviour and is to be confirmed there. Other matches end as
+  the host's rules say. A deploy switches the AIs off first and waits.
 
 **Rotation.** Switch the AI off (§5), wait until its matches have ended,
 change the password as that account through the ordinary password change,
@@ -157,9 +158,15 @@ sign-in, and the runner alerts when its session is replaced.
 *Why not a new credential.* A long-lived, introspected AI-seat token like
 [Tower access](tower-access.md) would avoid the 12-hour drain and the
 one-session rule. It would also be a new credential with its own issuance,
-revocation, storage and tests. The default works with the drain rule and the
-two narrow branches of §4. Reconsider it only if measurements show that the
-drain costs real availability.
+revocation, storage and tests, and its `sid`s would meet the same unique
+indexes as a session's (§4). The default works with the drain rule and the
+changes of §4. Reconsider it only if measurements show that the drain costs
+real availability.
+
+*Also set aside:* several native sessions for one AI account, one for each
+game slot. That would leave the `sid` indexes alone but break the rule that an
+account holds one native session of each kind. It would also hide a thief: a
+sign-in would take a free slot instead of throwing the runner out.
 
 ## 3. Fill-in
 
@@ -206,7 +213,7 @@ while the person's ticket is still `waiting` and:
 1. the person's ticket (`FOR UPDATE SKIP LOCKED`, then checked for `waiting`
    again);
 2. the `ai_settings` row (`FOR UPDATE`), which serializes fill-in and the
-   carousel against `global_games`;
+   carousel against `global_seats`;
 3. the chosen AI's `ai_players` row (`FOR UPDATE`), after which its live
    matches are counted, and its offer row (`FOR SHARE`, so the session's end
    waits);
@@ -226,7 +233,7 @@ fill-in runs at all.
   is live and has `drain_minutes` left before its cap;
 - its live matches are below `max_games`, counted after the lock;
 - its matches today are below `daily_games`;
-- all AI matches together are below `global_games`.
+- all AI seats together are below `global_seats`.
 
 If the chosen AI fails a check after its lock, fill-in tries the next one, at
 most four in all.
@@ -281,6 +288,9 @@ People's queue paths assume one match per account:
   then compares it with the fence;
 - `streams::held_sid`, where a new ranked `sid` deletes the session's other
   ranked `sid`s and so revokes the earlier match at its host;
+- two unique rules of `gateway_sids` in the database: one ranked `sid` per
+  session (`gateway_sids_one_ranked`, migration 000040) and one `sid` per
+  session, gateway and purpose (the table's `UNIQUE`, migration 000024);
 - one native session per account.
 
 An AI seat is therefore never a ticket. `ranked_tickets`, its index and the
@@ -323,7 +333,7 @@ poll later. Clients built before such an event pass over it
 native client does. It accepts the host's current terms through the terms
 API, approves the host for this match (`Hosts`, `ApproveHosts`), and opens
 the ranked socket with the match's fence (`RelayRoute` and the relay's
-match-bound token). Two branches change, both only for a flagged account:
+match-bound token). Three things change, each only for a flagged account:
 
 - `assigned_match` resolves the match by the fence's `match_id`. It requires
   the account to sit in that match and applies the same host, epoch and lease
@@ -332,16 +342,26 @@ match-bound token). Two branches change, both only for a flagged account:
   deletes only those of matches that have ended, which still publishes their
   revocations. With `max_games` at most 16, a session stays below
   `MAX_SIDS_PER_SESSION` (32).
+- `gateway_sids` gains `ai_seat boolean NOT NULL DEFAULT false`, with a CHECK
+  that only a `ranked` row has it. The table's `UNIQUE (session_digest, stream,
+  purpose)` and `gateway_sids_one_ranked` become partial unique indexes
+  `WHERE NOT ai_seat`. A new unique index on `(session_digest, ranked_match)
+  WHERE ai_seat` allows one `sid` per match. `held_sid` sets `ai_seat` only
+  for a flagged account, decided in the same transaction. Every row a person's
+  session writes, and every row the previous binary writes, still falls under
+  both rules as before.
 
 The relay already allows several matches for one session: its capabilities
 are scoped per session, fence, origin and seat. What bounds the runner are
 the listener's 64 relay slots and the per-address limits it shares with push
-sockets (32 sockets and 60 dials a minute). `global_games` (default 8, at
-most 32) keeps AI relays well inside them. Raising it beyond that needs a
-review of those limits.
+sockets: 32 sockets and 60 dials a minute. All the runner's relays come from
+one address, and a match between two AIs needs two. So the global bound
+counts seats, not matches: `global_seats` (default 8, at most 16) leaves the
+address room for the AI accounts' push sockets and the runner's redials after
+a restart. Raising it beyond 16 needs a review of those limits.
 
 **The bound.** `max_games` is counted after locking the AI's row, at every
-match Central makes for it. `global_games` is counted after locking
+match Central makes for it. `global_seats` is counted after locking
 `ai_settings`.
 
 ## 5. The administrator's switch
@@ -361,10 +381,15 @@ Switching an AI off locks its row. A fill-in that holds the row commits first,
 and every later one reads `enabled = false`. The switch touches no running
 match: admission (the `assigned_match` branch) and the host's start and
 finish do not ask for `enabled`, so the match ends normally. `Work` tells the
-runner to stop offering. `global_games = 0` stops every AI the same way. To
-end running matches as well, an administrator resets the account's login,
-which ends its session and its `sid`s (open question 6 asks whether switching
-off should need a fresh password).
+runner to stop offering. `global_seats = 0` stops every AI the same way.
+
+Ending running matches as well needs the AI's sessions to end. Issuing a reset
+code ends nothing ([account reset](account-reset.md)). What ends every
+session today is a new password: the operator changes the AI's password
+natively, or redeems a reset code an administrator made. An administrator's
+own way to end an account's sessions comes with the account locks of the
+administration's step 6. Open question 6 asks whether switching off should
+need a recent password.
 
 ## 6. Labelling
 
@@ -456,13 +481,13 @@ SQL can end a season or open a new one (open question 5).
 | Threat | Control | Check for the adversarial pass |
 | --- | --- | --- |
 | A person makes their account look like an AI | Only an administrator flags an account (browser listener, recent password, audited). The badge comes from `ai_players` and never from a request. People cannot choose the prefixes `KI-` and `AI-`. | Every `Ai` request with a person's session is `Rejected`. A name change to either prefix is refused. No reply carries a badge for an unflagged account. |
-| A stolen AI password: a person plays people as "the AI" | Native sign-in only, the address allowlist if adopted, the runner's alert when replaced, the last sign-in in the administration, the switch, a login reset | A sign-in from another address is refused, and a browser sign-in is refused. A replaced session's offers vanish by cascade, and no match is made from them. |
+| A stolen AI password: a person plays people as "the AI" | Native sign-in only, the address allowlist if adopted, the runner's alert when replaced, the last sign-in in the administration, the switch, a new password | A sign-in from another address is refused, and a browser sign-in is refused. A replaced session's offers vanish by cascade, and no match is made from them. |
 | An AI passes as a person | The flag stays after the first match. `kind` and `profile` have no `UPDATE` grant. No own profile change, deletion, administrator role, social request or lobby admission. | Clearing after a match is refused. `SetAdmin` on a flagged account is refused. An AI account's Join, contact request, whisper and `admit` grant are refused. |
 | A ticket that refused AIs meets an AI | AI accounts cannot Join. Fill-in reads the ticket's choice. The carousel pairs AIs only. As a second guard, `matchmaking::candidate` excludes flagged accounts. | Every path is tried with a `none` ticket and an eligible AI: no match. An absent field decodes as `none`. |
 | An old client gets an AI without a badge | An absent `ai` is `none`. Protocol `2` replies carry no new field, and AI names carry the prefix. | A protocol `2` Join waits past 60 s and gets no AI. A protocol `2` board decodes with the old types. |
 | Farming a fixed-strength AI | The repeat cost in the choice, the repeat damping (half, then a quarter), the AI's rating falling as it loses, one ticket and 24 joins an hour, a fixed profile, the switch | Policy tests: a person who keeps meeting one AI is offered another when one is near. Settlement tests for repeat damping with an AI seat. |
-| Exhausting the AIs | One ticket per person, 24 joins an hour, `max_games`, `global_games`, a cancel before the claim freeing the slot, the carousel yielding to people, registration's own limits | Parallel fill-ins race for the last slot and exactly one wins. `max_games` holds under concurrency. |
-| Exhausting hosts or relays with AI matches | `host_reserve`; `global_games` at most 32 against 64 relay slots and 32 sockets an address | Fill-in is refused when a host would fall below its reserve. |
+| Exhausting the AIs | One ticket per person, 24 joins an hour, `max_games`, `global_seats`, a cancel before the claim freeing the slot, the carousel yielding to people, registration's own limits | Parallel fill-ins race for the last slot and exactly one wins. `max_games` holds under concurrency. |
+| Exhausting hosts or relays with AI matches | `host_reserve`; `global_seats` at most 16 against 64 relay slots and 32 sockets an address | Fill-in is refused when a host would fall below its reserve. A match between two AIs counts two seats. |
 | A dead runner leaves a person stranded | Offers live 45 s. A match the AI never claims becomes void after the 2-minute lease, as today. | Offer expiry. The void and the person's next search. |
 | The switch races a fill-in | The switch locks the AI row, and fill-in counts after the same lock. | Interleaved switch and fill-in: no match after the switch commits. |
 | The AI flag or a person's preference leaks | Public: kind, label and fair. The administration only: profile, caps, who flagged. A person's preference lives only in `ranked_ticket_ai`, in no reply but their own, in no host's work and no public view. `ai_fill_in_at` ignores other people's tickets. | Replies to the opponent, host work and public reads hold no preference. The host's assignment is unchanged. |
@@ -484,12 +509,16 @@ note asserts no legal basis.
 
 **The migration**, `m2026MMDD_000053_ai_players` (the next free number when it
 is written), creates `ai_players`, `ai_settings` (with its one row),
-`ai_offers`, `ranked_ticket_ai` and `ai_matches`. It changes no column and no
-grant of an existing table. The previous binary's startup check refuses a
-wider grant on any table it knows, but it passes over new tables, so the
-deploy hook's fallback to that binary needs no rollback of grants. After
-migration 000014 it did ([operations](operations.md)). The migration is
-forward-only. Like every migration it is tested for a fresh install, an upgrade from
+`ai_offers`, `ranked_ticket_ai` and `ai_matches`. Of the existing tables it
+changes only `gateway_sids`: the `ai_seat` column with its default and the
+unique indexes of §4. It changes no grant of an existing table. The runtime's
+`INSERT` on `gateway_sids` covers the whole table, and the new column gets no
+`UPDATE`. The previous binary's startup check names the tables it knows and
+their exact grants, and as far as that check shows, it passes over new
+tables. So the deploy hook's fallback to that binary should need no rollback
+of grants, which after migration 000014 it did ([operations](operations.md)).
+The implementation pass runs the previous binary over the migrated schema to
+prove it. The migration is forward-only. Like every migration it is tested for a fresh install, an upgrade from
 000052, a failing DDL and privileges
 ([database development](database-development.md)).
 
@@ -518,7 +547,7 @@ forward-only. Like every migration it is tested for a fresh install, an upgrade 
     guard;
   - `ranked/fill_in/`: the eligibility query and `policy.rs`;
   - `ranked/ai.rs`: the runner's requests;
-  - `streams.rs`: the two branches of §4;
+  - `streams.rs`: the `assigned_match` and `held_sid` branches of §4;
   - `admin.rs`: the requests and the `Action`s;
   - `boards/standings.rs`, `boards.rs`, `profiles.rs` and `participants.rs`:
     the badge;
@@ -581,10 +610,10 @@ revision. It changes in step:
    over as everyone's do.
 6. **A recent password to switch an AI off.** Every administration change
    needs one today. *Recommended:* exempt switching off (one AI, or
-   `global_games = 0`). It only reduces exposure and is still audited.
+   `global_seats = 0`). It only reduces exposure and is still audited.
    Switching on, flagging and every other change keep the rule.
 7. **Starting numbers.** *Recommended* until the speed check and load
-   measurements exist: `max_games` 4 for house levels, `global_games` 8,
+   measurements exist: `max_games` 4 for house levels, `global_seats` 8,
    `host_reserve` 2, `drain_minutes` 120, `fill_in_after` 60.
 8. **Retiring protocol `2`.** *Recommended:* one client release after the
    badges ship. Until then AI names carry the prefix.
@@ -596,9 +625,9 @@ revision. It changes in step:
   `-`. They become labels (§6).
 - The concept gives an AI account several games at once. The code allows one
   native session per account, and a new sign-in revokes its gateway `sid`s.
-  It allows one ranked `sid` per session (`held_sid`) and one ticket, and some
-  queries assume a single assigned ticket. Hence §4's offers, the two
-  branches and §2's drain rule.
+  It allows one ranked `sid` per session, in `held_sid` and in two unique
+  indexes of `gateway_sids`, and one ticket, and some queries assume a single
+  assigned ticket. Hence §4's offers, its three changes and §2's drain rule.
 - The concept says the 60 s match the queue's own schedule. That holds for a
   quiet queue only: a busy queue opens fully at 120 s, and newcomer
   protection holds back a newcomer more than 350 points away for 10 s. The
@@ -608,5 +637,8 @@ revision. It changes in step:
   since migration 000035, and no tool manages seasons (open question 5).
 - An additive reply field is not backward compatible here, because the
   ranked wire types have `deny_unknown_fields` (§6).
-- The relay's 64 slots and per-address limits bound how many AI matches run
-  at once, which the concept's carousel and several-games plans must fit.
+- The relay's 64 slots and per-address limits bound how many AI seats run at
+  once, which the concept's carousel and several-games plans must fit.
+- The concept has admins switch an AI off at once. Switching off works at
+  once for new matches. Ending an AI's running matches needs its sessions to
+  end, and today only a new password does that (§5).
