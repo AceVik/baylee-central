@@ -162,6 +162,16 @@ GRANT SELECT, INSERT ON central_identity.ranked_receipts TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (published_on, finalized) ON central_identity.ranked_publications TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.ranked_champions TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (place) ON central_identity.ranked_badge_peaks TO central_runtime;
+-- AI players (docs/ai-players.md): an administrator flags, changes, switches
+-- and clears; the kind, the profile and who flagged never change. A runner
+-- renews its offers; a person's consent and how a match was made are written once.
+GRANT SELECT, INSERT, DELETE, UPDATE (label, fair, enabled, max_games, daily_games, changed_at, changed_by)
+  ON central_identity.ai_players TO central_runtime;
+GRANT SELECT, UPDATE (fill_in_after, drain_minutes, global_seats, host_reserve, carousel_games,
+  carousel_daily, changed_at, changed_by) ON central_identity.ai_settings TO central_runtime;
+GRANT SELECT, INSERT, DELETE, UPDATE (session_digest, commitment, renewed_at, expires_at)
+  ON central_identity.ai_offers TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.ranked_ticket_ai, central_identity.ai_matches TO central_runtime;
 
 -- Only the operator stages a legacy source. The authenticated transfer advances or retires it.
 GRANT SELECT, DELETE, UPDATE (next_page) ON central_identity.legacy_deck_transfers TO central_runtime;

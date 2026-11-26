@@ -316,7 +316,15 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "DROP TABLE central_identity.report_tokens;
+            "DROP TABLE central_identity.ai_matches, central_identity.ranked_ticket_ai,
+                        central_identity.ai_offers, central_identity.ai_settings, central_identity.ai_players;
+             DROP INDEX central_identity.gateway_sids_ai_match, central_identity.gateway_sids_one_each,
+                        central_identity.gateway_sids_one_ranked;
+             ALTER TABLE central_identity.gateway_sids DROP COLUMN ai_seat,
+                 ADD UNIQUE (session_digest, stream, purpose);
+             CREATE UNIQUE INDEX gateway_sids_one_ranked ON central_identity.gateway_sids(session_digest)
+                 WHERE purpose='ranked';
+             DROP TABLE central_identity.report_tokens;
              ALTER TABLE central_identity.reports DROP COLUMN filed_by;
              ALTER TABLE central_identity.report_notes DROP COLUMN token_name;
              ALTER TABLE central_identity.report_audit DROP COLUMN token_name;
