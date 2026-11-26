@@ -246,7 +246,7 @@ async fn tickets(
           queue_elo,state,match_id,created_at,expires_at)
          VALUES ($1,$2,$3,'standard',$4,1500,$5,$6,now()-$7::interval,now()-$7::interval+interval '4 minutes')";
     let rows = [
-        (me, 0x11, 1, "waiting", None, "0 seconds"),
+        (me, 0x11u8, 1, "waiting", None, "0 seconds"),
         // ended with a match two days ago: pruned
         (me, 0x11, 2, "closed", Some(old), "3 days"),
         // waiting ended two days ago, no match: pruned
