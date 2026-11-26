@@ -114,42 +114,95 @@ enough, and it keeps `accounts` and its grants as they are (§9).
 password per AI account.* AI accounts have no password. An administrator
 creates each AI account on the website (§1) and issues an **AI runner
 token** for each runner machine, bound to the AI accounts that machine may
-play. The token follows the machine-credential pattern of report tokens
-(migration 000052): 32 random bytes, shown once, only its SHA-256 digest
-kept, at most 366 days of life, revocable, its issue and revocation audited.
+play. The token follows the machine credentials before it: a gateway's token
+(migration 000014) and a report token (migration 000052).
 
-- **No password, no recovery.** The creation path writes the account
-  without an OPAQUE record anyone could use and without a recovery wrapper.
-  Every password, reset, recovery, pairing and deletion flow refuses an AI
-  account, so none of them can ever succeed for one.
-- **The exchange.** On the native listener the runner trades a live token
-  for a session of one of the token's accounts. That session is an ordinary
-  native session with the same signed bearer an OPAQUE sign-in yields, so
-  admission, the seat claim and the relay need no change. The session row
-  names the token that minted it.
-- **Up to four sessions.** An AI account may hold up to four minted native
-  sessions at once; a fifth exchange ends the oldest. Each lives 30 minutes,
-  is renewed, and ends at most 12 hours after its exchange. The runner rolls
-  over: new offers go under a newer session while older ones finish their
-  matches. No drain rule is needed, and no new sign-in ends a running match.
-  Fill-in still seats an AI only through an offer whose session has
-  `drain_minutes` left before its cap.
-- **Revocation** ends every session the token minted, in the same
-  transaction; each `sid` is revoked by the trigger, so the hosts drop those
-  seats. Taking an account off a token's list ends that account's sessions
-  of that token.
-- **Transport.** The runner reaches Central's public native endpoint over
-  TLS from any machine. There is no address allowlist and no file of
-  passwords; the runner keeps its token in a root-only credential of its unit
-  and its sessions in memory.
+**The token.** 32 bytes from the operating system's generator
+(`Token::generate`), shown once as `bat_` and 64 lowercase hex digits
+(`central_api::ai_runner::token_text`), only its SHA-256 digest kept. It has
+a name (1 to 64 bytes), lives 1 to 366 days (the page offers 90), lists 1 to
+16 AI accounts, and is revocable. At most 32 are live at once and 32 are made
+in a day. Its making and its revocation are audit events
+(`ai.runner_token_created`, `ai.runner_token_revoked`) that name it by id in
+`audit_events.ai_runner_token_id`, never by name or digest. It does not die
+with its maker's role, unlike a report token: it plays AI accounts and opens
+no administration, every administrator sees and revokes every token, and a
+runner should not stop because the administrator who set it up stepped down.
+
+**No password, no recovery.** The creation path writes the account with a
+sealed credential: fixed bytes that no OPAQUE record parses, a random master
+key wrapper, recovery wrapper and document that nothing can open, and an
+unguessable login name (`ai-` and 20 hex digits). So every check that asks for
+an enrolled account (`credential IS NOT NULL`, the revision, the table's
+CHECKs) holds unchanged, and nothing has to tell an AI from a person to stay
+correct. On top of that the store answers an AI account's login name and
+credential as it answers an unknown name, and every password, reset,
+recovery, address, pairing and deletion flow refuses an AI account (§1), so
+none of them can ever give one a password.
+
+**The exchange.** On the native listener, without an `Authorization`
+header, the runner sends `wire::Request::AiRunnerSession { token, account }`
+and gets `wire::Response::AiRunnerSession { token, identity, expires_at }`:
+an ordinary native session and the same signed bearer an OPAQUE sign-in
+yields, so admission, the seat claim and the relay need no change. In one
+transaction, in this order:
+
+1. the token row by digest, live (not revoked, not expired) and listing
+   `account`, `FOR SHARE`; the fetched digest is compared with the presented
+   one in constant time as well. A revocation waits for the exchange and then
+   ends its session too; an exchange that waited for a revocation finds no row;
+2. the account row `FOR UPDATE`, which must be enrolled and an AI player.
+   `enabled` is not asked: a switched-off AI still rolls over to end its
+   running matches (§5);
+3. the account's runner sessions: expired ones are deleted, and while four
+   live ones remain the oldest is deleted;
+4. the new session, `kind = 'native'`, `runner_token` set, 30 minutes;
+5. the token's `last_used_at`, the account's `last_sign_in_at` (the page's
+   "last runner sign-in") and a row in `ai_runner_signins` (token, account,
+   time), the exchange's audit, kept 90 days and pruned by the exchange.
+
+Every refusal is the same `Rejected`: unknown, revoked or expired token, an
+account it does not list, an account that is no AI any more. The sessions
+ended in step 3, and those a revocation ends, are handed to the push sockets
+as ended, as a sign-out's are. Budgets: 60 exchanges an hour from one address,
+and after 30 refused ones in an hour the store is not asked again from it;
+12 successful exchanges an hour for one account, so a thief cannot churn the
+runner's sessions faster than that.
+
+**Up to four sessions.** An AI account may hold up to four minted native
+sessions at once (`central_api::ai_runner::MAX_SESSIONS`); a fifth exchange
+ends the oldest. The table's one-native-session rule
+(`sessions_one_per_account`) becomes a partial index over the sessions no
+token minted, so every person's session and every row the previous binary
+writes keep it. Each runner session lives 30 minutes, is renewed, and ends at
+most 12 hours after its exchange. The runner rolls over: new offers go under
+a newer session while older ones finish their matches. No drain rule is
+needed, and no new sign-in ends a running match. Fill-in still seats an AI
+only through an offer whose session has `drain_minutes` left before its cap.
+
+**Revocation** ends every session the token minted, in the same transaction;
+each `sid` is revoked by the trigger, so the hosts drop those seats. It needs
+no fresh password, like switching an AI off: it only takes exposure away, and
+it is audited. A token's list is fixed when it is made; to change it, an
+administrator makes a new token and revokes the old one. Removing an AI
+account ends its sessions by cascade.
+
+**Transport.** The runner reaches Central's public native endpoint over
+TLS from any machine. There is no address allowlist and no file of
+passwords; the runner keeps its token in a root-only credential of its unit
+and its sessions in memory. In `central-client` it calls
+`ai_runner_session(transport, &token, account)`, which answers a `Session`
+without a master key: the operations that need one (the document, objects,
+chat keys, the vault key, a password change, pairing) refuse.
 
 **What a thief gains.** With a token, a thief gets runner sessions for the
 accounts the token lists until an administrator revokes it. A person could
 then play people as "the AI", which is the worst case; it is bounded by the
 token's accounts and ends at once on revocation. The thief cannot reach an
-account the token does not list, a website session, the administration or
-a person's account. *Recommended:* one token per machine, 90 days of life,
-and a runner that alerts when its token is refused.
+account the token does not list, a website session, the administration, a
+person's account, or a password, address or recovery code for the AI
+account. *Recommended:* one token per machine, 90 days of life, and a runner
+that alerts when its token is refused.
 
 ## 3. Fill-in
 
