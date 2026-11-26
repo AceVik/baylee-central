@@ -33,6 +33,30 @@ These are engineering passes, not independent external audits. Separate agent
 reviews and their scope are recorded below. Release still needs independent review
 and operational/legal gates.
 
+## Account download for never-restored accounts, 26 November 2026
+
+Design pass: a registered account that has only used the website never confirms a
+vault restore, since `ConfirmRestore` is the native client's. Every read the website's
+download makes was checked for that gate. AccountExport, e-mail status, the challenge
+and Tower-run exports, presence, profile details, pictures and the ranked export do not
+require it. The Echoes totals and receipt export did, so the whole download failed with
+`Rejected` for such an account (GDPR Art. 15 and 20 self-service). Invariant: the own-data
+reads keep every other gate and stay keyed by the session's account. Writes keep the
+restore requirement.
+
+Implementation pass: only the shared `caller` of the two Echoes reads changed. It still
+requires a live session of the right surface, the current credential revision, an
+enrolled credential and, for a native session, a password proof within 12 hours.
+Delivery (`write.rs`) still answers `Conflict` until the restore. No island swallows
+an error.
+
+Adversarial pass: the PostgreSQL suite reads a never-restored account's totals and
+export on both surfaces (zero, empty, no cursor). Another account's receipts stay out
+of it, while that account still reads its own. A cookie presented as a native bearer
+and the reverse are refused, as is an unknown token. A delivery to the unrestored
+account remains `Conflict`. This is the implementing agent's engineering review, not
+an independent audit.
+
 ## Ranked export and closed-ticket pruning, 26 November 2026
 
 Design pass: the assets are one account's ranked history and, in the same rows,
