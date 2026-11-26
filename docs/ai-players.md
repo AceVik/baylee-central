@@ -781,7 +781,7 @@ Built as §2 says, with one change to step 1 (below):
 
 - **Migration 000054** (`m20261126_000054_ai_runner_tokens`): the tables
   and columns of §9, and their exact grants in `ops/grants.sql` and the
-  startup check. Committed alone first (`dcc1a658`), with the store and its
+  startup check. Committed alone first (`0591f665`), with the store and its
   startup check as before, so that the previous binary's suite runs over the
   new schema: see "Evidence" below.
 - **`central-api`**: `ai_runner` (`TOKEN_PREFIX` `bat_`, `token_text`,
@@ -850,16 +850,18 @@ accounts in both are made by one helper each (`ai_account`), which the
 next step rewrites.
 
 **Evidence (26.11.2026),** on the owner's Mac under a load average of 40 to
-75 from other sessions. `cargo clippy --all-targets --all-features -D
-warnings` over `central-api`, `-client`, `-identity`, `-http`, `-postgres`
-and `-migration`, and their tests: `central-api` 194, `central-client` 26
-and 5, `central-http` 173 and 7, `central-identity` 158,
-`central-migration` 7, `central-postgres` 46, all green. The store suite
-(`cargo xtask postgres --store-only`) at `7c11f3ab`: green in 829 s, with
-the suite's five-minute deadline raised locally and not committed; one run
-before it stopped at a connection timeout ahead of every account test. The
-previous binary over the migrated schema, at `dcc1a658` (the migration and
-the grants alone): its startup check accepted the schema, and its store
+75 from other sessions. After the rebase onto `main`: `cargo clippy
+--all-targets --all-features -D warnings` over `central-api`, `-client`,
+`-identity`, `-http`, `-postgres`, `-migration` and `-web`, and the tests
+of the first six: `central-api` 199, `central-client` 26 and 5,
+`central-http` 173 and 7, `central-identity` 159, `central-migration` 7,
+`central-postgres` 46, all green. The store suite
+(`cargo xtask postgres --store-only`) at `7c11f3ab` (`aec7810d` after the
+rebase onto `main`): green in 829 s, with the suite's five-minute deadline
+raised locally and not committed; one run before it stopped at a connection
+timeout ahead of every account test. The previous binary over the migrated
+schema, at `dcc1a658` (`0591f665` after the rebase; the migration and the
+grants alone): its startup check accepted the schema, and its store
 suite ran green through the sessions, ranked (with the AI path), advent,
 gateway, one-session, objects, terms, registration, password,
 administration, reset, deletion, pairing and report checks before it
