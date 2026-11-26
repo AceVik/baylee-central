@@ -172,6 +172,13 @@ GRANT SELECT, UPDATE (fill_in_after, drain_minutes, global_seats, host_reserve, 
 GRANT SELECT, INSERT, DELETE, UPDATE (session_digest, commitment, renewed_at, expires_at)
   ON central_identity.ai_offers TO central_runtime;
 GRANT SELECT, INSERT ON central_identity.ranked_ticket_ai, central_identity.ai_matches TO central_runtime;
+-- AI runner tokens (docs/ai-players.md section 2): stored by digest with the
+-- accounts they list; afterwards only their revocation and last use change,
+-- and none is deleted. Each exchange is kept 90 days and then pruned.
+GRANT SELECT, INSERT (name, digest, created_by, created_at, expires_at),
+  UPDATE (revoked_at, revoked_by, last_used_at) ON central_identity.ai_runner_tokens TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.ai_runner_accounts TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.ai_runner_signins TO central_runtime;
 
 -- Only the operator stages a legacy source. The authenticated transfer advances or retires it.
 GRANT SELECT, DELETE, UPDATE (next_page) ON central_identity.legacy_deck_transfers TO central_runtime;

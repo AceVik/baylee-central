@@ -194,7 +194,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        52
+        53
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -316,7 +316,13 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
     operator
         .execute_unprepared(
-            "DROP TABLE central_identity.ai_matches, central_identity.ranked_ticket_ai,
+            "ALTER TABLE central_identity.sessions DROP COLUMN runner_token;
+             DROP INDEX IF EXISTS central_identity.sessions_one_per_account;
+             CREATE UNIQUE INDEX sessions_one_per_account ON central_identity.sessions(account_id, kind);
+             DROP TABLE central_identity.ai_runner_signins, central_identity.ai_runner_accounts,
+                        central_identity.ai_runner_tokens;
+             ALTER TABLE central_identity.audit_events DROP COLUMN ai_runner_token_id;
+             DROP TABLE central_identity.ai_matches, central_identity.ranked_ticket_ai,
                         central_identity.ai_offers, central_identity.ai_settings, central_identity.ai_players;
              DROP INDEX central_identity.gateway_sids_ai_match, central_identity.gateway_sids_one_each,
                         central_identity.gateway_sids_one_ranked;
@@ -388,7 +394,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        52
+        53
     );
     assert_eq!(
         scalar(

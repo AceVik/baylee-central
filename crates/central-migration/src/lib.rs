@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 52] = migrations![
+const MIGRATIONS: [Migration; 53] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -88,6 +88,7 @@ const MIGRATIONS: [Migration; 52] = migrations![
     "m20261124_000051_friend_invites",
     "m20261125_000052_report_tokens",
     "m20261126_000053_ai_players",
+    "m20261126_000054_ai_runner_tokens",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -211,7 +212,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 52);
+        assert_eq!(MIGRATIONS.len(), 53);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -243,7 +244,7 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(52));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(53));
         assert_eq!(
             pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
             Some("m20261119_000033_presence")
@@ -309,8 +310,10 @@ mod tests {
     /// `gateway_sids` changes, and only for rows marked as an AI seat.
     #[test]
     fn ai_players_migration_keeps_people_s_sid_rules() {
-        let m = MIGRATIONS.last().expect("AI players migration is present");
-        assert_eq!(m.name, "m20261126_000053_ai_players");
+        let m = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "m20261126_000053_ai_players")
+            .expect("AI players migration is present");
         for said in [
             "CREATE TABLE central_identity.ai_players",
             "CONSTRAINT ai_model_capped CHECK (kind <> 'model' OR daily_games IS NOT NULL)",
@@ -338,6 +341,40 @@ mod tests {
             assert!(m.sql.contains(&revoke), "{table}");
         }
         // No existing table gains or loses a grant here.
+        assert!(!m.sql.contains("GRANT"));
+    }
+
+    /// A runner token is stored by its digest alone; a session it minted
+    /// names it and goes with it; a person's sessions, and every row a binary
+    /// from before writes, keep the one-session rule.
+    #[test]
+    fn ai_runner_tokens_migration_keeps_people_s_one_session_rule() {
+        let m = MIGRATIONS.last().expect("runner tokens migration is present");
+        assert_eq!(m.name, "m20261126_000054_ai_runner_tokens");
+        for said in [
+            "CREATE TABLE central_identity.ai_runner_tokens",
+            "pg_catalog.uuid_extract_version(id) IS NOT DISTINCT FROM 7",
+            "digest bytea NOT NULL UNIQUE CHECK (octet_length(digest) = 32)",
+            "name text NOT NULL CHECK (octet_length(name) BETWEEN 1 AND 64)",
+            "expires_at <= created_at + interval '366 days'",
+            "(revoked_by IS NULL OR revoked_at IS NOT NULL)",
+            "REFERENCES central_identity.ai_players(account_id) ON DELETE CASCADE",
+            "PRIMARY KEY (token_id, account_id)",
+            "ADD COLUMN runner_token uuid",
+            "CHECK (runner_token IS NULL OR kind = 'native')",
+            "FOREIGN KEY (runner_token, account_id)\n        REFERENCES central_identity.ai_runner_accounts(token_id, account_id) ON DELETE CASCADE",
+            "DROP INDEX central_identity.sessions_one_per_account",
+            "sessions(account_id, kind)\n    WHERE runner_token IS NULL",
+            "ADD COLUMN ai_runner_token_id uuid",
+        ] {
+            assert!(m.sql.contains(said), "{said}");
+        }
+        for table in ["ai_runner_tokens", "ai_runner_accounts", "ai_runner_signins"] {
+            let revoke = format!("REVOKE ALL ON central_identity.{table} FROM PUBLIC");
+            assert!(m.sql.contains(&revoke), "{table}");
+        }
+        // No existing table gains or loses a grant here: sessions and the
+        // audit have table-wide grants that cover a new column.
         assert!(!m.sql.contains("GRANT"));
     }
 }
