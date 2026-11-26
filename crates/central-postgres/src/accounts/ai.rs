@@ -311,7 +311,9 @@ impl AccountStore {
             Action::AiFlagged
         };
         tx.execute_raw(statement(
-            "UPDATE central_identity.accounts SET display_name = $2 WHERE id = $1",
+            "UPDATE central_identity.accounts SET display_name = $2,
+               display_name_at = pg_catalog.clock_timestamp()
+             WHERE id = $1 AND display_name IS DISTINCT FROM $2",
             vec![account.into(), settings.display_name.clone().into()],
         ))
         .await

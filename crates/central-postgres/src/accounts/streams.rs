@@ -104,7 +104,11 @@ async fn assigned_match(
     // A standby reassignment may change only the replica row. Acquire the same
     // parent lock as routing *before* taking the snapshot of roles and grants.
     tx.query_one_raw(statement(
-        &format!("SELECT m.id FROM {seated} FOR SHARE OF m"),
+        // This statement binds two values: the account and the named match.
+        &format!(
+            "SELECT m.id FROM {} FOR SHARE OF m",
+            seated.replace("$4", "$2")
+        ),
         vec![account.into(), ai_seat.into()],
     ))
     .await

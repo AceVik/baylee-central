@@ -15,7 +15,7 @@ scope; where a choice here could block one, the section says why it does not.
 ## What it must keep
 
 Assets: a person's choice not to meet an AI; whether an account is an AI
-(who decides that, and who sees it); the AI accounts' passwords; the ladder's
+(who decides that, and who sees it); the AI runner tokens; the ladder's
 integrity; host capacity and relay slots; the queue rules people rely on.
 
 Invariants:
@@ -39,14 +39,17 @@ Invariants:
    the host slots kept for people.
 7. From the commit of an administrator's switch-off, the AI gets no new
    match. Its running matches end normally.
-8. The runner holds no new kind of credential.
+8. The runner holds only an AI runner token: scoped to listed AI accounts,
+   kept as a digest, revocable, audited; an AI account has no password.
 9. A person's AI preference reaches neither the opponent, nor a host, nor a
    public view.
 
 ## 1. Representation
 
-An AI player is an ordinary enrolled account that an administrator marks as
-an AI. A new table, `central_identity.ai_players`:
+An AI player is an account an administrator creates as an AI on the website
+(owner, 26.11.2026): a name with the `KI-` prefix, a tag, the settings below,
+and no password (§2). A person's account is never converted. Its AI state
+lives in a new table, `central_identity.ai_players`:
 
 | Column | Meaning |
 | --- | --- |
@@ -54,7 +57,6 @@ an AI. A new table, `central_identity.ai_players`:
 | `kind` | `house`, `model` or `net` |
 | `profile` | the runner's key for the mind, such as `house:expert` (`^[a-z]{1,12}:[a-z0-9_.-]{1,48}$`) |
 | `label` | the public label, such as "Haus-KI · Expert": 1 to 40 characters, no control characters |
-| `fair` | false only for a level that sees hidden cards (`house:seer`, a later stage) |
 | `enabled` | takes part in fill-in and the carousel; false until an administrator switches it on |
 | `max_games` | matches at once, 1 to 16, default 1 |
 | `daily_games` | games a UTC day, `NULL` for no cap; a CHECK requires it for `model` |
@@ -72,10 +74,13 @@ The transaction that changes a row locks the account row first and checks:
 - **The mind is fixed.** `kind` and `profile` never change. A different
   mind is a different account, because the name is the measurement
   (concept §"Who plays"). Before the first match an administrator clears and
-  flags again. `label`, `fair`, `max_games`, `daily_games`, `enabled` and the
+  flags again. `label`, `max_games`, `daily_games`, `enabled` and the
   display name may change.
+- **Fair only.** Every ranked AI is a fair remote seat (owner, 26.11.2026):
+  a profile that sees hidden cards (`house:seer`) is refused, by the code and
+  by a CHECK in the table, and the badge says nothing of fairness.
 - **No administration through an AI.** `SetAdmin` refuses a flagged account,
-  so an AI's password never opens the administration.
+  so an AI's token never opens the administration.
 - **The administrator owns the AI's public face.** The display name is set
   with the flag and begins with the reserved prefix of §6. For a flagged
   account Central refuses the account's own profile changes (name, picture,
@@ -105,68 +110,46 @@ enough, and it keeps `accounts` and its grants as they are (§9).
 
 ## 2. How the runner signs in
 
-The runner is the seat agent on the game server (concept §"Running it on one
-server"). It signs in to each AI account as a native client does, with OPAQUE
-and a native session that it renews. No new credential class.
+*The owner's decision of 26.11.2026 replaced this note's first design, a
+password per AI account.* AI accounts have no password. An administrator
+creates each AI account on the website (§1) and issues an **AI runner
+token** for each runner machine, bound to the AI accounts that machine may
+play. The token follows the machine-credential pattern of report tokens
+(migration 000052): 32 random bytes, shown once, only its SHA-256 digest
+kept, at most 366 days of life, revocable, its issue and revocation audited.
 
-**Credentials.** Each AI account has a username and a password of 32 random
-bytes. The operator generates the password when registering the account. The
-credentials live in one root-owned file, mode `0600`, which systemd hands
-only to the seat agent's unit (`LoadCredential=`). The file is outside
-`/etc/baylee` and outside every repository. A credential never goes into an
-argument, the environment or a log. The runner keeps sessions in memory only.
+- **No password, no recovery.** The creation path writes the account
+  without an OPAQUE record anyone could use and without a recovery wrapper.
+  Every password, reset, recovery, pairing and deletion flow refuses an AI
+  account, so none of them can ever succeed for one.
+- **The exchange.** On the native listener the runner trades a live token
+  for a session of one of the token's accounts. That session is an ordinary
+  native session with the same signed bearer an OPAQUE sign-in yields, so
+  admission, the seat claim and the relay need no change. The session row
+  names the token that minted it.
+- **Up to four sessions.** An AI account may hold up to four minted native
+  sessions at once; a fifth exchange ends the oldest. Each lives 30 minutes,
+  is renewed, and ends at most 12 hours after its exchange. The runner rolls
+  over: new offers go under a newer session while older ones finish their
+  matches. No drain rule is needed, and no new sign-in ends a running match.
+  Fill-in still seats an AI only through an offer whose session has
+  `drain_minutes` left before its cap.
+- **Revocation** ends every session the token minted, in the same
+  transaction; each `sid` is revoked by the trigger, so the hosts drop those
+  seats. Taking an account off a token's list ends that account's sessions
+  of that token.
+- **Transport.** The runner reaches Central's public native endpoint over
+  TLS from any machine. There is no address allowlist and no file of
+  passwords; the runner keeps its token in a root-only credential of its unit
+  and its sessions in memory.
 
-**One native session per account.** `issue_session` deletes the account's
-earlier native session, and with it every gateway `sid` of that session. That
-revokes the seat at its host. Consequences:
-
-- The runner renews each session about every ten minutes. A session expires
-  30 minutes after its last renewal and at most 12 hours after its sign-in.
-- It signs in again only while the account has no live match. So that such a
-  moment comes before the 12-hour cap, Central seats an AI only while its
-  session has at least `drain_minutes` (2 hours) left before the cap. The
-  runner signs in anew as soon as the account is idle and the cap is less than
-  4 hours away, or after its last match once Central has stopped seating it.
-- A runner restart is a new sign-in. A match whose AI seat returns within the
-  host's reconnect window goes on: `host::claim` checks the newly presented
-  `sid` and sets `claimed_*` only once, so a seat can claim again with a fresh
-  proof. Whether the host takes the seat back under the new `sid` is the game
-  repository's behaviour and is to be confirmed there. Other matches end as
-  the host's rules say. A deploy switches the AIs off first and waits.
-
-**Rotation.** Switch the AI off (§5), wait until its matches have ended,
-change the password as that account through the ordinary password change,
-replace the file, switch the AI on. The new credential revision ends every
-session of the old password. Rotate whenever the file may have been seen.
-
-**What a thief gains.** With an AI's password, a thief can sign in to it
-natively. That throws the runner out and ends the AI's running matches; the
-runner notices because its renewal is `Rejected`. The thief can then offer
-decks and play the AI's fill-in matches as a person posing as the AI, which
-is the worst case. They can lose on purpose to a friend and so move points,
-and they can read the account's own ranked data and vault. They cannot flag,
-unflag, switch on, rename, relabel or raise `max_games` (all administrator
-changes), sign in on the website, reach the administration, another account
-or any host credential.
-
-*Hardening, recommended (open question 4):* Central accepts a native sign-in
-to a flagged account only from configured runner addresses
-(`ai.sign_in_from`, loopback when Central and the runner share the host). The
-address is compared, never stored. The administration shows an AI's last
-sign-in, and the runner alerts when its session is replaced.
-
-*Why not a new credential.* A long-lived, introspected AI-seat token like
-[Tower access](tower-access.md) would avoid the 12-hour drain and the
-one-session rule. It would also be a new credential with its own issuance,
-revocation, storage and tests, and its `sid`s would meet the same unique
-indexes as a session's (§4). The default works with the drain rule and the
-changes of §4. Reconsider it only if measurements show that the drain costs
-real availability.
-
-*Also set aside:* several native sessions for one AI account, one for each
-game slot. That would leave the `sid` indexes alone but break the rule that an
-account holds one native session of each kind. It would also hide a thief: a
-sign-in would take a free slot instead of throwing the runner out.
+**What a thief gains.** With a token, a thief gets runner sessions for the
+accounts the token lists until an administrator revokes it. A person could
+then play people as "the AI", which is the worst case; it is bounded by the
+token's accounts and ends at once on revocation. The thief cannot reach an
+account the token does not list, a website session, the administration or
+a person's account. *Recommended:* one token per machine, 90 days of life,
+and a runner that alerts when its token is refused.
 
 ## 3. Fill-in
 
@@ -317,7 +300,7 @@ operations:
 
 - `Offer { offers }` takes at most three (format, commitment) pairs and
   replaces the set. It is accepted only while the AI is enabled.
-- `Work` answers with the account's AI settings (kind, profile, label, fair,
+- `Work` answers with the account's AI settings (kind, profile, label,
   enabled, `max_games`), its live matches (`reserved` or `playing`, at most
   `max_games`), each as the `Assignment` a person gets, and when its offers
   expire. A disabled AI gets an answer too, so its running matches can end.
@@ -383,20 +366,17 @@ match: admission (the `assigned_match` branch) and the host's start and
 finish do not ask for `enabled`, so the match ends normally. `Work` tells the
 runner to stop offering. `global_seats = 0` stops every AI the same way.
 
-Ending running matches as well needs the AI's sessions to end. Issuing a reset
-code ends nothing ([account reset](account-reset.md)). What ends every
-session today is a new password: the operator changes the AI's password
-natively, or redeems a reset code an administrator made. An administrator's
-own way to end an account's sessions comes with the account locks of the
-administration's step 6. Open question 6 asks whether switching off should
-need a recent password.
+Ending running matches as well needs the AI's sessions to end: an
+administrator revokes the runner token, or takes the account off its list,
+which ends the sessions it minted in the same transaction (§2). Switching off
+needs no recent password (open question 6, recommended and taken).
 
 ## 6. Labelling
 
 **The badge.**
 
 ```rust
-pub struct AiBadge { pub kind: AiKind, pub label: String, pub fair: bool }
+pub struct AiBadge { pub kind: AiKind, pub label: String }
 pub enum AiKind { House, Model, Net, #[serde(other)] Other }
 ```
 
@@ -417,6 +397,13 @@ same. The implementation pass proves the catch-all with a test.
 - `QueueState::Finished.opponent_ai`
 - `QueueState::Waiting.ai_fill_in_at`
 - the administration's account rows
+
+A public board also takes a filter (owner, 26.11.2026, "proper statistics"):
+`Request::Board.players` is `everyone` (absent on the wire, as before),
+`people` or `ai`. Later stages add a runner's per-game report, a model
+ranking and the administration's usage numbers (Baylee's concept,
+§"Statistics and features"); `ai_matches` keeps one row per match with an AI
+seat for them to hang off, and nothing here blocks them.
 
 **Backward compatibility.** Every type in `central-api`'s ranked module has
 `deny_unknown_fields`, and the Baylee client decodes with those types. A field
@@ -481,7 +468,7 @@ SQL can end a season or open a new one (open question 5).
 | Threat | Control | Check for the adversarial pass |
 | --- | --- | --- |
 | A person makes their account look like an AI | Only an administrator flags an account (browser listener, recent password, audited). The badge comes from `ai_players` and never from a request. People cannot choose the prefixes `KI-` and `AI-`. | Every `Ai` request with a person's session is `Rejected`. A name change to either prefix is refused. No reply carries a badge for an unflagged account. |
-| A stolen AI password: a person plays people as "the AI" | Native sign-in only, the address allowlist if adopted, the runner's alert when replaced, the last sign-in in the administration, the switch, a new password | A sign-in from another address is refused, and a browser sign-in is refused. A replaced session's offers vanish by cascade, and no match is made from them. |
+| A stolen AI runner token: a person plays people as "the AI" | The token's account list, its lifetime, digest-only storage, an administrator's revocation that ends its sessions at once, the runner's alert, the audit | A revoked token mints nothing and its sessions are gone in the same transaction. A token never mints a session for an account it does not list. A fifth session ends the oldest. Password, reset and recovery flows refuse an AI account. |
 | An AI passes as a person | The flag stays after the first match. `kind` and `profile` have no `UPDATE` grant. No own profile change, deletion, administrator role, social request or lobby admission. | Clearing after a match is refused. `SetAdmin` on a flagged account is refused. An AI account's Join, contact request, whisper and `admit` grant are refused. |
 | A ticket that refused AIs meets an AI | AI accounts cannot Join. Fill-in reads the ticket's choice. The carousel pairs AIs only. As a second guard, `matchmaking::candidate` excludes flagged accounts. | Every path is tried with a `none` ticket and an eligible AI: no match. An absent field decodes as `none`. |
 | An old client gets an AI without a badge | An absent `ai` is `none`. Protocol `2` replies carry no new field, and AI names carry the prefix. | A protocol `2` Join waits past 60 s and gets no AI. A protocol `2` board decodes with the old types. |
@@ -490,7 +477,7 @@ SQL can end a season or open a new one (open question 5).
 | Exhausting hosts or relays with AI matches | `host_reserve`; `global_seats` at most 16 against 64 relay slots and 32 sockets an address | Fill-in is refused when a host would fall below its reserve. A match between two AIs counts two seats. |
 | A dead runner leaves a person stranded | Offers live 45 s. A match the AI never claims becomes void after the 2-minute lease, as today. | Offer expiry. The void and the person's next search. |
 | The switch races a fill-in | The switch locks the AI row, and fill-in counts after the same lock. | Interleaved switch and fill-in: no match after the switch commits. |
-| The AI flag or a person's preference leaks | Public: kind, label and fair. The administration only: profile, caps, who flagged. A person's preference lives only in `ranked_ticket_ai`, in no reply but their own, in no host's work and no public view. `ai_fill_in_at` ignores other people's tickets. | Replies to the opponent, host work and public reads hold no preference. The host's assignment is unchanged. |
+| The AI flag or a person's preference leaks | Public: kind and label. The administration only: profile, caps, who flagged. A person's preference lives only in `ranked_ticket_ai`, in no reply but their own, in no host's work and no public view. `ai_fill_in_at` ignores other people's tickets. | Replies to the opponent, host work and public reads hold no preference. The host's assignment is unchanged. |
 | A fence names another match | The AI branch of `assigned_match` requires the account to sit in the match. `owned` and `RelayRoute` check it as today. | A foreign match's fence is refused. |
 | An AI in a protected (replicated) match | Fill-in and the carousel never create `ranked_replicas`. The replicated rules are unchanged. | AI matches are never protected. |
 
@@ -527,7 +514,7 @@ prove it. The migration is forward-only. Like every migration it is tested for a
 
 | Table | Grant |
 | --- | --- |
-| `ai_players` | `SELECT, INSERT, DELETE`; `UPDATE (label, fair, enabled, max_games, daily_games, changed_at, changed_by)`. `kind`, `profile`, `set_at` and `set_by` are never updated. |
+| `ai_players` | `SELECT, INSERT, DELETE`; `UPDATE (label, enabled, max_games, daily_games, changed_at, changed_by)`. `kind`, `profile`, `set_at` and `set_by` are never updated. |
 | `ai_settings` | `SELECT`; `UPDATE` of every column except the key |
 | `ai_offers` | `SELECT, INSERT, DELETE`; `UPDATE (session_digest, commitment, renewed_at, expires_at)` |
 | `ranked_ticket_ai` | `SELECT, INSERT` |
@@ -554,12 +541,12 @@ prove it. The migration is forward-only. Like every migration it is tested for a
   - the refusals of §1;
   - `grants.rs`.
 - `central-http`: protocol `2` and `3`, the version passed to the reads, and
-  the sign-in address check if it is adopted.
+  and the runner token's exchange.
 - `central-client`: the runner's calls and Join's `ai`.
 - `central-web`: the administration's AI page, and the badge on the player
   page and the boards.
 - Docs: `ranked.md`, `administration.md`, `operations.md` (the credential
-  file, the drain rule, seasons), the draft of the privacy notice, and the
+  runner tokens, seasons), the draft of the privacy notice, and the
   threat model.
 
 **The game repository** pins `central-api` and `central-client` by git
@@ -573,8 +560,9 @@ revision. It changes in step:
   - the countdown from `ai_fill_in_at`;
   - badges from `opponent_ai`, `Participants.ai`, `Row.ai` and
     `Profile.ai`.
-- Seat agent: the ranked runner. It reads the credential file, signs in,
-  renews and follows the drain rule. It offers decks and polls `Work`. For
+- Seat agent: the ranked runner. It exchanges its runner token for a
+  session per AI account, renews it and rolls over to a new one before the
+  cap. It offers decks and polls `Work`. For
   each match it accepts the host's terms, approves the host and opens the
   ranked socket. It reconnects after a restart.
 - The gateway and the engine server change nothing in Stage 1. An AI seat is
@@ -600,9 +588,8 @@ revision. It changes in step:
 3. **AI display names.** *Recommended:* the prefix `KI-` for every AI's name,
    with `KI-` and `AI-` reserved from people. The concept's names become
    labels.
-4. **Sign-in addresses for AI accounts.** *Recommended:* yes, an allowlist
-   (loopback when Central and the seat agent share the server). It takes away
-   most of what a stolen password is worth.
+4. **How the runner signs in.** *Decided by the owner, 26.11.2026:* AI
+   runner tokens per machine, no passwords, no address allowlist (§2).
 5. **Calibration and seasons.** A season has been open since migration
    000035, and no tool ends one or opens another. *Recommended:* calibrate in
    the current test season with fill-in off. Then an operator command
@@ -627,7 +614,8 @@ revision. It changes in step:
   native session per account, and a new sign-in revokes its gateway `sid`s.
   It allows one ranked `sid` per session, in `held_sid` and in two unique
   indexes of `gateway_sids`, and one ticket, and some queries assume a single
-  assigned ticket. Hence §4's offers, its three changes and §2's drain rule.
+  assigned ticket. Hence §4's offers, its three changes and §2's rolling
+  runner sessions.
 - The concept says the 60 s match the queue's own schedule. That holds for a
   quiet queue only: a busy queue opens fully at 120 s, and newcomer
   protection holds back a newcomer more than 350 points away for 10 s. The
@@ -641,4 +629,37 @@ revision. It changes in step:
   once, which the concept's carousel and several-games plans must fit.
 - The concept has admins switch an AI off at once. Switching off works at
   once for new matches. Ending an AI's running matches needs its sessions to
-  end, and today only a new password does that (§5).
+  end, which revoking the runner token does (§5).
+
+## Implementation pass, 26 November 2026 (in progress)
+
+Built on branch `claude/ai-players`, Stage 1 without the runner token:
+
+- **Migration 000053** and its exact grants (`ops/grants.sql`, the startup
+  check). The previous binary runs over the migrated schema: its own store
+  suite, at the commit with the migration and the grants alone (the store and
+  its startup check as before), passes. See "Evidence" below.
+- **`central-api`**: `AiOpponents` on `SeatRequest::Join`, `BoardPlayers` on
+  `Request::Board`, `ranked::ai` (`AiBadge`, `AiKind`, `Offer`, the runner's
+  `Request` and `Response`), the badge fields of §6, the administration's
+  AI requests, and `PROTOCOL_VERSION` 3 with `PROTOCOL_VERSIONS` 2 and 3.
+  `wire::Response::omit_ai` names every answer, so a new one does not
+  compile until it is decided; a test decodes every changed reply, sent down
+  the protocol 2 path, with frozen copies of protocol 2's types.
+- **`central-http`**: serves 2 and 3, and leaves out what 3 added for a
+  caller of 2.
+- **`central-postgres`**: fill-in after `pair` with the policy as one pure
+  function (`ranked/fill_in/policy.rs`); offers and `Work`; the AI branches
+  of `assigned_match` and `held_sid` with `gateway_sids.ai_seat`;
+  `max_games`, `global_seats` and `host_reserve` counted after their locks;
+  the switch, the settings and their audit; the badges on boards, profiles,
+  participants, assignments and receipts; the board filter; the refusals of
+  an AI's Join, browser sign-in, lobby admission and administrator role.
+- **`central-client`**: `Session::ai` for the runner, and Join's `ai`.
+
+Not yet built: the runner token (§2: issuance, exchange, up to four
+sessions, revocation), the creation path for AI accounts (until it lands,
+an administrator flags an enrolled account that has never played; the
+owner's decision makes that path go), the refusals of social requests,
+deletion, Tower, password, reset and recovery for AI accounts, the website's
+administration page and badges, and the operator docs.

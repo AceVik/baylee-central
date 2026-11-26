@@ -80,26 +80,27 @@ async fn ai(store: &AccountStore, token: &Token, request: AiRequest) -> Result<A
     }
 }
 
-async fn person(store: &AccountStore, keys: &ServerKeys, name: &str) -> (Token, [u8; 16]) {
+async fn person(
+    store: &AccountStore,
+    keys: &ServerKeys,
+    name: &str,
+) -> (Token, [u8; 16], central_api::wire::Identity) {
     let identity = enroll(store, keys, name, name).await;
     let token = login(store, keys, identity).await;
     store.confirm_restore(&token, 1).await.unwrap();
     store.close_legacy(name, identity).await.unwrap();
-    (token, identity.account)
+    (token, identity.account, identity)
 }
 
 pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &ServerKeys) {
-    let (owner, _) = person(store, keys, "ai-fixture-owner").await;
-    let (admin, admin_id) = person(store, keys, "ai-fixture-admin").await;
-    let (pia, pia_id) = person(store, keys, "ai-fixture-pia").await;
-    let (quinn, quinn_id) = person(store, keys, "ai-fixture-quinn").await;
-    let (rosa, rosa_id) = person(store, keys, "ai-fixture-rosa").await;
-    let (bot, bot_id) = person(store, keys, "ai-fixture-bot").await;
+    let (owner, _, _) = person(store, keys, "ai-fixture-owner").await;
+    let (admin, admin_id, admin_identity) = person(store, keys, "ai-fixture-admin").await;
+    let (pia, pia_id, _) = person(store, keys, "ai-fixture-pia").await;
+    let (quinn, quinn_id, _) = person(store, keys, "ai-fixture-quinn").await;
+    let (rosa, rosa_id, _) = person(store, keys, "ai-fixture-rosa").await;
+    let (bot, bot_id, bot_identity) = person(store, keys, "ai-fixture-bot").await;
+    let (sam, _, _) = person(store, keys, "ai-fixture-sam").await;
     appoint_admin(db, "ai-fixture-admin").await.unwrap();
-    let admin_identity = central_api::wire::Identity {
-        account: admin_id,
-        epoch: 1,
-    };
     let credential = store.credential(admin_identity).await.unwrap().unwrap();
     let cookie = Token::generate().unwrap();
     store
@@ -174,14 +175,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         Err(Error::Rejected)
     );
     // Native only: a website session is refused.
-    let bot_credential = store
-        .credential(central_api::wire::Identity {
-            account: bot_id,
-            epoch: 1,
-        })
-        .await
-        .unwrap()
-        .unwrap();
+    let bot_credential = store.credential(bot_identity).await.unwrap().unwrap();
     assert_eq!(
         store
             .issue_session(
@@ -233,7 +227,10 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         queue(store, &rosa, Request::Status).await.unwrap(),
         QueueState::Waiting { .. }
     ));
-    // People first: while rosa waits, pia's search gets no AI.
+    queue(store, &rosa, Request::Cancel { key: id(91) })
+        .await
+        .unwrap();
+    // A search that accepts an AI shows when one may come; before 60 s none does.
     let QueueState::Waiting {
         ai_fill_in_at: Some(due),
         queued_at,
@@ -245,10 +242,6 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         panic!("pia waits with a countdown");
     };
     assert_eq!(due, queued_at + 60);
-    queue(store, &rosa, Request::Cancel { key: id(91) })
-        .await
-        .unwrap();
-    // Before 60 s nothing comes; after it the AI does.
     assert!(matches!(
         queue(store, &pia, Request::Status).await.unwrap(),
         QueueState::Waiting { .. }
@@ -298,9 +291,22 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         queue(store, &rosa, Request::Status).await.unwrap(),
         QueueState::Waiting { .. }
     ));
+    // People first: a person who arrives is paired with the person waiting,
+    // never given the AI.
+    let QueueState::Assigned {
+        assignment: people, ..
+    } = queue(store, &sam, join(95, AiOpponents::Local))
+        .await
+        .unwrap()
+    else {
+        panic!("sam meets rosa");
+    };
+    assert_eq!(people.opponent_ai, None);
 
     // One AI session holds a ranked sid for each match; the second grant
     // leaves the first in place. A person's session still holds one.
+    replicas::privacy::approve_all(store, &pia, first.match_id).await;
+    replicas::privacy::approve_all(store, &quinn, second.match_id).await;
     for (seat, fresh) in [(&first, 201), (&second, 202)] {
         replicas::privacy::approve_all(store, &bot, seat.match_id).await;
         store
@@ -354,6 +360,11 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
             .is_err()
     );
 
+    // After its first match the flag stays.
+    assert_eq!(
+        store.set_ai_player(&cookie, bot_id, None).await,
+        Err(Error::Conflict)
+    );
     // Switched off without a fresh sign-in: no new match; running ones stay.
     sql(
         db,
@@ -362,7 +373,10 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         vec![Session::Browser(&cookie).digest().to_vec().into()],
     )
     .await;
-    assert_eq!(store.set_ai_enabled(&cookie, bot_id, true).await, Ok(()));
+    assert_eq!(
+        store.set_ai_enabled(&cookie, bot_id, true).await,
+        Err(Error::Rejected)
+    );
     store.set_ai_enabled(&cookie, bot_id, false).await.unwrap();
     assert_eq!(
         store
@@ -396,14 +410,14 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         .await,
         3
     );
-    // After its first match the flag stays.
+    // A stale sign-in clears nothing either.
     assert_eq!(
         store.set_ai_player(&cookie, bot_id, None).await,
-        Err(Error::Conflict)
+        Err(Error::Rejected)
     );
 
     // Clean up: this suite shares the instance.
-    for match_id in [first.match_id, second.match_id] {
+    for match_id in [first.match_id, second.match_id, people.match_id] {
         store
             .ranked_host(
                 Registered(&host_credential),
