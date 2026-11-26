@@ -112,6 +112,8 @@ pub const fn credential_operation(request: &Request) -> bool {
         | Request::Discover { .. }
         | Request::LoginStart { .. }
         | Request::LoginFinish { .. }
+        // the runner token travels in the body; a bearer of either kind is refused
+        | Request::AiRunnerSession { .. }
         | Request::LegacyLogin { .. }
         | Request::LegacyExport
         | Request::LegacySourcePage { .. }

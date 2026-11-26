@@ -30,6 +30,13 @@ impl IdentityService {
         if let Request::LoginFinish { attempt, message } = request {
             return self.finish(&attempt, message, surface, bearer).await;
         }
+        // A runner's exchange needs no terms: like a sign-in, it has no
+        // session yet whose account could have accepted them.
+        if let Request::AiRunnerSession { token, account } = request {
+            return self
+                .ai_runner_session(&token, account, bearer, surface)
+                .await;
+        }
         if let Request::ChangePasswordFinish {
             attempt,
             proof,

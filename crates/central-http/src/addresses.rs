@@ -50,6 +50,15 @@ pub(crate) const KOFI: u32 = 30;
 /// credential is neither counted nor refused by it.
 pub(crate) const REPORT_REFUSALS: u32 = 30;
 
+/// AI runner exchanges an hour (`docs/ai-players.md` §2): a runner trades its
+/// token for a session per AI account and rolls over every few hours, far
+/// fewer than this.
+pub(crate) const RUNNER_EXCHANGES: u32 = 60;
+/// Refused runner exchanges an hour: past them the store is not asked about
+/// another from the address until the hour is over, as for report tokens
+/// ([`REPORT_REFUSALS`]). A runner whose token was revoked meets it too.
+pub(crate) const RUNNER_REFUSALS: u32 = 30;
+
 /// Each budget's addresses; one is forgotten once its window has passed.
 #[derive(Default)]
 pub(crate) struct Budgets {
@@ -61,6 +70,8 @@ pub(crate) struct Budgets {
     reset_mail: Book,
     kofi: Book,
     report_refusals: Book,
+    runner: Book,
+    runner_refusals: Book,
 }
 
 impl Budgets {
@@ -75,6 +86,9 @@ impl Budgets {
             Request::LegacyLogin { .. } => self.legacy.charge(client, now, LEGACY, MINUTE),
             Request::ResetStart { .. } => self.reset.charge(client, now, RESET, HOUR),
             Request::ResetMail { .. } => self.reset_mail.charge(client, now, RESET_MAIL, HOUR),
+            Request::AiRunnerSession { .. } => {
+                self.runner.charge(client, now, RUNNER_EXCHANGES, HOUR)
+            }
             Request::Ranked { request } if request.is_public() => {
                 self.directory.charge(client, now, DIRECTORY, MINUTE)
             }
@@ -99,6 +113,22 @@ impl Budgets {
     pub(crate) fn report_refused(&mut self, client: Client, now: Instant) {
         self.report_refusals
             .charge(client, now, REPORT_REFUSALS, HOUR);
+    }
+
+    /// Whether the store may be asked about a runner token from `client`:
+    /// its refused exchanges in the hour are fewer than [`RUNNER_REFUSALS`].
+    /// Exchanges at once are asked before either is refused, so they may
+    /// pass it by as many as the listener serves at once.
+    pub(crate) fn may_exchange(&self, client: Client, now: Instant) -> bool {
+        !self
+            .runner_refusals
+            .spent(client, now, RUNNER_REFUSALS, HOUR)
+    }
+
+    /// Count a runner exchange of `client` that was refused.
+    pub(crate) fn exchange_refused(&mut self, client: Client, now: Instant) {
+        self.runner_refusals
+            .charge(client, now, RUNNER_REFUSALS, HOUR);
     }
 
     /// Spend one of `client`'s deliveries to Ko-fi's webhook; `false` when none is
@@ -133,7 +163,7 @@ mod tests {
         served
     }
 
-    fn requests() -> [(Request, u32, Duration); 5] {
+    fn requests() -> [(Request, u32, Duration); 6] {
         [
             (
                 Request::Discover {
@@ -178,6 +208,14 @@ mod tests {
                 RESET_MAIL,
                 HOUR,
             ),
+            (
+                Request::AiRunnerSession {
+                    token: Token::generate().unwrap(),
+                    account: [7; 16],
+                },
+                RUNNER_EXCHANGES,
+                HOUR,
+            ),
         ]
     }
 
@@ -198,7 +236,7 @@ mod tests {
             assert!(!budgets.charge(&request, client(1), late));
             assert!(budgets.charge(&request, client(1), start + period));
         }
-        // One operation's budget is not another's: all five were served
+        // One operation's budget is not another's: all six were served
         // for the same address above. A request that needs a session, or
         // any other, has none here.
         for _ in 0..1_000 {
@@ -305,6 +343,39 @@ mod tests {
         // asking remembers nobody
         assert!(budgets.may_present(client(3), start));
         assert!(!budgets.report_refusals.spent(client(3), start, 1, HOUR));
+    }
+
+    /// An address's refused runner exchanges are the last the store is asked
+    /// about for the hour; they are counted apart from refused report tokens
+    /// and spend nothing else.
+    #[test]
+    fn refused_runner_exchanges_are_counted_by_their_address() {
+        let start = Instant::now();
+        let mut budgets = Budgets::default();
+        for _ in 0..RUNNER_REFUSALS {
+            assert!(budgets.may_exchange(client(1), start));
+            budgets.exchange_refused(client(1), start);
+        }
+        assert!(!budgets.may_exchange(client(1), start));
+        assert!(budgets.may_exchange(client(2), start));
+        // a report token from the address is still asked about, and the
+        // other way round
+        assert!(budgets.may_present(client(1), start));
+        for _ in 0..REPORT_REFUSALS {
+            budgets.report_refused(client(2), start);
+        }
+        assert!(budgets.may_exchange(client(2), start));
+        let late = start + HOUR.saturating_sub(Duration::from_secs(1));
+        budgets.exchange_refused(client(1), late);
+        assert!(!budgets.may_exchange(client(1), late));
+        assert!(budgets.may_exchange(client(1), start + HOUR));
+        for (request, limit, _) in requests() {
+            assert_eq!(
+                served(&mut budgets, &request, client(1), start, limit),
+                limit
+            );
+        }
+        assert!(!budgets.runner_refusals.spent(client(3), start, 1, HOUR));
     }
 
     fn served_of(

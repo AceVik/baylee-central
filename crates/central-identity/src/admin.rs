@@ -27,14 +27,7 @@ impl IdentityService {
             }
             AdminRequest::Account { account } => self.account_answer(cookie, account).await?,
             AdminRequest::Audit { account, before } => {
-                let page = self.store.admin_audit(cookie, account, before).await?;
-                AdminAnswer::Audit {
-                    events: page.events,
-                    more: page.more,
-                    accounts: page.accounts,
-                    gateways: page.gateways,
-                    report_tokens: page.report_tokens,
-                }
+                self.audit_answer(cookie, account, before).await?
             }
             AdminRequest::Overview => AdminAnswer::Overview {
                 overview: self.store.admin_overview(cookie).await?,
@@ -109,6 +102,13 @@ impl IdentityService {
             | AdminRequest::AiSettings
             | AdminRequest::SetAiSettings { .. }
             | AdminRequest::StopAllAi) => return self.ai_admin(request, cookie).await,
+            // AI runner tokens (`docs/ai-players.md` §2): making one needs the
+            // fresh sign-in, revoking one does not; the store checks both.
+            request @ (AdminRequest::AiRunnerTokens
+            | AdminRequest::CreateAiRunnerToken { .. }
+            | AdminRequest::RevokeAiRunnerToken { .. }) => {
+                return self.runner_admin(request, cookie).await;
+            }
             AdminRequest::SetTag { account, tag } => {
                 return self.set_tag(cookie, account, tag).await;
             }
@@ -206,6 +206,59 @@ impl IdentityService {
             _ => return Err(Error::Rejected),
         };
         Ok(Response::Admin { answer })
+    }
+
+    /// AI runner tokens (`docs/ai-players.md` §2): the store checks the
+    /// administrator, the fresh sign-in of a making, and writes the audit. A
+    /// revocation ends the sessions the token minted, and their push sockets
+    /// are told, as a sign-out's are.
+    async fn runner_admin(&self, request: AdminRequest, cookie: &Token) -> Result<Response, Error> {
+        let answer = match request {
+            AdminRequest::AiRunnerTokens => AdminAnswer::AiRunnerTokens {
+                tokens: self.store.admin_ai_runner_tokens(cookie).await?,
+            },
+            AdminRequest::CreateAiRunnerToken {
+                name,
+                accounts,
+                days,
+            } => {
+                let token = Token::generate()?;
+                let (id, expires_at) = self
+                    .store
+                    .create_ai_runner_token(cookie, &name, &accounts, days, &token)
+                    .await?;
+                AdminAnswer::AiRunnerTokenCreated {
+                    id,
+                    token,
+                    expires_at,
+                }
+            }
+            AdminRequest::RevokeAiRunnerToken { token } => {
+                for digest in self.store.revoke_ai_runner_token(cookie, token).await? {
+                    self.live.ended(&digest);
+                }
+                return Ok(Response::Done);
+            }
+            _ => return Err(Error::Rejected),
+        };
+        Ok(Response::Admin { answer })
+    }
+
+    /// A page of the audit, with what its events name.
+    async fn audit_answer(
+        &self,
+        cookie: &Token,
+        account: Option<[u8; 16]>,
+        before: Option<[u8; 16]>,
+    ) -> Result<AdminAnswer, Error> {
+        let page = self.store.admin_audit(cookie, account, before).await?;
+        Ok(AdminAnswer::Audit {
+            events: page.events,
+            more: page.more,
+            accounts: page.accounts,
+            gateways: page.gateways,
+            report_tokens: page.report_tokens,
+        })
     }
 
     /// One account as the administration shows it.

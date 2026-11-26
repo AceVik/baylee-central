@@ -252,6 +252,40 @@ fn presented(
         .transpose()
 }
 
+/// An AI runner's exchange from `from` (`docs/ai-players.md` §2). Past
+/// [`crate::addresses::RUNNER_REFUSALS`] refused ones in the hour the store is
+/// not asked again from that address, and each refusal is counted for it; a
+/// `Busy` answer is no refusal.
+async fn exchange(
+    native: &Native,
+    request: wire::Request,
+    presented: Option<&Presented>,
+    from: Option<Client>,
+) -> Result<wire::Response, Error> {
+    if let Some(client) = from {
+        // The guard is gone before anything is awaited.
+        let may = native
+            .budgets
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .may_exchange(client, Instant::now());
+        if !may {
+            return Err(Error::Busy);
+        }
+    }
+    let said = native
+        .identity
+        .handle_from(request, presented, from.map(Place::from))
+        .await;
+    if matches!(said, Err(Error::Rejected))
+        && let Some(client) = from
+        && let Ok(mut budgets) = native.budgets.lock()
+    {
+        budgets.exchange_refused(client, Instant::now());
+    }
+    said
+}
+
 /// One native request from `from`: its bearer read first (a signed session is verified
 /// under its own budget and its address's share of it, unless Central issued or verified
 /// that token before, `limits.rs` and `verified.rs`), then its address's budget for the operation
@@ -307,6 +341,9 @@ async fn process(
                     request: ranked::replica::SeatRequest::RelayRoute { .. },
                 },
         } => return Err(Error::Rejected),
+        request @ wire::Request::AiRunnerSession { .. } => {
+            exchange(native, request, presented.as_ref(), from).await?
+        }
         request => {
             native
                 .identity

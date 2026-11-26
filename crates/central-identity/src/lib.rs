@@ -22,6 +22,7 @@ use tokio::sync::Semaphore;
 
 mod admin;
 mod advent;
+mod ai_runner;
 mod challenge;
 mod challenges;
 pub use challenge::{Agent, Seen};
@@ -202,6 +203,9 @@ pub fn browser_operation(request: &Request) -> bool {
         | Request::TowerAward { .. }
         | Request::ChallengeHost { .. }
         | Request::RankedHost { .. } | Request::AdventHost { .. }
+        // a runner token is traded for a native session, on the native
+        // listener alone (docs/ai-players.md §2)
+        | Request::AiRunnerSession { .. }
         | Request::CreateObject
         | Request::ReadObject { .. }
         | Request::ListObjects { .. }
@@ -1144,6 +1148,11 @@ mod tests {
                 idle: false,
                 table: None,
             },
+            // a runner's exchange is the native listener's alone
+            Request::AiRunnerSession {
+                token: token(),
+                account: [0; 16],
+            },
         ]
         .into_iter()
         .chain(objects())
@@ -1228,7 +1237,7 @@ mod tests {
                 text[start..].split('"').next().unwrap().to_owned()
             })
             .collect();
-        assert_eq!(named.len(), 79, "every operation is in one of the lists");
+        assert_eq!(named.len(), 80, "every operation is in one of the lists");
     }
 
     #[test]
@@ -1260,6 +1269,15 @@ mod tests {
         assert!(only.iter().all(|r| browser_operation(r)));
         assert!(!browser_only(&Request::SessionStatus));
         assert!(!browser_only(&Request::Logout));
+        // A runner's exchange is the native listener's, with no session and
+        // no credential: neither kind of bearer is taken for it.
+        let exchange = Request::AiRunnerSession {
+            token: token(),
+            account: [0; 16],
+        };
+        assert!(!browser_only(&exchange) && !browser_operation(&exchange));
+        assert!(!uses_session(&exchange) && !credential_operation(&exchange));
+        assert!(!terms::needs_acceptance(&exchange));
     }
 
     #[test]

@@ -97,6 +97,16 @@ pub(super) const PLACE_PAIRING_PER_MINUTE: u32 = 240;
 pub(super) const PLACES: usize = 8_192;
 const _: () = assert!(PLACES > 2 * 60 * 64 && PUBLIC_PER_SECOND <= 64);
 const MINUTE: Duration = Duration::from_secs(60);
+const HOUR: Duration = Duration::from_secs(3_600);
+/// AI accounts whose runner exchanges in their hour are remembered: as many
+/// as the tokens live at once and those made in a day can list, since only
+/// an exchange the store answered is counted.
+const RUNNERS: usize = 1_024;
+const _: () = assert!(
+    RUNNERS
+        >= (central_api::ai_runner::LIVE_TOKENS + central_api::ai_runner::TOKENS_PER_DAY)
+            * central_api::ai_runner::MAX_ACCOUNTS
+);
 
 /// Requests a second that come with a bearer no answer has vouched for
 /// ([`Proven`]), all of them together: a made-up token, or a session's
@@ -179,6 +189,9 @@ fn class(request: &Request) -> Class {
         Request::Discover { .. }
             | Request::LoginStart { .. }
             | Request::LoginFinish { .. }
+            // A runner's exchange comes without a bearer, as a sign-in;
+            // its account's own budget is `runner_fits`.
+            | Request::AiRunnerSession { .. }
             // Named, not left to the rule for requests without a
             // session: the table of challenges is sized by this budget
             // (`challenge::HELD`), whatever token comes with the request.
@@ -520,6 +533,9 @@ pub(super) struct Limits {
     /// Each report token's other requests in its hour, and its downloads
     /// among them.
     report_tokens: BTreeMap<[u8; 16], (Instant, u32, u32)>,
+    /// Each AI account's successful runner exchanges in its hour
+    /// ([`central_api::ai_runner::EXCHANGES_PER_HOUR`]).
+    runners: BTreeMap<[u8; 16], (Instant, u32)>,
     /// Signature checks of presented Central tokens.
     signatures: Window,
     /// Each place's share of them, by its block ([`PLACE_SIGNATURES_PER_SECOND`]).
@@ -856,6 +872,31 @@ impl Limits {
         }
         *used += 1;
         Ok(())
+    }
+
+    /// Whether `account` may be given one more runner session this hour
+    /// ([`central_api::ai_runner::EXCHANGES_PER_HOUR`]). It only reads:
+    /// asked before the store, it spends nothing, so exchanges the store
+    /// refuses (a stranger's made-up token for an AI's account) neither use
+    /// up the account's budget nor take room in the table.
+    pub(super) fn runner_fits(&self, account: [u8; 16], now: Instant) -> Result<(), Error> {
+        let spent = self.runners.get(&account).is_some_and(|(start, used)| {
+            now.duration_since(*start) < HOUR && *used >= central_api::ai_runner::EXCHANGES_PER_HOUR
+        });
+        if spent { Err(Error::Busy) } else { Ok(()) }
+    }
+
+    /// Count a runner session the store gave `account`. The table holds the
+    /// accounts that got one in the hour: AI accounts that a live token
+    /// lists, of which there are at most [`RUNNERS`].
+    pub(super) fn runner_exchanged(&mut self, account: [u8; 16], now: Instant) {
+        self.runners
+            .retain(|_, (start, _)| now.duration_since(*start) < HOUR);
+        if !self.runners.contains_key(&account) && self.runners.len() >= RUNNERS {
+            return;
+        }
+        let (_, used) = self.runners.entry(account).or_insert((now, 0));
+        *used = used.saturating_add(1);
     }
 
     /// Spend `requests` of a report token's
@@ -2090,6 +2131,44 @@ mod tests {
         // nothing is kept of a token whose hour is over
         limits.report_token(one, 1, 0, start + 3 * hour).unwrap();
         assert_eq!(limits.report_tokens.len(), 1);
+    }
+
+    /// An AI account gets twelve runner sessions an hour; asking costs
+    /// nothing, so refused exchanges leave its budget and the table alone.
+    #[test]
+    fn an_ai_account_has_its_exchanges_and_asking_spends_none() {
+        use central_api::ai_runner::EXCHANGES_PER_HOUR;
+        let start = Instant::now();
+        let (one, two) = ([1; 16], [2; 16]);
+        let mut limits = Limits::default();
+        // asking alone, however often, spends nothing and remembers nothing
+        for _ in 0..1_000 {
+            limits.runner_fits(one, start).unwrap();
+        }
+        assert!(limits.runners.is_empty());
+        for _ in 0..EXCHANGES_PER_HOUR {
+            limits.runner_fits(one, start).unwrap();
+            limits.runner_exchanged(one, start);
+        }
+        assert_eq!(limits.runner_fits(one, start), Err(Error::Busy));
+        let late = start + HOUR.saturating_sub(Duration::from_secs(1));
+        assert_eq!(limits.runner_fits(one, late), Err(Error::Busy));
+        // another account's are its own
+        limits.runner_fits(two, late).unwrap();
+        // the hour over, it starts again, and the old window is forgotten
+        limits.runner_fits(one, start + HOUR).unwrap();
+        limits.runner_exchanged(two, start + HOUR);
+        assert_eq!(limits.runners.len(), 1);
+        // a full table counts no newcomer and refuses nobody for it
+        let mut full = Limits::default();
+        for n in 0..RUNNERS {
+            let mut account = [0; 16];
+            account[..8].copy_from_slice(&u64::try_from(n).unwrap().to_be_bytes());
+            full.runner_exchanged(account, start);
+        }
+        full.runner_exchanged([0xff; 16], start);
+        assert_eq!(full.runners.len(), RUNNERS);
+        full.runner_fits([0xff; 16], start).unwrap();
     }
 
     #[test]
