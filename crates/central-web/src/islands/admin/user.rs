@@ -58,6 +58,15 @@ fn read_tag(text: &str) -> Option<u32> {
 /// nobody is signed in.
 async fn fetch(cx: Cx, account: [u8; 16]) -> Option<Load> {
     let lang = cx.lang;
+    // an AI player is never shown without its badge
+    let roster = match common::roster().await {
+        Ok(roster) => roster,
+        Err(unread) => {
+            return cx
+                .unread_text(unread, problem_text(lang, Problem::Failed))
+                .map(Load::Failed);
+        }
+    };
     match common::read(AdminRequest::Account { account }).await {
         Ok(AdminAnswer::Account {
             account,
@@ -65,7 +74,7 @@ async fn fetch(cx: Cx, account: [u8; 16]) -> Option<Load> {
             gateways,
             audit,
         }) => Some(Load::Ready(Detail {
-            row: Row::from(account),
+            row: Row::from(account).marked(&roster),
             recovery,
             gateways: gateways
                 .into_iter()
@@ -284,9 +293,19 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
     let a = *a;
     let lang = a.cx.lang;
     let row = &detail.row;
-    // nothing to change on a reserved account, nor one's own role
+    // nothing to change on a reserved account, nor one's own role; an AI
+    // player has no password and no role, and its page holds the rest
     let pending = row.state == AccountState::Pending;
-    let acts = !pending && row.id != a.cx.own;
+    let ai = row.ai.is_some();
+    let acts = !pending && row.id != a.cx.own && !ai;
+    let ai_card = ai.then(|| {
+        view! {
+            <section class="card" aria-labelledby="admin-user-ai">
+                <h2 id="admin-user-ai">{words::admin_ai_account(lang)}</h2>
+                <p>{words::admin_ai_account_text(lang)}</p>
+            </section>
+        }
+    });
     let outstanding = row.reset_until.map(|until| {
         view! { <p class="meta">{words::admin_reset_outstanding(lang, &when(lang, until))}</p> }
     });
@@ -329,6 +348,7 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
             {outstanding}
             {reset}
         </section>
+        {ai_card}
         {(!pending).then(|| tag_card(&a, row))}
         {acts.then(|| role_card(&a, row))}
         {gateways}

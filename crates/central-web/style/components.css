@@ -249,6 +249,30 @@
   color: var(--gold-ink);
 }
 
+/* An AI player's label beside its name (docs/ai-players.md §6): the kind's
+   mark and the administrator's label, cut rather than wrapped where the
+   line is narrow, as a name is. */
+.ai-badge {
+  max-inline-size: 100%;
+  vertical-align: middle;
+}
+
+.ai-badge > bdi {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-ai,
+.preview-user-ai {
+  margin: 0;
+}
+
+.preview-user-ai {
+  display: flex;
+  min-inline-size: 0;
+}
+
 .notice {
   margin-block-start: var(--space-4);
   padding: var(--space-4);

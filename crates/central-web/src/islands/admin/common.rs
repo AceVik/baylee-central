@@ -17,7 +17,8 @@
 
 use std::collections::HashMap;
 
-use central_api::admin::{AdminAnswer, AdminRequest, AuditEvent};
+use central_api::admin::{AdminAiPlayer, AdminAnswer, AdminRequest, AuditEvent};
+use central_api::ranked::ai::AiBadge;
 use central_api::wire::{Request, Response};
 use leptos::prelude::*;
 
@@ -161,6 +162,47 @@ pub async fn read(request: AdminRequest) -> Result<AdminAnswer, Unread> {
     }
 }
 
+/// The AI players' badges by account. The administration's account rows
+/// carry none, so the pages that list or show accounts read the AI players
+/// (`AdminRequest::AiPlayers`) and mark each account that is one
+/// (`docs/ai-players.md` §6).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Roster(HashMap<[u8; 16], AiBadge>);
+
+impl Roster {
+    /// The badges of `players`.
+    pub fn of(players: &[AdminAiPlayer]) -> Self {
+        Roster(
+            players
+                .iter()
+                .map(|player| {
+                    let badge = AiBadge {
+                        kind: player.settings.kind,
+                        label: player.settings.label.clone(),
+                    };
+                    (player.account, badge)
+                })
+                .collect(),
+        )
+    }
+
+    /// The badge of `account`, where it is an AI player.
+    pub fn badge(&self, account: &[u8; 16]) -> Option<AiBadge> {
+        self.0.get(account).cloned()
+    }
+}
+
+/// Reads the AI players' badges.
+///
+/// # Errors
+/// Why they could not be read.
+pub async fn roster() -> Result<Roster, Unread> {
+    match read(AdminRequest::AiPlayers).await? {
+        AdminAnswer::AiPlayers { players } => Ok(Roster::of(&players)),
+        _ => Err(Unread::Other(Problem::Failed)),
+    }
+}
+
 /// The browser's clock, in Unix seconds.
 pub fn now() -> i64 {
     i64::try_from(crate::islands::pow::now_ms() / 1000).unwrap_or(i64::MAX)
@@ -246,6 +288,14 @@ pub fn action_text(lang: Lang, action: &str) -> Option<&'static str> {
         "report_token.revoked" => words::admin_audit_rt_revoked(lang),
         "registration.closed" => words::admin_audit_registration_closed(lang),
         "registration.opened" => words::admin_audit_registration_opened(lang),
+        "ai.created" => words::admin_audit_ai_created(lang),
+        "ai.changed" => words::admin_audit_ai_changed(lang),
+        "ai.removed" => words::admin_audit_ai_removed(lang),
+        "ai.enabled" => words::admin_audit_ai_enabled(lang),
+        "ai.disabled" => words::admin_audit_ai_disabled(lang),
+        "ai.settings_changed" => words::admin_audit_ai_settings_changed(lang),
+        "ai.runner_token_created" => words::admin_audit_ai_runner_token_created(lang),
+        "ai.runner_token_revoked" => words::admin_audit_ai_runner_token_revoked(lang),
         _ => return None,
     })
 }
@@ -1178,6 +1228,14 @@ mod tests {
             "report_token.revoked",
             "registration.closed",
             "registration.opened",
+            "ai.created",
+            "ai.changed",
+            "ai.removed",
+            "ai.enabled",
+            "ai.disabled",
+            "ai.settings_changed",
+            "ai.runner_token_created",
+            "ai.runner_token_revoked",
         ];
         for lang in Lang::ALL {
             let texts: Vec<&str> = all
