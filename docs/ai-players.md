@@ -71,7 +71,8 @@ sign-in is under 30 minutes old, writes the account, its `ai_players` row
 (switched off) and the audit event:
 
 - `source = 'registered'` and a login name `ai-` with 20 hex digits from the
-  operating system's generator. The name is never shown and never guessed.
+  operating system's generator. Nobody signs in with it, nobody can
+  guess it, and only the administration's account rows show it.
 - The **sealed credential**: the fixed bytes `baylee:ai:sealed`
   (`SEALED_CREDENTIAL` in `accounts/ai/lifecycle.rs`), 16 bytes. An OPAQUE
   record has the fixed length of a registration upload, and
@@ -351,8 +352,13 @@ while the person's ticket is still `waiting` and:
 `pair` locks tickets and then hosts. The administration locks
 administrators' account rows, then the AI's account row for no key update
 when it changes or removes one, then the AI row (§1). No path takes them the
-other way round; the match fill-in writes only shares the AI's account key,
-which that lock allows. Fill-in reads eligibility without locks first and takes
+other way round, with one exception, older than the creation path and
+not changed by it: a fill-in for a person who is an administrator shares
+the key of that person's account row when it writes the match, a row the
+administration holds `FOR UPDATE` while it changes an AI. PostgreSQL then
+ends one of the two as a deadlock, which answers `Unavailable` once (open,
+below). The match fill-in writes only shares the AI's own account key,
+which the no-key-update lock allows. Fill-in reads eligibility without locks first and takes
 `ai_settings` only when an AI looks available. When several people wait, no
 fill-in runs at all.
 
@@ -1023,3 +1029,71 @@ Built after the owner's decision that AI accounts have no password:
 - **`Work`** locks nothing; `Offer` alone takes the AI's row. `Work` lists
   every live match up to `MAX_GAMES` (16), and `central-client` checks that
   bound instead of `max_games`.
+
+**What people pay.** Nothing where the terms are read. On the native
+listener a person pays one indexed statement more for each refused request
+that reads no terms and is not served elsewhere: `ReadDocument`,
+`ConfirmRestore`, `KeyCheckStatus`, `SetKeyCheck`, `AccountExport`,
+`DeleteAccountStart` and `DeleteAccountFinish`, `ChangePasswordFinish`,
+`Email` (status, withdrawal, removal), `Presence`, `TowerProgress`,
+`TowerAwardExport`, the task reads, and the ranked `Cancel`,
+`PreviewDeck` and `Export`. The library's operations and the presence
+report cost nothing.
+
+**Open.** A fill-in for a waiting administrator can deadlock with an
+administrator's change of an AI (§3); PostgreSQL ends one and it answers
+`Unavailable` once. Locking the administrators' rows for no key update
+instead would end it, but that touches every administration change and
+needs its own pass. The browser listener's families (profile, pictures,
+badges, recovery and its mail, notifications, the owner's area, pairing's
+start) rest on no AI holding a browser session, which the store suite
+shows for `issue_session`; the gate does not check them there.
+
+**Tests.** Unit tests: the gate's table (every operation decided: a
+service's credential acts on no session, what needs the terms or the
+cookie acts on one, the website's own operations are never the runner's,
+the runner's list outside ranked play, each refused family named; the
+ranked, seat and AI requests in `surface_tests.rs`), the sealed credential
+(no OPAQUE record parses it, the column holds it), the random parts (the
+login name a valid one, wrappers and the document with their version
+byte), and the client's `Work` bound (16 matches pass under `max_games`
+1, 17 do not). The store suite (`tests/support/accounts/ranked/ai.rs`):
+creation refuses the unfair profile, a person's name and the `AI-`
+prefix, a tag out of range and a taken one, and writes the row as §1
+says; a change keeps kind and profile and refuses a person; a removal
+before the first match ends the AI's runner session with its offer and
+audits it, and is refused after the first match and with a stale sign-in;
+the name, credential, sessions of both kinds, an administrator's code, a
+mailed code to an address the operator planted and a code the operator
+planted all refuse the AI; `SetAdmin` and the appointment refuse it,
+`SetTag` serves it; it keeps no library; `session_gate` says it is an AI
+and the runner accepts Central's terms with its session; `Work` lists
+both live matches after `max_games` is lowered to 1; and a removal and a
+fill-in for one AI, in four rounds (removal first, fill-in first, twice
+at once): the first two take each way, and the two at once end in one of
+them without a deadlock. The SDK suite (`central-client/tests/support/
+ai_runner.rs`), over the real listeners with a runner session: the
+address is refused before and after the terms, a reset by mail to a
+planted address mails nothing and makes no code, `ResetLogin` is refused
+while the same desk's fresh change is served, a planted code starts no
+reset, the AI's login name discovers as an unknown one; `Offer` waits for
+the terms, the runner accepts them and offers; twelve requests a
+person's session is served (key check, presence and its choice, the
+export, the address, Tower progress, tasks, contacts, the document, the
+library, the ranked export) are refused to the runner; nine more that
+would change its account are refused, three of them (a password change,
+the deletion, a person's `Join`) at more than one place; the push socket's dial is 401; the
+session's own, the terms' and the ranked requests are served, and its
+logout ends it.
+
+**Evidence (27.11.2026),** on the owner's Mac under the load of other
+sessions: `cargo test` of `central-api` (199), `central-client` (27 and
+5), `central-identity` (161) and `central-postgres` (48), green;
+`cargo clippy --all-targets -D warnings` over the same four crates and
+`cargo fmt --check`, clean. `cargo xtask postgres`: the SDK suite green in
+147 s (a first run stopped at the person's control for contacts, a moved
+account having no tag, which the test now gives it); then
+`cargo xtask postgres --store-only` green in 120 s, after three runs that
+stopped at the test's own mistakes (a fixture person without a tag, an
+integer vector bound as bytes). The suite's deadline was raised locally
+for these runs and is not committed.
