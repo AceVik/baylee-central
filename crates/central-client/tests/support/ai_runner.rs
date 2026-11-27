@@ -21,7 +21,7 @@ use central_api::{
     presence::Choice,
     ranked::{
         self,
-        ai::{AiKind, Offer, Request as AiRequest, Response as AiResponse},
+        ai::{AiKind, Offer, Request as AiRequest, Response as AiResponse, Unseated},
         replica::SeatRequest,
     },
     reset_code::ResetCode,
@@ -433,7 +433,15 @@ fn accepting(runner: &Runner<'_>) -> TermsVersion {
             },
         },
     };
+    let carousel = || Request::Ranked {
+        request: ranked::Request::Ai {
+            request: AiRequest::Carousel {
+                format: ranked::Format::Standard,
+            },
+        },
+    };
     assert_eq!(runner.ask(&offer()).err(), Some(Error::TermsRequired));
+    assert_eq!(runner.ask(&carousel()).err(), Some(Error::TermsRequired));
     let Ok(Response::TermsStatus {
         current: Some(current),
         accepted: false,
@@ -454,6 +462,17 @@ fn accepting(runner: &Runner<'_>) -> TermsVersion {
         Ok(Response::Ranked {
             response: ranked::Response::Ai {
                 response: AiResponse::Offered { until: Some(_) }
+            }
+        })
+    ));
+    // The carousel, as installed (`carousel_games` 0), tells the runner so.
+    assert!(matches!(
+        runner.ask(&carousel()),
+        Ok(Response::Ranked {
+            response: ranked::Response::Ai {
+                response: AiResponse::Unseated {
+                    reason: Unseated::Off
+                }
             }
         })
     ));
