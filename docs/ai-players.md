@@ -467,8 +467,9 @@ operations:
 
 The runner reads `Work` every two seconds while it offers, well inside a
 session's 128 control requests a second ([native login](native-login.md)
-§"Counted"). A push event `{"event":"ranked"}` on its socket could replace the
-poll later. Clients built before such an event pass over it
+§"Counted"). An AI account holds no push socket in Stage 1 (§2). A later
+stage that opens one for the runner could send `{"event":"ranked"}` there
+and replace the poll; clients built before such an event pass over it
 ([push socket](push-socket.md) §"Tables").
 
 **Admission for each match.** For each assignment the runner does what the
@@ -1090,10 +1091,13 @@ logout ends it.
 sessions: `cargo test` of `central-api` (199), `central-client` (27 and
 5), `central-identity` (161) and `central-postgres` (48), green;
 `cargo clippy --all-targets -D warnings` over the same four crates and
-`cargo fmt --check`, clean. `cargo xtask postgres`: the SDK suite green in
-147 s (a first run stopped at the person's control for contacts, a moved
-account having no tag, which the test now gives it); then
-`cargo xtask postgres --store-only` green in 120 s, after three runs that
-stopped at the test's own mistakes (a fixture person without a tag, an
-integer vector bound as bytes). The suite's deadline was raised locally
-for these runs and is not committed.
+`cargo fmt --check`, clean. `cargo xtask postgres` at `62bcff05`, with the
+committed deadline: green, the SDK suite in 150 s, the store suite in 99 s,
+the Tower access and Tower awards suites in 2 s each. Before it, with the
+deadline raised locally and not committed: a first SDK run stopped at the
+person's control for contacts (a moved account has no tag, which the test
+now gives it), and three store runs stopped at the test's own mistakes (a
+fixture person without a tag, an integer vector bound as bytes). The
+store suite does not drive an AI seat's play through `dispatch`: its seat
+requests are allowed by the table, which a unit test holds, and served by
+the store suite's `admitting` through the store.
