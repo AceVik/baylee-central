@@ -1140,7 +1140,7 @@ async fn the_privacy_notice_has_a_part_for_the_e_mail_address() {
     let (_, _, english) = get(&app, "/en/privacy", &[]).await;
     assert!(english.contains("An e-mail address is optional. An account needs none."));
     assert!(english.contains("you need no e-mail address"));
-    assert!(english.contains("As of 26 November 2026"));
+    assert!(english.contains("As of 27 November 2026"));
     // The minimum age (owner, 25.11.2026), and a consent under 16 (Art. 8).
     assert!(english.contains("You may create an account from the age of 13."));
     assert!(english.contains("If you are under 16, a consent counts only with"));
@@ -1183,7 +1183,7 @@ async fn the_privacy_notice_says_who_sees_an_account_online() {
             "Deine Wahl (online, abwesend, offline) speichert Central mit deinem Account"
         )
     );
-    assert!(german.contains("Stand: 26. November 2026"));
+    assert!(german.contains("Stand: 27. November 2026"));
 }
 
 /// The privacy notice tells of ranked play in a part of its own, after the
