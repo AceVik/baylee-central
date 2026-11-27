@@ -10,6 +10,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 mod ai;
 mod ai_runner;
 mod boards;
+mod carousel;
 mod credentials;
 mod export;
 mod grants;
@@ -367,6 +368,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     .unwrap();
     ai::run(store, db, keys).await;
     ai_runner::run(store, db, keys).await;
+    carousel::run(store, db, keys).await;
 }
 
 async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {
