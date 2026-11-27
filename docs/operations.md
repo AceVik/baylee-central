@@ -2044,6 +2044,13 @@ on the server on 12.11.2026, where neither package was installed):
 
 ## Deploying with the gateway
 
+The open beta's release of 27 November 2026 versions the service and website
+`0.2.2-beta.o1`, the same as Baylee's release they were deployed with
+(Baylee pins Central `d93c46d`). Production already runs `d93c46d` with
+migrations up to 000055; this version commit changes no code, migration or
+wire format, and its tag `v0.2.2-beta.o1` is what the website's footer
+(`git describe` in `cargo xtask site`) names.
+
 The 2 November 2026 preparation sets the service and website to
 `0.1.0-beta.9c`, the exact version confirmed by the owner. Shared library
 versions remain `0.1.0`; authentication, chat wire formats and persisted
