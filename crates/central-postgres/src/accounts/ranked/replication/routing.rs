@@ -9,7 +9,7 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
 mod leases;
 mod offers;
-pub(in crate::accounts::ranked) use offers::{Allocation, allocate};
+pub(in crate::accounts::ranked) use offers::{Allocation, allocate, allocate_single, room_single};
 
 pub(in crate::accounts::ranked) async fn assign(
     db: &DatabaseTransaction,

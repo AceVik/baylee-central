@@ -138,7 +138,7 @@ fn an_old_client_is_told_to_update(http: &Http) {
     for headers in [
         vec![json],
         vec![json, (PROTOCOL_HEADER, "1")],
-        vec![json, (PROTOCOL_HEADER, "3")],
+        vec![json, (PROTOCOL_HEADER, "4")],
     ] {
         let (status, head, answer) = http.raw("POST /v1/native", &headers, &body);
         assert_eq!(status, 426, "{headers:?}");

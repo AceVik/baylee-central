@@ -13,6 +13,12 @@
 //! decides them by column, but never deletes one (the operator's sweep does).
 //! It adds a donation once and converts one that came without a rate, by its
 //! euro column alone; it reads the donations' sums and never writes them.
+//! It creates, changes and switches AI players, deletes one only with its
+//! account, never changes one's kind or profile, keeps a runner's offers, and
+//! writes a person's AI consent and how a match with an AI was made once
+//! (`docs/ai-players.md`). It stores AI runner tokens with the accounts they
+//! list and never deletes one, may set only when one was revoked, by whom,
+//! and last used, and adds and prunes the record of each exchange.
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
@@ -113,7 +119,15 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('ranked_receipts', ARRAY['SELECT','INSERT'], NULL),
              ('ranked_publications', ARRAY['SELECT','INSERT'], ARRAY['published_on','finalized']),
              ('ranked_champions', ARRAY['SELECT','INSERT','DELETE'], NULL),
-             ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place'])),
+             ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place']),
+             ('ai_players', ARRAY['SELECT','INSERT'], ARRAY['label','enabled','max_games','daily_games','changed_at','changed_by']),
+             ('ai_settings', ARRAY['SELECT'], ARRAY['fill_in','fill_in_after','drain_minutes','global_seats','host_reserve','carousel_games','carousel_daily','changed_at','changed_by']),
+             ('ai_offers', ARRAY['SELECT','INSERT','DELETE'], ARRAY['session_digest','commitment','renewed_at','expires_at']),
+             ('ranked_ticket_ai', ARRAY['SELECT','INSERT'], NULL),
+             ('ai_matches', ARRAY['SELECT','INSERT'], NULL),
+             ('ai_runner_tokens', ARRAY['SELECT'], ARRAY['revoked_at','revoked_by','last_used_at']),
+             ('ai_runner_accounts', ARRAY['SELECT','INSERT'], NULL),
+             ('ai_runner_signins', ARRAY['SELECT','INSERT','DELETE'], NULL)),
              insert_columns(name,cols) AS (VALUES
                ('advent_table_looks', ARRAY['proof','account_id','gateway_id','sid','game','seat','sleeve','playmat']),
                ('advent_table_outfits', ARRAY['account_id','gateway_id','game','seat','stream','sleeve','playmat']),
@@ -125,6 +139,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
                ('cosmetic_equip_rights',ARRAY['account_id','art_id','advent_id','league','division']),
                ('gateway_approvals', ARRAY['gateway_id','enabled']),
                ('report_tokens', ARRAY['name','digest','file','read','triage','purge','created_by','created_at','expires_at']),
+               ('ai_runner_tokens', ARRAY['name','digest','created_by','created_at','expires_at']),
                ('ranked_hosts', ARRAY['host_id','ranked_epoch','capacity','seen_at','compatibility']),
                ('ranked_matches', ARRAY['season_id','format','account_a','account_b','commitment_a','commitment_b','host_id','ranked_epoch','origin']),
                ('ranked_tickets', ARRAY['account_id','request_id','season_id','format','commitment','queue_elo','replicable']))

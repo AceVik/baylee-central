@@ -590,13 +590,17 @@ or response did:
 12.11.2026 have the options):
 
 - Two addresses with two bearers each still fill a shared window (2 x 2 x
-  128), and one account has two sessions. So two accounts at two addresses
-  can still keep the other sessions at `Busy`; it took one address before,
-  and nothing at all before 11.11.2026. How much wider a shared window may
+  128), and one account has two sessions, one of each kind. An AI account
+  is the exception: it holds no browser session and up to four runner
+  sessions ([AI players](ai-players.md) §2), each counted by itself. So
+  two accounts at two addresses can still keep the other sessions at
+  `Busy`; it took one address before, and nothing at all before
+  11.11.2026. How much wider a shared window may
   be is a question of what the store's four connections serve.
 - One account's two sessions at their full budgets use up their address's
-  half. Everyone else behind that address is `Busy` meanwhile: a
-  household, and also a campus or a carrier's shared address.
+  half (an AI runner's four, from its one machine, the same). Everyone
+  else behind that address is `Busy` meanwhile: a household, and also a
+  campus or a carrier's shared address.
 - All of one account's gateways share one bearer's budget. An owner of
   several busy gateways is held to 128 and 64 a second for all of them.
 - The store is asked once more for each bearer an answer first vouches

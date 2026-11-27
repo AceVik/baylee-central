@@ -51,7 +51,10 @@ pages are to go.*
   deletion](account-deletion.md#the-operators-erasure-26112026)),
   `gateway.approved`, `gateway.disabled`, `gateway.token_revoked`,
   `gateway.ranked_verified`, `gateway.ranked_revoked`,
-  `report_token.created`, `report_token.revoked`) and the
+  `report_token.created`, `report_token.revoked`, and for AI players
+  ([AI players](ai-players.md)) `ai.created`, `ai.removed`, `ai.enabled`,
+  `ai.disabled`, `ai.changed`, `ai.settings_changed`,
+  `ai.runner_token_created`, `ai.runner_token_revoked`) and the
   ids it touched. No name, reason, note or key; a tag change keeps the two
   tags, which are numbers. Reads are not audited. Each change writes its
   event in the same transaction. Reading a page of it joins today's names
@@ -69,8 +72,9 @@ pages are to go.*
 An administrator appoints and removes administrators (`SetAdmin { account,
 admin }`). Nobody removes their own role, so the last administrator stays;
 only an enrolled account is appointed (a pending or unknown one is
-`Rejected`). The same state again is `Done` and writes nothing. Two
-administrators removing each other at once leave one: both lock the
+`Rejected`), and never an AI player's ([AI players](ai-players.md) §1).
+The same state again is `Done` and writes nothing. Two administrators
+removing each other at once leave one: both lock the
 administrators' account rows in id order, the second sees after the lock
 that it no longer holds the role, and is refused.
 
@@ -85,8 +89,9 @@ username arrives at run time, so the repository names nobody.
 
 A second change, `ResetLogin { account }`, makes a reset code
 ([account reset](account-reset.md), M1 step 2b), audited as
-`account.reset_issued`. The account's confirmed address, if it has one, is
-told afterwards that a code exists, not the code and not who made it
+`account.reset_issued`. It is `Rejected` for an AI player, which has no
+password and is never given one ([AI players](ai-players.md) §2). The
+account's confirmed address, if it has one, is told afterwards that a code exists, not the code and not who made it
 ([e-mail](email.md#notices-that-the-login-changed)).
 
 ## Reads
@@ -155,9 +160,9 @@ writes its audit event in its transaction; reads do not.
   assignments. Re-enabling ordinary directory approval leaves verification off.
 - `RevokeGatewayToken { token }` (`gateway.token_revoked`, with the gateway's
   id): the token stops at once. Revoked already is `Done`.
-- `SetTag { account, tag }` (`account.tag_changed`): an enrolled account
-  gets another tag, 1 to `MAX_TAG`. Tags stay unique (the column's unique
-  index; a taken tag is `Conflict`), so `Name#tag` does. The event's
+- `SetTag { account, tag }` (`account.tag_changed`): an enrolled account,
+  an AI player's too, gets another tag, 1 to `MAX_TAG`. Tags stay unique
+  (the column's unique index; a taken tag is `Conflict`), so `Name#tag` does. The event's
   `detail` holds `{"from": old, "to": new}`, numbers only. Gateways take the
   new tag into their projection at the account's next sign-in there
   (Baylee's `take_profile`). **Earlier whisper threads are gone for the
@@ -277,3 +282,47 @@ administrators on the account overview. The closed beta's keys, which this
 section's earlier plans listed, are gone ([registration
 abuse](registration-abuse.md)); `audit_events.beta_key_id` keeps the ids
 older events name.
+
+## AI players (26 November 2026)
+
+An administrator creates every AI player on the website ([AI
+players](ai-players.md) §1, §5): `CreateAiPlayer { settings, tag }` makes a
+new account with no password, named with the `KI-` prefix, a fair profile
+and the caps, switched off, and answers `AiPlayerCreated { account, tag }`;
+a taken tag is `Conflict`. `SetAiPlayer` changes its label, caps and
+display name, never its kind or profile (`Conflict`). `RemoveAiPlayer`
+removes one that has never been seated and holds no ticket that is not
+closed; after its first match it is `Conflict`, and the AI is switched off
+instead (`SetAiEnabled`). All three need the recent password and write
+`ai.created`, `ai.changed` or `ai.removed` with ids and numbers only. No
+request makes a person's account an AI. `SetAdmin` and `ResetLogin` refuse
+an AI player; `SetTag` serves one.
+
+**The page** is `/{lang}/account/admin/ai` (`islands/admin/ai/`, 27
+November 2026). It lists every AI player with its badge, whether it is on,
+its kind, profile and caps, its live matches, its games today, the formats
+it offers a deck for and its runner's last sign-in; each card switches it
+on or off, changes its label, caps and name, and removes it (a `Conflict`
+says that it has played and is switched off instead). Below are the form
+for a new one (the name begins with `KI-`, the tag is drawn when left
+empty, a language model needs a daily cap), the settings for every AI with
+`Stop every AI`, and the runner tokens: listed with the AI players they
+play and their maker (the operator where none), made from a name, 1 to 16
+AI players and their days (90 offered), shown once as the report tokens'
+page shows one, and revoked. Every form is checked by Central's own rules
+before it is sent. Switching off, stopping every AI and revoking a runner
+token ask for no password; everything else asks once where the sign-in is
+older than 30 minutes. `AdminAccount` carries no badge, so the accounts'
+list, an account's page and the reset code's search read `AiPlayers` once
+and mark every AI account in them; an AI's page offers neither the role nor
+a reset code. The audit names the eight `ai.*` actions in words.
+
+**Without the website.** The live operator signs in to the website as no
+administrator, and no operator account is appointed one for this.
+`central-service --ai-players-stdin` does what the page does, under the
+migrator login from standard input: it creates and changes AI players,
+switches them, sets the settings for every AI, revokes runner tokens and
+makes one for a runner machine, or lists them, in one transaction through
+the same code, its audit events naming the operator as their actor
+([operations](operations.md) §"AI players"). The page shows such a token's
+maker as the operator.

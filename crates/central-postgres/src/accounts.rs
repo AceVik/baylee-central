@@ -12,6 +12,9 @@ use sea_orm::{
 
 mod admin;
 mod advent;
+pub(crate) mod ai;
+mod ai_runner;
+pub use ai_runner::RunnerSession;
 mod challenges;
 mod deletion;
 mod donations;
@@ -81,7 +84,7 @@ pub use streams::{
     GatewayGrant, GatewayPush, GatewayPushResult, MAX_SIDS_PER_SESSION, PUSH_ATTEMPTS,
     REVOCATION_PAGE, RevocationPage,
 };
-pub use terms::MAX_GATEWAY_VERSIONS;
+pub use terms::{MAX_GATEWAY_VERSIONS, SessionGate};
 pub use tower_awards::provision_tower_award_issuer;
 
 /// An OPAQUE credential snapshot. It cannot issue sessions without proof verification.
@@ -195,13 +198,15 @@ impl AccountStore {
         Ok(store)
     }
 
-    /// Find an enrolled account by its canonical private login name.
+    /// Find an enrolled account by its canonical private login name. An AI
+    /// player's is none, as an unknown name's (`docs/ai-players.md` §2).
     ///
     /// # Errors
     /// Returns generic input or database failures.
     pub async fn discover(&self, name: &str) -> Result<Option<Identity>, Error> {
         self.db.query_one_raw(statement(
-            "SELECT id, vault_epoch FROM central_identity.accounts WHERE username_key = $1 AND credential IS NOT NULL",
+            &format!("SELECT id, vault_epoch FROM central_identity.accounts WHERE username_key = $1 AND credential IS NOT NULL
+             AND {}", ai::NO_AI),
             vec![username(name)?.into()],
         )).await.map_err(|_| Error::Unavailable)?.as_ref().map(identity).transpose()
     }
@@ -409,14 +414,16 @@ impl AccountStore {
         Ok(concerns)
     }
 
-    /// Read a credential for an OPAQUE exchange; the context is checked independently.
+    /// Read a credential for an OPAQUE exchange; the context is checked
+    /// independently. An AI player has none to read: a sign-in on one runs
+    /// as one on an unknown account does (`docs/ai-players.md` §2).
     ///
     /// # Errors
     /// Rejects stale account/epoch mappings and database failure.
     pub async fn credential(&self, expected: Identity) -> Result<Option<Credential>, Error> {
         let row = self.db.query_one_raw(statement(
-            "SELECT id, vault_epoch, credential_revision, credential FROM central_identity.accounts
-             WHERE id = $1 AND vault_epoch = $2 AND credential IS NOT NULL",
+            &format!("SELECT id, vault_epoch, credential_revision, credential FROM central_identity.accounts
+             WHERE id = $1 AND vault_epoch = $2 AND credential IS NOT NULL AND {}", ai::NO_AI),
             vec![uuid(expected.account).into(), number(expected.epoch)?.into()],
         )).await.map_err(|_| Error::Unavailable)?;
         row.as_ref()

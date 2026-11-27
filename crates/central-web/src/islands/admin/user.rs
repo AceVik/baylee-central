@@ -56,8 +56,21 @@ fn read_tag(text: &str) -> Option<u32> {
 
 /// The account read from Central; `None` once the area was told that
 /// nobody is signed in.
-async fn fetch(cx: Cx, account: [u8; 16]) -> Option<Load> {
+async fn fetch(
+    cx: Cx,
+    account: [u8; 16],
+    held: StoredValue<Option<common::Roster>>,
+) -> Option<Load> {
     let lang = cx.lang;
+    // an AI player is never shown without its badge
+    let roster = match common::roster_kept(held).await {
+        Ok(roster) => roster,
+        Err(unread) => {
+            return cx
+                .unread_text(unread, problem_text(lang, Problem::Failed))
+                .map(Load::Failed);
+        }
+    };
     match common::read(AdminRequest::Account { account }).await {
         Ok(AdminAnswer::Account {
             account,
@@ -65,7 +78,7 @@ async fn fetch(cx: Cx, account: [u8; 16]) -> Option<Load> {
             gateways,
             audit,
         }) => Some(Load::Ready(Detail {
-            row: Row::from(account),
+            row: Row::from(account).marked(&roster),
             recovery,
             gateways: gateways
                 .into_iter()
@@ -92,13 +105,15 @@ struct Account {
     typed: RwSignal<String>,
     tag_error: RwSignal<Option<&'static str>>,
     flow: Flow,
+    /// The AI players, read with the account the first time.
+    roster: StoredValue<Option<common::Roster>>,
 }
 
 impl Account {
     /// Reads the account (again).
     fn read(self) {
         leptos::task::spawn_local(async move {
-            if let Some(load) = fetch(self.cx, self.id).await {
+            if let Some(load) = fetch(self.cx, self.id, self.roster).await {
                 let _ = self.load.try_set(load);
             }
         });
@@ -284,9 +299,23 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
     let a = *a;
     let lang = a.cx.lang;
     let row = &detail.row;
-    // nothing to change on a reserved account, nor one's own role
+    // nothing to change on a reserved account, nor one's own role; an AI
+    // player has no password and no role, and its page holds the rest
     let pending = row.state == AccountState::Pending;
-    let acts = !pending && row.id != a.cx.own;
+    let ai = row.ai.is_some();
+    let acts = !pending && row.id != a.cx.own && !ai;
+    let ai_card = ai.then(|| {
+        let href = format!("/{}/{}", lang.code(), crate::data::Section::AdminAi.slug());
+        view! {
+            <section class="card" aria-labelledby="admin-user-ai">
+                <h2 id="admin-user-ai">{words::admin_ai_account(lang)}</h2>
+                <p>{words::admin_ai_account_text(lang)}</p>
+                <p class="actions">
+                    <a class="button" href=href>{glyph::glyph(glyph::BOT)}<span>{words::admin_ai_open(lang)}</span></a>
+                </p>
+            </section>
+        }
+    });
     let outstanding = row.reset_until.map(|until| {
         view! { <p class="meta">{words::admin_reset_outstanding(lang, &when(lang, until))}</p> }
     });
@@ -322,6 +351,9 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
     // the account's own name beside its events; others by their id's end
     let mut names = Names::default();
     names.accounts.insert(row.id, row.name());
+    if let Some(badge) = &row.ai {
+        names.badges.insert(row.id, badge.clone());
+    }
     view! {
         <section class="card" aria-labelledby="admin-user-title">
             <h2 id="admin-user-title" class="admin-title" tabindex="-1">{title(lang, row)}</h2>
@@ -329,6 +361,7 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
             {outstanding}
             {reset}
         </section>
+        {ai_card}
         {(!pending).then(|| tag_card(&a, row))}
         {acts.then(|| role_card(&a, row))}
         {gateways}
@@ -344,12 +377,13 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
 pub fn page(cx: Cx, id: [u8; 16]) -> impl IntoView {
     let lang = cx.lang;
     let load = RwSignal::new(Load::Loading);
+    let roster = StoredValue::new(None);
     let typed = RwSignal::new(String::new());
     let note = RwSignal::new(None::<Note>);
     // a change ended: the account is read again, which says a lost answer
     let finished = Callback::new(move |(change, came): (Change, Came)| {
         leptos::task::spawn_local(async move {
-            let Some(fresh) = fetch(cx, id).await else {
+            let Some(fresh) = fetch(cx, id, roster).await else {
                 return;
             };
             let read = matches!(fresh, Load::Ready(_));
@@ -372,6 +406,7 @@ pub fn page(cx: Cx, id: [u8; 16]) -> impl IntoView {
         typed,
         tag_error: RwSignal::new(None),
         flow: Flow::new(cx, note, finished),
+        roster,
     };
     // Effects run in the browser only: the server renders "loading".
     Effect::new(move |_| a.read());

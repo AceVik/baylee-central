@@ -345,6 +345,32 @@ pub const SPARKLES: &[Shape] = &[
     Path("M22 4h-4"),
     Circle("4", "20", "2"),
 ];
+/// `bot`: a house AI's mark, and the mark of a kind this build does not know.
+pub const BOT: &[Shape] = &[
+    Path("M12 8V4H8"),
+    Rect("16", "12", "4", "8", "2"),
+    Path("M2 14h2"),
+    Path("M20 14h2"),
+    Path("M15 13v2"),
+    Path("M9 13v2"),
+];
+/// `cpu`: the trained AI's mark.
+pub const CPU: &[Shape] = &[
+    Path("M12 20v2"),
+    Path("M12 2v2"),
+    Path("M17 20v2"),
+    Path("M17 2v2"),
+    Path("M2 12h2"),
+    Path("M2 17h2"),
+    Path("M2 7h2"),
+    Path("M20 12h2"),
+    Path("M20 17h2"),
+    Path("M20 7h2"),
+    Path("M7 20v2"),
+    Path("M7 2v2"),
+    Rect("16", "16", "4", "4", "2"),
+    Rect("8", "8", "8", "8", "1"),
+];
 
 /// The icon, hidden from assistive technology: its control names itself.
 pub fn glyph(shapes: &'static [Shape]) -> AnyView {

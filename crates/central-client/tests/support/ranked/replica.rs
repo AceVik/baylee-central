@@ -90,6 +90,7 @@ impl Fixture<'_> {
                     .into_bytes(),
                 format: api::Format::Commander,
                 deck: [u8::try_from(i + 1).unwrap(); 32],
+                ai: api::ai::AiOpponents::None,
             };
             let r::SeatResponse::Queue { state } = owner.replica(self.http, request).unwrap()
             else {

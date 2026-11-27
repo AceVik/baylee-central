@@ -101,8 +101,22 @@ OPAQUE proof of the password, as a password change does:
    and since migration 000026 its e-mail address and one that waits.
    Audit events stay: they name only ids, which no longer resolve. So do the
    report tokens a former administrator made or revoked (migration 000052):
-   they hold the account's id, and stopped working with the role. The
-   username and tag are free again for a later registration.
+   they hold the account's id, and stopped working with the role. The AI
+   runner tokens an administrator made or revoked (migration 000054) hold
+   the id as well, and keep working: they play AI accounts and open no
+   administration. An AI account leaves every token's list, and its runner
+   sessions end with it. The username and tag are free again for a later
+   registration.
+
+   An AI player ([AI players](ai-players.md)) deletes nothing of its own:
+   its runner's session is refused `DeleteAccountStart` and the export, as
+   every request but its runner's, and it has no password to prove. An
+   administrator removes one with `RemoveAiPlayer`, only before its first
+   ranked match, through the same `deletion::remove` as a person's
+   deletion: the foreign keys take everything it holds, its runner sessions
+   and their `sid`s with them, and the audit keeps `ai.removed` with the
+   id. After its first match an AI stays and is switched off. The
+   operator's erasure (below) serves an AI account as any other.
 
 What Central cannot delete: what gateways keep about their players (each
 gateway's own notice), backups until they rotate out (12 months), and

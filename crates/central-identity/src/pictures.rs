@@ -197,7 +197,8 @@ impl IdentityService {
         if self.pictures.worker.is_none() {
             return Err(Error::Unavailable.into());
         }
-        self.require_terms(Some(cookie), Surface::Browser).await?;
+        self.require_terms(Some(cookie), Surface::Browser, true)
+            .await?;
         let admission = self.store.picture_admission(cookie).await?;
         if admission.block.is_some() {
             return Err(UploadRefusal::Blocked);
@@ -228,7 +229,8 @@ impl IdentityService {
         if self.pictures.worker.is_none() {
             return Err(Error::Unavailable.into());
         }
-        self.require_terms(Some(cookie), Surface::Browser).await?;
+        self.require_terms(Some(cookie), Surface::Browser, true)
+            .await?;
         let admission = self.store.group_picture_admission(cookie, group).await?;
         if admission.block.is_some() {
             return Err(UploadRefusal::Blocked);

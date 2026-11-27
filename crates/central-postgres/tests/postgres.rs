@@ -194,7 +194,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        51
+        54
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -307,6 +307,23 @@ async fn assert_seaql_table_shape(operator: &sea_orm::DatabaseConnection) {
     );
 }
 
+/// Migrations 000055 and 000054 undone, the newest first, for [`history_as_sea_orm_left_it`]
+/// (000055 changes only tables this drops):
+/// the runner tokens' tables and columns, and the one-session rule as 000007 left it.
+async fn undo_runner_tokens(operator: &sea_orm::DatabaseConnection) {
+    operator
+        .execute_unprepared(
+            "ALTER TABLE central_identity.sessions DROP COLUMN runner_token;
+             DROP INDEX IF EXISTS central_identity.sessions_one_per_account;
+             CREATE UNIQUE INDEX sessions_one_per_account ON central_identity.sessions(account_id, kind);
+             DROP TABLE central_identity.ai_runner_signins, central_identity.ai_runner_accounts,
+                        central_identity.ai_runner_tokens;
+             ALTER TABLE central_identity.audit_events DROP COLUMN ai_runner_token_id;",
+        )
+        .await
+        .unwrap();
+}
+
 /// The history as sea-orm-migration 2.0.4 left it, and a database one migration
 /// behind: the runner reads the one and finishes the other.
 async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
@@ -314,9 +331,18 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // that crate migrated is read by this runner as it was written.
     assert_seaql_table_shape(operator).await;
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
+    undo_runner_tokens(operator).await;
     operator
         .execute_unprepared(
-            "DROP TABLE central_identity.report_tokens;
+            "DROP TABLE central_identity.ai_matches, central_identity.ranked_ticket_ai,
+                        central_identity.ai_offers, central_identity.ai_settings, central_identity.ai_players;
+             DROP INDEX central_identity.gateway_sids_ai_match, central_identity.gateway_sids_one_each,
+                        central_identity.gateway_sids_one_ranked;
+             ALTER TABLE central_identity.gateway_sids DROP COLUMN ai_seat,
+                 ADD UNIQUE (session_digest, stream, purpose);
+             CREATE UNIQUE INDEX gateway_sids_one_ranked ON central_identity.gateway_sids(session_digest)
+                 WHERE purpose='ranked';
+             DROP TABLE central_identity.report_tokens;
              ALTER TABLE central_identity.reports DROP COLUMN filed_by;
              ALTER TABLE central_identity.report_notes DROP COLUMN token_name;
              ALTER TABLE central_identity.report_audit DROP COLUMN token_name;
@@ -380,7 +406,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        51
+        54
     );
     assert_eq!(
         scalar(

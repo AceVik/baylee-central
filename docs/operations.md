@@ -692,6 +692,119 @@ events, never rewrite or delete one (`ops/grants.sql`, checked at startup).
 What a taken-over service gains by that is in [administration](administration.md)
 and the [threat model](threat-model.md).
 
+## AI players
+
+AI players ([AI players](ai-players.md)) are accounts with no password that
+fill a lonely person's ranked search and play each other in the carousel.
+An administrator manages them on the website (`/account/admin/ai`); the
+operator, who signs in to the website as no administrator, uses one command
+under the migrator login instead. Both take the same code, the same checks
+and write the same audit events; the operator's name the operator as their
+actor.
+
+```sh
+central-service --ai-players-stdin < ai-players.json > runner-token.txt
+```
+
+```json
+{"database": {"host": "…", "port": 5432, "name": "baylee_central", "user": "central_migrator",
+  "password": "…", "ca_certificate": "…"},
+ "players": [
+   {"display_name": "KI-Haus-Expert", "tag": 6699, "kind": "house", "profile": "house:expert",
+    "label": "Haus-KI · Expert", "max_games": 4, "enabled": true},
+   {"display_name": "KI-Haus-Mittel", "tag": 6700, "kind": "house", "profile": "house:medium",
+    "label": "Haus-KI · Mittel", "max_games": 4, "enabled": true}
+ ],
+ "settings": {"fill_in": false, "global_seats": 16, "carousel_games": 8, "carousel_daily": 10000},
+ "revoke": [],
+ "token": {"name": "runner-bigace", "accounts": ["KI-Haus-Expert", "KI-Haus-Mittel"], "days": 90}}
+```
+
+Every field but `database` may be left out. The plan is applied in one
+transaction, whole or not at all:
+
+- **`players`.** An AI player is named by its display name (which begins
+  with `KI-`) and its tag. With neither taken, it is created switched off,
+  with no password, and `enabled` then switches it on. With both held by one
+  AI of the same kind and profile, it is reported as `unchanged`, or
+  `changed` when the label, `max_games` or `daily_games` differ; nothing is
+  made twice. Anything else is ambiguous and refuses the whole plan: a tag a
+  person or another AI holds, the name under another tag, another kind or
+  profile (a mind is fixed, [AI players](ai-players.md) §1). `daily_games`
+  is required for `"kind": "model"`. `house:seer` is refused.
+- **`settings`.** The settings for every AI; those left out stay. Calibration
+  is `fill_in` false with high `carousel_games` and `carousel_daily`
+  (§7); `global_seats` 0 stops every AI.
+- **`revoke`.** Runner token ids, as the listing prints them. Each ends every
+  session it minted in the same transaction; one revoked already is no
+  error, an unknown id refuses the plan.
+- **`token`.** A runner token for one runner machine, listing 1 to 16 AI
+  players by display name (each must name exactly one AI), living `days`
+  (1 to 366, 90 when left out). A live token of the same name refuses the
+  plan: revoke the old one in the same plan to rotate. Its text, `bat_` and
+  64 hex digits, is the only thing the command writes to standard output,
+  once, after the plan committed. Central keeps its digest alone; the text
+  cannot be shown again.
+
+What was done goes to standard error: each player's name, tag and outcome,
+the settings as written, each revocation with the number of sessions it
+ended, and the new token's id and expiry. A refused plan changes nothing.
+The command names every fault first, one line each, each in its place, and
+ends with `AI players rejected the input, found it ambiguous, or failed;
+nothing was changed`:
+
+```text
+central: players[3].display_name "KI-DeepSeek-Flash": 17 characters, at most 16
+central: players[3].max_games 0: 1 to 16
+central: token.accounts[1] "Bob": not an AI player's name (KI-...)
+central: AI players rejected the input, found it ambiguous, or failed; nothing was changed
+```
+
+Everything the plan shows on its own (names, prefixes, tags, kinds,
+profiles, labels, limits, settings, the token's fields, ids, a repeated tag
+or name) is listed at once, before the database is asked. What only the
+database shows comes after: a tag a person or another AI holds, a name under
+another tag, another mind, a token account no AI player has, a live token
+of the same name, an unknown id to revoke. A login that is not one is said
+so, never quoted. These words are the operator command's alone; the
+network's requests keep their one refusal.
+
+`{"database": {…}, "list": true}` alone lists the runner tokens on standard
+output, one line each: id, name, accounts, expiry, last use, revocation,
+and whether an administrator or the operator made it. Never a digest or a
+text.
+
+### A runner token: issuing, rotating, revoking
+
+- **Issuing.** One token per runner machine, 90 days. Write the command's
+  standard output straight into the runner's credential, readable by root
+  alone (for a systemd unit, `LoadCredential=` from a root-only file), and
+  delete the plan's file or keep it where the migrator login is kept. The
+  runner trades the token for sessions on the public native endpoint
+  (`central_client::ai_runner_session`); there is no address allowlist.
+- **Rotating.** Before the old token expires: run a plan with the old id in
+  `revoke` and a `token` of the same name, then put the new text in place and
+  restart the runner. The old token's sessions end with the commit, so the
+  runner's running matches end with them: rotate between matches, or with
+  `enabled` false for its players first and wait until their live matches
+  are 0 (the administration's page or `Work` shows them).
+- **Revoking.** At once, when a machine or its credential may be lost: the
+  id in `revoke` (or the website's Revoke). Every session the token minted
+  ends in the same transaction and every seat it held is revoked at its
+  host. A thief with the token could play the AI players it lists, against
+  people, until then; nothing else ([AI players](ai-players.md) §2, "What a
+  thief gains").
+- **Watching.** The listing's last use moves at every exchange; the AI
+  page shows each player's last runner sign-in. A runner should alert when
+  its token is refused.
+- **An older binary.** A binary from before AI players knows no runner
+  session and refuses nothing to one: it would serve a live runner session
+  as an ordinary native session, through which a holder could set an
+  address and a password for the AI. The deploy hook's fallback goes to the
+  binary just before, which knows them once this is deployed. Before running
+  any older binary by hand, end every runner session as the migrator:
+  `DELETE FROM central_identity.sessions WHERE runner_token IS NOT NULL;`
+
 ## Deleting and exporting accounts
 
 A person deletes and exports their own account ([account

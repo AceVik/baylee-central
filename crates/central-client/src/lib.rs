@@ -13,6 +13,7 @@ use central_crypto::{
 use zeroize::Zeroizing;
 
 pub mod advent;
+pub mod ai_runner;
 pub mod challenges;
 pub mod chat;
 mod deletion;
@@ -32,6 +33,7 @@ mod social;
 mod terms;
 mod tower_access;
 mod tower_awards;
+pub use ai_runner::ai_runner_session;
 pub use central_crypto::pairing::PairingSecret;
 pub use deletion::Deletion;
 pub use email::reset_mail;

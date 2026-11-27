@@ -162,6 +162,26 @@ GRANT SELECT, INSERT ON central_identity.ranked_receipts TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (published_on, finalized) ON central_identity.ranked_publications TO central_runtime;
 GRANT SELECT, INSERT, DELETE ON central_identity.ranked_champions TO central_runtime;
 GRANT SELECT, INSERT, UPDATE (place) ON central_identity.ranked_badge_peaks TO central_runtime;
+-- AI players (docs/ai-players.md): an administrator or the operator creates,
+-- changes and switches them; the kind, the profile and who created one never
+-- change, and no row is deleted but with its account (by cascade, as the
+-- table's owner), so a played AI stays one. A runner renews its offers; a
+-- person's consent and how a match was made are written once.
+GRANT SELECT, INSERT, UPDATE (label, enabled, max_games, daily_games, changed_at, changed_by)
+  ON central_identity.ai_players TO central_runtime;
+REVOKE DELETE ON central_identity.ai_players FROM central_runtime;
+GRANT SELECT, UPDATE (fill_in, fill_in_after, drain_minutes, global_seats, host_reserve, carousel_games,
+  carousel_daily, changed_at, changed_by) ON central_identity.ai_settings TO central_runtime;
+GRANT SELECT, INSERT, DELETE, UPDATE (session_digest, commitment, renewed_at, expires_at)
+  ON central_identity.ai_offers TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.ranked_ticket_ai, central_identity.ai_matches TO central_runtime;
+-- AI runner tokens (docs/ai-players.md section 2): stored by digest with the
+-- accounts they list; afterwards only their revocation and last use change,
+-- and none is deleted. Each exchange is kept 90 days and then pruned.
+GRANT SELECT, INSERT (name, digest, created_by, created_at, expires_at),
+  UPDATE (revoked_at, revoked_by, last_used_at) ON central_identity.ai_runner_tokens TO central_runtime;
+GRANT SELECT, INSERT ON central_identity.ai_runner_accounts TO central_runtime;
+GRANT SELECT, INSERT, DELETE ON central_identity.ai_runner_signins TO central_runtime;
 
 -- Only the operator stages a legacy source. The authenticated transfer advances or retires it.
 GRANT SELECT, DELETE, UPDATE (next_page) ON central_identity.legacy_deck_transfers TO central_runtime;

@@ -18,6 +18,7 @@ const PAGES = [
   ["/en/account/admin/gateways", "Gateways"],
   ["/en/account/admin/audit", "Audit log"],
   ["/en/account/admin/legacy", "Legacy accounts"],
+  ["/en/account/admin/ai", "AI players"],
   ["/en/account/admin/feedback-tokens", "Feedback tokens"],
   ["/en/account/admin", "Reset a login"],
 ] as const;
@@ -60,7 +61,7 @@ test("an administrator finds the navigation on every page of the administration,
     await expect(links).toHaveText(NAV);
     expect(await links.evaluateAll((all) => all.map((a) => a.getAttribute("href")))).toEqual([
       "/en/account/admin/overview", "/en/account/admin/users", "/en/account/admin/gateways", "/en/account/admin/audit",
-      "/en/account/admin/legacy", "/en/account/admin/pictures", "/en/account/admin/feedback", "/en/account/admin/feedback-tokens", "/en/account/admin",
+      "/en/account/admin/legacy", "/en/account/admin/ai", "/en/account/admin/pictures", "/en/account/admin/feedback", "/en/account/admin/feedback-tokens", "/en/account/admin",
     ]);
     // where the page is
     const current = await links.evaluateAll((all) => all.map((a) => a.getAttribute("aria-current")));
@@ -159,7 +160,7 @@ test("German holds at 320 px", async ({ page }) => {
   await open(page, w, "/de/account/admin/overview");
   await expect(page.locator("h1")).toHaveText("Administration");
   const links = page.getByRole("navigation", { name: "Administration" }).getByRole("link");
-  await expect(links).toHaveText(["Übersicht", "Accounts", "Gateways", "Protokoll", "Alte Konten", "Gemeldete Profilbilder", "Feedback", "Feedback-Tokens", "Anmeldung zurücksetzen"]);
+  await expect(links).toHaveText(["Übersicht", "Accounts", "Gateways", "Protokoll", "Alte Konten", "KI-Spieler", "Gemeldete Profilbilder", "Feedback", "Feedback-Tokens", "Anmeldung zurücksetzen"]);
   await expect(page.locator(".admin-stats > li h2")).toHaveText([
     "Accounts", "Wartet auf Freigabe", "Offene Meldungen", "Gateways in der Liste", "Administratoren", "Noch umzuziehen",
   ]);

@@ -319,6 +319,7 @@ fn consent_and_relay_shapes_accept_the_single_generation_and_no_foreign_match() 
             key,
             format: Format::Standard,
             deck: [1; 32],
+            ai: crate::ranked::ai::AiOpponents::Local,
         };
         assert!(join.validate(false).is_err());
     }

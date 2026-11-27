@@ -17,6 +17,7 @@ use std::{
 };
 pub(super) mod admin;
 pub(super) mod advent;
+pub(super) mod ai_runner;
 pub(super) mod browser;
 pub(super) mod challenges;
 pub(super) mod deletion;
@@ -37,6 +38,20 @@ pub(super) mod reset;
 pub(super) mod strangers;
 pub(super) mod terms;
 pub(super) mod tokens;
+
+/// The administration's suites, in order: roles and accounts, report tokens,
+/// AI runner tokens.
+pub(super) fn administration(
+    http: &Http,
+    browser: &browser::Browser,
+    bridge: &Token,
+    runtime: &tokio::runtime::Runtime,
+    operator: &sea_orm::DatabaseConnection,
+) {
+    admin::run(http, browser, bridge, runtime, operator);
+    report_tokens::run(http, browser, bridge, runtime, operator);
+    ai_runner::run(http, browser, bridge, runtime, operator);
+}
 
 pub(super) fn config(user: &str, password: &str) -> DevConfig {
     assert_eq!(

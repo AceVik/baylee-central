@@ -25,25 +25,9 @@ impl IdentityService {
                     .await?;
                 AdminAnswer::Accounts { accounts, more }
             }
-            AdminRequest::Account { account } => {
-                let (account, recovery, gateways, audit) =
-                    self.store.admin_account(cookie, account).await?;
-                AdminAnswer::Account {
-                    account,
-                    recovery,
-                    gateways,
-                    audit,
-                }
-            }
+            AdminRequest::Account { account } => self.account_answer(cookie, account).await?,
             AdminRequest::Audit { account, before } => {
-                let page = self.store.admin_audit(cookie, account, before).await?;
-                AdminAnswer::Audit {
-                    events: page.events,
-                    more: page.more,
-                    accounts: page.accounts,
-                    gateways: page.gateways,
-                    report_tokens: page.report_tokens,
-                }
+                self.audit_answer(cookie, account, before).await?
             }
             AdminRequest::Overview => AdminAnswer::Overview {
                 overview: self.store.admin_overview(cookie).await?,
@@ -110,6 +94,23 @@ impl IdentityService {
             }
             // Profile pictures (`docs/profile-pictures.md`, `pictures.rs`).
             AdminRequest::Picture { request } => return self.picture_admin(request, cookie).await,
+            // AI players (`docs/ai-players.md`): the store checks the
+            // administrator, the fresh sign-in where one is needed, and audits.
+            request @ (AdminRequest::AiPlayers
+            | AdminRequest::CreateAiPlayer { .. }
+            | AdminRequest::SetAiPlayer { .. }
+            | AdminRequest::RemoveAiPlayer { .. }
+            | AdminRequest::SetAiEnabled { .. }
+            | AdminRequest::AiSettings
+            | AdminRequest::SetAiSettings { .. }
+            | AdminRequest::StopAllAi) => return self.ai_admin(request, cookie).await,
+            // AI runner tokens (`docs/ai-players.md` §2): making one needs the
+            // fresh sign-in, revoking one does not; the store checks both.
+            request @ (AdminRequest::AiRunnerTokens
+            | AdminRequest::CreateAiRunnerToken { .. }
+            | AdminRequest::RevokeAiRunnerToken { .. }) => {
+                return self.runner_admin(request, cookie).await;
+            }
             AdminRequest::SetTag { account, tag } => {
                 return self.set_tag(cookie, account, tag).await;
             }
@@ -170,5 +171,124 @@ impl IdentityService {
             }
             _ => Err(Error::Rejected),
         }
+    }
+
+    /// AI players (`docs/ai-players.md`): the store checks the administrator,
+    /// the fresh sign-in where one is needed, and writes the audit.
+    async fn ai_admin(&self, request: AdminRequest, cookie: &Token) -> Result<Response, Error> {
+        let answer = match request {
+            AdminRequest::AiPlayers => AdminAnswer::AiPlayers {
+                players: self.store.admin_ai_players(cookie).await?,
+            },
+            AdminRequest::AiSettings => {
+                let (settings, changed_at) = self.store.admin_ai_settings(cookie).await?;
+                AdminAnswer::AiSettings {
+                    settings,
+                    changed_at,
+                }
+            }
+            AdminRequest::CreateAiPlayer { settings, tag } => {
+                let (account, tag) = self.store.create_ai_player(cookie, &settings, tag).await?;
+                AdminAnswer::AiPlayerCreated { account, tag }
+            }
+            AdminRequest::SetAiPlayer { account, settings } => {
+                self.store.set_ai_player(cookie, account, &settings).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::RemoveAiPlayer { account } => {
+                // Its runner sessions went by cascade: their push sockets end
+                // as a revoked token's do, and what was kept of where the
+                // account signed in and who followed it goes with it.
+                for digest in self.store.remove_ai_player(cookie, account).await? {
+                    self.live.ended(&digest);
+                }
+                self.changed(account, None);
+                self.live.deleted(&account);
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetAiEnabled { account, enabled } => {
+                self.store.set_ai_enabled(cookie, account, enabled).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::SetAiSettings { settings } => {
+                self.store.set_ai_settings(cookie, Some(&settings)).await?;
+                return Ok(Response::Done);
+            }
+            AdminRequest::StopAllAi => {
+                self.store.set_ai_settings(cookie, None).await?;
+                return Ok(Response::Done);
+            }
+            _ => return Err(Error::Rejected),
+        };
+        Ok(Response::Admin { answer })
+    }
+
+    /// AI runner tokens (`docs/ai-players.md` §2): the store checks the
+    /// administrator, the fresh sign-in of a making, and writes the audit. A
+    /// revocation ends the sessions the token minted, and their push sockets
+    /// are told, as a sign-out's are.
+    async fn runner_admin(&self, request: AdminRequest, cookie: &Token) -> Result<Response, Error> {
+        let answer = match request {
+            AdminRequest::AiRunnerTokens => AdminAnswer::AiRunnerTokens {
+                tokens: self.store.admin_ai_runner_tokens(cookie).await?,
+            },
+            AdminRequest::CreateAiRunnerToken {
+                name,
+                accounts,
+                days,
+            } => {
+                let token = Token::generate()?;
+                let (id, expires_at) = self
+                    .store
+                    .create_ai_runner_token(cookie, &name, &accounts, days, &token)
+                    .await?;
+                AdminAnswer::AiRunnerTokenCreated {
+                    id,
+                    token,
+                    expires_at,
+                }
+            }
+            AdminRequest::RevokeAiRunnerToken { token } => {
+                for digest in self.store.revoke_ai_runner_token(cookie, token).await? {
+                    self.live.ended(&digest);
+                }
+                return Ok(Response::Done);
+            }
+            _ => return Err(Error::Rejected),
+        };
+        Ok(Response::Admin { answer })
+    }
+
+    /// A page of the audit, with what its events name.
+    async fn audit_answer(
+        &self,
+        cookie: &Token,
+        account: Option<[u8; 16]>,
+        before: Option<[u8; 16]>,
+    ) -> Result<AdminAnswer, Error> {
+        let page = self.store.admin_audit(cookie, account, before).await?;
+        Ok(AdminAnswer::Audit {
+            events: page.events,
+            more: page.more,
+            accounts: page.accounts,
+            gateways: page.gateways,
+            report_tokens: page.report_tokens,
+        })
+    }
+
+    /// One account as the administration shows it.
+    async fn account_answer(
+        &self,
+        cookie: &Token,
+        account: [u8; 16],
+    ) -> Result<AdminAnswer, Error> {
+        let (account, recovery, gateways, audit) =
+            self.store.admin_account(cookie, account).await?;
+        Ok(AdminAnswer::Account {
+            account,
+            recovery,
+            gateways,
+            audit,
+        })
     }
 }

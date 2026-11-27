@@ -26,7 +26,61 @@ fn version_values(version: Option<&TermsVersion>) -> [Value; 2] {
     ]
 }
 
+/// What dispatch learns of a session's account before an operation, in the
+/// one statement that reads the terms: whether it accepted the terms in
+/// force, and whether it is an AI player, which may make only its runner's
+/// operations (`docs/ai-players.md` §2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SessionGate {
+    /// The account accepted `current`; true when nothing is in force.
+    pub accepted: bool,
+    /// The account is an AI player.
+    pub ai: bool,
+}
+
 impl AccountStore {
+    /// Whether this live session's account accepted `current` (true when
+    /// nothing is in force) and whether it is an AI player, in one
+    /// statement, so that a person's operation pays nothing for the second.
+    ///
+    /// # Errors
+    /// Rejects a dead session; database failures are `Unavailable`, never "accepted".
+    pub async fn session_gate<'a>(
+        &self,
+        session: impl Into<Session<'a>>,
+        current: Option<&TermsVersion>,
+    ) -> Result<SessionGate, Error> {
+        let [version, digest] = version_values(current);
+        let row = self
+            .db
+            .query_one_raw(statement(
+                &format!(
+                    "WITH live AS ({LIVE_SESSION})
+                 SELECT ($2::text IS NULL OR EXISTS (SELECT 1 FROM central_identity.terms_acceptances t
+                     WHERE t.account_id = live.account_id AND t.subject = $4 AND t.version = $2 AND t.digest = $3))
+                     AS accepted,
+                   EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id = live.account_id)
+                     AS ai
+                 FROM live"
+                ),
+                vec![
+                    session.into().digest().to_vec().into(),
+                    version,
+                    digest,
+                    CENTRAL.into(),
+                ],
+            ))
+            .await
+            .map_err(|_| Error::Unavailable)?
+            .ok_or(Error::Rejected)?;
+        Ok(SessionGate {
+            accepted: row
+                .try_get("", "accepted")
+                .map_err(|_| Error::Unavailable)?,
+            ai: row.try_get("", "ai").map_err(|_| Error::Unavailable)?,
+        })
+    }
+
     /// Whether this live session's account accepted `current` (true when
     /// nothing is in force).
     ///

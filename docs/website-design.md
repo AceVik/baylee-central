@@ -218,6 +218,14 @@ Each lives in one stylesheet named after it and one component under
   `--shadow`. A card that is a link deepens its shade under the pointer.
 - **Pills** (`.pill`): a state in words, coloured by the state token,
   `--text-xs`, never alone without the word.
+- **The AI badge** (`.ai-badge`, `islands/ui/ai_badge.rs`): beside every
+  name of an account Central marks as an AI player ([AI
+  players](ai-players.md) §6), on the public profile, in a mention's preview
+  and in the administration: an info pill with the kind's mark (a house AI
+  and an unknown kind the bot, a language model the sparkles, the trained
+  AI the chip) and the administrator's label, cut with an ellipsis rather
+  than wrapped. The kind is its pointer tip, and a screen reader hears
+  "AI player, <kind>:" before the label.
 - **Tables** (`tables.css`): for administration only. Header row in the
   interface face, tabular figures, row hover, the first column the thing's
   name (in the heading's ink, underlined under the pointer), the last column
@@ -399,7 +407,7 @@ WCAG 2.1 AA, mobile first:
 | --- | --- | --- |
 | Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, `/donate`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
-| Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy` | the app frame, loaded only for an administrator |
+| Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy`, `/admin/ai` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register`, `/reset` | a dialog over the page that asked; at its own address, over the start page |
 
 The account area and the administration are loaded lazily and only after a

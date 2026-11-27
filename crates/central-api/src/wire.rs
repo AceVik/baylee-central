@@ -220,6 +220,16 @@ pub enum Request {
         /// KE3, not a password.
         message: Vec<u8>,
     },
+    /// An AI runner trades its runner token for a native session of one AI
+    /// account the token lists (`docs/ai-players.md` §2), on the native
+    /// listener only and without an `Authorization` header. Answered with
+    /// [`Response::AiRunnerSession`]; every refusal is the same `Rejected`.
+    AiRunnerSession {
+        /// The runner token ([`crate::ai_runner::parse_token_text`]).
+        token: Token,
+        /// The AI account to play.
+        account: [u8; 16],
+    },
     /// Authenticated legacy gateway reserves an identity after fresh password verification.
     LegacyReserve {
         /// Immutable ID at the sole configured legacy gateway; never an email match.
@@ -1026,6 +1036,18 @@ pub enum Response {
         /// Stored client-encrypted master key.
         wrapped_master: Vec<u8>,
     },
+    /// A runner session, the answer to [`Request::AiRunnerSession`]: the same
+    /// signed bearer a sign-in yields, for a session that no password opened
+    /// and that carries no master key.
+    AiRunnerSession {
+        /// Short-lived revocable central bearer.
+        token: SignedToken,
+        /// The AI account and its vault epoch.
+        identity: Identity,
+        /// Absolute Unix-seconds expiry, 30 minutes after the exchange;
+        /// renewed by [`Request::RenewSession`] up to 12 hours after it.
+        expires_at: i64,
+    },
     /// The browser listener's answer to a successful `LoginFinish`. The session
     /// token travels only in the `__Host-central` cookie, never in a body.
     BrowserSession {
@@ -1325,6 +1347,88 @@ pub enum Response {
         /// Inviter summary, status, expiry and registration-open metadata.
         invite: crate::social::FriendInvitePreview,
     },
+}
+
+impl Response {
+    /// Leave out every field protocol 3 added (AI players' badges and the
+    /// fill-in time), for a caller of protocol 2, whose types refuse a field
+    /// they do not know. Every answer is named, so a new one does not compile
+    /// until it is decided here.
+    pub fn omit_ai(&mut self) {
+        match self {
+            Self::Ranked { response } => response.omit_ai(),
+            Self::PublicProfile { profile } => profile.ai = None,
+            Self::AdventHost { .. }
+            | Self::Advent { .. }
+            | Self::TowerToken { .. }
+            | Self::TowerIdentity { .. }
+            | Self::TowerAward { .. }
+            | Self::TowerProgress { .. }
+            | Self::TowerAwardExport { .. }
+            | Self::RankedHost { .. }
+            | Self::Challenges { .. }
+            | Self::ChallengeHost { .. }
+            | Self::Notifications { .. }
+            | Self::Social { .. }
+            | Self::Email { .. }
+            | Self::SessionStatus { .. }
+            | Self::Renewed { .. }
+            | Self::ObjectState { .. }
+            | Self::Object { .. }
+            | Self::Objects { .. }
+            | Self::GatewayRegistered { .. }
+            | Self::GatewayDirectory { .. }
+            | Self::PublicFigures { .. }
+            | Self::PublicFunding { .. }
+            | Self::GatewayAdmins { .. }
+            | Self::Discovery { .. }
+            | Self::RegisterChallenge { .. }
+            | Self::RegisterWork { .. }
+            | Self::RegistrationClosed
+            | Self::LoginChallenge { .. }
+            | Self::Session { .. }
+            // Only a runner speaking protocol 3 asks for one, and it holds
+            // no field protocol 3 added.
+            | Self::AiRunnerSession { .. }
+            | Self::BrowserSession { .. }
+            | Self::BrowserStatus { .. }
+            | Self::Enrollment { .. }
+            | Self::EnrollmentChallenge { .. }
+            | Self::ResetChallenge { .. }
+            | Self::PasswordChallenge { .. }
+            | Self::DeleteChallenge { .. }
+            | Self::AccountExport { .. }
+            | Self::Document { .. }
+            | Self::LegacyEnrollment { .. }
+            | Self::LegacySnapshot { .. }
+            | Self::LegacySourcePage { .. }
+            | Self::LegacyStatus { .. }
+            | Self::GatewayToken { .. }
+            | Self::GatewayHeartbeat { .. }
+            | Self::GatewayRevocations { .. }
+            | Self::Done
+            | Self::Terms { .. }
+            | Self::TermsStatus { .. }
+            | Self::TermsPublished { .. }
+            | Self::Owner { .. }
+            | Self::GatewayStatus { .. }
+            | Self::Admin { .. }
+            | Self::AccountSummary { .. }
+            | Self::KeyCheck { .. }
+            | Self::Presence { .. }
+            | Self::PairStarted { .. }
+            | Self::PairClaimed { .. }
+            | Self::PairAccepted { .. }
+            | Self::Pending
+            | Self::Approved
+            | Self::PairSession { .. }
+            | Self::MyPicture { .. }
+            | Self::MyPictureReports { .. }
+            | Self::ProfileDetails { .. }
+            | Self::OwnBadges { .. }
+            | Self::FriendInviteInfo { .. } => {}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1866,6 +1970,52 @@ mod tests {
             );
             assert!(crate::decode::<Response>(text.as_bytes()).is_ok());
         }
+    }
+
+    /// A runner's exchange carries its token in the body and nothing else;
+    /// its answer is a bearer without a master key.
+    #[test]
+    fn the_runner_s_exchange_has_the_designed_shapes() {
+        let token = Token::generate().unwrap();
+        let request = Request::AiRunnerSession {
+            token,
+            account: [7; 16],
+        };
+        let text = String::from_utf8(crate::encode(&request).unwrap()).unwrap();
+        assert!(text.starts_with(r#"{"operation":"ai_runner_session","token":["#));
+        assert!(text.ends_with(r#""account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7]}"#));
+        assert!(matches!(
+            crate::decode::<Request>(text.as_bytes()).unwrap(),
+            Request::AiRunnerSession { account, .. } if account == [7; 16]
+        ));
+        for bad in [
+            text.replace(r#","account":["#, r#","name":"x","account":["#),
+            text.replace(r#","account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7]"#, ""),
+            r#"{"operation":"ai_runner_session","token":"bat_00","account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7]}"#.to_owned(),
+        ] {
+            assert!(crate::decode::<Request>(bad.as_bytes()).is_err(), "{bad}");
+        }
+        let answer = Response::AiRunnerSession {
+            token: SignedToken::new(zeroize::Zeroizing::new("a.b.c".to_owned())).unwrap(),
+            identity: Identity {
+                account: [7; 16],
+                epoch: 1,
+            },
+            expires_at: 9,
+        };
+        let text = String::from_utf8(crate::encode(&answer).unwrap()).unwrap();
+        assert_eq!(
+            text,
+            r#"{"result":"ai_runner_session","token":"a.b.c","identity":{"account":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"epoch":1},"expires_at":9}"#
+        );
+        assert!(!text.contains("wrapped_master"));
+        let mut decoded = crate::decode::<Response>(text.as_bytes()).unwrap();
+        // a caller of protocol 2 is never answered one, and nothing in it is cut
+        decoded.omit_ai();
+        assert_eq!(
+            String::from_utf8(crate::encode(&decoded).unwrap()).unwrap(),
+            text
+        );
     }
 
     #[test]

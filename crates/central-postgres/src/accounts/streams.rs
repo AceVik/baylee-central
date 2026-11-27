@@ -84,33 +84,55 @@ fn sid_bytes(bytes: &[u8]) -> Result<[u8; 16], Error> {
 }
 
 /// Only the account's current, live reservation can mint a game-scoped token.
+/// A person's is the match of its one assigned ticket; an AI player, which
+/// holds no ticket and may sit in several matches, names it by the fence
+/// (`docs/ai-players.md` section 4) and must sit in it.
 async fn assigned_match(
     tx: &DatabaseTransaction,
     account: Uuid,
     origin: &str,
     registered: bool,
+    ai_seat: Option<Uuid>,
 ) -> Result<(Uuid, Option<i64>, [u8; 16]), Error> {
+    let seated = if ai_seat.is_some() {
+        "central_identity.ranked_matches m WHERE m.id=$4 AND $1 IN (m.account_a,m.account_b)"
+    } else {
+        "central_identity.ranked_tickets t JOIN central_identity.ranked_matches m ON m.id=t.match_id
+         WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN(m.account_a,m.account_b)
+         AND $4::uuid IS NULL"
+    };
     // A standby reassignment may change only the replica row. Acquire the same
     // parent lock as routing *before* taking the snapshot of roles and grants.
     tx.query_one_raw(statement(
-        "SELECT m.id FROM central_identity.ranked_tickets t
-         JOIN central_identity.ranked_matches m ON m.id=t.match_id
-         WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN(m.account_a,m.account_b)
-         FOR SHARE OF m",
-        vec![account.into()],
+        // This statement binds two values: the account and the named match.
+        &format!(
+            "SELECT m.id FROM {} FOR SHARE OF m",
+            seated.replace("$4", "$2")
+        ),
+        vec![account.into(), ai_seat.into()],
     ))
     .await
     .map_err(|_| Error::Unavailable)?
     .ok_or(Error::Rejected)?;
+    let (from, seated) = if ai_seat.is_some() {
+        (
+            "central_identity.ranked_matches m",
+            "m.id=$4 AND $1 IN (m.account_a,m.account_b)",
+        )
+    } else {
+        (
+            "central_identity.ranked_tickets t JOIN central_identity.ranked_matches m ON m.id=t.match_id",
+            "t.account_id=$1 AND t.state='assigned' AND t.account_id IN (m.account_a,m.account_b) AND $4::uuid IS NULL",
+        )
+    };
     let row = tx
         .query_one_raw(statement(
-            "SELECT m.id,m.host_id,m.account_a,r.generation FROM central_identity.ranked_tickets t
-         JOIN central_identity.ranked_matches m ON m.id=t.match_id
+            &format!("SELECT m.id,m.host_id,m.account_a,r.generation FROM {from}
          LEFT JOIN central_identity.ranked_replicas r ON r.match_id=m.id
          JOIN central_identity.gateways g ON g.id=m.host_id AND g.origin=m.origin
          JOIN central_identity.gateway_approvals p ON p.gateway_id=g.id
          JOIN central_identity.ranked_hosts h ON h.host_id=g.id
-         WHERE t.account_id=$1 AND t.state='assigned' AND t.account_id IN (m.account_a,m.account_b)
+         WHERE {seated}
            AND g.origin=$2 AND g.official<>$3 AND p.enabled AND p.ranked_verified
            AND p.ranked_epoch=m.ranked_epoch AND h.ranked_epoch=m.ranked_epoch
            AND ((r.match_id IS NULL AND m.created_at>=h.continuity_since) OR
@@ -118,8 +140,8 @@ async fn assigned_match(
                  AND r.primary_until>clock_timestamp() AND h.continuity_since<=r.primary_until-interval '45 seconds'))
            AND h.seen_at>clock_timestamp()-interval '5 minutes'
            AND m.state IN ('reserved','playing') AND m.lease_until>clock_timestamp()
-         FOR SHARE OF m,p",
-            vec![account.into(), origin.into(), registered.into()],
+         FOR SHARE OF m,p"),
+            vec![account.into(), origin.into(), registered.into(), ai_seat.into()],
         ))
         .await
         .map_err(|_| Error::Unavailable)?
@@ -136,16 +158,75 @@ async fn assigned_match(
     Ok((id, generation, aliases[usize::from(first != account)]))
 }
 
+/// What a grant's purpose asks of the account.
+struct Scope<'a> {
+    account: Uuid,
+    stream: &'a str,
+    registered: bool,
+    purpose: GatewayPurpose,
+    fence: Option<central_api::ranked::replica::Fence>,
+    ai_seat: bool,
+    /// The account has no legacy move under way.
+    unmoved: bool,
+}
+
+/// The ranked match, generation and seat alias a grant binds, or none for
+/// another purpose. An AI player is admitted to its ranked seats only, each
+/// named by its fence: no lobby, no gateway administration
+/// (`docs/ai-players.md` section 1).
+async fn ranked_scope(
+    tx: &DatabaseTransaction,
+    scope: Scope<'_>,
+) -> Result<(Option<Uuid>, Option<i64>, [u8; 16]), Error> {
+    if scope.ai_seat && scope.purpose != GatewayPurpose::Ranked {
+        return Err(Error::Rejected);
+    }
+    if scope.purpose != GatewayPurpose::Ranked {
+        return Ok((None, None, scope.account.into_bytes()));
+    }
+    if !scope.unmoved {
+        return Err(Error::Rejected);
+    }
+    let named = scope
+        .fence
+        .filter(|_| scope.ai_seat)
+        .map(|f| Uuid::from_bytes(f.match_id));
+    if scope.ai_seat && named.is_none() {
+        return Err(Error::Rejected);
+    }
+    let (id, generation, alias) =
+        assigned_match(tx, scope.account, scope.stream, scope.registered, named).await?;
+    if !scope.fence.is_some_and(|f| {
+        f.match_id == id.into_bytes()
+            && i64::try_from(f.generation).ok() == Some(generation.unwrap_or(0))
+    }) {
+        return Err(Error::Conflict);
+    }
+    Ok((Some(id), generation, alias))
+}
+
 /// Reuse the SID for a refresh. A new ranked game gets its own revocable session.
+/// A ranked `sid`'s match and generation, and whether an AI seat holds it.
+#[derive(Clone, Copy)]
+struct RankedSid {
+    matched: Option<Uuid>,
+    generation: Option<i64>,
+    ai_seat: bool,
+}
+
 async fn held_sid(
     tx: &DatabaseTransaction,
     digest: &[u8],
     stream: &str,
     purpose: GatewayPurpose,
-    ranked_match: Option<Uuid>,
-    generation: Option<i64>,
+    ranked: RankedSid,
     fresh: [u8; 16],
 ) -> Result<[u8; 16], Error> {
+    let RankedSid {
+        matched: ranked_match,
+        generation,
+        ai_seat,
+    } = ranked;
     let found = tx
         .query_one_raw(statement(
             "SELECT sid FROM central_identity.gateway_sids
@@ -165,7 +246,20 @@ async fn held_sid(
         let sid: Vec<u8> = row.try_get("", "sid").map_err(|_| Error::Unavailable)?;
         return sid_bytes(&sid);
     }
-    if ranked_match.is_some() {
+    if ai_seat {
+        // An AI session keeps a ranked SID for each live match
+        // (docs/ai-players.md section 4). Only those of matches that ended,
+        // and an older generation of this one, go; each is revoked as usual.
+        tx.execute_raw(statement(
+            "DELETE FROM central_identity.gateway_sids k WHERE k.session_digest=$1
+             AND k.purpose='ranked' AND (k.ranked_match=$2 OR NOT EXISTS (
+               SELECT 1 FROM central_identity.ranked_matches m WHERE m.id=k.ranked_match
+               AND m.state IN ('reserved','playing') AND m.lease_until>clock_timestamp()))",
+            vec![digest.to_vec().into(), ranked_match.into()],
+        ))
+        .await
+        .map_err(|_| Error::Unavailable)?;
+    } else if ranked_match.is_some() {
         // The session is locked. Removing its previous ranked SID also publishes the normal
         // revocation to the previous host, which can be on a different gateway.
         tx.execute_raw(statement(
@@ -184,8 +278,8 @@ async fn held_sid(
     .map_err(|_| Error::Unavailable)?;
     let inserted = tx
         .execute_raw(statement(
-            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose, ranked_match, ranked_generation)
-             SELECT $1, $2, $3, $4, $6, $7 WHERE (SELECT count(*) FROM central_identity.gateway_sids
+            "INSERT INTO central_identity.gateway_sids(sid, session_digest, stream, purpose, ranked_match, ranked_generation, ai_seat)
+             SELECT $1, $2, $3, $4, $6, $7, $8 WHERE (SELECT count(*) FROM central_identity.gateway_sids
                  WHERE session_digest = $2) < $5",
             vec![
                 fresh.to_vec().into(),
@@ -195,6 +289,7 @@ async fn held_sid(
                 MAX_SIDS_PER_SESSION.into(),
                 ranked_match.into(),
                 generation.into(),
+                ai_seat.into(),
             ],
         ))
         .await
@@ -319,21 +414,20 @@ impl AccountStore {
         let closed: bool = row
             .try_get("", "legacy_closed")
             .map_err(|_| Error::Unavailable)?;
-        let (ranked_match, ranked_generation, subject) = if purpose == GatewayPurpose::Ranked {
-            if legacy_id.is_some() && !closed {
-                return Err(Error::Rejected);
-            }
-            let (id, generation, alias) = assigned_match(&tx, account, stream, registered).await?;
-            if !fence.is_some_and(|f| {
-                f.match_id == id.into_bytes()
-                    && i64::try_from(f.generation).ok() == Some(generation.unwrap_or(0))
-            }) {
-                return Err(Error::Conflict);
-            }
-            (Some(id), generation, alias)
-        } else {
-            (None, None, account.into_bytes())
-        };
+        let ai_seat = super::ai::flagged(&tx, account).await?;
+        let (ranked_match, ranked_generation, subject) = ranked_scope(
+            &tx,
+            Scope {
+                account,
+                stream,
+                registered,
+                purpose,
+                fence,
+                ai_seat,
+                unmoved: legacy_id.is_none() || closed,
+            },
+        )
+        .await?;
         if registered && ranked_match.is_none() {
             tx.query_one_raw(statement(
                 &format!(
@@ -353,16 +447,12 @@ impl AccountStore {
             // Admission needs a closed move; the official gateway has no Central admins.
             return Err(Error::Rejected);
         }
-        let sid = held_sid(
-            &tx,
-            &digest,
-            stream,
-            purpose,
-            ranked_match,
-            ranked_generation,
-            fresh,
-        )
-        .await?;
+        let ranked = RankedSid {
+            matched: ranked_match,
+            generation: ranked_generation,
+            ai_seat,
+        };
+        let sid = held_sid(&tx, &digest, stream, purpose, ranked, fresh).await?;
         let (display_name, tag, terms) = if ranked_match.is_some() {
             (None, None, None)
         } else {

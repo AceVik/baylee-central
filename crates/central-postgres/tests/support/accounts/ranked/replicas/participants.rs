@@ -25,6 +25,7 @@ pub(super) async fn run(table: &Table<'_>, id: api::Id, second_seat: u8) {
     let expected = r::SeatResponse::Participants {
         match_id: id,
         seats: handles.clone(),
+        ai: [None, None],
     };
     for (_, seat) in table.seats {
         assert_eq!(table.seat(seat, request.clone()).await.unwrap(), expected);
@@ -38,7 +39,8 @@ pub(super) async fn run(table: &Table<'_>, id: api::Id, second_seat: u8) {
         table.seat(table.seats[0].1, request.clone()).await.unwrap(),
         r::SeatResponse::Participants {
             match_id: id,
-            seats: handles
+            seats: handles,
+            ai: [None, None],
         }
     );
     for stranger in [table.observer, &table.first.token, &table.second.token] {

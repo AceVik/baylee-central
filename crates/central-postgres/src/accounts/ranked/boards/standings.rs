@@ -80,12 +80,13 @@ impl Source {
         let table = self.table;
         let same = self.previous_version;
         format!("WITH page AS MATERIALIZED ({page})
-          SELECT b.*,a.display_name,a.tag,
+          SELECT b.*,a.display_name,a.tag,ai.kind AS ai_kind,ai.label AS ai_label,
             CASE WHEN b.season_id=$1 THEN b.games-COALESCE(old.games,0) ELSE 0 END AS season_games,
             CASE WHEN b.season_id=$1 THEN b.wins-COALESCE(old.wins,0) ELSE 0 END AS season_wins,
             CASE WHEN b.season_id=$1 THEN b.losses-COALESCE(old.losses,0) ELSE 0 END AS season_losses,
             CASE WHEN b.season_id=$1 THEN b.draws-COALESCE(old.draws,0) ELSE 0 END AS season_draws
           FROM page b JOIN central_identity.accounts a ON a.id=b.account_id
+          LEFT JOIN central_identity.ai_players ai ON ai.account_id=b.account_id
           LEFT JOIN LATERAL (SELECT p.games,p.wins,p.losses,p.draws FROM {table} p
             JOIN central_identity.ranked_seasons previous ON previous.id=p.season_id
             WHERE p.account_id=b.account_id AND p.format=b.format {same}
@@ -144,15 +145,43 @@ fn league_number(league: League) -> i16 {
         .unwrap_or(-1)
 }
 
+/// People, AI players or both (docs/ai-players.md section 6), as a predicate
+/// on the ladder row `r`.
+const fn players_filter(players: central_api::ranked::ai::BoardPlayers) -> &'static str {
+    match players {
+        central_api::ranked::ai::BoardPlayers::Everyone => "",
+        central_api::ranked::ai::BoardPlayers::People => {
+            " AND NOT EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=r.account_id)"
+        }
+        central_api::ranked::ai::BoardPlayers::Ai => {
+            " AND EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=r.account_id)"
+        }
+    }
+}
+
+/// One board page's selection, as the request names it.
+pub(super) struct Page {
+    pub(super) format: Format,
+    pub(super) track: Track,
+    pub(super) league: League,
+    pub(super) division: Option<u8>,
+    pub(super) after: Option<Cursor>,
+    pub(super) players: central_api::ranked::ai::BoardPlayers,
+}
+
 pub(super) async fn board(
     db: &DatabaseTransaction,
     season: Uuid,
-    format: Format,
-    track: Track,
-    league: League,
-    division: Option<u8>,
-    after: Option<Cursor>,
+    page: Page,
 ) -> Result<(Vec<Row>, Option<Cursor>), Error> {
+    let Page {
+        format,
+        track,
+        league,
+        division,
+        after,
+        players,
+    } = page;
     let n = league_number(league);
     let divisions = match n {
         1..=4 => 3,
@@ -173,9 +202,10 @@ pub(super) async fn board(
         (_, Some(_)) => "r.league=$3 AND r.division=$4",
         _ => "r.league=$3",
     };
+    let who = players_filter(players);
     let rows = src.rows(
         track,
-        &format!("r.season_id=$1 AND r.format=$2 AND {eligible}"),
+        &format!("r.season_id=$1 AND r.format=$2 AND {eligible}{who}"),
     );
     let mut values: Vec<Value> = vec![
         season.into(),
@@ -229,6 +259,7 @@ pub(super) async fn board(
                 name,
                 tag,
                 standing: standing(r, track)?,
+                ai: crate::accounts::ai::badge_of(r)?,
             })
         })
         .collect::<Result<_, Error>>()?;

@@ -154,9 +154,11 @@ impl AccountStore {
     ) -> Result<Issued, Error> {
         let transaction = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         let row = transaction.query_one_raw(statement(
-            "SELECT wrapped_master, username_key, source = 'registered' AND tag IS NULL AS untagged
+            &format!("SELECT wrapped_master, username_key, source = 'registered' AND tag IS NULL AS untagged
              FROM central_identity.accounts WHERE id = $1
-             AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL FOR UPDATE",
+             AND vault_epoch = $2 AND credential_revision = $3 AND credential IS NOT NULL
+             -- an AI player signs in through its runner's token alone (docs/ai-players.md §2)
+             AND {} FOR UPDATE", super::ai::NO_AI),
             vec![uuid(credential.identity.account).into(), number(credential.identity.epoch)?.into(), credential.revision.into()],
         )).await.map_err(|_| Error::Unavailable)?.ok_or(Error::Rejected)?;
         if row
@@ -319,12 +321,18 @@ impl AccountStore {
                      COALESCE(s.absolute_expires_at, s.created_at + interval '30 days'))
                  ELSE LEAST(
                      pg_catalog.clock_timestamp() + interval '30 minutes',
-                     COALESCE(s.proven_at, s.created_at) + interval '12 hours')
+                     COALESCE(s.proven_at, s.created_at) + interval '12 hours',
+                     -- a runner session ends with its token (docs/ai-players.md §2)
+                     (SELECT r.expires_at FROM central_identity.ai_runner_tokens r
+                      WHERE r.id = s.runner_token))
                  END
              FROM central_identity.accounts a
              WHERE s.digest = $1 AND s.kind = $2 AND a.id = s.account_id
              AND a.credential_revision = s.credential_revision AND a.credential IS NOT NULL
              AND s.expires_at > pg_catalog.clock_timestamp()
+             AND (s.runner_token IS NULL OR EXISTS (SELECT 1 FROM central_identity.ai_runner_tokens r
+                 WHERE r.id = s.runner_token AND r.revoked_at IS NULL
+                 AND r.expires_at > pg_catalog.clock_timestamp()))
              RETURNING floor(extract(epoch FROM s.expires_at))::bigint AS expires_at",
                 vec![digest.into(), session.kind().into()],
             ))
@@ -541,7 +549,10 @@ fn slice_digest(bytes: &[u8]) -> Result<[u8; 32], Error> {
     bytes.try_into().map_err(|_| Error::Unavailable)
 }
 
-async fn delete_session_tx(tx: &impl sea_orm::ConnectionTrait, digest: &[u8]) -> Result<(), Error> {
+pub(super) async fn delete_session_tx(
+    tx: &impl sea_orm::ConnectionTrait,
+    digest: &[u8],
+) -> Result<(), Error> {
     tx.execute_raw(statement(
         "DELETE FROM central_identity.push_subscriptions WHERE session_digest = $1",
         vec![digest.to_vec().into()],

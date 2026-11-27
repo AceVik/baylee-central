@@ -122,6 +122,10 @@ function admin(w: World, asked: Asked, json: (value: unknown) => Promise<void>, 
       if (next === "lost") return abort();
       return answer({ answer: "reset_code", code: CODE, expires_at: EXPIRES });
     }
+    // The pages that list accounts read the AI players to mark them
+    // (docs/ai-players.md section 6); there are none here.
+    case "ai_players":
+      return answer({ answer: "ai_players", players: [] });
     default:
       return refused(401);
   }
@@ -206,11 +210,15 @@ const button = (page: Page, name: string) => page.getByRole("button", { name, ex
 const password = (page: Page) => page.locator("#admin-password");
 /** The administration's requests since `from`. */
 // The page's section of reported pictures asks for them on its own
-// (picture.spec.ts covers it); the accounts' requests are what is checked here.
+// (picture.spec.ts covers it), and its marks for AI players read them once
+// (admin-central.ts covers that); the accounts' requests are what is checked here.
 const asked = (seen: Body[], from = 0) =>
   seen
     .slice(from)
-    .filter((body) => body.operation === "admin" && body.request?.action !== "picture")
+    .filter(
+      (body) =>
+        body.operation === "admin" && body.request?.action !== "picture" && body.request?.action !== "ai_players",
+    )
     .map((body) => body.request);
 const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
 

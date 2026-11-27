@@ -60,6 +60,22 @@ pub enum Action {
     PictureBlocked,
     /// An administrator lifted an account's upload block.
     PictureUnblocked,
+    /// An administrator created an AI player (`docs/ai-players.md`).
+    AiCreated,
+    /// An administrator removed an AI player before its first match.
+    AiRemoved,
+    /// An AI player was switched on.
+    AiEnabled,
+    /// An AI player was switched off.
+    AiDisabled,
+    /// An AI player's label, name or caps changed.
+    AiChanged,
+    /// The settings for every AI changed; the detail holds the new numbers.
+    AiSettingsChanged,
+    /// An administrator made an AI runner token; the event names it by id.
+    AiRunnerTokenCreated,
+    /// An administrator revoked an AI runner token and ended its sessions.
+    AiRunnerTokenRevoked,
 }
 
 impl Action {
@@ -85,6 +101,14 @@ impl Action {
             Self::PictureRemoved => "picture.removed",
             Self::PictureBlocked => "picture.blocked",
             Self::PictureUnblocked => "picture.unblocked",
+            Self::AiCreated => "ai.created",
+            Self::AiRemoved => "ai.removed",
+            Self::AiEnabled => "ai.enabled",
+            Self::AiDisabled => "ai.disabled",
+            Self::AiChanged => "ai.changed",
+            Self::AiSettingsChanged => "ai.settings_changed",
+            Self::AiRunnerTokenCreated => "ai.runner_token_created",
+            Self::AiRunnerTokenRevoked => "ai.runner_token_revoked",
         }
     }
 }
@@ -571,6 +595,17 @@ impl AccountStore {
         &self,
         browser: &Token,
     ) -> Result<(sea_orm::DatabaseTransaction, Uuid), Error> {
+        self.acting_administrator_fresh(browser, true).await
+    }
+
+    /// [`Self::acting_administrator`], where `fresh` says whether the change
+    /// needs the recent password; stopping an AI does not
+    /// (`AdminRequest::fresh`).
+    pub(super) async fn acting_administrator_fresh(
+        &self,
+        browser: &Token,
+        needs_fresh: bool,
+    ) -> Result<(sea_orm::DatabaseTransaction, Uuid), Error> {
         Self::administrator(&self.db, browser).await?;
         let tx = self.db.begin().await.map_err(|_| Error::Unavailable)?;
         tx.query_all_raw(statement(
@@ -581,7 +616,7 @@ impl AccountStore {
         .await
         .map_err(|_| Error::Unavailable)?;
         let (actor, fresh) = Self::administrator(&tx, browser).await?;
-        if !fresh {
+        if needs_fresh && !fresh {
             return Err(Error::Rejected);
         }
         Ok((tx, actor))
@@ -1012,6 +1047,8 @@ impl AccountStore {
                 "INSERT INTO central_identity.account_roles (account_id, role, granted_by)
                  SELECT id, 'admin', $2 FROM central_identity.accounts
                  WHERE id = $1 AND credential IS NOT NULL
+                 -- an AI's password never opens the administration
+                 AND NOT EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id = $1)
                  ON CONFLICT (account_id, role) DO NOTHING",
                 vec![target.into(), actor.into()],
             ))
@@ -1068,8 +1105,12 @@ pub async fn appoint_admin(db: &DatabaseConnection, name: &str) -> Result<Appoin
     let tx = db.begin().await.map_err(|_| Error::Unavailable)?;
     let account: Uuid = tx
         .query_one_raw(statement(
-            "SELECT id FROM central_identity.accounts WHERE username_key = $1 AND credential IS NOT NULL
-             FOR UPDATE",
+            &format!(
+                "SELECT id FROM central_identity.accounts WHERE username_key = $1 AND credential IS NOT NULL
+                 -- an AI never opens the administration
+                 AND {} FOR UPDATE",
+                super::ai::NO_AI
+            ),
             vec![name.into()],
         ))
         .await

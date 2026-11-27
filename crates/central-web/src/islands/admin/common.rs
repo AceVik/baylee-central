@@ -17,7 +17,8 @@
 
 use std::collections::HashMap;
 
-use central_api::admin::{AdminAnswer, AdminRequest, AuditEvent};
+use central_api::admin::{AdminAiPlayer, AdminAnswer, AdminRequest, AuditEvent};
+use central_api::ranked::ai::AiBadge;
 use central_api::wire::{Request, Response};
 use leptos::prelude::*;
 
@@ -95,6 +96,7 @@ pub fn nav(lang: Lang, section: Section) -> impl IntoView {
                 {link(Section::AdminGateways, words::gw_title(lang))}
                 {link(Section::AdminAudit, words::admin_audit(lang))}
                 {link(Section::AdminLegacy, words::admin_legacy(lang))}
+                {link(Section::AdminAi, words::admin_ai_title(lang))}
                 {link(Section::AdminPictures, words::admin_pictures_title(lang))}
                 {link(Section::Feedback, words::admin_feedback(lang))}
                 {link(Section::FeedbackTokens, words::rt_title(lang))}
@@ -159,6 +161,60 @@ pub async fn read(request: AdminRequest) -> Result<AdminAnswer, Unread> {
         Err(Failure::Rejected) => Err(unread(super::standing().await)),
         Err(failure) => Err(Unread::Other(Problem::outside_sign_in(failure))),
     }
+}
+
+/// The AI players' badges by account. The administration's account rows
+/// carry none, so the pages that list or show accounts read the AI players
+/// (`AdminRequest::AiPlayers`) and mark each account that is one
+/// (`docs/ai-players.md` §6).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Roster(HashMap<[u8; 16], AiBadge>);
+
+impl Roster {
+    /// The badges of `players`.
+    pub fn of(players: &[AdminAiPlayer]) -> Self {
+        Roster(
+            players
+                .iter()
+                .map(|player| {
+                    let badge = AiBadge {
+                        kind: player.settings.kind,
+                        label: player.settings.label.clone(),
+                    };
+                    (player.account, badge)
+                })
+                .collect(),
+        )
+    }
+
+    /// The badge of `account`, where it is an AI player.
+    pub fn badge(&self, account: &[u8; 16]) -> Option<AiBadge> {
+        self.0.get(account).cloned()
+    }
+}
+
+/// Reads the AI players' badges.
+///
+/// # Errors
+/// Why they could not be read.
+pub async fn roster() -> Result<Roster, Unread> {
+    match read(AdminRequest::AiPlayers).await? {
+        AdminAnswer::AiPlayers { players } => Ok(Roster::of(&players)),
+        _ => Err(Unread::Other(Problem::Failed)),
+    }
+}
+
+/// The AI players' badges, read once for a page and kept in `held`.
+///
+/// # Errors
+/// Why they could not be read.
+pub async fn roster_kept(held: StoredValue<Option<Roster>>) -> Result<Roster, Unread> {
+    if let Some(Some(roster)) = held.try_get_value() {
+        return Ok(roster);
+    }
+    let roster = roster().await?;
+    let _ = held.try_set_value(Some(roster.clone()));
+    Ok(roster)
 }
 
 /// The browser's clock, in Unix seconds.
@@ -226,6 +282,8 @@ pub struct Names {
     /// The report token an event made or revoked, by the event: its id and
     /// its name.
     pub tokens: HashMap<[u8; 16], ([u8; 16], String)>,
+    /// An AI player's badge, beside its name.
+    pub badges: HashMap<[u8; 16], AiBadge>,
 }
 
 /// The words for an audited action Central names; `None` for one this page
@@ -246,6 +304,14 @@ pub fn action_text(lang: Lang, action: &str) -> Option<&'static str> {
         "report_token.revoked" => words::admin_audit_rt_revoked(lang),
         "registration.closed" => words::admin_audit_registration_closed(lang),
         "registration.opened" => words::admin_audit_registration_opened(lang),
+        "ai.created" => words::admin_audit_ai_created(lang),
+        "ai.changed" => words::admin_audit_ai_changed(lang),
+        "ai.removed" => words::admin_audit_ai_removed(lang),
+        "ai.enabled" => words::admin_audit_ai_enabled(lang),
+        "ai.disabled" => words::admin_audit_ai_disabled(lang),
+        "ai.settings_changed" => words::admin_audit_ai_settings_changed(lang),
+        "ai.runner_token_created" => words::admin_audit_ai_runner_token_created(lang),
+        "ai.runner_token_revoked" => words::admin_audit_ai_runner_token_revoked(lang),
         _ => return None,
     })
 }
@@ -256,7 +322,11 @@ fn account_cell(lang: Lang, id: [u8; 16], names: &Names) -> impl IntoView + use<
         Some(name) => view! { <bdi translate="no">{name}</bdi> }.into_any(),
         None => view! { <code translate="no">{id_end(&id)}</code> }.into_any(),
     };
-    view! { <a href=user_path(lang, &id) title=id_hex(&id)>{shown}</a> }
+    let badge = names
+        .badges
+        .get(&id)
+        .map(|badge| view! { " " {crate::islands::ui::ai_badge::ai_badge(lang, badge)} });
+    view! { <a href=user_path(lang, &id) title=id_hex(&id)>{shown}</a>{badge} }
 }
 
 fn gateway_cell(id: [u8; 16], names: &Names) -> impl IntoView + use<> {
@@ -348,6 +418,14 @@ pub enum Change {
     Revoke { gateway: [u8; 16], token: [u8; 16] },
     /// Revoke a report token.
     RevokeReport { token: [u8; 16] },
+    /// Switch an AI player on or off.
+    AiEnabled { account: [u8; 16], enabled: bool },
+    /// Remove an AI player before its first match.
+    RemoveAi { account: [u8; 16] },
+    /// Stop every AI at once.
+    StopAllAi,
+    /// Revoke an AI runner token, and every session it signed in.
+    RevokeRunner { token: [u8; 16] },
 }
 
 impl Change {
@@ -364,30 +442,51 @@ impl Change {
             }
             Change::Revoke { token, .. } => AdminRequest::RevokeGatewayToken { token },
             Change::RevokeReport { token } => AdminRequest::RevokeReportToken { token },
+            Change::AiEnabled { account, enabled } => {
+                AdminRequest::SetAiEnabled { account, enabled }
+            }
+            Change::RemoveAi { account } => AdminRequest::RemoveAiPlayer { account },
+            Change::StopAllAi => AdminRequest::StopAllAi,
+            Change::RevokeRunner { token } => AdminRequest::RevokeAiRunnerToken { token },
         }
+    }
+
+    /// Whether Central asks for a password sign-in less than 30 minutes old
+    /// (`AdminRequest::fresh`): switching an AI off, stopping every AI and
+    /// revoking a runner token only take exposure away, and need none.
+    pub fn fresh(self) -> bool {
+        self.request().fresh()
     }
 
     /// The read that tells whether what it changes still exists.
     fn target(self) -> AdminRequest {
         match self {
-            Change::Role { account, .. } | Change::Tag { account, .. } => {
-                AdminRequest::Account { account }
-            }
+            Change::Role { account, .. }
+            | Change::Tag { account, .. }
+            | Change::AiEnabled { account, .. }
+            | Change::RemoveAi { account } => AdminRequest::Account { account },
             Change::Approval { gateway, .. }
             | Change::Ranked { gateway, .. }
             | Change::Revoke { gateway, .. } => AdminRequest::Gateway { gateway },
             Change::RevokeReport { .. } => AdminRequest::ReportTokens,
+            Change::StopAllAi => AdminRequest::AiSettings,
+            Change::RevokeRunner { .. } => AdminRequest::AiRunnerTokens,
         }
     }
 
     /// What Central refuses for when what it changes is gone.
     fn missing(self) -> Came {
         match self {
-            Change::Role { .. } | Change::Tag { .. } => Came::AccountGone,
+            Change::Role { .. }
+            | Change::Tag { .. }
+            | Change::AiEnabled { .. }
+            | Change::RemoveAi { .. } => Came::AccountGone,
             Change::Approval { .. } | Change::Ranked { .. } | Change::Revoke { .. } => {
                 Came::GatewayGone
             }
-            Change::RevokeReport { .. } => Came::TokenGone,
+            Change::RevokeReport { .. } | Change::RevokeRunner { .. } => Came::TokenGone,
+            // the settings are always there
+            Change::StopAllAi => Came::Other(Problem::Failed),
         }
     }
 
@@ -405,6 +504,11 @@ impl Change {
             } => words::admin_gw_ranked_revoked(lang),
             Change::Revoke { .. } => words::tokens_revoked_now(lang),
             Change::RevokeReport { .. } => words::rt_revoked_done(lang),
+            Change::AiEnabled { enabled: true, .. } => words::ai_on_done(lang),
+            Change::AiEnabled { enabled: false, .. } => words::ai_off_done(lang),
+            Change::RemoveAi { .. } => words::ai_removed(lang),
+            Change::StopAllAi => words::ai_stop_done(lang),
+            Change::RevokeRunner { .. } => words::ai_token_revoked_done(lang),
         }
     }
 }
@@ -434,6 +538,9 @@ pub enum Came {
     TokenGone,
     /// Another account holds the tag, or the account's chat keeps its own.
     Taken,
+    /// The AI player has played a match: it stays, and is switched off
+    /// instead.
+    Played,
     /// No answer came back: it may have been made.
     Lost,
     /// Anything else, in the forms' shared words: nothing was made.
@@ -475,6 +582,7 @@ fn at_change(change: Change, failure: Failure) -> Option<Came> {
     match failure {
         Failure::Rejected => None,
         Failure::Conflict if matches!(change, Change::Tag { .. }) => Some(Came::Taken),
+        Failure::Conflict if matches!(change, Change::RemoveAi { .. }) => Some(Came::Played),
         Failure::Conflict | Failure::Forbidden => Some(Came::Other(Problem::Failed)),
         Failure::Busy => Some(Came::Other(Problem::Busy)),
         Failure::Unavailable | Failure::Malformed | Failure::Network => Some(Came::Lost),
@@ -486,11 +594,14 @@ fn at_change(change: Change, failure: Failure) -> Option<Came> {
 /// still exists (`None`: not known). Central refuses a change of an
 /// administrator's with a fresh sign-in only for something gone, so with
 /// it there, the sign-in is the reason: the password is asked for, once.
+/// A change that needs no fresh sign-in is never refused for its age.
 fn explain(change: Change, admin: bool, exists: Option<bool>, proven: bool) -> Came {
     if !admin {
         Came::Role
     } else if exists == Some(false) {
         change.missing()
+    } else if !change.fresh() {
+        Came::Other(Problem::Failed)
     } else if !proven {
         Came::Password
     } else if exists == Some(true) {
@@ -514,6 +625,7 @@ pub fn came_text(lang: Lang, came: Came) -> Option<&'static str> {
         Came::GatewayGone => Some(words::admin_refused_gateway(lang)),
         Came::TokenGone => Some(words::rt_missing(lang)),
         Came::Taken => Some(words::admin_tag_taken(lang)),
+        Came::Played => Some(words::ai_played(lang)),
         Came::Other(problem) => Some(problem_text(lang, problem)),
     }
 }
@@ -562,7 +674,8 @@ pub async fn refused(own: [u8; 16], proven: bool) -> Came {
 /// Sends `change`, once, after `AccountSummary` said it may be; `proven`
 /// where the password was proven just now.
 async fn send(change: Change, own: [u8; 16], proven: bool) -> Came {
-    if let Err(came) = may_send(own, proven).await {
+    // a change that needs no fresh sign-in is sent whatever its age
+    if let Err(came) = may_send(own, proven || !change.fresh()).await {
         return came;
     }
     let failure = match call(&Request::Admin {
@@ -932,7 +1045,7 @@ mod tests {
         Failure::Network,
     ];
 
-    fn changes() -> [Change; 9] {
+    fn changes() -> [Change; 14] {
         [
             Change::Role {
                 account: OTHER,
@@ -967,6 +1080,17 @@ mod tests {
                 verified: false,
             },
             Change::RevokeReport { token: [4; 16] },
+            Change::AiEnabled {
+                account: OTHER,
+                enabled: true,
+            },
+            Change::AiEnabled {
+                account: OTHER,
+                enabled: false,
+            },
+            Change::RemoveAi { account: OTHER },
+            Change::StopAllAi,
+            Change::RevokeRunner { token: [5; 16] },
         ]
     }
 
@@ -1017,6 +1141,9 @@ mod tests {
                     Failure::Conflict if matches!(change, Change::Tag { .. }) => {
                         assert_eq!(came, Some(Came::Taken));
                     }
+                    Failure::Conflict if matches!(change, Change::RemoveAi { .. }) => {
+                        assert_eq!(came, Some(Came::Played));
+                    }
                     Failure::Conflict | Failure::Forbidden => {
                         assert_eq!(came, Some(Came::Other(Problem::Failed)));
                     }
@@ -1031,8 +1158,12 @@ mod tests {
     fn a_refusal_is_explained_by_what_central_holds_now() {
         for change in changes() {
             let gone = match change {
-                Change::Role { .. } | Change::Tag { .. } => Came::AccountGone,
-                Change::RevokeReport { .. } => Came::TokenGone,
+                Change::Role { .. }
+                | Change::Tag { .. }
+                | Change::AiEnabled { .. }
+                | Change::RemoveAi { .. } => Came::AccountGone,
+                Change::RevokeReport { .. } | Change::RevokeRunner { .. } => Came::TokenGone,
+                Change::StopAllAi => Came::Other(Problem::Failed),
                 _ => Came::GatewayGone,
             };
             for proven in [false, true] {
@@ -1040,6 +1171,18 @@ mod tests {
                     assert_eq!(explain(change, false, exists, proven), Came::Role);
                 }
                 assert_eq!(explain(change, true, Some(false), proven), gone);
+            }
+            if !change.fresh() {
+                // switching off, stopping and revoking ask for no password
+                for proven in [false, true] {
+                    for exists in [None, Some(true)] {
+                        assert_eq!(
+                            explain(change, true, exists, proven),
+                            Came::Other(Problem::Failed)
+                        );
+                    }
+                }
+                continue;
             }
             assert_eq!(explain(change, true, Some(true), false), Came::Password);
             assert_eq!(explain(change, true, None, false), Came::Password);
@@ -1076,6 +1219,7 @@ mod tests {
             Came::GatewayGone,
             Came::TokenGone,
             Came::Taken,
+            Came::Played,
         ];
         for lang in Lang::ALL {
             let texts: Vec<&str> = said
@@ -1115,7 +1259,31 @@ mod tests {
             verify,
             withdraw,
             revoke_report,
+            switch_on,
+            switch_off,
+            remove_ai,
+            stop_all,
+            revoke_runner,
         ] = changes();
+        assert!(text(switch_on.request()).contains(r#""action":"set_ai_enabled""#));
+        assert!(text(switch_off.request()).ends_with(r#""enabled":false}}"#));
+        assert!(text(remove_ai.request()).contains(r#""action":"remove_ai_player""#));
+        assert_eq!(
+            text(stop_all.request()),
+            r#"{"operation":"admin","request":{"action":"stop_all_ai"}}"#
+        );
+        assert!(text(revoke_runner.request()).contains(r#""action":"revoke_ai_runner_token""#));
+        assert!(text(revoke_runner.target()).contains(r#""action":"ai_runner_tokens""#));
+        assert!(text(stop_all.target()).contains(r#""action":"ai_settings""#));
+        // only taking exposure away needs no fresh sign-in
+        let fresh: Vec<bool> = changes().iter().map(|change| change.fresh()).collect();
+        assert_eq!(
+            fresh,
+            [
+                true, true, true, true, true, true, true, true, true, true, false, true, false,
+                false
+            ]
+        );
         assert!(text(verify.request()).contains(r#""action":"set_ranked_verification""#));
         assert!(text(withdraw.request()).ends_with(r#""verified":false}}"#));
         assert_eq!(
@@ -1178,6 +1346,14 @@ mod tests {
             "report_token.revoked",
             "registration.closed",
             "registration.opened",
+            "ai.created",
+            "ai.changed",
+            "ai.removed",
+            "ai.enabled",
+            "ai.disabled",
+            "ai.settings_changed",
+            "ai.runner_token_created",
+            "ai.runner_token_revoked",
         ];
         for lang in Lang::ALL {
             let texts: Vec<&str> = all
@@ -1189,6 +1365,40 @@ mod tests {
             }
             assert_eq!(action_text(lang, "account.locked"), None);
         }
+    }
+
+    /// The audit's table marks an AI player where it names one, and only
+    /// there.
+    #[test]
+    fn the_audit_marks_an_ai_player() {
+        use central_api::ranked::ai::AiKind;
+        let event = |n: u8, account: [u8; 16]| Event {
+            id: [n; 16],
+            at: NOW,
+            actor: None,
+            action: "ai.created".into(),
+            account: Some(account),
+            gateway: None,
+        };
+        let mut names = Names::default();
+        names.accounts.insert(OTHER, "KI-Haus-Expert#1a2b".into());
+        names.accounts.insert(OWN, "Erika#2b3c".into());
+        names.badges.insert(
+            OTHER,
+            AiBadge {
+                kind: AiKind::House,
+                label: "Haus-KI · Expert".into(),
+            },
+        );
+        let owner = Owner::new();
+        let shown = owner.with(|| audit_table(Lang::En, "t", &[event(1, OTHER)], &names).to_html());
+        assert!(shown.contains("Haus-KI · Expert"), "{shown}");
+        assert!(
+            shown.contains(words::admin_audit_ai_created(Lang::En)),
+            "{shown}"
+        );
+        let shown = owner.with(|| audit_table(Lang::En, "t", &[event(2, OWN)], &names).to_html());
+        assert!(!shown.contains("ai-badge"), "{shown}");
     }
 
     #[test]

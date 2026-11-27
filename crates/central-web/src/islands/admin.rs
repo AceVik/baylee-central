@@ -29,6 +29,7 @@
 //! feature: the administration's own module, which only these pages load
 //! (`docs/proposals/frontend-rewrite.md` §27).
 
+mod ai;
 mod audit;
 mod common;
 mod gateways;
@@ -44,6 +45,7 @@ pub use common::nav;
 use std::sync::Arc;
 
 use central_api::admin::{AccountQuery, AccountState, AdminAccount, AdminAnswer, AdminRequest};
+use central_api::ranked::ai::AiBadge;
 use central_api::reset_code::ResetCode;
 use central_api::wire::{AccountSource, Request, Response};
 use leptos::prelude::*;
@@ -75,6 +77,9 @@ struct Row {
     last_sign_in_at: Option<i64>,
     admin: bool,
     reset_until: Option<i64>,
+    /// Its badge where it is an AI player, from the AI players' list
+    /// (`common::Roster`): `AdminAccount` carries none.
+    ai: Option<AiBadge>,
 }
 
 impl From<AdminAccount> for Row {
@@ -90,6 +95,7 @@ impl From<AdminAccount> for Row {
             last_sign_in_at: account.last_sign_in_at,
             admin: account.admin,
             reset_until: account.reset_until,
+            ai: None,
         }
     }
 }
@@ -102,6 +108,12 @@ impl Row {
             (Some(name), Some(tag)) => central_api::profile::handle(name, tag),
             _ => self.username.clone(),
         }
+    }
+
+    /// The row with its badge where the AI players name it.
+    fn marked(mut self, roster: &common::Roster) -> Self {
+        self.ai = roster.badge(&self.id);
+        self
     }
 
     /// Its part of element ids: its id in hex, unique on the page.
@@ -131,6 +143,8 @@ enum Refusal {
     Administrator,
     /// It is the administrator's own.
     Own,
+    /// It is an AI player, which has no password.
+    Ai,
     /// It was reserved and never set up.
     Pending,
     /// It moved from the official gateway and the move is not finished:
@@ -178,6 +192,7 @@ fn refusal_text(lang: Lang, refusal: Refusal) -> &'static str {
     match refusal {
         Refusal::Administrator => words::admin_refused_admin(lang),
         Refusal::Own => words::admin_refused_own(lang),
+        Refusal::Ai => words::admin_refused_ai(lang),
         Refusal::Pending => words::admin_refused_pending(lang),
         Refusal::Moving => words::admin_refused_moving(lang),
         Refusal::Stale => words::admin_refused_stale(lang),
@@ -193,6 +208,8 @@ fn refusal_text(lang: Lang, refusal: Refusal) -> &'static str {
 fn refusal(row: &Row, own: [u8; 16]) -> Option<Refusal> {
     if row.id == own {
         Some(Refusal::Own)
+    } else if row.ai.is_some() {
+        Some(Refusal::Ai)
     } else if row.admin {
         Some(Refusal::Administrator)
     } else if row.state == AccountState::Pending {
@@ -318,8 +335,9 @@ struct Admin {
     more: RwSignal<bool>,
     listing: RwSignal<Listing>,
     adding: RwSignal<bool>,
-    /// The search the list shows.
-    asked: StoredValue<Option<String>>,
+    /// The search the list shows, and the AI players read with the first
+    /// list, so that every account the page names is marked where it is one.
+    asked: StoredValue<Sought>,
     /// The newest list request: an older one's answer is not drawn.
     generation: StoredValue<u32>,
     typed: RwSignal<String>,
@@ -328,6 +346,13 @@ struct Admin {
     said: RwSignal<Option<Said>>,
     password: RwSignal<String>,
     signed_out: Callback<()>,
+}
+
+/// What the list was asked for, and the AI players read with it.
+#[derive(Clone, Default)]
+struct Sought {
+    query: Option<String>,
+    roster: Option<common::Roster>,
 }
 
 /// Where this browser's account stands, asked after Central refused a
@@ -371,6 +396,29 @@ impl Admin {
         self.signed_out.run(());
     }
 
+    /// The AI players, read once for the page; where they cannot be read,
+    /// what to say (`None` once the area was told that nobody is signed in).
+    async fn roster(self) -> Result<common::Roster, Option<Said>> {
+        if let Some(Some(roster)) = self.asked.try_with_value(|held| held.roster.clone()) {
+            return Ok(roster);
+        }
+        match common::roster().await {
+            Ok(roster) => {
+                let _ = self
+                    .asked
+                    .try_update_value(|held| held.roster = Some(roster.clone()));
+                Ok(roster)
+            }
+            Err(common::Unread::SignedOut) => {
+                self.leave();
+                Err(None)
+            }
+            Err(common::Unread::Role) => Err(Some(Said::Refused(Refusal::Role))),
+            Err(common::Unread::Missing) => Err(Some(Said::Other(Problem::Failed))),
+            Err(common::Unread::Other(problem)) => Err(Some(Said::Other(problem))),
+        }
+    }
+
     /// What to say of a read Central refused, or `None` once the area was
     /// told that nobody is signed in.
     async fn refused_read(self) -> Option<Said> {
@@ -393,7 +441,7 @@ impl Admin {
             generation
         };
         self.generation.set_value(generation);
-        let query = self.asked.get_value();
+        let query = self.asked.with_value(|held| held.query.clone());
         leptos::task::spawn_local(async move {
             let request = Request::Admin {
                 request: AdminRequest::Accounts { query, before },
@@ -407,7 +455,25 @@ impl Admin {
                 Ok(Response::Admin {
                     answer: AdminAnswer::Accounts { accounts, more },
                 }) => {
-                    let found: Vec<Row> = accounts.into_iter().map(Row::from).collect();
+                    // an AI player is never listed without its badge
+                    let roster = match self.roster().await {
+                        Ok(roster) => roster,
+                        Err(said) => {
+                            if let Some(said) = said {
+                                self.listing
+                                    .set(Listing::Failed(said_text(self.lang, said)));
+                            }
+                            self.adding.set(false);
+                            return;
+                        }
+                    };
+                    if self.generation.try_get_value() != Some(generation) {
+                        return;
+                    }
+                    let found: Vec<Row> = accounts
+                        .into_iter()
+                        .map(|account| Row::from(account).marked(&roster))
+                        .collect();
                     let next = found.first().map(Row::key);
                     if before.is_some() {
                         self.rows.update(|rows| rows.extend(found));
@@ -456,7 +522,7 @@ impl Admin {
             return;
         };
         self.search_error.set(None);
-        self.asked.set_value(asked);
+        self.asked.update_value(|held| held.query = asked);
         self.rows.set(Vec::new());
         self.more.set(false);
         self.listing.set(Listing::Loading);
@@ -512,7 +578,12 @@ impl Admin {
                             account, recovery, ..
                         },
                 }) => {
-                    let row = Row::from(account);
+                    let roster = match self.roster().await {
+                        Ok(roster) => roster,
+                        Err(Some(said)) => return self.unnamed(said),
+                        Err(None) => return,
+                    };
+                    let row = Row::from(account).marked(&roster);
                     self.go(
                         Step::Account(Opened { row, recovery }),
                         "#admin-account-title",
@@ -550,7 +621,8 @@ impl Admin {
                             account, recovery, ..
                         },
                 }) => {
-                    let fresh = Row::from(account);
+                    let mut fresh = Row::from(account);
+                    fresh.ai.clone_from(&row.ai);
                     self.replace(&fresh);
                     self.go(
                         Step::Account(Opened {
@@ -627,7 +699,13 @@ impl Admin {
                     match explained {
                         Why::SignedOut => self.leave(),
                         Why::Said(said, fresh) => {
-                            let opened = fresh.unwrap_or(opened);
+                            let opened = match fresh {
+                                Some(mut fresh) => {
+                                    fresh.row.ai.clone_from(&opened.row.ai);
+                                    fresh
+                                }
+                                None => opened,
+                            };
                             self.replace(&opened.row);
                             // where the account read again says it, the
                             // reason stands in the button's place and takes
@@ -651,7 +729,13 @@ impl Admin {
     /// again after an answer that did not arrive (a code may stand now).
     async fn settle(self, opened: Opened, said: Said) {
         let opened = if said == Said::Lost {
-            read_account(opened.row.id).await.unwrap_or(opened)
+            match read_account(opened.row.id).await {
+                Some(mut fresh) => {
+                    fresh.row.ai.clone_from(&opened.row.ai);
+                    fresh
+                }
+                None => opened,
+            }
         } else {
             opened
         };
@@ -842,13 +926,17 @@ fn handle_view(lang: Lang, row: &Row) -> AnyView {
     }
 }
 
-/// An account's name (with inline copy button when it has a handle) and the
-/// role's pill.
+/// An account's name (with inline copy button when it has a handle), the
+/// role's pill, and an AI player's badge.
 fn title(lang: Lang, row: &Row) -> impl IntoView + use<> {
     let pill = row
         .admin
         .then(|| view! { <span class="pill info">{words::admin_pill(lang)}</span> });
-    view! { {handle_view(lang, row)}{pill} }
+    let ai = row
+        .ai
+        .as_ref()
+        .map(|badge| super::ui::ai_badge::ai_badge(lang, badge));
+    view! { {handle_view(lang, row)}{pill}{ai} }
 }
 
 fn row_view(a: Admin, row: &Row) -> impl IntoView + use<> {
@@ -1150,7 +1238,7 @@ pub fn page(
         more: RwSignal::new(false),
         listing: RwSignal::new(Listing::Loading),
         adding: RwSignal::new(false),
-        asked: StoredValue::new(None),
+        asked: StoredValue::new(Sought::default()),
         generation: StoredValue::new(0),
         typed: RwSignal::new(String::new()),
         search_error: RwSignal::new(None),
@@ -1206,6 +1294,7 @@ pub fn area(
         Section::AdminGateways => gateways::page(cx).into_any(),
         Section::AdminAudit => audit::page(cx).into_any(),
         Section::AdminLegacy => legacy::page(cx).into_any(),
+        Section::AdminAi => ai::page(cx).into_any(),
         Section::AdminPictures => super::moderation::section(lang, worker).into_any(),
         Section::FeedbackTokens => tokens::page(cx).into_any(),
         _ => page(lang, worker, username, own, signed_out).into_any(),
@@ -1280,6 +1369,7 @@ mod tests {
             last_sign_in_at: None,
             admin: false,
             reset_until: None,
+            ai: None,
         }
     }
 
@@ -1318,6 +1408,19 @@ mod tests {
             ..row()
         };
         assert_eq!(refusal(&admin, OWN), Some(Refusal::Administrator));
+        // an AI player has no password: the page says so and asks nothing
+        let ai = Row {
+            ai: Some(AiBadge {
+                kind: central_api::ranked::ai::AiKind::House,
+                label: "Haus-KI · Expert".into(),
+            }),
+            ..row()
+        };
+        assert_eq!(refusal(&ai, OWN), Some(Refusal::Ai));
+        let mut roster_marked = row().marked(&common::Roster::default());
+        assert_eq!(roster_marked.ai, None);
+        roster_marked.ai.clone_from(&ai.ai);
+        assert_eq!(refusal(&roster_marked, OWN), Some(Refusal::Ai));
         let pending = Row {
             state: AccountState::Pending,
             ..row()
@@ -1442,6 +1545,7 @@ mod tests {
         let all = [
             Refusal::Administrator,
             Refusal::Own,
+            Refusal::Ai,
             Refusal::Pending,
             Refusal::Moving,
             Refusal::Stale,

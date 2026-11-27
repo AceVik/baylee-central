@@ -47,11 +47,18 @@ fn person(row: &QueryResult) -> Result<Person, Error> {
     })
 }
 
+/// The person whose tag is `tag`. An AI player is no one here: its tag
+/// answers as an unknown one, so no contact, block or group row ever names
+/// one, and no social reply names an AI without its badge
+/// (`docs/ai-players.md` §1 and §6).
 async fn by_tag(db: &impl ConnectionTrait, tag: u32) -> Result<Option<QueryResult>, Error> {
     let tag = i32::try_from(tag).map_err(|_| Error::Rejected)?;
     db.query_one_raw(statement(
-        "SELECT id, tag, display_name FROM central_identity.accounts
-         WHERE tag = $1 AND credential IS NOT NULL AND display_name IS NOT NULL",
+        &format!(
+            "SELECT id, tag, display_name FROM central_identity.accounts
+             WHERE tag = $1 AND credential IS NOT NULL AND display_name IS NOT NULL AND {}",
+            super::ai::NO_AI
+        ),
         vec![tag.into()],
     ))
     .await
@@ -354,6 +361,10 @@ async fn search(
                AND a.display_name IS NOT NULL
                AND a.tag IS NOT NULL
                AND a.id <> $1
+               -- an AI player is found by no search (docs/ai-players.md §1)
+               AND NOT EXISTS (
+                   SELECT 1 FROM central_identity.ai_players ai WHERE ai.account_id = a.id
+               )
                AND NOT EXISTS (
                    SELECT 1 FROM central_identity.social_blocks b
                    WHERE (b.owner = $1 AND b.blocked = a.id)

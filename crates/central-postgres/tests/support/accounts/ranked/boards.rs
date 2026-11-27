@@ -80,6 +80,7 @@ async fn board(
                     league,
                     division: None,
                     after,
+                    players: central_api::ranked::ai::BoardPlayers::Everyone,
                 },
             )
             .await

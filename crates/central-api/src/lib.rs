@@ -5,6 +5,7 @@
 
 pub mod admin;
 pub mod advent;
+pub mod ai_runner;
 pub mod challenges;
 pub mod chat;
 pub mod email;
@@ -41,9 +42,13 @@ pub use token::{Bearer, SignedToken, Token};
 
 /// The header every native request carries, naming the protocol it speaks.
 pub const PROTOCOL_HEADER: &str = "Baylee-Central-Protocol";
-/// The protocol this build speaks. Central answers any other with
-/// [`UPDATE_REQUIRED_STATUS`] before it reads the request.
-pub const PROTOCOL_VERSION: &str = "2";
+/// The protocol this build speaks: 3 reads AI players' badges
+/// (`docs/ai-players.md`). Central answers a version outside
+/// [`PROTOCOL_VERSIONS`] with [`UPDATE_REQUIRED_STATUS`] before it reads the request.
+pub const PROTOCOL_VERSION: &str = "3";
+/// Every protocol Central serves. A caller of 2 gets no field protocol 3 added
+/// ([`wire::Response::omit_ai`]).
+pub const PROTOCOL_VERSIONS: [&str; 2] = ["2", "3"];
 /// The status of a client or gateway too old to be served: 426 Upgrade Required.
 pub const UPDATE_REQUIRED_STATUS: u16 = 426;
 /// That answer's body, in the refusal form clients read. It names no version: Central

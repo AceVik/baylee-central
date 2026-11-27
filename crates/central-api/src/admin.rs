@@ -1,11 +1,12 @@
 //! Central administration (`docs/administration.md`): what an administrator
 //! asks and is answered, on the browser listener only, with a browser session
 //! whose account holds the administrator role. No answer has a field that
-//! could carry a wrapper, a document or any other ciphertext, and two can
+//! could carry a wrapper, a document or any other ciphertext, and three can
 //! carry a secret, each answered once to the change that made it and never
-//! again: a reset code and a new report token.
+//! again: a reset code, a new report token and a new AI runner token.
 use crate::Error;
 use crate::Token;
+use crate::ai_runner::AiRunnerTokenInfo;
 use crate::gateway::{GatewayMetadata, GatewayState};
 use crate::owner::TokenInfo;
 use crate::report_tokens::{ReportScopes, ReportTokenInfo};
@@ -276,6 +277,183 @@ pub enum AdminRequest {
         /// The action.
         request: crate::picture::PictureAdmin,
     },
+    /// Every AI player (`docs/ai-players.md`), at most [`AI_PLAYERS`].
+    AiPlayers,
+    /// Create an AI player (`docs/ai-players.md` §1): a new account with no
+    /// password, named with an AI prefix, switched off. The only way an
+    /// account becomes an AI; a person's account never does. Audited.
+    /// Answered with [`AdminAnswer::AiPlayerCreated`]; `Conflict` for a
+    /// taken tag.
+    CreateAiPlayer {
+        /// The settings, the display name among them.
+        settings: AiPlayerSettings,
+        /// Its tag, or none to draw one.
+        tag: Option<u32>,
+    },
+    /// Change an AI player's label, limits or display name. The kind and
+    /// the profile never change (`Conflict`). Audited.
+    SetAiPlayer {
+        /// Account ID.
+        account: [u8; 16],
+        /// The settings, with the kind and profile it has.
+        settings: AiPlayerSettings,
+    },
+    /// Remove an AI player that has never been seated and holds no open
+    /// ticket: its account goes with everything it holds, its runner
+    /// sessions among them. After its first match an AI stays and is
+    /// switched off instead (`Conflict`). Audited.
+    RemoveAiPlayer {
+        /// Account ID.
+        account: [u8; 16],
+    },
+    /// Switch an AI player on or off. Off takes it out of every new match
+    /// at once; its running matches end normally. Audited.
+    SetAiEnabled {
+        /// Account ID.
+        account: [u8; 16],
+        /// On or off.
+        enabled: bool,
+    },
+    /// The settings for every AI.
+    AiSettings,
+    /// Change the settings for every AI. Audited.
+    SetAiSettings {
+        /// The new settings.
+        settings: AiSettings,
+    },
+    /// Stop every AI at once (`global_seats` to 0). Audited.
+    StopAllAi,
+    /// The AI runner tokens (`docs/ai-players.md` §2): the live ones, and
+    /// those revoked or expired in the last 30 days. Answered with
+    /// [`AdminAnswer::AiRunnerTokens`].
+    AiRunnerTokens,
+    /// Make an AI runner token for a runner machine: a change that hands out
+    /// a credential. Every account must be an AI player. At most
+    /// [`crate::ai_runner::LIVE_TOKENS`] live ones and
+    /// [`crate::ai_runner::TOKENS_PER_DAY`] new ones a day (`Busy`).
+    /// Answered with [`AdminAnswer::AiRunnerTokenCreated`], the only answer
+    /// that carries the token.
+    CreateAiRunnerToken {
+        /// Its name ([`crate::owner::token_name`]).
+        name: String,
+        /// The AI accounts it may play, 1 to
+        /// [`crate::ai_runner::MAX_ACCOUNTS`], each once; fixed for its life.
+        accounts: Vec<[u8; 16]>,
+        /// How many days it lives, 1 to [`crate::owner::MAX_TOKEN_DAYS`].
+        days: u16,
+    },
+    /// Revoke an AI runner token at once, and with it every session it
+    /// minted: a change that needs no fresh sign-in, since it only takes
+    /// exposure away. Audited. `Done` again for one revoked already.
+    RevokeAiRunnerToken {
+        /// The token's id.
+        token: [u8; 16],
+    },
+}
+
+/// Most AI players a listing shows.
+pub const AI_PLAYERS: usize = 64;
+
+/// What an administrator sets for an AI player.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AiPlayerSettings {
+    /// The kind of mind; fixed when the AI is created.
+    pub kind: crate::ranked::ai::AiKind,
+    /// The runner's key for the mind, such as `house:expert`; fixed when the
+    /// AI is created.
+    pub profile: String,
+    /// The public label.
+    pub label: String,
+    /// Matches at once, 1 to [`crate::ranked::ai::MAX_GAMES`].
+    pub max_games: u8,
+    /// Games a UTC day; required for a language model.
+    pub daily_games: Option<u32>,
+    /// The display name, which begins with an AI prefix ([`crate::profile::ai_name`]).
+    pub display_name: String,
+}
+
+/// The settings for every AI.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AiSettings {
+    /// Whether fill-in runs at all. Off for calibration: the carousel then
+    /// plays alone (`docs/ai-players.md` §7). On unless set off.
+    #[serde(default = "fill_in_default")]
+    pub fill_in: bool,
+    /// Seconds a search waits before an AI may fill it, 30 to 600.
+    pub fill_in_after: u16,
+    /// Minutes an AI's session must have left before its cap, 30 to 600.
+    pub drain_minutes: u16,
+    /// AI seats at once, 0 to 16; a match between two AIs takes two.
+    pub global_seats: u8,
+    /// Slots each host keeps for people, 0 to 64.
+    pub host_reserve: u8,
+    /// Matches between two AIs at once, 0 to 8.
+    pub carousel_games: u8,
+    /// Matches between two AIs a UTC day, 0 to 10,000.
+    pub carousel_daily: u32,
+}
+
+/// Fill-in runs unless the settings say otherwise.
+const fn fill_in_default() -> bool {
+    true
+}
+
+impl AiSettings {
+    /// Whether every value is in its range.
+    #[must_use]
+    pub const fn valid(&self) -> bool {
+        self.fill_in_after >= 30
+            && self.fill_in_after <= 600
+            && self.drain_minutes >= 30
+            && self.drain_minutes <= 600
+            && self.global_seats <= 16
+            && self.host_reserve <= 64
+            && self.carousel_games <= 8
+            && self.carousel_daily <= 10_000
+    }
+}
+
+impl AiPlayerSettings {
+    /// Whether the settings are in their bounds. The kind must be a known one.
+    #[must_use]
+    pub fn valid(&self) -> bool {
+        self.kind.as_str().is_some()
+            && crate::ranked::ai::ranked_profile(&self.profile)
+            && crate::ranked::ai::valid_label(&self.label)
+            && (1..=crate::ranked::ai::MAX_GAMES).contains(&self.max_games)
+            && self.daily_games.is_none_or(|games| games <= 10_000)
+            && (self.kind != crate::ranked::ai::AiKind::Model || self.daily_games.is_some())
+            && crate::profile::ai_name(&self.display_name)
+    }
+}
+
+/// One AI player as the administration lists it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminAiPlayer {
+    /// Account ID.
+    pub account: [u8; 16],
+    /// Display name.
+    pub display_name: Option<String>,
+    /// Tag.
+    pub tag: Option<u32>,
+    /// Its settings.
+    pub settings: AiPlayerSettings,
+    /// Switched on.
+    pub enabled: bool,
+    /// Matches reserved or playing now.
+    pub live_matches: u32,
+    /// Matches made for it today (UTC).
+    pub games_today: u32,
+    /// Formats it offers a deck for now.
+    pub offers: Vec<crate::ranked::Format>,
+    /// Its runner's last sign-in, the last exchange of a runner token
+    /// for it (`docs/ai-players.md` §2), Unix seconds.
+    pub last_sign_in: Option<i64>,
+    /// When it was created, Unix seconds.
+    pub set_at: i64,
 }
 
 impl AdminRequest {
@@ -306,7 +484,15 @@ impl AdminRequest {
             | Self::SetReportsSeen { .. }
             | Self::CreateReportToken { .. }
             | Self::RevokeReportToken { .. }
-            | Self::SetRegistration { .. } => true,
+            | Self::SetRegistration { .. }
+            | Self::CreateAiPlayer { .. }
+            | Self::SetAiPlayer { .. }
+            | Self::RemoveAiPlayer { .. }
+            | Self::SetAiEnabled { .. }
+            | Self::SetAiSettings { .. }
+            | Self::StopAllAi
+            | Self::CreateAiRunnerToken { .. }
+            | Self::RevokeAiRunnerToken { .. } => true,
             Self::Picture { request } => request.changes(),
             Self::Accounts { .. }
             | Self::Account { .. }
@@ -324,7 +510,10 @@ impl AdminRequest {
             | Self::ReportAdmins
             | Self::ReportViews
             | Self::ReportTokens
-            | Self::Registration => false,
+            | Self::Registration
+            | Self::AiPlayers
+            | Self::AiSettings
+            | Self::AiRunnerTokens => false,
         }
     }
 
@@ -341,7 +530,13 @@ impl AdminRequest {
             | Self::RemoveReportNote { .. }
             | Self::SaveReportView { .. }
             | Self::DeleteReportView { .. }
-            | Self::SetReportsSeen { .. } => false,
+            | Self::SetReportsSeen { .. }
+            // Stopping an AI only takes exposure away (docs/ai-players.md,
+            // open question 6): it needs no fresh password, and is audited.
+            | Self::SetAiEnabled { enabled: false, .. }
+            | Self::StopAllAi
+            // So does revoking a runner token (docs/ai-players.md §2).
+            | Self::RevokeAiRunnerToken { .. } => false,
             Self::ReportsBulk { bulk, .. } => matches!(bulk, BulkAction::Purge),
             _ => self.changes(),
         }
@@ -734,6 +929,41 @@ pub enum AdminAnswer {
         /// An upload block in force, if any.
         block: Option<crate::picture::UploadBlock>,
     },
+    /// Every AI player, oldest first.
+    AiPlayers {
+        /// At most [`AI_PLAYERS`].
+        players: Vec<AdminAiPlayer>,
+    },
+    /// An AI player just created, switched off.
+    AiPlayerCreated {
+        /// Its account ID.
+        account: [u8; 16],
+        /// Its tag.
+        tag: u32,
+    },
+    /// The settings for every AI.
+    AiSettings {
+        /// The settings.
+        settings: AiSettings,
+        /// When they last changed, Unix seconds.
+        changed_at: Option<i64>,
+    },
+    /// The AI runner tokens.
+    AiRunnerTokens {
+        /// At most [`crate::ai_runner::LISTED_TOKENS`], the live ones first,
+        /// each group newest first.
+        tokens: Vec<AiRunnerTokenInfo>,
+    },
+    /// An AI runner token, shown to the administrator once; Central keeps
+    /// its digest.
+    AiRunnerTokenCreated {
+        /// The token's id.
+        id: [u8; 16],
+        /// The token: [`crate::ai_runner::token_text`] is the form to show.
+        token: Token,
+        /// When it stops working, in Unix seconds.
+        expires_at: i64,
+    },
 }
 
 #[cfg(test)]
@@ -963,5 +1193,56 @@ mod tests {
         };
         assert_eq!(token.hex().as_str(), hex.as_str());
         assert!(!format!("{token:?}").contains(hex.as_str()));
+    }
+
+    /// An AI runner token's requests: making one is a change that needs a
+    /// fresh sign-in, revoking one is a change that needs none, and only the
+    /// creation answer carries the token.
+    #[test]
+    fn a_runner_token_is_made_fresh_revoked_at_once_and_shown_once() {
+        let request: AdminRequest = crate::decode(
+            br#"{"action":"create_ai_runner_token","name":"runner-1","accounts":[[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]],"days":90}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            &request,
+            AdminRequest::CreateAiRunnerToken { days: 90, accounts, .. } if accounts == &[[1; 16]]
+        ));
+        assert!(request.changes() && request.fresh());
+        let revoke = AdminRequest::RevokeAiRunnerToken { token: [0; 16] };
+        assert!(revoke.changes() && !revoke.fresh());
+        let list = AdminRequest::AiRunnerTokens;
+        assert!(!list.changes() && !list.fresh());
+        for bad in [
+            br#"{"action":"create_ai_runner_token","name":"runner-1","days":90}"#.as_slice(),
+            br#"{"action":"create_ai_runner_token","name":"runner-1","accounts":[],"days":90,"digest":"x"}"#,
+            br#"{"action":"create_ai_runner_token","name":"runner-1","accounts":[[1]],"days":90}"#,
+            br#"{"action":"revoke_ai_runner_token"}"#,
+        ] {
+            assert!(
+                crate::decode::<AdminRequest>(bad).is_err(),
+                "{}",
+                String::from_utf8_lossy(bad)
+            );
+        }
+        let token = Token::generate().unwrap();
+        let hex = token.hex();
+        let created = AdminAnswer::AiRunnerTokenCreated {
+            id: [1; 16],
+            token,
+            expires_at: 1_807_776_000,
+        };
+        let text = crate::encode(&created).unwrap();
+        assert!(text.starts_with(br#"{"answer":"ai_runner_token_created","id":[1,"#));
+        let AdminAnswer::AiRunnerTokenCreated { token, .. } = crate::decode(&text).unwrap() else {
+            panic!("another answer");
+        };
+        assert_eq!(token.hex().as_str(), hex.as_str());
+        assert!(!format!("{token:?}").contains(hex.as_str()));
+        let listed = AdminAnswer::AiRunnerTokens { tokens: Vec::new() };
+        assert_eq!(
+            crate::encode(&listed).unwrap(),
+            br#"{"answer":"ai_runner_tokens","tokens":[]}"#
+        );
     }
 }

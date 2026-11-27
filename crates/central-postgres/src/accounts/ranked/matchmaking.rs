@@ -79,7 +79,8 @@ async fn candidate(
            AND m.state='finished' AND m.finished_at>now()-interval '6 hours' LIMIT 3) p) AS repeats
          FROM (SELECT * FROM oldest UNION SELECT * FROM lower UNION SELECT * FROM upper_pool) c
          JOIN central_identity.ranked_tickets t ON t.account_id=c.account_id AND t.state='waiting'
-         CROSS JOIN recent",
+         CROSS JOIN recent
+         WHERE NOT EXISTS (SELECT 1 FROM central_identity.ai_players p WHERE p.account_id=t.account_id)",
             vec![
                 mine.id.into(),
                 season.into(),

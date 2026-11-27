@@ -21,7 +21,12 @@ pub(super) fn responds(
             _ => false,
         },
         (SeatRequest::RelayRoute { .. }, SeatResponse::RelayRoute { seat, .. }) => *seat < 2,
-        (SeatRequest::Join { key, format, deck }, SeatResponse::Queue { state }) => match state {
+        (
+            SeatRequest::Join {
+                key, format, deck, ..
+            },
+            SeatResponse::Queue { state },
+        ) => match state {
             api::QueueState::Assigned {
                 key: k,
                 assignment: a,
@@ -85,6 +90,7 @@ pub(super) fn responds(
             SeatResponse::Participants {
                 match_id: actual,
                 seats,
+                ..
             },
         ) => {
             match_id == actual
@@ -323,6 +329,7 @@ mod tests {
             key: [2; 16],
             format: api::Format::Standard,
             deck: [7; 32],
+            ai: api::ai::AiOpponents::None,
         };
         let base = || api::Assignment {
             match_id: [1; 16],
@@ -333,6 +340,7 @@ mod tests {
             seat: 1,
             deck: [7; 32],
             game: None,
+            opponent_ai: None,
         };
         let reply = |key, assignment| SeatResponse::Queue {
             state: api::QueueState::Assigned { key, assignment },
@@ -360,6 +368,7 @@ mod tests {
                 key,
                 format,
                 queued_at: 1,
+                ai_fill_in_at: None,
             },
         };
         assert!(answered(&join, &waiting([2; 16], api::Format::Standard)));
@@ -505,6 +514,7 @@ mod tests {
         let reply = |match_id, name: &str| SeatResponse::Participants {
             match_id,
             seats: [None, Some(name.into())],
+            ai: [None, None],
         };
         assert!(answered(&names, &reply([1; 16], &"x".repeat(32))));
         assert!(!answered(&names, &reply([9; 16], "x")));
@@ -539,6 +549,7 @@ mod tests {
             SeatResponse::Participants {
                 match_id: [1; 16],
                 seats: [None, None],
+                ai: [None, None],
             },
             SeatResponse::Receipt {
                 command_id: [1; 16],

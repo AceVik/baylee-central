@@ -86,7 +86,10 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
         }
         | Request::Social { .. }
             | Request::Advent { .. }
-            | Request::Ranked { request: central_api::ranked::Request::Join { .. } | central_api::ranked::Request::Replicate {
+            | Request::Ranked { request: central_api::ranked::Request::Ai {
+                request: central_api::ranked::ai::Request::Offer { .. }
+                    | central_api::ranked::ai::Request::Carousel { .. }
+            } | central_api::ranked::Request::Join { .. } | central_api::ranked::Request::Replicate {
                 request: central_api::ranked::replica::SeatRequest::Join { .. }
                     | central_api::ranked::replica::SeatRequest::ApproveHosts { .. }
                     | central_api::ranked::replica::SeatRequest::Submit { .. }
@@ -151,21 +154,28 @@ impl IdentityService {
     }
 
     /// Refuse a session operation while Central's terms in force are not
-    /// accepted by the session's account. The token is a session of the
-    /// listener's kind: on the browser listener the cookie's.
+    /// accepted by the session's account, and, with `refuse_ai`, one that an
+    /// AI player's session may not make (`ai_gate.rs`), in the same
+    /// statement. The AI is refused first, and also while no terms are in
+    /// force. The token is a session of the listener's kind: on the browser
+    /// listener the cookie's.
     pub(super) async fn require_terms(
         &self,
         bearer: Option<&Token>,
         surface: Surface,
+        refuse_ai: bool,
     ) -> Result<(), Error> {
-        let Some(current) = self.current() else {
+        let current = self.current();
+        if current.is_none() && !refuse_ai {
             return Ok(());
-        };
-        if self
+        }
+        let gate = self
             .store
-            .terms_status(surface.session(bearer)?, Some(current))
-            .await?
-        {
+            .session_gate(surface.session(bearer)?, current)
+            .await?;
+        if refuse_ai && gate.ai {
+            Err(Error::Rejected)
+        } else if gate.accepted {
             Ok(())
         } else {
             Err(Error::TermsRequired)

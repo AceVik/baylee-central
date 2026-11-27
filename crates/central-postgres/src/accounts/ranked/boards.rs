@@ -200,11 +200,18 @@ pub(super) async fn read(
             league,
             division,
             after,
+            players,
             ..
         } => {
-            let (entries, next) =
-                standings::board(db, season_id, *format, *track, *league, *division, *after)
-                    .await?;
+            let page = standings::Page {
+                format: *format,
+                track: *track,
+                league: *league,
+                division: *division,
+                after: *after,
+                players: *players,
+            };
+            let (entries, next) = standings::board(db, season_id, page).await?;
             Ok(api::Response::Board {
                 season,
                 entries,
@@ -233,6 +240,7 @@ pub(super) async fn read(
                 tag,
                 formats,
                 awards,
+                ai: crate::accounts::ai::badge(db, id).await?,
             })
         }
         _ => Err(Error::Rejected),

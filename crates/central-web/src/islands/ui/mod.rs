@@ -2,6 +2,7 @@
 //! onboarding, and public profile views.
 
 pub mod action_menu;
+pub mod ai_badge;
 pub mod badges;
 pub mod copy_handle;
 pub mod datepicker;

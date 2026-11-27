@@ -595,6 +595,9 @@ pub enum Section {
     AdminAudit,
     /// `/account/admin/legacy`: what is left of the legacy store.
     AdminLegacy,
+    /// `/account/admin/ai`: the AI players, the settings for every AI and
+    /// the runner tokens (`docs/ai-players.md` §1, §2, §5).
+    AdminAi,
     /// `/account/admin/pictures`: the reported profile pictures, an
     /// account's case and their moderation (`docs/profile-pictures.md`).
     AdminPictures,
@@ -629,7 +632,7 @@ impl Section {
     /// Every section with a fixed address: the navigation's and the
     /// administration's. One account's page (`AdminUser`) has an address
     /// per account and is read by [`Section::account_page`] apart.
-    pub const ROUTED: [Section; 18] = [
+    pub const ROUTED: [Section; 19] = [
         Section::Home,
         Section::Chat,
         Section::Contacts,
@@ -644,6 +647,7 @@ impl Section {
         Section::AdminGateways,
         Section::AdminAudit,
         Section::AdminLegacy,
+        Section::AdminAi,
         Section::AdminPictures,
         Section::Feedback,
         Section::FeedbackTokens,
@@ -668,6 +672,7 @@ impl Section {
             Section::AdminGateways => "account/admin/gateways",
             Section::AdminAudit => "account/admin/audit",
             Section::AdminLegacy => "account/admin/legacy",
+            Section::AdminAi => "account/admin/ai",
             Section::AdminPictures => "account/admin/pictures",
             Section::Feedback | Section::Report => "account/admin/feedback",
             Section::FeedbackTokens => "account/admin/feedback-tokens",
@@ -687,6 +692,7 @@ impl Section {
                 | Section::AdminGateways
                 | Section::AdminAudit
                 | Section::AdminLegacy
+                | Section::AdminAi
                 | Section::AdminPictures
                 | Section::FeedbackTokens
         )
@@ -849,7 +855,7 @@ mod tests {
         assert_eq!(Section::account_page(&format!("account/users/{hex}")), None);
         // the administration's pages say so; the area's own do not
         let admin = Section::ROUTED.iter().filter(|s| s.admin()).count();
-        assert_eq!(admin, 8);
+        assert_eq!(admin, 9);
         assert!(Section::AdminUser(id).admin());
         assert!(Section::ALL.iter().all(|s| !s.admin()));
         assert_eq!(Section::AdminUser(id).slug(), Section::AdminUsers.slug());

@@ -44,7 +44,8 @@ impl Session {
     /// Authenticate and decrypt one chunk against its expected identity and revision floor.
     ///
     /// # Errors
-    /// Rejects substitution, rollback, deletion, malformed ciphertext or transport failure.
+    /// Rejects a runner's session, substitution, rollback, deletion, malformed ciphertext
+    /// or transport failure.
     pub fn read_object(
         &self,
         transport: &impl Transport,
@@ -52,6 +53,7 @@ impl Session {
         minimum_revision: u64,
     ) -> Result<ObjectDocument, Error> {
         self.same_endpoint(transport)?;
+        let master = self.master()?;
         let Response::Object {
             state,
             document: Some(document),
@@ -62,8 +64,7 @@ impl Session {
         if state.id != id || state.deleted || state.revision < minimum_revision {
             return Err(Error::Rejected);
         }
-        let plaintext = self
-            .master
+        let plaintext = master
             .open_object(self.object_context(id, state.revision)?, &document)
             .map_err(|_| Error::Rejected)?;
         Ok(ObjectDocument {
@@ -87,7 +88,7 @@ impl Session {
         self.same_endpoint(transport)?;
         let revision = expected_revision.checked_add(1).ok_or(Error::Rejected)?;
         let document = self
-            .master
+            .master()?
             .seal_object(self.object_context(id, revision)?, plaintext)
             .map_err(|_| Error::Rejected)?;
         let response = transport.exchange(

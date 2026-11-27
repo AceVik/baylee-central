@@ -9,7 +9,9 @@ pub struct Session {
     pub(crate) endpoint: Endpoint,
     pub(crate) identity: Identity,
     pub(crate) token: SignedToken,
-    pub(crate) master: MasterKey,
+    /// None for an AI runner's session, which no password opened
+    /// ([`crate::ai_runner_session`]).
+    master: Option<MasterKey>,
     revision: u64,
     document: Document,
     confirmed: bool,
@@ -26,12 +28,40 @@ impl Session {
             endpoint,
             identity,
             token,
-            master,
+            master: Some(master),
             revision: 0,
             document: Zeroizing::new(Vec::new()),
             confirmed: false,
         }
     }
+
+    /// An AI runner's session: no master key, no document, and no restore
+    /// confirmed, so every operation that needs one of them refuses.
+    pub(crate) fn runner(endpoint: Endpoint, identity: Identity, token: SignedToken) -> Self {
+        Self {
+            endpoint,
+            identity,
+            token,
+            master: None,
+            revision: 0,
+            document: Zeroizing::new(Vec::new()),
+            confirmed: false,
+        }
+    }
+
+    /// The master key, which a runner's session does not have. Every
+    /// operation that needs it asks before it sends anything.
+    pub(crate) fn master(&self) -> Result<&MasterKey, Error> {
+        self.master.as_ref().ok_or(Error::Rejected)
+    }
+
+    /// Whether this is an AI runner's session, opened with a runner token
+    /// ([`crate::ai_runner_session`]) and holding no master key.
+    #[must_use]
+    pub const fn is_runner(&self) -> bool {
+        self.master.is_none()
+    }
+
     pub(crate) fn same_endpoint(&self, transport: &impl Transport) -> Result<(), Error> {
         if transport.endpoint() != &self.endpoint {
             return Err(Error::Rejected);
@@ -56,9 +86,10 @@ impl Session {
     /// The stable account chat identity shared by browser and native clients.
     ///
     /// # Errors
-    /// Refuses an invalid account context or failed key derivation.
+    /// Refuses a runner's session, an invalid account context or failed key
+    /// derivation.
     pub fn chat_identity(&self) -> Result<central_crypto::chat::DeviceSecrets, Error> {
-        self.master
+        self.master()?
             .chat_identity(context(&self.endpoint, self.identity)?)
             .map_err(|_| Error::Rejected)
     }
@@ -69,10 +100,12 @@ impl Session {
     /// vault opens without the password. The master key stays inside.
     ///
     /// # Errors
-    /// An identity this endpoint cannot bind (never for a live session).
+    /// A runner's session, which has no master key, and an identity this
+    /// endpoint cannot bind (never for a live session).
     pub fn local_vault_key(&self, scope: &[u8; 32]) -> Result<Zeroizing<[u8; 32]>, Error> {
+        let master = self.master()?;
         let context = context(&self.endpoint, self.identity)?;
-        self.master
+        master
             .local_vault_key(context, scope)
             .map(central_crypto::vault::LocalVaultKey::into_bytes)
             .map_err(|_| Error::Rejected)
@@ -141,9 +174,11 @@ impl Session {
     /// Refresh with account/revision authentication; retain the prior copy on every failure.
     ///
     /// # Errors
-    /// Rejects transport changes, unavailable/corrupt content or a revision older than this device saw.
+    /// Rejects a runner's session, transport changes, unavailable/corrupt content or a
+    /// revision older than this device saw.
     pub fn refresh(&mut self, transport: &impl Transport) -> Result<(), Error> {
         self.same_endpoint(transport)?;
+        self.master()?;
         let Response::Document { revision, document } =
             transport.exchange(&Request::ReadDocument, Some((&self.token).into()))?
         else {
@@ -153,7 +188,7 @@ impl Session {
             return Err(Error::Conflict);
         }
         let plaintext = self
-            .master
+            .master()?
             .open_object(self.object(revision)?, &document)
             .map_err(|_| Error::Rejected)?;
         self.document = plaintext;
@@ -164,9 +199,11 @@ impl Session {
     /// Confirm only after application validation/restoration succeeds. This enables bridge cutover.
     ///
     /// # Errors
-    /// Rejects changed revisions, wrong endpoint, expired sessions or unavailable storage.
+    /// Rejects a runner's session, which restores no document, changed revisions, wrong
+    /// endpoint, expired sessions or unavailable storage.
     pub fn confirm_restored(&mut self, transport: &impl Transport) -> Result<(), Error> {
         self.same_endpoint(transport)?;
+        self.master()?;
         match transport.exchange(
             &Request::ConfirmRestore {
                 revision: self.revision,
@@ -185,12 +222,13 @@ impl Session {
     /// On a lost response, refresh before retrying; never blindly overwrite another device's data.
     ///
     /// # Errors
-    /// Rejects oversized input, exhausted revisions, concurrent edits or transport/storage failure.
+    /// Rejects a runner's session, oversized input, exhausted revisions, concurrent edits
+    /// or transport/storage failure.
     pub fn save(&mut self, transport: &impl Transport, plaintext: &[u8]) -> Result<(), Error> {
         self.same_endpoint(transport)?;
         let revision = self.revision.checked_add(1).ok_or(Error::Rejected)?;
         let document = self
-            .master
+            .master()?
             .seal_object(self.object(revision)?, plaintext)
             .map_err(|_| Error::Rejected)?;
         match transport.exchange(

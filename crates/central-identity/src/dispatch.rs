@@ -1,6 +1,6 @@
 use super::{
     BrowserReply, Discovery, Error, IdentityService, Place, Request, Response, Seen, Surface,
-    Token, browser_only, browser_operation, challenge,
+    Token, ai_gate::ForAi, browser_only, browser_operation, challenge,
 };
 use central_api::{
     chat::{ChatRequest, ChatResponse},
@@ -27,8 +27,24 @@ impl IdentityService {
         if surface == Surface::Native && browser_only(&request) {
             return Err(Error::Rejected);
         }
+        // An AI account's session makes its runner's operations alone
+        // (`ai_gate.rs`). Where the terms are read below, the same statement
+        // says whether the account is an AI; elsewhere it is asked here,
+        // before anything is done or spent for the operation.
+        let for_ai = ForAi::of(&request);
+        let needs_terms = super::terms::needs_acceptance(&request);
+        if for_ai == ForAi::Refused && !needs_terms {
+            self.refuse_ai(bearer, surface).await?;
+        }
         if let Request::LoginFinish { attempt, message } = request {
             return self.finish(&attempt, message, surface, bearer).await;
+        }
+        // A runner's exchange needs no terms: like a sign-in, it has no
+        // session yet whose account could have accepted them.
+        if let Request::AiRunnerSession { token, account } = request {
+            return self
+                .ai_runner_session(&token, account, bearer, surface)
+                .await;
         }
         if let Request::ChangePasswordFinish {
             attempt,
@@ -84,8 +100,9 @@ impl IdentityService {
         }
         // A choice's budget is spent before the terms are read for it.
         self.presence_budget(&request, bearer)?;
-        if super::terms::needs_acceptance(&request) {
-            self.require_terms(bearer, surface).await?;
+        if needs_terms {
+            self.require_terms(bearer, surface, for_ai != ForAi::Allowed)
+                .await?;
         }
         Ok(BrowserReply {
             response: self.respond(request, bearer, surface, seen, place).await?,

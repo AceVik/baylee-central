@@ -8,14 +8,14 @@ use axum::{
     Router,
     body::Bytes,
     extract::{Request, State},
-    http::{Extensions, HeaderMap, HeaderValue, StatusCode, header},
+    http::{Extensions, HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
 use central_api::{
-    Error, PROTOCOL_HEADER, PROTOCOL_VERSION, UPDATE_REQUIRED_BODY, UPDATE_REQUIRED_STATUS, ranked,
-    wire,
+    Error, PROTOCOL_HEADER, PROTOCOL_VERSION, PROTOCOL_VERSIONS, UPDATE_REQUIRED_BODY,
+    UPDATE_REQUIRED_STATUS, ranked, wire,
 };
 use central_identity::{IdentityService, KofiAnswer, Place, Presented};
 use std::{
@@ -110,13 +110,23 @@ pub(crate) fn update_required() -> Response {
 /// (`boundary.rs`); a report route's body is not read at all. An old client hears this at its
 /// first request, not as a failure to decode the answer to a sign-in that has already happened.
 pub(crate) async fn protocol(request: Request, next: Next) -> Response {
-    let mut values = request.headers().get_all(PROTOCOL_HEADER).iter();
-    if values.next().map(HeaderValue::as_bytes) == Some(PROTOCOL_VERSION.as_bytes())
-        && values.next().is_none()
-    {
+    if spoken(request.headers()).is_some() {
         return next.run(request).await;
     }
     update_required()
+}
+
+/// The protocol a request names: exactly one header, one of
+/// [`PROTOCOL_VERSIONS`]. A caller of 2 is served without what 3 added.
+pub(crate) fn spoken(headers: &HeaderMap) -> Option<&'static str> {
+    let mut values = headers.get_all(PROTOCOL_HEADER).iter();
+    let first = values.next()?;
+    if values.next().is_some() {
+        return None;
+    }
+    PROTOCOL_VERSIONS
+        .into_iter()
+        .find(|version| first.as_bytes() == version.as_bytes())
 }
 
 /// `GET /.well-known/jwks.json`: the keys tokens verify under. Public and made once.
@@ -242,6 +252,40 @@ fn presented(
         .transpose()
 }
 
+/// An AI runner's exchange from `from` (`docs/ai-players.md` §2). Past
+/// [`crate::addresses::RUNNER_REFUSALS`] refused ones in the hour the store is
+/// not asked again from that address, and each refusal is counted for it; a
+/// `Busy` answer is no refusal.
+async fn exchange(
+    native: &Native,
+    request: wire::Request,
+    presented: Option<&Presented>,
+    from: Option<Client>,
+) -> Result<wire::Response, Error> {
+    if let Some(client) = from {
+        // The guard is gone before anything is awaited.
+        let may = native
+            .budgets
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .may_exchange(client, Instant::now());
+        if !may {
+            return Err(Error::Busy);
+        }
+    }
+    let said = native
+        .identity
+        .handle_from(request, presented, from.map(Place::from))
+        .await;
+    if matches!(said, Err(Error::Rejected))
+        && let Some(client) = from
+        && let Ok(mut budgets) = native.budgets.lock()
+    {
+        budgets.exchange_refused(client, Instant::now());
+    }
+    said
+}
+
 /// One native request from `from`: its bearer read first (a signed session is verified
 /// under its own budget and its address's share of it, unless Central issued or verified
 /// that token before, `limits.rs` and `verified.rs`), then its address's budget for the operation
@@ -297,6 +341,9 @@ async fn process(
                     request: ranked::replica::SeatRequest::RelayRoute { .. },
                 },
         } => return Err(Error::Rejected),
+        request @ wire::Request::AiRunnerSession { .. } => {
+            exchange(native, request, presented.as_ref(), from).await?
+        }
         request => {
             native
                 .identity
@@ -314,6 +361,9 @@ async fn process(
             wire::Response::AdventHost { response } => response.omit_framing(),
             _ => {}
         }
+    }
+    if spoken(headers) != Some(PROTOCOL_VERSION) {
+        response.omit_ai();
     }
     central_api::encode(&response)
 }
@@ -344,10 +394,14 @@ mod tests {
 
     #[tokio::test]
     async fn the_protocol_of_this_build_reaches_the_route() {
-        let response = call(&[PROTOCOL_VERSION]).await;
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = to_bytes(response.into_body(), 64).await.unwrap();
-        assert_eq!(&body[..], b"reached");
+        // 3 is this build's; 2 is still served, without what 3 added.
+        assert_eq!(PROTOCOL_VERSION, "3");
+        for version in PROTOCOL_VERSIONS {
+            let response = call(&[version]).await;
+            assert_eq!(response.status(), StatusCode::OK, "{version}");
+            let body = to_bytes(response.into_body(), 64).await.unwrap();
+            assert_eq!(&body[..], b"reached");
+        }
     }
 
     #[tokio::test]
@@ -355,11 +409,13 @@ mod tests {
         for values in [
             &[][..],
             &["1"],
-            &["3"],
+            &["4"],
             &["2 "],
-            &["02"],
+            &["03"],
             &[""],
             &["2", "2"],
+            &["3", "3"],
+            &["2", "3"],
         ] {
             let response = call(values).await;
             assert_eq!(response.status().as_u16(), 426, "{values:?}");

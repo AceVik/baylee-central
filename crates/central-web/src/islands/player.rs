@@ -8,6 +8,7 @@ use crate::words::{self, Lang};
 
 #[cfg(target_arch = "wasm32")]
 use super::central;
+use super::ui::ai_badge::ai_badge;
 use super::ui::badges::{badge_wall, rank_title};
 use super::ui::copy_handle::handle_with_copy;
 use super::ui::rank_avatar::{AvatarSize, rank_avatar};
@@ -103,6 +104,13 @@ fn player_card(lang: Lang, profile: PublicProfile) -> AnyView {
         |r| rank_title(lang, r),
     );
     let wall = badge_wall(lang, &profile.badges);
+    // an AI account is never shown without its label (docs/ai-players.md §6)
+    let ai = profile.ai.as_ref().map(|badge| {
+        view! {
+            <p class="pills player-ai">{ai_badge(lang, badge)}</p>
+            <p class="meta">{words::player_ai_lead(lang)}</p>
+        }
+    });
 
     view! {
         <div class="stack">
@@ -118,6 +126,7 @@ fn player_card(lang: Lang, profile: PublicProfile) -> AnyView {
                     <div class="player-hero-meta">
                         <h1><bdi>{profile.display_name.clone()}</bdi></h1>
                         {handle_with_copy(lang, profile.display_name, tag_hex, false)}
+                        {ai}
                     </div>
                 </div>
                 <dl class="overview-stats">
@@ -203,5 +212,35 @@ mod tests {
             Some("Player One#abcd".to_owned())
         );
         assert_eq!(handle_from_path("/de/player/NoTag"), None);
+    }
+
+    /// An AI account's profile shows its label beside the name, and a
+    /// person's shows none.
+    #[test]
+    fn an_ai_player_s_profile_carries_its_label() {
+        use central_api::profile::PublicBadges;
+        use central_api::ranked::ai::{AiBadge, AiKind};
+        let person = PublicProfile {
+            display_name: "Erika".into(),
+            tag: 0x1a2b,
+            picture: None,
+            badges: PublicBadges::default(),
+            ai: None,
+        };
+        let ai = PublicProfile {
+            display_name: "KI-Haus-Expert".into(),
+            ai: Some(AiBadge {
+                kind: AiKind::House,
+                label: "Haus-KI · Expert".into(),
+            }),
+            ..person.clone()
+        };
+        let owner = Owner::new();
+        let shown = owner.with(|| player_card(Lang::En, ai).to_html());
+        assert!(shown.contains("Haus-KI · Expert"), "{shown}");
+        assert!(shown.contains("ai-badge"), "{shown}");
+        assert!(shown.contains(words::player_ai_lead(Lang::En)), "{shown}");
+        let shown = owner.with(|| player_card(Lang::En, person).to_html());
+        assert!(!shown.contains("ai-badge"), "{shown}");
     }
 }

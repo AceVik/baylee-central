@@ -24,6 +24,7 @@ and assembly are forbidden. See [AGENTS.md](AGENTS.md) for binding development r
 - [PostgreSQL and UUID policy](docs/postgresql.md)
 - [SeaORM adapter and migration tests](docs/database-development.md)
 - [Threat model](docs/threat-model.md)
+- [AI players: design pass, not built](docs/ai-players.md)
 - [Privacy and training](docs/privacy-training.md)
 - [Implementation plan and acceptance gates](docs/implementation-plan.md)
 - [Implementation handoff](docs/handoff.md)

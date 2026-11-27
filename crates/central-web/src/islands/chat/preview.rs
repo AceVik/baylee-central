@@ -18,6 +18,7 @@ use leptos::web_sys;
 
 use super::super::central;
 use super::super::picture;
+use super::super::ui::ai_badge::ai_badge;
 use super::super::ui::badges::{preview_badges_showcase, rank_title};
 use super::super::ui::copy_handle::{handle_with_copy, player_path};
 use super::super::ui::rank_avatar::{AvatarSize, rank_avatar, rank_of};
@@ -1075,6 +1076,11 @@ impl PreviewCtl {
         let profile_href = player_path(lang, &display_name, &state.tag_hex);
 
         let body = user_overlay_body(lang, &state);
+        // an AI account is never shown without its label (docs/ai-players.md §6)
+        let ai =
+            state.profile.as_ref().and_then(|p| p.ai.as_ref()).map(
+                |badge| view! { <span class="preview-user-ai">{ai_badge(lang, badge)}</span> },
+            );
 
         let close_btn = is_pinned.then(|| {
             view! {
@@ -1116,6 +1122,7 @@ impl PreviewCtl {
                             {presence_badge}
                         </div>
                         {handle_with_copy(lang, display_name, state.tag_hex, false)}
+                        {ai}
                     </div>
                 </div>
                 <div class="preview-user-body">{body}</div>

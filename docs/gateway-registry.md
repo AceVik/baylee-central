@@ -435,7 +435,10 @@ sign-in, so Central is not on its path.
 
 ## One session per account
 
-Exactly **one** central session of each kind is active per account, even on the same device. A
+Exactly **one** central session of each kind is active per account, even on the same device. An
+AI account is the exception: it signs in only by its runner's token, holds no browser session, and
+holds up to four native runner sessions, the oldest ending when a fifth is minted ([AI
+players](ai-players.md) §2). For a person, a
 successfully verified new login atomically deletes the earlier session before inserting the new one
 under an account row lock, which revokes its `sid`s. Concurrent successful logins leave the last
 committed session active. Incorrect password proofs or stale credential revisions do not revoke the

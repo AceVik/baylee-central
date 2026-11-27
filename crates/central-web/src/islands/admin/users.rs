@@ -40,6 +40,9 @@ struct Users {
     search_error: RwSignal<Option<&'static str>>,
     /// The pause after typing, until the list follows.
     pause: StoredValue<Option<TimeoutHandle>>,
+    /// The AI players, read with the first list, so that every AI account
+    /// in it is marked.
+    roster: StoredValue<Option<common::Roster>>,
 }
 
 impl Users {
@@ -65,7 +68,25 @@ impl Users {
             }
             match answer {
                 Ok(AdminAnswer::Accounts { accounts, more }) => {
-                    let found: Vec<Row> = accounts.into_iter().map(Row::from).collect();
+                    // an AI player is never listed without its badge
+                    let roster = match common::roster_kept(self.roster).await {
+                        Ok(roster) => roster,
+                        Err(unread) => {
+                            let missing = problem_text(lang, Problem::Failed);
+                            if let Some(text) = self.cx.unread_text(unread, missing) {
+                                let _ = self.listing.try_set(Listing::Failed(text));
+                            }
+                            let _ = self.adding.try_set(false);
+                            return;
+                        }
+                    };
+                    if self.generation.try_get_value() != Some(generation) {
+                        return;
+                    }
+                    let found: Vec<Row> = accounts
+                        .into_iter()
+                        .map(|account| Row::from(account).marked(&roster))
+                        .collect();
                     let next = found.first().map(Row::key);
                     if before.is_some() {
                         self.rows.update(|rows| rows.extend(found));
@@ -186,6 +207,10 @@ fn row_view(cx: Cx, row: &Row) -> impl IntoView + use<> {
     let pill = row
         .admin
         .then(|| view! { " " <span class="pill info">{words::admin_pill(lang)}</span> });
+    let ai = row
+        .ai
+        .as_ref()
+        .map(|badge| view! { " " {crate::islands::ui::ai_badge::ai_badge(lang, badge)} });
     let source = if row.moved {
         words::profile_source_moved(lang)
     } else {
@@ -199,6 +224,7 @@ fn row_view(cx: Cx, row: &Row) -> impl IntoView + use<> {
             <th scope="row">
                 <a id=format!("admin-user-{}", row.key()) href=common::user_path(lang, &row.id)><bdi translate="no">{row.name()}</bdi></a>
                 {pill}
+                {ai}
             </th>
             <td><code translate="no">{row.username.clone()}</code></td>
             <td>{source}</td>
@@ -280,6 +306,7 @@ pub fn page(cx: Cx) -> impl IntoView {
         typed: RwSignal::new(String::new()),
         search_error: RwSignal::new(None),
         pause: StoredValue::new(None),
+        roster: StoredValue::new(None),
     };
     // Effects run in the browser only: the newest accounts first.
     Effect::new(move |_| u.read(None));

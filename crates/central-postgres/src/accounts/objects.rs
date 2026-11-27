@@ -18,10 +18,14 @@ fn state(row: &QueryResult) -> Result<ObjectState, Error> {
 // The same account lock serializes login replacement, quota changes and object
 // mutations. Recheck the session after acquiring it to reject a concurrent logout.
 // A restored, operator-staged archive can populate its encrypted library only
-// after this same native account has fetched its entire generation.
+// after this same native account has fetched its entire generation. An AI
+// player holds no library, and its runner reads none: refused here, in the
+// statement that finds the owner, rather than by a statement of its own on
+// every person's read (docs/ai-players.md §2).
 const OBJECT_ACCESS: &str = "a.restored AND (a.legacy_closed OR a.source='registered'
     OR EXISTS (SELECT 1 FROM central_identity.legacy_deck_transfers t WHERE t.account_id=a.id
-    AND t.next_page=(t.source_bytes+65535)/65536))";
+    AND t.next_page=(t.source_bytes+65535)/65536))
+    AND NOT EXISTS (SELECT 1 FROM central_identity.ai_players ai WHERE ai.account_id=a.id)";
 
 pub(super) async fn locked_owner(
     db: &impl ConnectionTrait,
