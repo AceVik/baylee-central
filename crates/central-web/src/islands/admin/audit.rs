@@ -25,6 +25,9 @@ struct Audit {
     listing: RwSignal<Listing>,
     more: RwSignal<bool>,
     adding: RwSignal<bool>,
+    /// The AI players, read with the first page, so that every AI account
+    /// the log names is marked.
+    roster: StoredValue<Option<common::Roster>>,
 }
 
 impl Audit {
@@ -32,6 +35,18 @@ impl Audit {
     fn read(self, before: Option<[u8; 16]>) {
         let lang = self.cx.lang;
         leptos::task::spawn_local(async move {
+            // an AI player is never named without its badge
+            let roster = match common::roster_kept(self.roster).await {
+                Ok(roster) => roster,
+                Err(unread) => {
+                    let missing = problem_text(lang, Problem::Failed);
+                    if let Some(text) = self.cx.unread_text(unread, missing) {
+                        let _ = self.listing.try_set(Listing::Failed(text));
+                    }
+                    let _ = self.adding.try_set(false);
+                    return;
+                }
+            };
             let answer = common::read(AdminRequest::Audit {
                 account: None,
                 before,
@@ -49,6 +64,9 @@ impl Audit {
                     let next = found.first().map(|event| id_hex(&event.id));
                     let _ = self.names.try_update(|names| {
                         for account in accounts {
+                            if let Some(badge) = roster.badge(&account.id) {
+                                names.badges.insert(account.id, badge);
+                            }
                             if let Some(name) =
                                 common::handle(account.display_name.as_deref(), account.tag)
                             {
@@ -117,6 +135,7 @@ pub fn page(cx: Cx) -> impl IntoView {
         listing: RwSignal::new(Listing::Loading),
         more: RwSignal::new(false),
         adding: RwSignal::new(false),
+        roster: StoredValue::new(None),
     };
     // Effects run in the browser only: the server renders "loading".
     Effect::new(move |_| a.read(None));

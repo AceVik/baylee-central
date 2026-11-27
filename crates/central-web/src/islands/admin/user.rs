@@ -351,6 +351,9 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
     // the account's own name beside its events; others by their id's end
     let mut names = Names::default();
     names.accounts.insert(row.id, row.name());
+    if let Some(badge) = &row.ai {
+        names.badges.insert(row.id, badge.clone());
+    }
     view! {
         <section class="card" aria-labelledby="admin-user-title">
             <h2 id="admin-user-title" class="admin-title" tabindex="-1">{title(lang, row)}</h2>

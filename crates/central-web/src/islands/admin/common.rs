@@ -282,6 +282,8 @@ pub struct Names {
     /// The report token an event made or revoked, by the event: its id and
     /// its name.
     pub tokens: HashMap<[u8; 16], ([u8; 16], String)>,
+    /// An AI player's badge, beside its name.
+    pub badges: HashMap<[u8; 16], AiBadge>,
 }
 
 /// The words for an audited action Central names; `None` for one this page
@@ -320,7 +322,11 @@ fn account_cell(lang: Lang, id: [u8; 16], names: &Names) -> impl IntoView + use<
         Some(name) => view! { <bdi translate="no">{name}</bdi> }.into_any(),
         None => view! { <code translate="no">{id_end(&id)}</code> }.into_any(),
     };
-    view! { <a href=user_path(lang, &id) title=id_hex(&id)>{shown}</a> }
+    let badge = names
+        .badges
+        .get(&id)
+        .map(|badge| view! { " " {crate::islands::ui::ai_badge::ai_badge(lang, badge)} });
+    view! { <a href=user_path(lang, &id) title=id_hex(&id)>{shown}</a>{badge} }
 }
 
 fn gateway_cell(id: [u8; 16], names: &Names) -> impl IntoView + use<> {
@@ -1359,6 +1365,40 @@ mod tests {
             }
             assert_eq!(action_text(lang, "account.locked"), None);
         }
+    }
+
+    /// The audit's table marks an AI player where it names one, and only
+    /// there.
+    #[test]
+    fn the_audit_marks_an_ai_player() {
+        use central_api::ranked::ai::AiKind;
+        let event = |n: u8, account: [u8; 16]| Event {
+            id: [n; 16],
+            at: NOW,
+            actor: None,
+            action: "ai.created".into(),
+            account: Some(account),
+            gateway: None,
+        };
+        let mut names = Names::default();
+        names.accounts.insert(OTHER, "KI-Haus-Expert#1a2b".into());
+        names.accounts.insert(OWN, "Erika#2b3c".into());
+        names.badges.insert(
+            OTHER,
+            AiBadge {
+                kind: AiKind::House,
+                label: "Haus-KI · Expert".into(),
+            },
+        );
+        let owner = Owner::new();
+        let shown = owner.with(|| audit_table(Lang::En, "t", &[event(1, OTHER)], &names).to_html());
+        assert!(shown.contains("Haus-KI · Expert"), "{shown}");
+        assert!(
+            shown.contains(words::admin_audit_ai_created(Lang::En)),
+            "{shown}"
+        );
+        let shown = owner.with(|| audit_table(Lang::En, "t", &[event(2, OWN)], &names).to_html());
+        assert!(!shown.contains("ai-badge"), "{shown}");
     }
 
     #[test]
