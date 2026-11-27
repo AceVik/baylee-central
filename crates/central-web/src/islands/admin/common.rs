@@ -96,6 +96,7 @@ pub fn nav(lang: Lang, section: Section) -> impl IntoView {
                 {link(Section::AdminGateways, words::gw_title(lang))}
                 {link(Section::AdminAudit, words::admin_audit(lang))}
                 {link(Section::AdminLegacy, words::admin_legacy(lang))}
+                {link(Section::AdminAi, words::admin_ai_title(lang))}
                 {link(Section::AdminPictures, words::admin_pictures_title(lang))}
                 {link(Section::Feedback, words::admin_feedback(lang))}
                 {link(Section::FeedbackTokens, words::rt_title(lang))}
@@ -201,6 +202,19 @@ pub async fn roster() -> Result<Roster, Unread> {
         AdminAnswer::AiPlayers { players } => Ok(Roster::of(&players)),
         _ => Err(Unread::Other(Problem::Failed)),
     }
+}
+
+/// The AI players' badges, read once for a page and kept in `held`.
+///
+/// # Errors
+/// Why they could not be read.
+pub async fn roster_kept(held: StoredValue<Option<Roster>>) -> Result<Roster, Unread> {
+    if let Some(Some(roster)) = held.try_get_value() {
+        return Ok(roster);
+    }
+    let roster = roster().await?;
+    let _ = held.try_set_value(Some(roster.clone()));
+    Ok(roster)
 }
 
 /// The browser's clock, in Unix seconds.
@@ -398,6 +412,14 @@ pub enum Change {
     Revoke { gateway: [u8; 16], token: [u8; 16] },
     /// Revoke a report token.
     RevokeReport { token: [u8; 16] },
+    /// Switch an AI player on or off.
+    AiEnabled { account: [u8; 16], enabled: bool },
+    /// Remove an AI player before its first match.
+    RemoveAi { account: [u8; 16] },
+    /// Stop every AI at once.
+    StopAllAi,
+    /// Revoke an AI runner token, and every session it signed in.
+    RevokeRunner { token: [u8; 16] },
 }
 
 impl Change {
@@ -414,30 +436,51 @@ impl Change {
             }
             Change::Revoke { token, .. } => AdminRequest::RevokeGatewayToken { token },
             Change::RevokeReport { token } => AdminRequest::RevokeReportToken { token },
+            Change::AiEnabled { account, enabled } => {
+                AdminRequest::SetAiEnabled { account, enabled }
+            }
+            Change::RemoveAi { account } => AdminRequest::RemoveAiPlayer { account },
+            Change::StopAllAi => AdminRequest::StopAllAi,
+            Change::RevokeRunner { token } => AdminRequest::RevokeAiRunnerToken { token },
         }
+    }
+
+    /// Whether Central asks for a password sign-in less than 30 minutes old
+    /// (`AdminRequest::fresh`): switching an AI off, stopping every AI and
+    /// revoking a runner token only take exposure away, and need none.
+    pub fn fresh(self) -> bool {
+        self.request().fresh()
     }
 
     /// The read that tells whether what it changes still exists.
     fn target(self) -> AdminRequest {
         match self {
-            Change::Role { account, .. } | Change::Tag { account, .. } => {
-                AdminRequest::Account { account }
-            }
+            Change::Role { account, .. }
+            | Change::Tag { account, .. }
+            | Change::AiEnabled { account, .. }
+            | Change::RemoveAi { account } => AdminRequest::Account { account },
             Change::Approval { gateway, .. }
             | Change::Ranked { gateway, .. }
             | Change::Revoke { gateway, .. } => AdminRequest::Gateway { gateway },
             Change::RevokeReport { .. } => AdminRequest::ReportTokens,
+            Change::StopAllAi => AdminRequest::AiSettings,
+            Change::RevokeRunner { .. } => AdminRequest::AiRunnerTokens,
         }
     }
 
     /// What Central refuses for when what it changes is gone.
     fn missing(self) -> Came {
         match self {
-            Change::Role { .. } | Change::Tag { .. } => Came::AccountGone,
+            Change::Role { .. }
+            | Change::Tag { .. }
+            | Change::AiEnabled { .. }
+            | Change::RemoveAi { .. } => Came::AccountGone,
             Change::Approval { .. } | Change::Ranked { .. } | Change::Revoke { .. } => {
                 Came::GatewayGone
             }
-            Change::RevokeReport { .. } => Came::TokenGone,
+            Change::RevokeReport { .. } | Change::RevokeRunner { .. } => Came::TokenGone,
+            // the settings are always there
+            Change::StopAllAi => Came::Other(Problem::Failed),
         }
     }
 
@@ -455,6 +498,11 @@ impl Change {
             } => words::admin_gw_ranked_revoked(lang),
             Change::Revoke { .. } => words::tokens_revoked_now(lang),
             Change::RevokeReport { .. } => words::rt_revoked_done(lang),
+            Change::AiEnabled { enabled: true, .. } => words::ai_on_done(lang),
+            Change::AiEnabled { enabled: false, .. } => words::ai_off_done(lang),
+            Change::RemoveAi { .. } => words::ai_removed(lang),
+            Change::StopAllAi => words::ai_stop_done(lang),
+            Change::RevokeRunner { .. } => words::ai_token_revoked_done(lang),
         }
     }
 }
@@ -484,6 +532,9 @@ pub enum Came {
     TokenGone,
     /// Another account holds the tag, or the account's chat keeps its own.
     Taken,
+    /// The AI player has played a match: it stays, and is switched off
+    /// instead.
+    Played,
     /// No answer came back: it may have been made.
     Lost,
     /// Anything else, in the forms' shared words: nothing was made.
@@ -525,6 +576,7 @@ fn at_change(change: Change, failure: Failure) -> Option<Came> {
     match failure {
         Failure::Rejected => None,
         Failure::Conflict if matches!(change, Change::Tag { .. }) => Some(Came::Taken),
+        Failure::Conflict if matches!(change, Change::RemoveAi { .. }) => Some(Came::Played),
         Failure::Conflict | Failure::Forbidden => Some(Came::Other(Problem::Failed)),
         Failure::Busy => Some(Came::Other(Problem::Busy)),
         Failure::Unavailable | Failure::Malformed | Failure::Network => Some(Came::Lost),
@@ -536,11 +588,14 @@ fn at_change(change: Change, failure: Failure) -> Option<Came> {
 /// still exists (`None`: not known). Central refuses a change of an
 /// administrator's with a fresh sign-in only for something gone, so with
 /// it there, the sign-in is the reason: the password is asked for, once.
+/// A change that needs no fresh sign-in is never refused for its age.
 fn explain(change: Change, admin: bool, exists: Option<bool>, proven: bool) -> Came {
     if !admin {
         Came::Role
     } else if exists == Some(false) {
         change.missing()
+    } else if !change.fresh() {
+        Came::Other(Problem::Failed)
     } else if !proven {
         Came::Password
     } else if exists == Some(true) {
@@ -564,6 +619,7 @@ pub fn came_text(lang: Lang, came: Came) -> Option<&'static str> {
         Came::GatewayGone => Some(words::admin_refused_gateway(lang)),
         Came::TokenGone => Some(words::rt_missing(lang)),
         Came::Taken => Some(words::admin_tag_taken(lang)),
+        Came::Played => Some(words::ai_played(lang)),
         Came::Other(problem) => Some(problem_text(lang, problem)),
     }
 }
@@ -612,7 +668,8 @@ pub async fn refused(own: [u8; 16], proven: bool) -> Came {
 /// Sends `change`, once, after `AccountSummary` said it may be; `proven`
 /// where the password was proven just now.
 async fn send(change: Change, own: [u8; 16], proven: bool) -> Came {
-    if let Err(came) = may_send(own, proven).await {
+    // a change that needs no fresh sign-in is sent whatever its age
+    if let Err(came) = may_send(own, proven || !change.fresh()).await {
         return came;
     }
     let failure = match call(&Request::Admin {
@@ -982,7 +1039,7 @@ mod tests {
         Failure::Network,
     ];
 
-    fn changes() -> [Change; 9] {
+    fn changes() -> [Change; 14] {
         [
             Change::Role {
                 account: OTHER,
@@ -1017,6 +1074,17 @@ mod tests {
                 verified: false,
             },
             Change::RevokeReport { token: [4; 16] },
+            Change::AiEnabled {
+                account: OTHER,
+                enabled: true,
+            },
+            Change::AiEnabled {
+                account: OTHER,
+                enabled: false,
+            },
+            Change::RemoveAi { account: OTHER },
+            Change::StopAllAi,
+            Change::RevokeRunner { token: [5; 16] },
         ]
     }
 
@@ -1067,6 +1135,9 @@ mod tests {
                     Failure::Conflict if matches!(change, Change::Tag { .. }) => {
                         assert_eq!(came, Some(Came::Taken));
                     }
+                    Failure::Conflict if matches!(change, Change::RemoveAi { .. }) => {
+                        assert_eq!(came, Some(Came::Played));
+                    }
                     Failure::Conflict | Failure::Forbidden => {
                         assert_eq!(came, Some(Came::Other(Problem::Failed)));
                     }
@@ -1081,8 +1152,12 @@ mod tests {
     fn a_refusal_is_explained_by_what_central_holds_now() {
         for change in changes() {
             let gone = match change {
-                Change::Role { .. } | Change::Tag { .. } => Came::AccountGone,
-                Change::RevokeReport { .. } => Came::TokenGone,
+                Change::Role { .. }
+                | Change::Tag { .. }
+                | Change::AiEnabled { .. }
+                | Change::RemoveAi { .. } => Came::AccountGone,
+                Change::RevokeReport { .. } | Change::RevokeRunner { .. } => Came::TokenGone,
+                Change::StopAllAi => Came::Other(Problem::Failed),
                 _ => Came::GatewayGone,
             };
             for proven in [false, true] {
@@ -1090,6 +1165,18 @@ mod tests {
                     assert_eq!(explain(change, false, exists, proven), Came::Role);
                 }
                 assert_eq!(explain(change, true, Some(false), proven), gone);
+            }
+            if !change.fresh() {
+                // switching off, stopping and revoking ask for no password
+                for proven in [false, true] {
+                    for exists in [None, Some(true)] {
+                        assert_eq!(
+                            explain(change, true, exists, proven),
+                            Came::Other(Problem::Failed)
+                        );
+                    }
+                }
+                continue;
             }
             assert_eq!(explain(change, true, Some(true), false), Came::Password);
             assert_eq!(explain(change, true, None, false), Came::Password);
@@ -1126,6 +1213,7 @@ mod tests {
             Came::GatewayGone,
             Came::TokenGone,
             Came::Taken,
+            Came::Played,
         ];
         for lang in Lang::ALL {
             let texts: Vec<&str> = said
@@ -1165,7 +1253,31 @@ mod tests {
             verify,
             withdraw,
             revoke_report,
+            switch_on,
+            switch_off,
+            remove_ai,
+            stop_all,
+            revoke_runner,
         ] = changes();
+        assert!(text(switch_on.request()).contains(r#""action":"set_ai_enabled""#));
+        assert!(text(switch_off.request()).ends_with(r#""enabled":false}}"#));
+        assert!(text(remove_ai.request()).contains(r#""action":"remove_ai_player""#));
+        assert_eq!(
+            text(stop_all.request()),
+            r#"{"operation":"admin","request":{"action":"stop_all_ai"}}"#
+        );
+        assert!(text(revoke_runner.request()).contains(r#""action":"revoke_ai_runner_token""#));
+        assert!(text(revoke_runner.target()).contains(r#""action":"ai_runner_tokens""#));
+        assert!(text(stop_all.target()).contains(r#""action":"ai_settings""#));
+        // only taking exposure away needs no fresh sign-in
+        let fresh: Vec<bool> = changes().iter().map(|change| change.fresh()).collect();
+        assert_eq!(
+            fresh,
+            [
+                true, true, true, true, true, true, true, true, true, true, false, true, false,
+                false
+            ]
+        );
         assert!(text(verify.request()).contains(r#""action":"set_ranked_verification""#));
         assert!(text(withdraw.request()).ends_with(r#""verified":false}}"#));
         assert_eq!(

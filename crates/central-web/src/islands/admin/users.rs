@@ -69,22 +69,16 @@ impl Users {
             match answer {
                 Ok(AdminAnswer::Accounts { accounts, more }) => {
                     // an AI player is never listed without its badge
-                    let roster = match self.roster.try_get_value() {
-                        Some(Some(roster)) => roster,
-                        _ => match common::roster().await {
-                            Ok(roster) => {
-                                let _ = self.roster.try_set_value(Some(roster.clone()));
-                                roster
+                    let roster = match common::roster_kept(self.roster).await {
+                        Ok(roster) => roster,
+                        Err(unread) => {
+                            let missing = problem_text(lang, Problem::Failed);
+                            if let Some(text) = self.cx.unread_text(unread, missing) {
+                                let _ = self.listing.try_set(Listing::Failed(text));
                             }
-                            Err(unread) => {
-                                let missing = problem_text(lang, Problem::Failed);
-                                if let Some(text) = self.cx.unread_text(unread, missing) {
-                                    let _ = self.listing.try_set(Listing::Failed(text));
-                                }
-                                let _ = self.adding.try_set(false);
-                                return;
-                            }
-                        },
+                            let _ = self.adding.try_set(false);
+                            return;
+                        }
                     };
                     if self.generation.try_get_value() != Some(generation) {
                         return;

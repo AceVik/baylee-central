@@ -297,3 +297,22 @@ instead (`SetAiEnabled`). All three need the recent password and write
 `ai.created`, `ai.changed` or `ai.removed` with ids and numbers only. No
 request makes a person's account an AI. `SetAdmin` and `ResetLogin` refuse
 an AI player; `SetTag` serves one.
+
+**The page** is `/{lang}/account/admin/ai` (`islands/admin/ai/`, 27
+November 2026). It lists every AI player with its badge, whether it is on,
+its kind, profile and caps, its live matches, its games today, the formats
+it offers a deck for and its runner's last sign-in; each card switches it
+on or off, changes its label, caps and name, and removes it (a `Conflict`
+says that it has played and is switched off instead). Below are the form
+for a new one (the name begins with `KI-`, the tag is drawn when left
+empty, a language model needs a daily cap), the settings for every AI with
+`Stop every AI`, and the runner tokens: listed with the AI players they
+play and their maker (the operator where none), made from a name, 1 to 16
+AI players and their days (90 offered), shown once as the report tokens'
+page shows one, and revoked. Every form is checked by Central's own rules
+before it is sent. Switching off, stopping every AI and revoking a runner
+token ask for no password; everything else asks once where the sign-in is
+older than 30 minutes. `AdminAccount` carries no badge, so the accounts'
+list, an account's page and the reset code's search read `AiPlayers` once
+and mark every AI account in them; an AI's page offers neither the role nor
+a reset code. The audit names the eight `ai.*` actions in words.

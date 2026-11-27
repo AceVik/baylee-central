@@ -416,6 +416,37 @@
   overflow-wrap: anywhere;
 }
 
+/* ---- AI players ------------------------------------------------------------ */
+
+/* the page's parts one under another, and the headings with what they head */
+.ai-stack {
+  display: grid;
+  gap: var(--space-5);
+  min-inline-size: 0;
+}
+
+.ai-stack > h2,
+.ai-stack > p {
+  margin: 0;
+}
+
+/* a form's numbers side by side, as many to a row as fit, equally wide */
+.ai-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+}
+
+.ai-edit {
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--edge-soft);
+}
+
+.ai-edit h3 {
+  margin: 0;
+}
+
 /* ---- A change: its confirmation in the card of what it changes ------------ */
 
 .admin-confirm {

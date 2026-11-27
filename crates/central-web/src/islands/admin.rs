@@ -29,6 +29,7 @@
 //! feature: the administration's own module, which only these pages load
 //! (`docs/proposals/frontend-rewrite.md` §27).
 
+mod ai;
 mod audit;
 mod common;
 mod gateways;
@@ -1293,6 +1294,7 @@ pub fn area(
         Section::AdminGateways => gateways::page(cx).into_any(),
         Section::AdminAudit => audit::page(cx).into_any(),
         Section::AdminLegacy => legacy::page(cx).into_any(),
+        Section::AdminAi => ai::page(cx).into_any(),
         Section::AdminPictures => super::moderation::section(lang, worker).into_any(),
         Section::FeedbackTokens => tokens::page(cx).into_any(),
         _ => page(lang, worker, username, own, signed_out).into_any(),

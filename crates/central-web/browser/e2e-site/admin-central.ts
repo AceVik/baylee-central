@@ -197,6 +197,8 @@ export type World = {
   gone: boolean;
   /** How the next change ends instead: a status, an answer of another kind, or no answer after it was made. */
   next: number | "lost" | "other" | null;
+  /** The AI players, as `AdminRequest::AiPlayers` lists them. */
+  aiPlayers: unknown[];
   /** A read that is refused or unanswered instead, by its action. */
   failing: Record<string, number>;
 };
@@ -204,7 +206,7 @@ export type World = {
 export const world = (more: Partial<World> = {}): World => ({
   accounts: ACCOUNTS(), gateways: GATEWAYS(), events: EVENTS(), reportTokens: REPORT_TOKENS(), legacy: LEGACY(),
   reports: { statuses: [["new", 4], ["triaged", 2], ["in_progress", 1], ["resolved", 9]], crashes: 2 },
-  admin: true, stale: false, as: OWN, gone: false, next: null, failing: {}, ...more,
+  admin: true, stale: false, as: OWN, gone: false, next: null, failing: {}, aiPlayers: [], ...more,
 });
 
 export type Asked = {
@@ -386,6 +388,16 @@ function admin(w: World, asked: Asked, answer: Answer, done: (other: boolean) =>
       return answer({ answer: "registration", open: true, changed_at: null });
     case "report_tokens":
       return answer({ answer: "report_tokens", tokens: w.reportTokens });
+    case "ai_players":
+      return answer({ answer: "ai_players", players: w.aiPlayers });
+    case "ai_settings":
+      return answer({
+        answer: "ai_settings",
+        settings: { fill_in_after: 60, drain_minutes: 120, global_seats: 8, host_reserve: 2, carousel_games: 0, carousel_daily: 0 },
+        changed_at: null,
+      });
+    case "ai_runner_tokens":
+      return answer({ answer: "ai_runner_tokens", tokens: [] });
     case "set_admin":
     case "set_tag":
     case "set_gateway_approval":
@@ -470,7 +482,12 @@ export async function open(page: Page, w: World, path: string): Promise<Opened> 
 }
 
 /** The administration's requests since `from`. */
-export const asked = (seen: Body[], from = 0) => seen.slice(from).filter((body) => body.operation === "admin").map((body) => body.request);
+/** The administration's requests since `from`, without the AI players' list that every page naming accounts reads once to mark theirs. */
+export const asked = (seen: Body[], from = 0) =>
+  seen
+    .slice(from)
+    .filter((body) => body.operation === "admin" && body.request?.action !== "ai_players")
+    .map((body) => body.request);
 /** The operations since `from`. */
 export const operations = (seen: Body[], from: number) => seen.slice(from).map((body) => body.operation);
 /** The changes since `from`. */
@@ -498,5 +515,5 @@ export async function tabs(page: Page, from: Locator, stops: Locator[]) {
 }
 
 /** The administration's navigation, in its order. */
-export const NAV = ["Overview", "Accounts", "Gateways", "Audit log", "Legacy accounts", "Reported profile pictures", "Feedback", "Feedback tokens", "Reset a login"];
+export const NAV = ["Overview", "Accounts", "Gateways", "Audit log", "Legacy accounts", "AI players", "Reported profile pictures", "Feedback", "Feedback tokens", "Reset a login"];
 export const nav = (page: Page) => page.getByRole("navigation", { name: "Administration" });

@@ -56,10 +56,14 @@ fn read_tag(text: &str) -> Option<u32> {
 
 /// The account read from Central; `None` once the area was told that
 /// nobody is signed in.
-async fn fetch(cx: Cx, account: [u8; 16]) -> Option<Load> {
+async fn fetch(
+    cx: Cx,
+    account: [u8; 16],
+    held: StoredValue<Option<common::Roster>>,
+) -> Option<Load> {
     let lang = cx.lang;
     // an AI player is never shown without its badge
-    let roster = match common::roster().await {
+    let roster = match common::roster_kept(held).await {
         Ok(roster) => roster,
         Err(unread) => {
             return cx
@@ -101,13 +105,15 @@ struct Account {
     typed: RwSignal<String>,
     tag_error: RwSignal<Option<&'static str>>,
     flow: Flow,
+    /// The AI players, read with the account the first time.
+    roster: StoredValue<Option<common::Roster>>,
 }
 
 impl Account {
     /// Reads the account (again).
     fn read(self) {
         leptos::task::spawn_local(async move {
-            if let Some(load) = fetch(self.cx, self.id).await {
+            if let Some(load) = fetch(self.cx, self.id, self.roster).await {
                 let _ = self.load.try_set(load);
             }
         });
@@ -299,10 +305,14 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
     let ai = row.ai.is_some();
     let acts = !pending && row.id != a.cx.own && !ai;
     let ai_card = ai.then(|| {
+        let href = format!("/{}/{}", lang.code(), crate::data::Section::AdminAi.slug());
         view! {
             <section class="card" aria-labelledby="admin-user-ai">
                 <h2 id="admin-user-ai">{words::admin_ai_account(lang)}</h2>
                 <p>{words::admin_ai_account_text(lang)}</p>
+                <p class="actions">
+                    <a class="button" href=href>{glyph::glyph(glyph::BOT)}<span>{words::admin_ai_open(lang)}</span></a>
+                </p>
             </section>
         }
     });
@@ -364,12 +374,13 @@ fn detail_view(a: &Account, detail: &Detail) -> AnyView {
 pub fn page(cx: Cx, id: [u8; 16]) -> impl IntoView {
     let lang = cx.lang;
     let load = RwSignal::new(Load::Loading);
+    let roster = StoredValue::new(None);
     let typed = RwSignal::new(String::new());
     let note = RwSignal::new(None::<Note>);
     // a change ended: the account is read again, which says a lost answer
     let finished = Callback::new(move |(change, came): (Change, Came)| {
         leptos::task::spawn_local(async move {
-            let Some(fresh) = fetch(cx, id).await else {
+            let Some(fresh) = fetch(cx, id, roster).await else {
                 return;
             };
             let read = matches!(fresh, Load::Ready(_));
@@ -392,6 +403,7 @@ pub fn page(cx: Cx, id: [u8; 16]) -> impl IntoView {
         typed,
         tag_error: RwSignal::new(None),
         flow: Flow::new(cx, note, finished),
+        roster,
     };
     // Effects run in the browser only: the server renders "loading".
     Effect::new(move |_| a.read());

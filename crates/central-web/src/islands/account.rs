@@ -1702,6 +1702,7 @@ pub fn Account(lang: Lang, section: Section, worker: String) -> impl IntoView {
         | Section::AdminGateways
         | Section::AdminAudit
         | Section::AdminLegacy
+        | Section::AdminAi
         | Section::AdminPictures
         | Section::Feedback
         | Section::FeedbackTokens
