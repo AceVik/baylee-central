@@ -992,8 +992,17 @@ for 180 s), not at anything of this change. The previous binary over the
 migrated schema: at the commit with the migration and the grants alone
 (`11d20bc7` after the rebase), its startup check accepted the schema and its
 store suite ran green up to that same clock check. That run used the
-migration before `fair` was removed; a full green run is still owed and is
-the next step's first check.
+migration before `fair` was removed; the full green runs owed came later
+(below, "The previous binary, proven").
+
+**The previous binary, proven (27.11.2026).** `main`'s code with this
+branch's migration crate, `ops/grants.sql` and the migration test's history
+harness (the counts and the undoing of the new migrations before the
+runner's history test; no store code and no other test changed): its whole
+store suite green over 000053 and 000054, at `f1a19319`, on the owner's
+Mac (263 s); and over 000053, 000054 and 000055, at `8d6ac023`, on bigace
+(97 s). Its startup check names none of the new tables, so the new tables
+and columns, the partial indexes and the new grants leave it running.
 
 ### The runner token (26 November 2026)
 
@@ -1456,3 +1465,13 @@ migrations' partial indexes and CHECKs.
 
 This review and the passes above are the implementing agents' engineering
 passes, not an independent audit; the owner's release gates still apply.
+
+**Evidence after the fixes (27.11.2026),** on bigace at the tree of
+`832fe749`: `cargo xtask postgres` green (the SDK suite 162 s, the store
+suite 97 s, both Tower suites 2 s), `cargo test` of `central-api` (201),
+`central-identity` (161) and `central-service` (51 and the CLI's 8), clippy
+`-D warnings` over `central-api`, `central-postgres`, `central-identity`
+and `central-service`, `cargo fmt --check`. The website's browser specs
+(CI's `site`) had failed at `eb6504e6` on two things of this branch: the
+German navigation's list lacked the AI page, and the reset page's stand-in
+Central refused the AI read; both are in `832fe749`.
