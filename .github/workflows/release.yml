@@ -132,4 +132,4 @@ jobs:
           gh release create "$TAG" \
             --title "Baylee Central $TAG" \
             --generate-notes \
-            release-out/*.tar.gz release-out/*.sha256 release-out/SHA256SUMS.txt
+            release-out/*.tar.gz release-out/*.sha256 release-out/dist/SHA256SUMS.txt
