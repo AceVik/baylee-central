@@ -160,7 +160,7 @@ test("German holds at 320 px", async ({ page }) => {
   await open(page, w, "/de/account/admin/overview");
   await expect(page.locator("h1")).toHaveText("Administration");
   const links = page.getByRole("navigation", { name: "Administration" }).getByRole("link");
-  await expect(links).toHaveText(["Übersicht", "Accounts", "Gateways", "Protokoll", "Alte Konten", "Gemeldete Profilbilder", "Feedback", "Feedback-Tokens", "Anmeldung zurücksetzen"]);
+  await expect(links).toHaveText(["Übersicht", "Accounts", "Gateways", "Protokoll", "Alte Konten", "KI-Spieler", "Gemeldete Profilbilder", "Feedback", "Feedback-Tokens", "Anmeldung zurücksetzen"]);
   await expect(page.locator(".admin-stats > li h2")).toHaveText([
     "Accounts", "Wartet auf Freigabe", "Offene Meldungen", "Gateways in der Liste", "Administratoren", "Noch umzuziehen",
   ]);

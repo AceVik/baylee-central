@@ -780,6 +780,13 @@ text.
 - **Watching.** The listing's last use moves at every exchange; the AI
   page shows each player's last runner sign-in. A runner should alert when
   its token is refused.
+- **An older binary.** A binary from before AI players knows no runner
+  session and refuses nothing to one: it would serve a live runner session
+  as an ordinary native session, through which a holder could set an
+  address and a password for the AI. The deploy hook's fallback goes to the
+  binary just before, which knows them once this is deployed. Before running
+  any older binary by hand, end every runner session as the migrator:
+  `DELETE FROM central_identity.sessions WHERE runner_token IS NOT NULL;`
 
 ## Deleting and exporting accounts
 

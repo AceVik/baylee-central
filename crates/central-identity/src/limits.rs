@@ -536,6 +536,10 @@ pub(super) struct Limits {
     /// Each AI account's successful runner exchanges in its hour
     /// ([`central_api::ai_runner::EXCHANGES_PER_HOUR`]).
     runners: BTreeMap<[u8; 16], (Instant, u32)>,
+    /// Each AI account's runner exchanges the store is answering now: they
+    /// count against its hour until they end, so exchanges sent at once
+    /// cannot pass the budget together.
+    runners_in_flight: BTreeMap<[u8; 16], u32>,
     /// Signature checks of presented Central tokens.
     signatures: Window,
     /// Each place's share of them, by its block ([`PLACE_SIGNATURES_PER_SECOND`]).
@@ -874,22 +878,47 @@ impl Limits {
         Ok(())
     }
 
-    /// Whether `account` may be given one more runner session this hour
-    /// ([`central_api::ai_runner::EXCHANGES_PER_HOUR`]). It only reads:
-    /// asked before the store, it spends nothing, so exchanges the store
-    /// refuses (a stranger's made-up token for an AI's account) neither use
-    /// up the account's budget nor take room in the table.
-    pub(super) fn runner_fits(&self, account: [u8; 16], now: Instant) -> Result<(), Error> {
-        let spent = self.runners.get(&account).is_some_and(|(start, used)| {
-            now.duration_since(*start) < HOUR && *used >= central_api::ai_runner::EXCHANGES_PER_HOUR
-        });
-        if spent { Err(Error::Busy) } else { Ok(()) }
+    /// Begin a runner exchange for `account`: refused when its successful
+    /// exchanges this hour and those in flight reach
+    /// [`central_api::ai_runner::EXCHANGES_PER_HOUR`], or when the table of
+    /// exchanges in flight is full. An exchange begun is counted until
+    /// [`Self::runner_end`], so exchanges sent at once cannot pass the budget
+    /// together; one the store refuses spends nothing once it ends, so a
+    /// stranger's made-up tokens do not use up an AI's hour.
+    pub(super) fn runner_begin(&mut self, account: [u8; 16], now: Instant) -> Result<(), Error> {
+        let used = self
+            .runners
+            .get(&account)
+            .filter(|(start, _)| now.duration_since(*start) < HOUR)
+            .map_or(0, |(_, used)| *used);
+        let flying = self.runners_in_flight.get(&account).copied().unwrap_or(0);
+        if used.saturating_add(flying) >= central_api::ai_runner::EXCHANGES_PER_HOUR
+            || (flying == 0 && self.runners_in_flight.len() >= RUNNERS)
+        {
+            return Err(Error::Busy);
+        }
+        *self.runners_in_flight.entry(account).or_insert(0) += 1;
+        Ok(())
+    }
+
+    /// End an exchange [`Self::runner_begin`] began; `minted` counts it
+    /// against the hour.
+    pub(super) fn runner_end(&mut self, account: [u8; 16], now: Instant, minted: bool) {
+        if let Some(flying) = self.runners_in_flight.get_mut(&account) {
+            *flying = flying.saturating_sub(1);
+            if *flying == 0 {
+                self.runners_in_flight.remove(&account);
+            }
+        }
+        if minted {
+            self.runner_exchanged(account, now);
+        }
     }
 
     /// Count a runner session the store gave `account`. The table holds the
     /// accounts that got one in the hour: AI accounts that a live token
     /// lists, of which there are at most [`RUNNERS`].
-    pub(super) fn runner_exchanged(&mut self, account: [u8; 16], now: Instant) {
+    fn runner_exchanged(&mut self, account: [u8; 16], now: Instant) {
         self.runners
             .retain(|_, (start, _)| now.duration_since(*start) < HOUR);
         if !self.runners.contains_key(&account) && self.runners.len() >= RUNNERS {
@@ -2133,30 +2162,41 @@ mod tests {
         assert_eq!(limits.report_tokens.len(), 1);
     }
 
-    /// An AI account gets twelve runner sessions an hour; asking costs
-    /// nothing, so refused exchanges leave its budget and the table alone.
+    /// An AI account gets twelve runner sessions an hour. An exchange
+    /// counts while the store answers it, so twelve at once fill the hour
+    /// and a thirteenth is refused; one the store refused spends nothing
+    /// once it ends.
     #[test]
-    fn an_ai_account_has_its_exchanges_and_asking_spends_none() {
+    fn an_ai_account_has_its_exchanges_and_a_refused_one_spends_none() {
         use central_api::ai_runner::EXCHANGES_PER_HOUR;
         let start = Instant::now();
         let (one, two) = ([1; 16], [2; 16]);
         let mut limits = Limits::default();
-        // asking alone, however often, spends nothing and remembers nothing
+        // refused ones, however many, spend nothing and remember nothing
         for _ in 0..1_000 {
-            limits.runner_fits(one, start).unwrap();
+            limits.runner_begin(one, start).unwrap();
+            limits.runner_end(one, start, false);
         }
         assert!(limits.runners.is_empty());
+        assert!(limits.runners_in_flight.is_empty());
+        // twelve at once fill the hour before any has ended
         for _ in 0..EXCHANGES_PER_HOUR {
-            limits.runner_fits(one, start).unwrap();
-            limits.runner_exchanged(one, start);
+            limits.runner_begin(one, start).unwrap();
         }
-        assert_eq!(limits.runner_fits(one, start), Err(Error::Busy));
+        assert_eq!(limits.runner_begin(one, start), Err(Error::Busy));
+        for _ in 0..EXCHANGES_PER_HOUR {
+            limits.runner_end(one, start, true);
+        }
+        assert!(limits.runners_in_flight.is_empty());
+        assert_eq!(limits.runner_begin(one, start), Err(Error::Busy));
         let late = start + HOUR.saturating_sub(Duration::from_secs(1));
-        assert_eq!(limits.runner_fits(one, late), Err(Error::Busy));
+        assert_eq!(limits.runner_begin(one, late), Err(Error::Busy));
         // another account's are its own
-        limits.runner_fits(two, late).unwrap();
+        limits.runner_begin(two, late).unwrap();
+        limits.runner_end(two, late, false);
         // the hour over, it starts again, and the old window is forgotten
-        limits.runner_fits(one, start + HOUR).unwrap();
+        limits.runner_begin(one, start + HOUR).unwrap();
+        limits.runner_end(one, start + HOUR, false);
         limits.runner_exchanged(two, start + HOUR);
         assert_eq!(limits.runners.len(), 1);
         // a full table counts no newcomer and refuses nobody for it
@@ -2168,7 +2208,7 @@ mod tests {
         }
         full.runner_exchanged([0xff; 16], start);
         assert_eq!(full.runners.len(), RUNNERS);
-        full.runner_fits([0xff; 16], start).unwrap();
+        full.runner_begin([0xff; 16], start).unwrap();
     }
 
     #[test]

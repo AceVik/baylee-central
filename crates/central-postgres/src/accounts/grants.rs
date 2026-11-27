@@ -13,12 +13,12 @@
 //! decides them by column, but never deletes one (the operator's sweep does).
 //! It adds a donation once and converts one that came without a rate, by its
 //! euro column alone; it reads the donations' sums and never writes them.
-//! It flags, changes and clears AI players but never changes one's kind or
-//! profile, keeps a runner's offers, and writes a person's AI consent and how
-//! a match with an AI was made once (`docs/ai-players.md`). It stores AI
-//! runner tokens with the accounts they list and never deletes one, may set
-//! only when one was revoked, by whom, and last used, and adds and prunes the
-//! record of each exchange.
+//! It creates, changes and switches AI players, deletes one only with its
+//! account, never changes one's kind or profile, keeps a runner's offers, and
+//! writes a person's AI consent and how a match with an AI was made once
+//! (`docs/ai-players.md`). It stores AI runner tokens with the accounts they
+//! list and never deletes one, may set only when one was revoked, by whom,
+//! and last used, and adds and prunes the record of each exchange.
 use super::{AccountStore, statement};
 use sea_orm::ConnectionTrait;
 
@@ -120,7 +120,7 @@ const REQUIRED_GRANTS: &str = "WITH required(name, privileges, updatable) AS (VA
              ('ranked_publications', ARRAY['SELECT','INSERT'], ARRAY['published_on','finalized']),
              ('ranked_champions', ARRAY['SELECT','INSERT','DELETE'], NULL),
              ('ranked_badge_peaks', ARRAY['SELECT','INSERT'], ARRAY['place']),
-             ('ai_players', ARRAY['SELECT','INSERT','DELETE'], ARRAY['label','enabled','max_games','daily_games','changed_at','changed_by']),
+             ('ai_players', ARRAY['SELECT','INSERT'], ARRAY['label','enabled','max_games','daily_games','changed_at','changed_by']),
              ('ai_settings', ARRAY['SELECT'], ARRAY['fill_in','fill_in_after','drain_minutes','global_seats','host_reserve','carousel_games','carousel_daily','changed_at','changed_by']),
              ('ai_offers', ARRAY['SELECT','INSERT','DELETE'], ARRAY['session_digest','commitment','renewed_at','expires_at']),
              ('ranked_ticket_ai', ARRAY['SELECT','INSERT'], NULL),

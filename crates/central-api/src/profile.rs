@@ -59,12 +59,24 @@ pub fn reserved(name: &str) -> bool {
 /// (`docs/ai-players.md` section 6). No person may choose them.
 pub const AI_PREFIXES: [&str; 2] = ["ki-", "ai-"];
 
-/// Whether `name` begins with an AI prefix.
+/// Whether `name` begins with an AI prefix, read as [`reserved`] reads a
+/// name: without case, and `_` as `-`, so that `KI_Bot` does not pass for
+/// an AI on a page that shows only the name.
 #[must_use]
 pub fn ai_prefixed(name: &str) -> bool {
     AI_PREFIXES.iter().any(|prefix| {
-        name.get(..prefix.len())
-            .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
+        name.get(..prefix.len()).is_some_and(|start| {
+            start
+                .bytes()
+                .map(|byte| {
+                    if byte == b'_' {
+                        b'-'
+                    } else {
+                        byte.to_ascii_lowercase()
+                    }
+                })
+                .eq(prefix.bytes())
+        })
     })
 }
 
@@ -434,6 +446,22 @@ mod tests {
             !choosable("_admin"),
             "a malformed name is not choosable either"
         );
+    }
+
+    /// People cannot take a name that reads as an AI's, with either
+    /// separator and in any case; an AI's own name begins with `KI-`.
+    #[test]
+    fn ai_prefixes_are_reserved_from_people() {
+        for name in ["KI-Bot", "ki-bot", "KI_Bot", "ki_Haus", "AI-Bot", "Ai_Bot"] {
+            assert!(ai_prefixed(name), "{name}");
+            assert!(!choosable(name), "{name}");
+        }
+        for name in ["Kiwi", "Aimee", "KIBot", "Bot-KI", "Ki"] {
+            assert!(!ai_prefixed(name), "{name}");
+        }
+        assert!(ai_name("KI-Haus-Expert"));
+        assert!(!ai_name("KI_Haus-Expert"));
+        assert!(!ai_name("AI-Haus-Expert"));
     }
 
     #[test]

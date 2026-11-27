@@ -9,8 +9,9 @@
 //!
 //! The order of the locks is the administration's and fill-in's: every
 //! administrator's row (so a token's caps are counted as an administrator
-//! counts them), the settings for every AI, the tokens revoked with their
-//! sessions, the AI accounts and their rows, and a new token last.
+//! counts them), the settings for every AI, the tokens to revoke (as an
+//! exchange takes its token first), the AI accounts and their rows, the
+//! revoked tokens' sessions, and a new token last.
 use super::lifecycle::{change, create};
 use super::{get, settings, switch, unavailable, write_settings};
 use crate::accounts::ai_runner::{listed, make, revoke};
@@ -319,12 +320,23 @@ pub async fn apply_ai_plan(
         write_settings(&tx, None, &next).await?;
         applied.settings = Some(next);
     }
+    // The tokens to revoke are held before any AI account, as an exchange
+    // takes its token before its account, and their sessions are ended
+    // after the accounts: an exchange then never holds what this waits for.
+    let revoked: Vec<Uuid> = plan.revoke.iter().map(|id| uuid(*id)).collect();
+    tx.query_all_raw(statement(
+        "SELECT id FROM central_identity.ai_runner_tokens WHERE id = ANY($1) ORDER BY id
+         FOR UPDATE",
+        vec![revoked.into()],
+    ))
+    .await
+    .map_err(unavailable)?;
+    for wanted in &plan.players {
+        applied.players.push(player(&tx, wanted).await?);
+    }
     for id in &plan.revoke {
         let ended = revoke(&tx, None, uuid(*id)).await?;
         applied.revoked.push((*id, ended.len()));
-    }
-    for wanted in &plan.players {
-        applied.players.push(player(&tx, wanted).await?);
     }
     if let (Some(wanted), Some(secret)) = (&plan.token, secret) {
         applied.token = Some(token(&tx, wanted, secret).await?);

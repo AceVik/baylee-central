@@ -237,8 +237,12 @@ pub(super) async fn seat(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
     }
     let settings = ai::settings(db, true).await?;
     // Asked again under the lock: fill-in switched off for calibration
-    // seats nothing from that commit on.
-    if !settings.fill_in || seats_live(db).await? >= i64::from(settings.global_seats) {
+    // seats nothing from that commit on, and a person who joined while this
+    // waited for the lock is paired first (people first, section 3).
+    if !settings.fill_in
+        || seats_live(db).await? >= i64::from(settings.global_seats)
+        || person_waiting(db, ticket).await?
+    {
         return Ok(());
     }
     let elo: i32 = column(ticket, "queue_elo")?;
@@ -246,11 +250,17 @@ pub(super) async fn seat(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
         let id = candidates[index].id;
         // Its row locked (skipped while the switch or another fill-in holds
         // it), then counted again in a fresh statement: max_games and the
-        // switch hold, as the administration checks after its locks.
+        // switch hold, as the administration checks after its locks. Its
+        // account's key is shared as the match's foreign key will share it,
+        // skipped while a runner's exchange holds the row: an exchange that
+        // ends a held offer's session waits for this fill-in, so this must
+        // never wait for it (as the carousel does).
         if db
             .query_one_raw(statement(
-                "SELECT 1 AS one FROM central_identity.ai_players
-                 WHERE account_id = $1 AND enabled FOR UPDATE SKIP LOCKED",
+                "SELECT 1 AS one FROM central_identity.ai_players p
+                 JOIN central_identity.accounts a ON a.id = p.account_id
+                 WHERE p.account_id = $1 AND p.enabled
+                 FOR UPDATE OF p SKIP LOCKED FOR KEY SHARE OF a SKIP LOCKED",
                 vec![id.into()],
             ))
             .await

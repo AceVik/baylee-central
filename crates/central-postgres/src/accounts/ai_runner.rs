@@ -169,7 +169,11 @@ async fn mint(
     tx.query_one_raw(statement(
         "INSERT INTO central_identity.sessions
            (digest, account_id, credential_revision, kind, created_at, expires_at, runner_token)
-         SELECT $1, $2, $3, 'native', t, t + interval '30 minutes', $4
+         SELECT $1, $2, $3, 'native', t,
+             -- never past the token's own end (docs/ai-players.md §2)
+             LEAST(t + interval '30 minutes', (SELECT r.expires_at
+                 FROM central_identity.ai_runner_tokens r WHERE r.id = $4)),
+             $4
          FROM (SELECT pg_catalog.clock_timestamp() AS t) clock
          RETURNING floor(extract(epoch FROM expires_at))::bigint AS expires_at",
         vec![

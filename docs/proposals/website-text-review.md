@@ -365,3 +365,46 @@ New:
 For the chat (Art. 6(1)(b) GDPR), Central stores personal contacts, contact
 requests, blocks and group memberships, device public keys,
 ```
+
+## AI opponents in Ranked: a draft for the next version (27.11.2026)
+
+*A draft for the owner; nothing of it is in `legal/` yet, and it asserts no
+legal basis he has not chosen.* AI players ([AI players](../ai-players.md))
+change what the privacy policy says about ranked play in three places. The
+wording below is a proposal for the version that ships with them.
+
+### `legal/privacy.en.md`, ranked play (§3, after "the games we pair you for")
+
+> **AI opponents.** When you search with AI opponents allowed (the client's
+> "people only" switch off), we store that choice with your queue entry and
+> delete it with the entry. If no other person is searching, an AI player of
+> ours may take the other seat after a minute. AI players are accounts we
+> run ourselves, always marked as AI; they are not people and have no
+> personal data. Your game against one runs on our own servers, and the
+> AI's program sees what your opponent would see, nothing of your hidden
+> cards. Your choice is never shown to your opponent, a gateway or anyone
+> else. Language-model opponents, which would send your moves to a provider,
+> are not offered yet; when they are, this section names the provider before
+> you can allow them.
+
+### `legal/privacy.de.md`, Ranked (§3, nach „die Partien, für die wir dich paaren“)
+
+> **KI-Gegner.** Wenn du mit erlaubten KI-Gegnern suchst (der Schalter „Nur
+> Menschen“ im Client ist aus), speichern wir diese Wahl mit deinem
+> Warteschlangeneintrag und löschen sie mit ihm. Sucht niemand sonst, kann
+> nach einer Minute ein KI-Spieler von uns den anderen Platz einnehmen.
+> KI-Spieler sind Konten, die wir selbst betreiben, immer als KI
+> gekennzeichnet; sie sind keine Menschen und haben keine personenbezogenen
+> Daten. Deine Partie gegen sie läuft auf unseren eigenen Servern, und das
+> Programm der KI sieht, was dein Gegner sähe, nichts von deinen verdeckten
+> Karten. Deine Wahl sieht weder dein Gegner noch ein Gateway noch sonst
+> jemand. Gegner aus Sprachmodellen, die deine Züge an einen Anbieter
+> schicken würden, gibt es noch nicht; kommen sie, nennt dieser Abschnitt den
+> Anbieter, bevor du sie erlauben kannst.
+
+Open for the owner: whether the boards' new filter (people, AI players,
+everyone) needs a sentence; whether "after a minute" should name the setting
+(`fill_in_after`, 30 to 600 seconds) instead; and the version number this
+lands in. The terms need no change for Stage 1 as far as this pass sees: an
+AI is no participant of the contract, and a person's game against one is a
+ranked game like any other.

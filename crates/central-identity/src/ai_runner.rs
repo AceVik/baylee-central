@@ -3,14 +3,34 @@
 //! header, for a native session of one AI account it lists, answered with
 //! the same signed bearer a sign-in yields. The administration's side, the
 //! making, listing and revoking of tokens, is in `admin.rs`.
-use super::{BrowserReply, Error, IdentityService, Response, Surface, Token};
+use super::{BrowserReply, Error, IdentityService, Response, Surface, Token, limits::Limits};
+use std::sync::Mutex;
 use std::time::Instant;
+
+/// An exchange the account's hourly budget counts while the store answers
+/// it; it ends when this goes, also when the caller stops waiting, and
+/// spends the hour only when it minted a session.
+struct InFlight<'a> {
+    limits: &'a Mutex<Limits>,
+    account: [u8; 16],
+    minted: bool,
+}
+
+impl Drop for InFlight<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut limits) = self.limits.lock() {
+            limits.runner_end(self.account, Instant::now(), self.minted);
+        }
+    }
+}
 
 impl IdentityService {
     /// Trade `token` for a session of `account`. The account's hourly
-    /// budget is read before the store and spent after a success only, so a
-    /// stranger's made-up tokens cannot use up an AI's. The sessions the
-    /// exchange ended are told to their push sockets, as a sign-out's are.
+    /// budget counts the exchange from before the store is asked until it
+    /// ends, and keeps it only when it minted a session, so exchanges sent
+    /// at once cannot pass the budget together and a stranger's made-up
+    /// tokens cannot use up an AI's. The sessions the exchange ended are
+    /// told to their push sockets, as a sign-out's are.
     pub(super) async fn ai_runner_session(
         &self,
         token: &Token,
@@ -26,15 +46,19 @@ impl IdentityService {
         self.limits
             .lock()
             .map_err(|_| Error::Unavailable)?
-            .runner_fits(account, Instant::now())?;
+            .runner_begin(account, Instant::now())?;
+        let mut flight = InFlight {
+            limits: &self.limits,
+            account,
+            minted: false,
+        };
         let session = Token::generate()?;
         let minted = self
             .store
             .ai_runner_session(token, account, &session)
             .await?;
-        if let Ok(mut limits) = self.limits.lock() {
-            limits.runner_exchanged(account, Instant::now());
-        }
+        flight.minted = true;
+        drop(flight);
         self.issued(&session);
         for digest in &minted.ended {
             self.live.ended(digest);

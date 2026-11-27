@@ -263,6 +263,10 @@ and after 30 refused ones in an hour the store is not asked again from it;
 12 successful exchanges an hour for one account, so a thief cannot churn the
 runner's sessions faster than that.
 
+**Never past the token.** A runner session is minted and renewed never past
+its token's expiry, and an expired or revoked token's sessions renew no more:
+a session minted just before the token ends dies with it.
+
 **Up to four sessions.** An AI account may hold up to four minted native
 sessions at once (`central_api::ai_runner::MAX_SESSIONS`); a fifth exchange
 ends the oldest. The table's one-native-session rule
@@ -1330,9 +1334,7 @@ not compiled; neither names the runner's requests or answers.
   and removes them, holds the settings for every AI with "stop every AI",
   and makes, shows once and revokes runner tokens. The site renders no
   ranked board, so the board filter has nowhere to go there yet; a client's
-  board takes it (§6). Open: the chat's people search (`social::Person`)
-  carries no badge, and finds an AI account unlabelled but for its `KI-`
-  name.
+  board takes it (§6). The chat's people search finds no AI at all (below).
 - **The operator's command** (§5, [operations](operations.md) §"AI
   players"): `central-service --ai-players-stdin`, `ai/operator.rs` in the
   store. The administration's change functions were split so that both
@@ -1394,3 +1396,63 @@ receipts. Fill-in's switch reads again under the settings' lock.
 `central-postgres` (lib 56), `central-service` (lib 51, CLI 8);
 `cargo clippy --all-targets -D warnings` over those crates and `cargo fmt
 --check`, clean; `cargo xtask postgres --store-only`, green.
+
+### The adversarial pass over the whole pull request (27 November 2026)
+
+A second agent reviewed the branch against `main` read-only, given the code
+and the design but not the implementer's conclusions, attacking each area as
+an internet caller, a person, the holder of a stolen or revoked runner token,
+a runner session, a host and an administrator overstepping. Nothing high.
+What it found, and what changed:
+
+- **Medium: people could find, contact, block and invite an AI.** The social
+  lookups (`by_tag`, which groups and contacts take, and the search) read
+  enrolled accounts, which an AI is by design, and their replies carry no
+  badge. Now an AI answers there as an unknown tag (`NO_AI`), so no contact,
+  block or group row ever names one; the store suite shows a person finding a
+  person by tag and finding no AI by tag or search, and a contact request or
+  block of an AI refused.
+- **Low: `ai_players` kept its `DELETE` grant** from the interim path; no
+  statement deletes from it (an account's removal cascades as the table's
+  owner). Revoked (`ops/grants.sql`, the startup check), so a runtime bug
+  cannot turn a played AI back into an account that a reset code could give
+  a password.
+- **Low: fill-in did not ask "people first" again under its lock.** A person
+  who joined while a fill-in waited for the settings' row could watch an AI
+  take the lonely ticket. It asks again after the lock now, as the carousel
+  does.
+- **Low: the exchange's hourly budget was check-then-act.** Exchanges sent at
+  once all passed it. An exchange now counts from before the store is asked
+  until it ends (a guard, also when the caller hangs up), and spends the hour
+  only when it minted a session; a unit test fills the hour with twelve at
+  once.
+- **Low: an expired token's sessions renewed for up to 12 hours.** A session
+  is now minted and renewed never past its token's expiry, and an expired or
+  revoked token's sessions renew no more (§2).
+- **Low: the operator's plan locked in the exchange's reverse order.** It
+  holds the tokens to revoke before any AI account now and ends their
+  sessions after the accounts.
+- **Low: people could choose `KI_` and `AI_` names.** The prefix check reads
+  `_` as `-`, as the reserved names do.
+- **Low: an older binary serves runner sessions as ordinary ones.** The
+  operations runbook says to end them before running one by hand.
+- **Low: fill-in could deadlock with an exchange** (the offer held, then the
+  match's foreign key waiting for the account the exchange holds). Fill-in
+  shares the AI account's key with `SKIP LOCKED` under its row lock, as the
+  carousel does. Still open, and rare: a fill-in for a waiting
+  administrator's ticket against that administrator's change of an AI; one
+  of the two is ended by PostgreSQL and answers `Unavailable` once.
+- **Nit:** a connection that failed to close after the operator's commit
+  made the command say nothing changed; it says what was applied now.
+
+What it found sound, and checked: the exchange's lookup, constant-time
+compare and single refusal, its races with revocation and removal, the cap
+of four across tokens; the gate's exhaustive table and that every refused
+request reaches a check before any early return; that no AI can hold a
+browser session or a password by any path; consent, caps and switches read
+after their locks; protocol 2's omissions; the operator command's secrets and
+atomicity; the website's escaping and that the token is shown once; the
+migrations' partial indexes and CHECKs.
+
+This review and the passes above are the implementing agents' engineering
+passes, not an independent audit; the owner's release gates still apply.

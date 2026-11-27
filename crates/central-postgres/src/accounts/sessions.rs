@@ -321,12 +321,18 @@ impl AccountStore {
                      COALESCE(s.absolute_expires_at, s.created_at + interval '30 days'))
                  ELSE LEAST(
                      pg_catalog.clock_timestamp() + interval '30 minutes',
-                     COALESCE(s.proven_at, s.created_at) + interval '12 hours')
+                     COALESCE(s.proven_at, s.created_at) + interval '12 hours',
+                     -- a runner session ends with its token (docs/ai-players.md §2)
+                     (SELECT r.expires_at FROM central_identity.ai_runner_tokens r
+                      WHERE r.id = s.runner_token))
                  END
              FROM central_identity.accounts a
              WHERE s.digest = $1 AND s.kind = $2 AND a.id = s.account_id
              AND a.credential_revision = s.credential_revision AND a.credential IS NOT NULL
              AND s.expires_at > pg_catalog.clock_timestamp()
+             AND (s.runner_token IS NULL OR EXISTS (SELECT 1 FROM central_identity.ai_runner_tokens r
+                 WHERE r.id = s.runner_token AND r.revoked_at IS NULL
+                 AND r.expires_at > pg_catalog.clock_timestamp()))
              RETURNING floor(extract(epoch FROM s.expires_at))::bigint AS expires_at",
                 vec![digest.into(), session.kind().into()],
             ))

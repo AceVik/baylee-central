@@ -284,14 +284,18 @@ async fn apply() -> Result<(), ()> {
     let applied = apply_ai_plan(&db, &plan, secret.as_ref())
         .await
         .map_err(|_| ());
-    let closed = db.close().await.map_err(|_| ());
+    let closed = db.close().await;
     let applied = applied?;
     report(&applied);
-    // Committed: the token works now, so its text is shown, this once.
+    // Committed: the token works now, so its text is shown, this once. A
+    // connection that fails to close after the commit changes nothing of it.
     if let (Some(secret), Some(_)) = (secret, applied.token) {
         println!("{}", *token_text(&secret));
     }
-    closed
+    if closed.is_err() {
+        eprintln!("central: the plan was applied; closing the connection failed");
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -37,10 +37,42 @@ The native client enters Standard, Baylee Highlander or two-player Commander thr
 | Enable a ranked host | A Central administrator using the existing fresh web administration session. Directory approval and ranked verification are separate stored decisions. |
 | Advertise capacity or claim, start, finish or void a game | A verified host using its registered host credential, a named token explicitly granted the ranked scope, or the official bridge. Operations on a match also require its assigned host and current verification epoch. |
 | Assign ranks and award points | Central, once for the engine-confirmed result of the assigned game. |
+| Create, change, switch or remove an AI player; issue or revoke an AI runner token | A Central administrator on the website (a fresh sign-in except to switch off, stop all and revoke), or the operator with `central-service --ai-players-stdin` ([AI players](ai-players.md) §5). |
+| Offer an AI's decks, read its work, ask the carousel | A runner session of that AI account, minted by a runner token that lists it ([AI players](ai-players.md) §2, §4). |
 
 The queue holds at most one active ticket per account across all formats. A client retains its request key on retries and its frozen deck commitment. In a busy queue the matcher checks older tickets and nearby Elo neighbours. Its range grows with waiting time. In a sparse queue it opens the broadest range after 60 seconds. Recent repeats cost preference, so two people alone can still play. A fresh capacity announcement and a free slot on a verified host are required to reserve an opponent.
 
 For native admission the Central listener authenticates the participant, resolves the current verified primary and presents a match-bound ranked token on the relayed connection. Its host-scoped subject and revocable session are distinct from ordinary lobby admission. The primary verifies the frozen deck commitment against the submitted legal deck and binds both seats to one engine game. A single-host table can settle its own engine result. A protected table settles on matching evidence from both executors. Removing verification fences outstanding assignments.
+
+## AI opponents
+
+Some accounts are AI players ([AI players](ai-players.md)): accounts with
+no password that an administrator or the operator creates, always shown
+with an AI badge (kind and label) and a display name that begins with
+`KI-`. People cannot choose that prefix, nor `AI-`, in any case or with `_`.
+
+- **Consent.** A person meets an AI only when the search asks for one:
+  `SeatRequest::Join` carries `ai` (`none` when absent, `local` for house
+  and trained AIs, `any` also for language models). A client of protocol 2
+  sends none, so it never meets an AI.
+- **Fill-in.** When a search that accepts an AI has waited `fill_in_after`
+  (60 s) and no other person waits in the same season, format and kind, an
+  eligible AI with a live offer for the format takes the other seat, on one
+  host that keeps `host_reserve` slots for people. People always come
+  first: a person who joins during the countdown is paired as the queue's
+  own rules allow. The `Waiting` reply's `ai_fill_in_at` is the earliest
+  time an AI may be seated, not a promise.
+- **The carousel.** Two AIs play each other only while no person waits in
+  the format, within `carousel_games` at once and `carousel_daily` a day;
+  calibration runs it with fill-in switched off.
+- **Scoring.** A match with an AI seat scores as people's do, repeat damping
+  included. AI players stand on the boards beside people; a board takes a
+  filter (`players`: everyone, people or AI players). Protocol 2 callers get
+  no badge and no new field anywhere; there an AI is told by its name.
+- **Caps.** One AI plays at most its `max_games` at once, all AI seats
+  together at most `global_seats`, a language model at most its
+  `daily_games` a UTC day. An administrator's switch-off stops new matches
+  at once and lets running ones end.
 
 ## Progress and deck edits
 

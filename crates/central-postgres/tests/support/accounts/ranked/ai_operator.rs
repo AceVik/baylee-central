@@ -6,6 +6,7 @@ use super::ai::{count, forget, person, sql};
 use super::{AccountStore, DatabaseConnection, Error, ServerKeys, Token};
 use central_api::admin::AiPlayerSettings;
 use central_api::ranked::ai::AiKind;
+use central_api::social::{ContactAction, SocialRequest};
 use central_postgres::{
     AiPlan, AiPlayerPlan, AiSettingsPlan, PlayerOutcome, RunnerTokenPlan, ai_runner_tokens,
     apply_ai_plan,
@@ -16,6 +17,7 @@ use sea_orm::prelude::Uuid;
 const ALPHA: u32 = 0x7fff_0a01;
 const BETA: u32 = 0x7fff_0a02;
 const PERSON: u32 = 0x7fff_0a03;
+const SEEN: u32 = 0x7fff_0a04;
 
 fn house(name: &str, label: &str) -> AiPlayerSettings {
     AiPlayerSettings {
@@ -56,23 +58,30 @@ async fn operator_events(db: &DatabaseConnection, action: &str) -> i64 {
 }
 
 pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &ServerKeys) {
-    let (_, someone, _) = person(store, keys, "op-fixture-person").await;
-    // A moved account may have no tag yet; this one holds one an AI asks for.
-    sql(
-        db,
-        "UPDATE central_identity.accounts SET tag = $2 WHERE id = $1",
-        vec![
-            Uuid::from_bytes(someone).into(),
-            i32::try_from(PERSON).unwrap().into(),
-        ],
-    )
-    .await;
+    let (someone_session, someone, _) = person(store, keys, "op-fixture-person").await;
+    let (_, seen, _) = person(store, keys, "op-fixture-seen").await;
+    // A moved account may have no tag or name yet; these hold the ones the
+    // tests ask for: one an AI asks for, and a person others find.
+    for (account, tag, name) in [(someone, PERSON, "OpSomeone"), (seen, SEEN, "OpSeen")] {
+        sql(
+            db,
+            "UPDATE central_identity.accounts SET tag = $2, display_name = $3,
+               display_name_at = pg_catalog.clock_timestamp() WHERE id = $1",
+            vec![
+                Uuid::from_bytes(account).into(),
+                i32::try_from(tag).unwrap().into(),
+                name.into(),
+            ],
+        )
+        .await;
+    }
     let (alpha, token_id, session) = first(store, db).await;
     again(db, alpha).await;
+    unfindable(store, &someone_session).await;
     refusals(db, alpha).await;
     revoking(store, db, token_id, &session).await;
     clean(db, alpha).await;
-    forget(db, &[someone]).await;
+    forget(db, &[someone, seen]).await;
 }
 
 /// One plan: a player made and switched on, calibration's settings, and a
@@ -316,4 +325,44 @@ async fn label(db: &DatabaseConnection, account: [u8; 16]) -> String {
     .unwrap()
     .try_get("", "label")
     .unwrap()
+}
+
+/// A person finds no AI player by its tag or by a search, and can neither
+/// ask one for contact nor block one: the AI is no one in social requests,
+/// so no social reply names it without its badge.
+async fn unfindable(store: &AccountStore, someone: &Token) {
+    let session = central_postgres::Session::Native(someone);
+    let names = |answer: &central_api::social::SocialResponse, name: &str| {
+        String::from_utf8(central_api::encode(answer).unwrap())
+            .unwrap()
+            .contains(name)
+    };
+    let names_it = |answer: &central_api::social::SocialResponse| names(answer, "KI-Op-Alpha");
+    // The control: the same person finds a person by tag.
+    let found = store
+        .social(session, SocialRequest::Lookup { tag: SEEN })
+        .await
+        .unwrap();
+    assert!(names(&found, "OpSeen"));
+    for request in [
+        SocialRequest::Lookup { tag: ALPHA },
+        SocialRequest::Search {
+            query: "KI-Op".into(),
+        },
+        SocialRequest::Search {
+            query: format!("#{ALPHA:x}"),
+        },
+    ] {
+        if let Ok(answer) = store.social(session, request).await {
+            assert!(!names_it(&answer));
+        }
+    }
+    for change in [ContactAction::Request, ContactAction::Block] {
+        assert!(
+            store
+                .social(session, SocialRequest::Contact { tag: ALPHA, change })
+                .await
+                .is_err()
+        );
+    }
 }
