@@ -569,11 +569,12 @@ needs no recent password (open question 6, recommended and taken).
 administrator, and no operator account is appointed one for this (owner,
 27.11.2026). `central-service --ai-players-stdin` does what this page does
 under the migrator login: it creates and changes AI players, switches them,
-sets the settings for every AI (calibration's among them), revokes runner
-tokens and makes one for a runner machine, or lists them
+sets the settings for every AI (calibration's among them), removes those that
+have never played, revokes runner tokens and makes one for a runner
+machine, or lists them
 ([operations](operations.md) §"AI players"). A plan is applied in one
 transaction through the same functions as the page (`ai/lifecycle.rs`
-`create` and `change`, `ai.rs` `switch` and `write_settings`, `ai_runner.rs`
+`create`, `change` and `remove`, `ai.rs` `switch` and `write_settings`, `ai_runner.rs`
 `make` and `revoke`), and its audit events name the operator as their actor
 (`actor_kind = 'operator'`; a token without a maker,
 `ai_runner_tokens.created_by IS NULL`, is the operator's). It is idempotent
@@ -1825,3 +1826,27 @@ store suite 106 s, both Tower suites 2 s). At the tree before the fixes
 
 These are the implementing agents' engineering passes, not an independent
 audit; the owner's release gates still apply.
+
+### The operator removes AI players (27 November 2026)
+
+`central-service --ai-players-stdin` takes `"remove": [...]`: AI players
+that have never played, each by its display name and tag
+(`KI-GPT-Astra#1b66`) or its account id. The website's removal was split so
+both take one function (`ai/lifecycle.rs` `remove`: the account row and the
+AI's row locked, has it played, its sessions, `deletion::remove`, the audit's
+`ai.removed`), the operator as its actor. Removals run after the tokens to
+revoke are held and before the plan's players, the order a change takes.
+Every fault is said at once: before the database, a name that is no AI's, a
+tag out of range, a target named twice, one a player of the same plan names
+too; after it, one no AI player is, two targets that are one AI, one that has
+played (`has played 12 matches, cannot be removed; switch it off instead`).
+
+Tests: unit tests for the plan's faults and the targets' forms; the CLI
+suite with a malformed and a repeated target; the store suite removes one AI
+by name and tag (its runner session ends with it) and one by id, each
+audited as the operator's, refuses a plan with a target no AI is, one named
+twice and an unknown id, all at once and with nothing removed, says a second
+removal of a gone AI, and refuses to remove a carousel AI that has played,
+naming its matches. Evidence on bigace: `central-postgres` lib 59,
+`central-service` 52 and the CLI's 9, clippy and fmt clean, and the store
+suite green (113 s).

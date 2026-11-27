@@ -732,6 +732,7 @@ central-service --ai-players-stdin < ai-players.json > runner-token.txt
  ],
  "settings": {"fill_in": false, "global_seats": 16, "carousel_games": 8, "carousel_daily": 10000},
  "revoke": [],
+ "remove": [],
  "token": {"name": "runner-bigace", "accounts": ["KI-Haus-Expert", "KI-Haus-Mittel"], "days": 90}}
 ```
 
@@ -762,6 +763,15 @@ transaction, whole or not at all:
 - **`revoke`.** Runner token ids, as the listing prints them. Each ends every
   session it minted in the same transaction; one revoked already is no
   error, an unknown id refuses the plan.
+- **`remove`.** AI players that have never played, each by its display name
+  and tag as players read it (`"KI-GPT-Astra#1b66"`) or by its account id.
+  Each goes as the website's Remove takes one (the same code): the account
+  with everything it holds, its runner sessions among them, audited as
+  `ai.removed` with the operator as the actor. One that has played refuses
+  the plan (`has played 12 matches, cannot be removed; switch it off
+  instead`): an AI's record stays for good. So does one no AI player is, one
+  named twice, and one whose name or tag a player of the same plan has too:
+  remove it in one plan, make the new one in the next.
 - **`token`.** A runner token for one runner machine, listing 1 to 16 AI
   players by display name (each must name exactly one AI), living `days`
   (1 to 366, 90 when left out). A live token of the same name refuses the

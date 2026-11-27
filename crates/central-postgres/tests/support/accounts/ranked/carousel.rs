@@ -17,7 +17,9 @@ use central_api::ranked::ai::{
 };
 use central_api::ranked::{Format, HostRequest, Outcome, PoolEntry, QueueState, Request};
 use central_api::wire::GatewayPurpose;
-use central_postgres::{RankedHostCredential::Registered, appoint_admin};
+use central_postgres::{
+    AiPlan, RankedHostCredential::Registered, RemoveTarget, apply_ai_plan, appoint_admin,
+};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, TransactionTrait, prelude::Uuid};
 
 /// No other suite queues in this format, so nobody else's ticket waits in it.
@@ -786,6 +788,7 @@ async fn scoring(
     assert_eq!(carousel, people, "an AI's match scores as people's");
     assert_eq!(carousel, [12, 12, 6, 6, 3]);
     results_in_work(store, bots, &carousel).await;
+    played_stays(db, bots).await;
     // Both AIs' ratings moved; the carousel's matches show in their records.
     assert_eq!(
         count(
@@ -824,4 +827,31 @@ async fn results_in_work(store: &AccountStore, bots: &Bots, carousel: &[i64]) {
         let ids: std::collections::BTreeSet<_> = last.iter().map(|f| f.match_id).collect();
         assert_eq!(ids.len(), 5);
     }
+}
+
+/// An AI that has played is not removed by the operator either: the plan is
+/// refused, naming it and how many matches it played, and it stays.
+async fn played_stays(db: &DatabaseConnection, bots: &Bots) {
+    let plan = AiPlan {
+        remove: vec![RemoveTarget::Id(bots.a.account)],
+        ..AiPlan::default()
+    };
+    let fault = apply_ai_plan(db, &plan, None).await.unwrap_err();
+    assert_eq!(fault.error, Error::Conflict);
+    let said = &fault.faults[0];
+    assert!(said.starts_with("remove[0] \"KI-"), "{said}");
+    assert!(
+        said.contains("has played ")
+            && said.ends_with(" matches, cannot be removed; switch it off instead"),
+        "{said}"
+    );
+    assert_eq!(
+        count(
+            db,
+            "SELECT count(*) AS n FROM central_identity.ai_players WHERE account_id = $1",
+            vec![bots.a.id().into()],
+        )
+        .await,
+        1
+    );
 }

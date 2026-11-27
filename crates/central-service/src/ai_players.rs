@@ -19,8 +19,8 @@ use central_api::admin::AiPlayerSettings;
 use central_api::ai_runner::{AiRunnerTokenInfo, token_text};
 use central_api::ranked::ai::AiKind;
 use central_postgres::{
-    AiApplied, AiPlan, AiPlayerPlan, AiSettingsPlan, PlanFault, PlayerOutcome, RunnerTokenPlan,
-    ai_runner_tokens, apply_ai_plan, connect_server, plan_faults,
+    AiApplied, AiPlan, AiPlayerPlan, AiSettingsPlan, PlanFault, PlayerOutcome, RemoveTarget,
+    RunnerTokenPlan, ai_runner_tokens, apply_ai_plan, connect_server, plan_faults,
 };
 use serde::Deserialize;
 use std::process::ExitCode;
@@ -41,6 +41,9 @@ struct Input {
     #[serde(default)]
     #[zeroize(skip)]
     revoke: Vec<String>,
+    #[serde(default)]
+    #[zeroize(skip)]
+    remove: Vec<String>,
     #[serde(default)]
     #[zeroize(skip)]
     token: Option<NewToken>,
@@ -135,6 +138,7 @@ struct Parts<'a> {
     players: &'a [Player],
     settings: Option<&'a Settings>,
     revoke: &'a [String],
+    remove: &'a [String],
     token: Option<&'a NewToken>,
     list: bool,
 }
@@ -145,10 +149,30 @@ impl Input {
             players: &self.players,
             settings: self.settings.as_ref(),
             revoke: &self.revoke,
+            remove: &self.remove,
             token: self.token.as_ref(),
             list: self.list,
         }
     }
+}
+
+/// An AI player to remove as the operator writes it: its display name and
+/// tag (`KI-GPT-Astra#1b66`, the tag in hex as players read it), or its
+/// account id.
+fn removal(text: &str) -> Option<RemoveTarget> {
+    if let Some((name, tag)) = text.rsplit_once('#') {
+        if name.is_empty() || tag.is_empty() || tag.len() > 8 {
+            return None;
+        }
+        if !tag.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        return Some(RemoveTarget::Named {
+            display_name: name.to_owned(),
+            tag: u32::from_str_radix(tag, 16).ok()?,
+        });
+    }
+    uuid_bytes(text).ok().map(RemoveTarget::Id)
 }
 
 /// The plan the input asks for, or every fault of its shape: a listing
@@ -157,14 +181,18 @@ fn plan(input: &Parts<'_>) -> Result<AiPlan, Vec<String>> {
     let changes = !input.players.is_empty()
         || input.settings.is_some()
         || !input.revoke.is_empty()
+        || !input.remove.is_empty()
         || input.token.is_some();
     let mut wrong = Vec::new();
     if input.list && changes {
         wrong.push(
-            "list: a listing goes alone, without players, settings, revoke or token".to_owned(),
+            "list: a listing goes alone, without players, settings, revoke, remove or token"
+                .to_owned(),
         );
     } else if !input.list && !changes {
-        wrong.push("nothing asked: give players, settings, revoke, token, or list".to_owned());
+        wrong.push(
+            "nothing asked: give players, settings, revoke, remove, token, or list".to_owned(),
+        );
     }
     let mut revoke = Vec::with_capacity(input.revoke.len());
     for (index, text) in input.revoke.iter().enumerate() {
@@ -172,6 +200,15 @@ fn plan(input: &Parts<'_>) -> Result<AiPlan, Vec<String>> {
             Ok(id) => revoke.push(id),
             Err(()) => wrong.push(format!(
                 "revoke[{index}] {text:?}: a runner token's id, such as 0192f0c4-7b1a-7cde-8f00-000000000001"
+            )),
+        }
+    }
+    let mut remove = Vec::with_capacity(input.remove.len());
+    for (index, text) in input.remove.iter().enumerate() {
+        match removal(text) {
+            Some(target) => remove.push(target),
+            None => wrong.push(format!(
+                "remove[{index}] {text:?}: an AI player's name with its tag, such as KI-GPT-Astra#1b66, or its id"
             )),
         }
     }
@@ -205,6 +242,7 @@ fn plan(input: &Parts<'_>) -> Result<AiPlan, Vec<String>> {
             carousel_daily: settings.carousel_daily,
         }),
         revoke,
+        remove,
         token: input.token.map(|token| RunnerTokenPlan {
             name: token.name.clone(),
             accounts: token.accounts.clone(),
@@ -241,6 +279,8 @@ struct Shape {
     #[serde(default)]
     revoke: Vec<String>,
     #[serde(default)]
+    remove: Vec<String>,
+    #[serde(default)]
     token: Option<NewToken>,
     #[serde(default)]
     list: bool,
@@ -263,6 +303,7 @@ fn unread(bytes: &[u8]) -> Vec<String> {
         players: &shape.players,
         settings: shape.settings.as_ref(),
         revoke: &shape.revoke,
+        remove: &shape.remove,
         token: shape.token.as_ref(),
         list: shape.list,
     };
@@ -310,6 +351,15 @@ fn report(applied: &AiApplied) {
         eprintln!(
             "central: runner token {} revoked, {sessions} sessions ended",
             uuid_text(id)
+        );
+    }
+    for removed in &applied.removed {
+        eprintln!(
+            "central: AI player {}#{:x} removed ({}), {} sessions ended",
+            removed.display_name,
+            removed.tag,
+            uuid_text(&removed.account),
+            removed.sessions
         );
     }
     if let Some((id, expires_at)) = applied.token {
@@ -431,7 +481,7 @@ mod tests {
         assert!(planned(format!(r#"{{{LOGIN},"list":true}}"#)).is_ok());
         assert_eq!(
             planned(format!(r"{{{LOGIN}}}")).unwrap_err(),
-            ["nothing asked: give players, settings, revoke, token, or list"]
+            ["nothing asked: give players, settings, revoke, remove, token, or list"]
         );
         assert!(
             planned(format!(
@@ -462,6 +512,33 @@ mod tests {
         assert_eq!(settings.fill_in_after, None);
         assert_eq!(read.revoke[0][..2], [0x01, 0x92]);
         assert_eq!(read.token.unwrap().days, 90);
+    }
+
+    #[test]
+    fn a_removal_names_an_ai_by_name_and_tag_or_by_id() {
+        assert_eq!(
+            removal("KI-GPT-Astra#1b66"),
+            Some(RemoveTarget::Named {
+                display_name: "KI-GPT-Astra".into(),
+                tag: 0x1b66
+            })
+        );
+        assert_eq!(
+            removal("0192f0c4-7b1a-7cde-8f00-000000000001"),
+            uuid_bytes("0192f0c4-7b1a-7cde-8f00-000000000001")
+                .ok()
+                .map(RemoveTarget::Id)
+        );
+        for wrong in [
+            "KI-GPT-Astra",
+            "KI-GPT-Astra#",
+            "#1b66",
+            "KI-GPT-Astra#xyz",
+            "KI-GPT-Astra#123456789",
+            "",
+        ] {
+            assert_eq!(removal(wrong), None, "{wrong}");
+        }
     }
 
     #[test]

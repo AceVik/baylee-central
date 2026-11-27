@@ -12,7 +12,7 @@
 //! counts them), the settings for every AI, the tokens to revoke (as an
 //! exchange takes its token first), the AI accounts and their rows, the
 //! revoked tokens' sessions, and a new token last.
-use super::lifecycle::{change, create};
+use super::lifecycle::{change, create, remove};
 use super::{get, settings, switch, unavailable, write_settings};
 use crate::accounts::ai_runner::{listed, make, revoke};
 use crate::accounts::{Error, Token, statement, uuid};
@@ -91,8 +91,47 @@ pub struct AiPlan {
     pub settings: Option<AiSettingsPlan>,
     /// Runner tokens to revoke, by id, before a new one is made.
     pub revoke: Vec<[u8; 16]>,
+    /// AI players to remove, which must never have played.
+    pub remove: Vec<RemoveTarget>,
     /// A runner token to make.
     pub token: Option<RunnerTokenPlan>,
+}
+
+/// An AI player the plan removes: by its id, or by its display name and
+/// tag (`KI-GPT-Astra#1b66`).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RemoveTarget {
+    /// Its account id.
+    Id([u8; 16]),
+    /// Its display name and tag.
+    Named {
+        /// The display name.
+        display_name: String,
+        /// The tag.
+        tag: u32,
+    },
+}
+
+impl std::fmt::Display for RemoveTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Id(id) => write!(f, "{}", Uuid::from_bytes(*id)),
+            Self::Named { display_name, tag } => write!(f, "{display_name}#{tag:x}"),
+        }
+    }
+}
+
+/// An AI player the plan removed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RemovedApplied {
+    /// Its account, gone now.
+    pub account: [u8; 16],
+    /// Its display name, as it was.
+    pub display_name: String,
+    /// Its tag, as it was.
+    pub tag: u32,
+    /// How many of its sessions ended with it.
+    pub sessions: usize,
 }
 
 /// What became of one AI player of the plan.
@@ -130,6 +169,8 @@ pub struct AiApplied {
     pub settings: Option<AiSettings>,
     /// The tokens revoked now, each with how many sessions ended with it.
     pub revoked: Vec<([u8; 16], usize)>,
+    /// The AI players removed now, in the plan's order.
+    pub removed: Vec<RemovedApplied>,
     /// The new token's id and expiry, in Unix seconds.
     pub token: Option<([u8; 16], i64)>,
 }
@@ -282,6 +323,134 @@ async fn player(
     })
 }
 
+/// The AI player a removal names, with its display name and tag as they
+/// are; none when no AI player is it.
+async fn target(
+    tx: &DatabaseTransaction,
+    wanted: &RemoveTarget,
+) -> Result<Option<(Uuid, String, u32)>, PlanFault> {
+    let row = match wanted {
+        RemoveTarget::Id(id) => {
+            tx.query_one_raw(statement(
+                "SELECT a.id, a.display_name, a.tag FROM central_identity.accounts a
+                 JOIN central_identity.ai_players p ON p.account_id = a.id WHERE a.id = $1",
+                vec![Uuid::from_bytes(*id).into()],
+            ))
+            .await
+        }
+        RemoveTarget::Named { display_name, tag } => {
+            let Ok(tag) = i32::try_from(*tag) else {
+                return Ok(None);
+            };
+            tx.query_one_raw(statement(
+                "SELECT a.id, a.display_name, a.tag FROM central_identity.accounts a
+                 JOIN central_identity.ai_players p ON p.account_id = a.id
+                 WHERE a.display_name = $1 AND a.tag = $2",
+                vec![display_name.clone().into(), tag.into()],
+            ))
+            .await
+        }
+    }
+    .map_err(unavailable)?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let name: Option<String> = get(&row, "display_name")?;
+    let tag: Option<i32> = get(&row, "tag")?;
+    Ok(Some((
+        get(&row, "id")?,
+        name.unwrap_or_default(),
+        tag.and_then(|tag| u32::try_from(tag).ok()).unwrap_or(0),
+    )))
+}
+
+/// How many ranked matches `account` has been seated in, and whether it
+/// holds a ticket that is not closed: what keeps an AI from going.
+async fn played(tx: &DatabaseTransaction, account: Uuid) -> Result<(i64, bool), PlanFault> {
+    let row = tx
+        .query_one_raw(statement(
+            "SELECT (SELECT count(*) FROM central_identity.ranked_matches
+                     WHERE account_a = $1 OR account_b = $1)::bigint AS matches,
+                    EXISTS (SELECT 1 FROM central_identity.ranked_tickets
+                     WHERE account_id = $1 AND state <> 'closed') AS ticket",
+            vec![account.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Unavailable)?;
+    Ok((get(&row, "matches")?, get(&row, "ticket")?))
+}
+
+/// Remove the plan's AI players, after every removal's faults are known and
+/// said at once: one no AI player is, one named twice, one that has played.
+/// Each goes through the administration's own removal ([`remove`]), with
+/// the operator as the audit's actor.
+async fn removals(
+    tx: &DatabaseTransaction,
+    plan: &AiPlan,
+) -> Result<Vec<RemovedApplied>, PlanFault> {
+    let mut faults = Vec::new();
+    let mut error = Error::Rejected;
+    let mut found: Vec<(usize, Uuid, String, u32)> = Vec::new();
+    for (index, wanted) in plan.remove.iter().enumerate() {
+        let Some((account, name, tag)) = target(tx, wanted).await? else {
+            faults.push(match wanted {
+                RemoveTarget::Id(_) => {
+                    format!("remove[{index}] {wanted}: no AI player has that id")
+                }
+                RemoveTarget::Named { .. } => {
+                    format!("remove[{index}] \"{wanted}\": no AI player has that name and tag")
+                }
+            });
+            continue;
+        };
+        if let Some((before, ..)) = found.iter().find(|(_, held, ..)| *held == account) {
+            faults.push(format!(
+                "remove[{index}] \"{name}#{tag:x}\": the same AI player as remove[{before}]"
+            ));
+            continue;
+        }
+        let (matches, ticket) = played(tx, account).await?;
+        if matches > 0 || ticket {
+            error = Error::Conflict;
+            faults.push(if matches > 0 {
+                format!(
+                    "remove[{index}] \"{name}#{tag:x}\": has played {matches} matches, cannot be removed; switch it off instead"
+                )
+            } else {
+                format!(
+                    "remove[{index}] \"{name}#{tag:x}\": holds an open ranked ticket, cannot be removed; switch it off instead"
+                )
+            });
+        }
+        found.push((index, account, name, tag));
+    }
+    if !faults.is_empty() {
+        return Err(PlanFault { error, faults });
+    }
+    let mut removed = Vec::with_capacity(found.len());
+    for (index, account, display_name, tag) in found {
+        let ended = remove(tx, None, account)
+            .await
+            .map_err(|error| match error {
+                Error::Conflict => PlanFault::at(
+                    error,
+                    format!(
+                        "remove[{index}] \"{display_name}#{tag:x}\": was seated meanwhile, cannot be removed; switch it off instead"
+                    ),
+                ),
+                other => other.into(),
+            })?;
+        removed.push(RemovedApplied {
+            account: account.into_bytes(),
+            display_name,
+            tag,
+            sessions: ended.len(),
+        });
+    }
+    Ok(removed)
+}
+
 /// The one AI player named `name`, the token's `index`th account; none or
 /// several is refused, saying which.
 async fn named(tx: &DatabaseTransaction, index: usize, name: &str) -> Result<[u8; 16], PlanFault> {
@@ -401,6 +570,9 @@ pub async fn apply_ai_plan(
     ))
     .await
     .map_err(unavailable)?;
+    // Removals before the players, in the plan's order, each AI's account
+    // row before its own row, as a change takes them.
+    applied.removed = removals(&tx, plan).await?;
     for (index, wanted) in plan.players.iter().enumerate() {
         applied.players.push(player(&tx, index, wanted).await?);
     }

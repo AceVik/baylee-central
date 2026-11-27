@@ -16,7 +16,7 @@ mod legacy;
 mod pending;
 pub use accounts::ai::operator::{
     AiApplied, AiPlan, AiPlayerPlan, AiSettingsPlan, PlanFault, PlayerApplied, PlayerOutcome,
-    RunnerTokenPlan, ai_runner_tokens, apply_ai_plan, plan_faults,
+    RemoveTarget, RemovedApplied, RunnerTokenPlan, ai_runner_tokens, apply_ai_plan, plan_faults,
 };
 pub use accounts::{
     ALL_STORED, AUDIT_YEARS, AccountStore, Action, Appointed, Approval, AuditPage,

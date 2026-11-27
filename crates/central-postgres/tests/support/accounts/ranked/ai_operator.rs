@@ -8,8 +8,8 @@ use central_api::admin::AiPlayerSettings;
 use central_api::ranked::ai::AiKind;
 use central_api::social::{ContactAction, SocialRequest};
 use central_postgres::{
-    AiPlan, AiPlayerPlan, AiSettingsPlan, PlayerOutcome, RunnerTokenPlan, ai_runner_tokens,
-    apply_ai_plan,
+    AiPlan, AiPlayerPlan, AiSettingsPlan, PlayerOutcome, RemoveTarget, RunnerTokenPlan,
+    ai_runner_tokens, apply_ai_plan,
 };
 use sea_orm::prelude::Uuid;
 
@@ -81,6 +81,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     unfindable(store, &someone_session).await;
     refusals(db, alpha).await;
     revoking(store, db, token_id, &session).await;
+    removing(store, db).await;
     clean(db, alpha).await;
     forget(db, &[someone, seen]).await;
 }
@@ -98,6 +99,7 @@ async fn first(store: &AccountStore, db: &DatabaseConnection) -> ([u8; 16], [u8;
             ..AiSettingsPlan::default()
         }),
         revoke: Vec::new(),
+        remove: Vec::new(),
         token: Some(runner("op-runner-1", &["KI-Op-Alpha"])),
     };
     let applied = apply_ai_plan(db, &first, Some(&secret)).await.unwrap();
@@ -457,5 +459,154 @@ async fn token_bound(store: &AccountStore, db: &DatabaseConnection, alpha: [u8; 
             .await
             .err(),
         Some(Error::Rejected)
+    );
+}
+
+/// The operator removes AI players that have never played, by name and tag
+/// or by id, through the administration's own removal: their accounts go,
+/// their runner sessions with them, each audited with the operator as the
+/// actor. One no AI player is, or one named twice, refuses the whole plan.
+async fn removing(store: &AccountStore, db: &DatabaseConnection) {
+    let (gone, spare, twice) = (ALPHA + 0x10, ALPHA + 0x11, ALPHA + 0x12);
+    let secret = Token::generate().unwrap();
+    let made = apply_ai_plan(
+        db,
+        &AiPlan {
+            players: vec![
+                wanted("KI-Op-Gone", gone, "Haus-KI"),
+                wanted("KI-Op-Spare", spare, "Haus-KI"),
+                wanted("KI-Op-Twice", twice, "Haus-KI"),
+            ],
+            token: Some(runner("op-runner-gone", &["KI-Op-Gone"])),
+            ..AiPlan::default()
+        },
+        Some(&secret),
+    )
+    .await
+    .unwrap();
+    let [gone_id, spare_id, twice_id] = [0, 1, 2].map(|i| made.players[i].account);
+    let session = Token::generate().unwrap();
+    store
+        .ai_runner_session(&secret, gone_id, &session)
+        .await
+        .unwrap();
+    let named = |name: &str, tag: u32| RemoveTarget::Named {
+        display_name: name.into(),
+        tag,
+    };
+    // Every fault at once, and nothing removed.
+    let fault = apply_ai_plan(
+        db,
+        &AiPlan {
+            remove: vec![
+                named("KI-Op-Gone", gone),
+                named("KI-Op-Nobody", ALPHA + 0x13),
+                named("KI-Op-Twice", twice),
+                RemoveTarget::Id(twice_id),
+                RemoveTarget::Id([9; 16]),
+            ],
+            ..AiPlan::default()
+        },
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(fault.error, Error::Rejected);
+    assert_eq!(
+        fault.faults,
+        [
+            "remove[1] \"KI-Op-Nobody#7fff0a14\": no AI player has that name and tag".to_owned(),
+            "remove[3] \"KI-Op-Twice#7fff0a13\": the same AI player as remove[2]".to_owned(),
+            format!(
+                "remove[4] {}: no AI player has that id",
+                Uuid::from_bytes([9; 16])
+            ),
+        ]
+    );
+    store.renew_session(&session).await.unwrap();
+    removed_go(store, db, &session, [(gone, gone_id), (spare, spare_id)]).await;
+    // Clean up: the third, and what was written about all three.
+    forget(db, &[twice_id]).await;
+    let all: Vec<Uuid> = [gone_id, spare_id, twice_id].map(Uuid::from_bytes).to_vec();
+    sql(
+        db,
+        "DELETE FROM central_identity.audit_events WHERE account_id = ANY($1)",
+        vec![all.into()],
+    )
+    .await;
+}
+
+/// By name and tag, and by id: both go, the runner's session with the
+/// first, each audited as the operator's; asked again, it is said, not done.
+async fn removed_go(
+    store: &AccountStore,
+    db: &DatabaseConnection,
+    session: &Token,
+    [(gone, gone_id), (spare, spare_id)]: [(u32, [u8; 16]); 2],
+) {
+    let named = |name: &str, tag: u32| RemoveTarget::Named {
+        display_name: name.into(),
+        tag,
+    };
+    let removed = apply_ai_plan(
+        db,
+        &AiPlan {
+            remove: vec![named("KI-Op-Gone", gone), RemoveTarget::Id(spare_id)],
+            ..AiPlan::default()
+        },
+        None,
+    )
+    .await
+    .unwrap()
+    .removed;
+    assert_eq!(removed.len(), 2);
+    assert_eq!(
+        (removed[0].account, removed[0].sessions),
+        (gone_id, 1),
+        "{removed:?}"
+    );
+    assert_eq!(
+        (
+            removed[1].display_name.as_str(),
+            removed[1].tag,
+            removed[1].sessions
+        ),
+        ("KI-Op-Spare", spare, 0)
+    );
+    assert_eq!(store.renew_session(session).await, Err(Error::Rejected));
+    let ids: Vec<Uuid> = [gone_id, spare_id].map(Uuid::from_bytes).to_vec();
+    assert_eq!(
+        count(
+            db,
+            "SELECT count(*) AS n FROM central_identity.accounts WHERE id = ANY($1)",
+            vec![ids.clone().into()],
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        count(
+            db,
+            "SELECT count(*) AS n FROM central_identity.audit_events
+             WHERE action = 'ai.removed' AND actor_kind = 'operator' AND account_id = ANY($1)",
+            vec![ids.clone().into()],
+        )
+        .await,
+        2
+    );
+    // Gone means gone: asking again is said, not done twice.
+    let again = apply_ai_plan(
+        db,
+        &AiPlan {
+            remove: vec![named("KI-Op-Gone", gone)],
+            ..AiPlan::default()
+        },
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        again.faults,
+        ["remove[0] \"KI-Op-Gone#7fff0a11\": no AI player has that name and tag"]
     );
 }
