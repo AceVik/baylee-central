@@ -23,7 +23,7 @@ const WRAPPED: usize = 73;
 const DOCUMENT: usize = 41;
 
 /// The hex digits after `ai-` in an AI account's login name: 80 bits from
-/// the operating system, never shown and never guessed.
+/// the operating system: nobody signs in with it or guesses it.
 const LOGIN_BYTES: usize = 10;
 
 /// `len` bytes from the operating system's generator ([`Token::generate`]).

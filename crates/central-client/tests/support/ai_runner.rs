@@ -191,7 +191,7 @@ pub(crate) fn run(
     assert!(listed.revoked_at.is_some() && listed.last_used_at.is_some());
     assert_eq!(listed.accounts.len(), 1);
 
-    refusing(http, &desk, runtime, operator, &person_bearer);
+    refusing(http, &desk, runtime, operator, (admin, &person_bearer));
 }
 
 /// A request as the wire writes it, for a failure's message.
@@ -294,8 +294,20 @@ fn refusing(
     desk: &Desk<'_>,
     runtime: &Runtime,
     operator: &DatabaseConnection,
-    person: &SignedToken,
+    (admin, person): (Identity, &SignedToken),
 ) {
+    // The person's control needs a name and a tag, which a moved account
+    // waits for: social requests ask for both.
+    operated(
+        runtime,
+        operator,
+        "UPDATE central_identity.accounts SET display_name = 'RunnerDesk',
+           display_name_at = pg_catalog.clock_timestamp(),
+           tag = (SELECT min(t) FROM pg_catalog.generate_series(4096, 65535) t
+                  WHERE NOT EXISTS (SELECT 1 FROM central_identity.accounts WHERE tag = t))
+         WHERE id = $1 AND tag IS NULL",
+        vec![Uuid::from_bytes(admin.account).into()],
+    );
     let ai = ai_account(desk, "KI-Refused");
     let name: String = runtime
         .block_on(operator.query_one_raw(Statement::from_sql_and_values(
@@ -353,6 +365,11 @@ fn mailing(runner: &Runner<'_>, desk: &Desk<'_>) {
         .err(),
         Some(Error::Rejected)
     );
+    // The desk is fresh: a change that needs it is served.
+    desk.done(AdminRequest::SetAiEnabled {
+        account: runner.ai.account,
+        enabled: true,
+    });
     assert!(!runner.holds_a_code());
     let code = ResetCode::generate().unwrap();
     operated(
@@ -444,8 +461,10 @@ fn accepting(runner: &Runner<'_>) -> TermsVersion {
     current
 }
 
-/// Each family: what a person's session is served, an AI's is refused; and
-/// what would change the AI's account is refused as well. No push socket.
+/// Each family: what a person's session is served, an AI's is refused.
+/// What would change the AI's own account has no person's control here and
+/// is refused as well; a few of those are refused at more than one place
+/// (a person's `Join`, a sealed credential's proof). No push socket.
 fn families(runner: &Runner<'_>, person: &SignedToken, current: &TermsVersion) {
     let http = runner.http;
     pace();
@@ -463,6 +482,9 @@ fn families(runner: &Runner<'_>, person: &SignedToken, current: &TermsVersion) {
     for request in &[
         Request::KeyCheckStatus,
         Request::Presence,
+        Request::SetPresence {
+            choice: Choice::Online,
+        },
         Request::AccountExport,
         Request::Email {
             request: EmailRequest::Status,
@@ -474,7 +496,9 @@ fn families(runner: &Runner<'_>, person: &SignedToken, current: &TermsVersion) {
         Request::Social {
             request: SocialRequest::Contacts,
         },
+        Request::ReadDocument,
         Request::ListObjects { after: None },
+        Request::CreateObject,
         Request::Ranked {
             request: ranked::Request::Export {
                 table: ranked::export::Table::ALL[0],
@@ -484,7 +508,7 @@ fn families(runner: &Runner<'_>, person: &SignedToken, current: &TermsVersion) {
     ] {
         pace();
         let served = http.exchange(request, Some(person.into()));
-        assert!(served.is_ok(), "{}", named(request));
+        assert!(served.is_ok(), "{}: {:?}", named(request), served.err());
         let refused = runner.ask(request).err();
         assert_eq!(refused, Some(Error::Rejected), "{}", named(request));
     }
@@ -492,21 +516,11 @@ fn families(runner: &Runner<'_>, person: &SignedToken, current: &TermsVersion) {
     let (_, registration) = Enrollment::start(OLD.into(), context(http, runner.ai)).unwrap();
     for request in [
         Request::SetKeyCheck { check: vec![1; 32] },
-        Request::SetPresence {
-            choice: Choice::Online,
-        },
-        Request::ChangePasswordStart {
-            login: ke1.clone(),
-            registration,
-        },
-        Request::DeleteAccountStart { login: ke1 },
-        Request::ReadDocument,
         Request::ConfirmRestore { revision: 1 },
         Request::WriteDocument {
             expected_revision: 1,
             document: [[1].as_slice(), &[0; 40]].concat(),
         },
-        Request::CreateObject,
         Request::TowerToken {},
         Request::Advent {
             request: advent::Request::CurrentCalendar {},
@@ -519,6 +533,12 @@ fn families(runner: &Runner<'_>, person: &SignedToken, current: &TermsVersion) {
                 website: "https://ai-runner.example/".into(),
             },
         },
+        // Refused at more than one place.
+        Request::ChangePasswordStart {
+            login: ke1.clone(),
+            registration,
+        },
+        Request::DeleteAccountStart { login: ke1 },
         Request::Ranked {
             request: ranked::Request::Replicate {
                 request: SeatRequest::Join {

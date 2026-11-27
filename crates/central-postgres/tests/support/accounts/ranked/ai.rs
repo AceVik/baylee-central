@@ -157,12 +157,13 @@ pub(super) async fn forget(db: &DatabaseConnection, accounts: &[[u8; 16]]) {
     .await;
 }
 
-/// A tag no account holds: one past the highest.
+/// A tag no account holds, of four hex digits.
 async fn free_tag(db: &DatabaseConnection) -> u32 {
     u32::try_from(
         count(
             db,
-            "SELECT COALESCE(max(tag), 4095)::bigint + 1 AS n FROM central_identity.accounts",
+            "SELECT min(t)::bigint AS n FROM pg_catalog.generate_series(4096, 65535) t
+             WHERE NOT EXISTS (SELECT 1 FROM central_identity.accounts WHERE tag = t)",
             vec![],
         )
         .await,
@@ -191,7 +192,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     let cookie = desk(store, admin_identity).await;
     drop(admin);
 
-    let bot_id = creating(store, db, &cookie, admin_id, pia_id).await;
+    let bot_id = creating(store, db, &cookie, admin_id).await;
     changing(store, db, &cookie, bot_id, pia_id).await;
     let removed = removing(store, db, &cookie, pia_id).await;
     refusing(store, db, &cookie, bot_id).await;
@@ -265,7 +266,6 @@ async fn creating(
     db: &DatabaseConnection,
     cookie: &Token,
     admin_id: [u8; 16],
-    pia_id: [u8; 16],
 ) -> [u8; 16] {
     for refused in [
         settings("house:seer", "KI-Haus-Seer"),
@@ -278,26 +278,18 @@ async fn creating(
             "{refused:?}"
         );
     }
-    let taken = u32::try_from(
-        count(
-            db,
-            "SELECT tag::bigint AS n FROM central_identity.accounts WHERE id = $1",
-            vec![Uuid::from_bytes(pia_id).into()],
-        )
-        .await,
-    )
-    .unwrap();
     let expert = settings("house:expert", "KI-Haus-Expert");
-    assert_eq!(
-        store.create_ai_player(cookie, &expert, Some(taken)).await,
-        Err(Error::Conflict)
-    );
     assert_eq!(
         store.create_ai_player(cookie, &expert, Some(0)).await,
         Err(Error::Rejected)
     );
     let (bot, tag) = store.create_ai_player(cookie, &expert, None).await.unwrap();
     assert!(tag >= central_api::profile::REGISTERED_TAG_FLOOR);
+    // The tag it drew is taken now: another AI gets a conflict, not another tag.
+    assert_eq!(
+        store.create_ai_player(cookie, &expert, Some(tag)).await,
+        Err(Error::Conflict)
+    );
     let account = Uuid::from_bytes(bot);
     // Enrolled as every check asks, and nothing in it opens.
     assert_eq!(
@@ -492,7 +484,7 @@ async fn refusing(store: &AccountStore, db: &DatabaseConnection, cookie: &Token,
         db,
         "UPDATE central_identity.accounts SET reset_digest = $2,
            reset_expires = pg_catalog.clock_timestamp() + interval '1 hour' WHERE id = $1",
-        vec![account.into(), [9; 32].to_vec().into()],
+        vec![account.into(), vec![9_u8; 32].into()],
     )
     .await;
     assert_eq!(
@@ -852,10 +844,19 @@ async fn switching(
     );
 }
 
-/// A removal and a fill-in race for one AI: either the match is made and
-/// the removal refused, or the AI goes and the person waits; never both and
-/// never a deadlock. Three rounds, each with an AI of its own. Answers the
-/// AIs that stayed.
+/// How one round of [`racing`] orders the removal and the fill-in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Order {
+    RemovalFirst,
+    FillInFirst,
+    Together,
+}
+
+/// A removal and a fill-in for one AI, each round with an AI of its own:
+/// one after the other in either order, which takes each way for certain,
+/// then twice at once. Either the match is made and the removal refused,
+/// or the AI goes and the person waits; never both, and never a deadlock.
+/// Answers the AIs that stayed.
 async fn racing(
     store: &AccountStore,
     db: &DatabaseConnection,
@@ -871,7 +872,15 @@ async fn racing(
     .await;
     let cookie = desk(store, admin).await;
     let mut stayed = Vec::new();
-    for round in 0..3_u8 {
+    let orders = [
+        Order::RemovalFirst,
+        Order::FillInFirst,
+        Order::Together,
+        Order::Together,
+    ];
+    for (round, order) in (0_u8..).zip(orders) {
+        // Seen again, as a live host is every few seconds.
+        store.ranked_host(Registered(host), ready(4)).await.unwrap();
         let racer = created(store, &cookie, &format!("KI-Racer-{round}")).await;
         let session = runner(store, &runner_token(store, &cookie, &[racer]).await, racer).await;
         ai(store, &session, standard()).await.unwrap();
@@ -879,10 +888,18 @@ async fn racing(
             .await
             .unwrap();
         waited(db, person_id).await;
-        let (removed, state) = tokio::join!(
-            store.remove_ai_player(&cookie, racer),
-            queue(store, person, Request::Status)
-        );
+        let status = || queue(store, person, Request::Status);
+        let (removed, state) = match order {
+            Order::RemovalFirst => {
+                let removed = store.remove_ai_player(&cookie, racer).await;
+                (removed, status().await)
+            }
+            Order::FillInFirst => {
+                let state = status().await;
+                (store.remove_ai_player(&cookie, racer).await, state)
+            }
+            Order::Together => tokio::join!(store.remove_ai_player(&cookie, racer), status()),
+        };
         let seated = count(
             db,
             "SELECT count(*) AS n FROM central_identity.ranked_matches
@@ -891,7 +908,7 @@ async fn racing(
         )
         .await;
         match (removed, state.unwrap()) {
-            (Ok(ended), QueueState::Waiting { .. }) => {
+            (Ok(ended), QueueState::Waiting { .. }) if order != Order::FillInFirst => {
                 assert_eq!(ended, vec![Session::Native(&session).digest()]);
                 assert_eq!(seated, 0, "round {round}");
                 queue(
@@ -904,7 +921,9 @@ async fn racing(
                 .await
                 .unwrap();
             }
-            (Err(Error::Conflict), QueueState::Assigned { assignment, .. }) => {
+            (Err(Error::Conflict), QueueState::Assigned { assignment, .. })
+                if order != Order::RemovalFirst =>
+            {
                 assert_eq!(seated, 1, "round {round}");
                 assert!(assignment.opponent_ai.is_some());
                 store.set_ai_enabled(&cookie, racer, false).await.unwrap();
@@ -919,7 +938,7 @@ async fn racing(
                     .unwrap();
                 stayed.push(racer);
             }
-            (removed, state) => panic!("round {round}: {removed:?} with {state:?}"),
+            (removed, state) => panic!("round {round}, {order:?}: {removed:?} with {state:?}"),
         }
     }
     stayed
