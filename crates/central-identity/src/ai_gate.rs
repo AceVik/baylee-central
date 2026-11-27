@@ -164,7 +164,9 @@ impl ForAi {
     const fn ranked(request: &ranked::Request) -> Self {
         match request {
             ranked::Request::Ai { request } => match request {
-                ai::Request::Offer { .. } | ai::Request::Work => Self::Allowed,
+                ai::Request::Offer { .. } | ai::Request::Work | ai::Request::Carousel { .. } => {
+                    Self::Allowed
+                }
             },
             ranked::Request::Replicate { request } => match request {
                 SeatRequest::Relay { .. }

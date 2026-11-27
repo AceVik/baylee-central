@@ -595,7 +595,10 @@ impl Response {
             Self::Queue { state } => state.omit_ai(),
             Self::Board { entries, .. } => entries.iter_mut().for_each(|row| row.ai = None),
             Self::Profile { ai, .. } => *ai = None,
-            // Nothing protocol 3 added is in these answers.
+            // Nothing protocol 3 added is in the first three. The runner's
+            // answers came with protocol 3 (its work and the carousel's seat
+            // carry the opponent's badge): only a runner asks for them, and
+            // it reads them whole.
             Self::DeckPreview { .. }
             | Self::Seasons { .. }
             | Self::Export { .. }

@@ -7,14 +7,14 @@ use crate::accounts::ai::{self, LIVE, TODAY};
 use central_api::ranked::ai::AiKind;
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
-mod policy;
+pub(super) mod policy;
 
 /// Most candidates fill-in tries after the first refuses under its lock.
-const TRIES: usize = 4;
+pub(super) const TRIES: usize = 4;
 
 /// An AI's live offer for format `$2`, made under a native session that is
 /// live and has `$3` minutes left before its cap.
-const OFFERED: &str = "EXISTS (SELECT 1 FROM central_identity.ai_offers o
+pub(super) const OFFERED: &str = "EXISTS (SELECT 1 FROM central_identity.ai_offers o
     JOIN central_identity.sessions s ON s.digest = o.session_digest AND s.account_id = o.account_id
     JOIN central_identity.accounts a ON a.id = s.account_id AND a.credential_revision = s.credential_revision
     WHERE o.account_id = p.account_id AND o.format = $2 AND o.expires_at > pg_catalog.clock_timestamp()
@@ -63,8 +63,10 @@ fn eligible_sql() -> String {
     )
 }
 
-/// The AIs that pass every hard rule but the global bound, or just `only`.
-async fn eligible(
+/// The AIs other than `person` (the person searching, or the AI asking the
+/// carousel) that pass every hard rule but the global bound, or just
+/// `only`; their meetings are those with `person`.
+pub(super) async fn eligible(
     db: &DatabaseTransaction,
     person: Uuid,
     format: &str,
@@ -293,54 +295,23 @@ async fn place(
     else {
         return Ok(());
     };
-    let ai_first: bool = column(
-        &db.query_one_raw(statement(
-            "SELECT pg_catalog.random() < 0.5 AS first",
-            vec![],
-        ))
-        .await
-        .map_err(unavailable)?
-        .ok_or(Error::Unavailable)?,
-        "first",
-    )?;
-    let person_deck: Vec<u8> = column(ticket, "commitment")?;
-    let ai_deck: Vec<u8> = column(offer, "commitment")?;
-    let (a, b, deck_a, deck_b) = if ai_first {
-        (id, me, ai_deck, person_deck)
-    } else {
-        (me, id, person_deck, ai_deck)
-    };
-    let Some(matched) = db
-        .query_one_raw(statement(
-            "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,
-               commitment_a,commitment_b,host_id,ranked_epoch,origin)
-             SELECT s.id,$2,$3,$4,$5,$6,$7,$8,$9 FROM central_identity.ranked_seasons s WHERE s.id=$1
-             AND s.starts_at<=pg_catalog.clock_timestamp()
-             AND (s.ends_at IS NULL OR s.ends_at>pg_catalog.clock_timestamp()) RETURNING id",
-            vec![
-                column::<Uuid>(ticket, "season_id")?.into(),
-                format.clone().into(),
-                a.into(),
-                b.into(),
-                deck_a.into(),
-                deck_b.into(),
-                host.id.into(),
-                host.epoch.into(),
-                host.origin.into(),
-            ],
-        ))
-        .await
-        .map_err(unavailable)?
+    let ai_first = coin(db).await?;
+    let person = (me, column::<Vec<u8>>(ticket, "commitment")?);
+    let ai = (id, column::<Vec<u8>>(offer, "commitment")?);
+    let seats = if ai_first { [ai, person] } else { [person, ai] };
+    let arranged = Arranged::FillIn { ai_first };
+    let Some(matched) = write(
+        db,
+        column(ticket, "season_id")?,
+        &format,
+        seats,
+        host,
+        arranged,
+    )
+    .await?
     else {
         return Ok(());
     };
-    let matched: Uuid = column(&matched, "id")?;
-    db.execute_raw(statement(
-        "INSERT INTO central_identity.ai_matches(match_id, arranged, ai_seats) VALUES ($1, 'fill_in', $2)",
-        vec![matched.into(), if ai_first { 1_i16 } else { 2_i16 }.into()],
-    ))
-    .await
-    .map_err(unavailable)?;
     let changed = db
         .execute_raw(statement(
             "UPDATE central_identity.ranked_tickets SET state='assigned', match_id=$1
@@ -353,4 +324,91 @@ async fn place(
         return Err(Error::Conflict);
     }
     Ok(())
+}
+
+/// A fair coin from the database's generator: whether the first of two
+/// seats goes first. With an AI seat, the seat order is drawn for each
+/// match, never taken from who asked.
+pub(super) async fn coin(db: &DatabaseTransaction) -> Result<bool, Error> {
+    column(
+        &db.query_one_raw(statement(
+            "SELECT pg_catalog.random() < 0.5 AS first",
+            vec![],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Unavailable)?,
+        "first",
+    )
+}
+
+/// How a match with an AI seat was made (`ai_matches.arranged`), and so
+/// which of its seats are AIs.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Arranged {
+    /// An AI fills a person's search, in seat zero when `ai_first`.
+    FillIn {
+        /// Whether the AI sits in seat zero.
+        ai_first: bool,
+    },
+    /// The carousel: both seats are AIs.
+    Carousel,
+}
+
+impl Arranged {
+    /// The stored key and `ai_seats`: 1 seat zero, 2 seat one, 3 both.
+    const fn row(self) -> (&'static str, i16) {
+        match self {
+            Self::FillIn { ai_first: true } => ("fill_in", 1),
+            Self::FillIn { ai_first: false } => ("fill_in", 2),
+            Self::Carousel => ("carousel", 3),
+        }
+    }
+}
+
+/// Write a match with an AI seat as `pair` writes one, on `host` and in
+/// `season` while it is open, each seat with its account and the commitment
+/// it plays, and the record of how it was made. None once the season has
+/// closed.
+pub(super) async fn write(
+    db: &DatabaseTransaction,
+    season: Uuid,
+    format: &str,
+    [(a, deck_a), (b, deck_b)]: [(Uuid, Vec<u8>); 2],
+    host: super::host::Host,
+    arranged: Arranged,
+) -> Result<Option<Uuid>, Error> {
+    let Some(matched) = db
+        .query_one_raw(statement(
+            "INSERT INTO central_identity.ranked_matches(season_id,format,account_a,account_b,
+               commitment_a,commitment_b,host_id,ranked_epoch,origin)
+             SELECT s.id,$2,$3,$4,$5,$6,$7,$8,$9 FROM central_identity.ranked_seasons s WHERE s.id=$1
+             AND s.starts_at<=pg_catalog.clock_timestamp()
+             AND (s.ends_at IS NULL OR s.ends_at>pg_catalog.clock_timestamp()) RETURNING id",
+            vec![
+                season.into(),
+                format.into(),
+                a.into(),
+                b.into(),
+                deck_a.into(),
+                deck_b.into(),
+                host.id.into(),
+                host.epoch.into(),
+                host.origin.into(),
+            ],
+        ))
+        .await
+        .map_err(unavailable)?
+    else {
+        return Ok(None);
+    };
+    let matched: Uuid = column(&matched, "id")?;
+    let (key, seats) = arranged.row();
+    db.execute_raw(statement(
+        "INSERT INTO central_identity.ai_matches(match_id, arranged, ai_seats) VALUES ($1, $2, $3)",
+        vec![matched.into(), key.into(), seats.into()],
+    ))
+    .await
+    .map_err(unavailable)?;
+    Ok(Some(matched))
 }

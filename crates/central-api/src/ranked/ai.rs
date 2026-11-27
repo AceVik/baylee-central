@@ -1,6 +1,7 @@
-//! AI players (`docs/ai-players.md`): accounts an administrator marks as an AI,
-//! which fill a lonely person's search. A person consents per search; every
-//! reply that names an AI to a client of protocol 3 carries its badge.
+//! AI players (`docs/ai-players.md`): accounts an administrator creates as AIs,
+//! which fill a lonely person's search and play each other in the carousel. A
+//! person consents per search; every reply that names an AI to a client of
+//! protocol 3 carries its badge.
 use super::{Assignment, Format};
 use serde::{Deserialize, Serialize};
 
@@ -186,6 +187,39 @@ pub enum Request {
     },
     /// The account's AI settings and its live matches.
     Work,
+    /// A match against another AI in this format, made now if every rule
+    /// allows it (the carousel, `docs/ai-players.md` section 7): Central
+    /// pairs the account's offer for the format with another AI's, only
+    /// while no person waits in it and every cap has room.
+    Carousel {
+        /// Competitive format of one of the account's offers.
+        format: Format,
+    },
+}
+
+/// Why a carousel request made no match: no more than the runner needs to
+/// know when asking again can help. A person's waiting search is one of the
+/// reasons for [`Self::Later`] and is never named, so a runner session
+/// learns nothing of people's searches.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum Unseated {
+    /// Closed to this AI until an administrator or the operator changes
+    /// something: the AI is switched off or has a `daily_games` of 0, the
+    /// carousel allows no match (`carousel_games` or `carousel_daily` 0,
+    /// `global_seats` under two), or no season is open.
+    Off,
+    /// The account offers no deck for the format under a session with
+    /// `drain_minutes` left before its cap: offer, under a newer session if
+    /// need be, and ask again.
+    Offer,
+    /// A daily cap is reached, the AI's `daily_games` or today's carousel
+    /// matches (`carousel_daily`): ask again after midnight UTC.
+    Tomorrow,
+    /// Not now: a person waits in the format, the AI or every partner has
+    /// no free slot, the carousel's live matches, `global_seats` or the hosts'
+    /// room are taken, or another request held a row. Ask again in a while.
+    Later,
 }
 
 /// An AI account's own settings, as its administrator set them.
@@ -218,6 +252,17 @@ pub enum Response {
         /// Every live match (reserved or playing), at most [`MAX_GAMES`]: more
         /// than `max_games` while an administrator has just lowered it.
         assignments: Vec<Assignment>,
+    },
+    /// The carousel made a match now: the account's seat in it, which
+    /// [`Self::Work`] lists from now on too. The opponent is an AI.
+    Seated {
+        /// The seat, as a person's assignment.
+        assignment: Assignment,
+    },
+    /// The carousel made no match now.
+    Unseated {
+        /// When asking again can help.
+        reason: Unseated,
     },
 }
 
@@ -502,6 +547,57 @@ mod tests {
                 serde_json::from_value::<v2::PublicProfile>(profile)
                     .unwrap_or_else(|e| panic!("{e}: {text}"));
             }
+        }
+    }
+
+    /// The carousel asks for a format alone and answers a seat or one of
+    /// four reasons; nothing else reads as either.
+    #[test]
+    fn the_carousel_asks_for_a_format_and_answers_a_seat_or_a_reason() {
+        let request: Request =
+            serde_json::from_str(r#"{"carousel":{"format":"highlander"}}"#).unwrap();
+        assert_eq!(
+            request,
+            Request::Carousel {
+                format: Format::Highlander
+            }
+        );
+        for wrong in [
+            r#"{"carousel":{}}"#,
+            r#"{"carousel":{"format":"standard","partner":"x"}}"#,
+            r#"{"carousel":{"format":"vintage"}}"#,
+        ] {
+            assert!(serde_json::from_str::<Request>(wrong).is_err(), "{wrong}");
+        }
+        let reasons = [
+            Unseated::Off,
+            Unseated::Offer,
+            Unseated::Tomorrow,
+            Unseated::Later,
+        ];
+        let replies = reasons
+            .map(|reason| Response::Unseated { reason })
+            .into_iter()
+            .chain([Response::Seated {
+                assignment: assignment(),
+            }]);
+        for reply in replies {
+            let text = serde_json::to_string(&reply).unwrap();
+            assert_eq!(serde_json::from_str::<Response>(&text).unwrap(), reply);
+        }
+        assert_eq!(
+            serde_json::to_string(&Response::Unseated {
+                reason: Unseated::Later
+            })
+            .unwrap(),
+            r#"{"unseated":{"reason":"later"}}"#
+        );
+        // A reason this build does not know is refused, never read as another.
+        for wrong in [
+            r#"{"unseated":{"reason":"people"}}"#,
+            r#"{"unseated":{"reason":"later","who":1}}"#,
+        ] {
+            assert!(serde_json::from_str::<Response>(wrong).is_err(), "{wrong}");
         }
     }
 

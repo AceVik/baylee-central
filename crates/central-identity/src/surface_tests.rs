@@ -354,6 +354,11 @@ fn an_ai_session_plays_its_seats_and_nothing_else() {
         ranked(ranked::Request::Ai {
             request: ranked::ai::Request::Offer { offers: vec![] },
         }),
+        ranked(ranked::Request::Ai {
+            request: ranked::ai::Request::Carousel {
+                format: ranked::Format::Standard,
+            },
+        }),
         seat(replica::SeatRequest::Status { match_id: ID }),
         seat(replica::SeatRequest::Hosts { match_id: ID }),
         seat(replica::SeatRequest::Participants { match_id: ID }),
@@ -414,4 +419,16 @@ fn an_ai_session_plays_its_seats_and_nothing_else() {
     for request in services() {
         assert_eq!(ForAi::of(&request), ForAi::NoSession, "{}", name(&request));
     }
+    // What makes a match or stands for one waits for the terms, as a
+    // person's Join does; the work is read without them.
+    let ai = |request| ranked(ranked::Request::Ai { request });
+    for request in [
+        ranked::ai::Request::Offer { offers: vec![] },
+        ranked::ai::Request::Carousel {
+            format: ranked::Format::Commander,
+        },
+    ] {
+        assert!(terms::needs_acceptance(&ai(request.clone())), "{request:?}");
+    }
+    assert!(!terms::needs_acceptance(&ai(ranked::ai::Request::Work)));
 }

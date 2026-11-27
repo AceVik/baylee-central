@@ -1,6 +1,7 @@
 //! An AI runner's operations on its account's native session
-//! (`docs/ai-players.md` section 4): standing offers and its live matches.
-use super::{Error, api, column, statement, unavailable};
+//! (`docs/ai-players.md` sections 4 and 7): standing offers, its live
+//! matches, and a match against another AI.
+use super::{Error, api, carousel, column, statement, unavailable};
 use crate::accounts::ai::{LIVE, badge};
 use api::ai::{AiBadge, AiKind, MAX_GAMES, MAX_OFFERS, Offer, Request, Response, Settings};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
@@ -8,14 +9,19 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 /// How long an offer stands without renewal.
 const OFFER_SECONDS: f64 = 45.0;
 
+/// The columns of a match an assignment is read from.
+const SEAT: &str = "m.id, m.host_id, m.origin, m.format, m.account_a, m.account_b,
+    m.commitment_a, m.commitment_b, m.game_id";
+
 pub(super) async fn handle(
     db: &DatabaseTransaction,
     me: Uuid,
     session: [u8; 32],
     request: &Request,
 ) -> Result<Response, Error> {
-    // Only an offer locks the AI's row, so that a switch-off waits for it
-    // and then withdraws what it stored; the work reads it as it stands.
+    // Only an offer locks the AI's row here, so that a switch-off waits for
+    // it and then withdraws what it stored; the work reads it as it stands,
+    // and the carousel locks it later, after the settings, as fill-in does.
     let row = db
         .query_one_raw(statement(
             if matches!(request, Request::Offer { .. }) {
@@ -33,6 +39,12 @@ pub(super) async fn handle(
     match request {
         Request::Offer { offers } => offer(db, me, session, column(&row, "enabled")?, offers).await,
         Request::Work => work(db, me, &row).await,
+        Request::Carousel { format } => match carousel::seat(db, me, *format).await? {
+            Ok(matched) => Ok(Response::Seated {
+                assignment: seated(db, me, matched).await?,
+            }),
+            Err(reason) => Ok(Response::Unseated { reason }),
+        },
     }
 }
 
@@ -102,9 +114,7 @@ async fn work(db: &DatabaseTransaction, me: Uuid, row: &QueryResult) -> Result<R
     let rows = db
         .query_all_raw(statement(
             &format!(
-                "SELECT m.id, m.host_id, m.origin, m.format, m.account_a, m.account_b,
-                   m.commitment_a, m.commitment_b, m.game_id
-                 FROM central_identity.ranked_matches m
+                "SELECT {SEAT} FROM central_identity.ranked_matches m
                  WHERE $1 IN (m.account_a, m.account_b) AND {LIVE}
                  ORDER BY m.created_at, m.id LIMIT $2"
             ),
@@ -114,31 +124,57 @@ async fn work(db: &DatabaseTransaction, me: Uuid, row: &QueryResult) -> Result<R
         .map_err(unavailable)?;
     let mut assignments = Vec::with_capacity(rows.len());
     for row in rows {
-        let first: Uuid = column(&row, "account_a")?;
-        let seat = u8::from(first != me);
-        let (other, deck) = if seat == 0 {
-            ("account_b", "commitment_a")
-        } else {
-            ("account_a", "commitment_b")
-        };
-        assignments.push(api::Assignment {
-            match_id: column::<Uuid>(&row, "id")?.into_bytes(),
-            host_id: column::<Uuid>(&row, "host_id")?.into_bytes(),
-            origin: column(&row, "origin")?,
-            format: column::<String>(&row, "format")?
-                .parse()
-                .map_err(unavailable)?,
-            account: me.into_bytes(),
-            seat,
-            deck: column::<Vec<u8>>(&row, deck)?
-                .try_into()
-                .map_err(unavailable)?,
-            game: column::<Option<Uuid>>(&row, "game_id")?.map(Uuid::into_bytes),
-            opponent_ai: badge(db, column(&row, other)?).await?,
-        });
+        assignments.push(assignment(db, me, &row).await?);
     }
     Ok(Response::Work {
         settings,
         assignments,
+    })
+}
+
+/// The account's seat in the match the carousel has just made.
+async fn seated(
+    db: &DatabaseTransaction,
+    me: Uuid,
+    matched: Uuid,
+) -> Result<api::Assignment, Error> {
+    let row = db
+        .query_one_raw(statement(
+            &format!("SELECT {SEAT} FROM central_identity.ranked_matches m WHERE m.id = $1"),
+            vec![matched.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Unavailable)?;
+    assignment(db, me, &row).await
+}
+
+/// The account's seat in a match read with [`SEAT`], as a person's assignment.
+async fn assignment(
+    db: &DatabaseTransaction,
+    me: Uuid,
+    row: &QueryResult,
+) -> Result<api::Assignment, Error> {
+    let first: Uuid = column(row, "account_a")?;
+    let seat = u8::from(first != me);
+    let (other, deck) = if seat == 0 {
+        ("account_b", "commitment_a")
+    } else {
+        ("account_a", "commitment_b")
+    };
+    Ok(api::Assignment {
+        match_id: column::<Uuid>(row, "id")?.into_bytes(),
+        host_id: column::<Uuid>(row, "host_id")?.into_bytes(),
+        origin: column(row, "origin")?,
+        format: column::<String>(row, "format")?
+            .parse()
+            .map_err(unavailable)?,
+        account: me.into_bytes(),
+        seat,
+        deck: column::<Vec<u8>>(row, deck)?
+            .try_into()
+            .map_err(unavailable)?,
+        game: column::<Option<Uuid>>(row, "game_id")?.map(Uuid::into_bytes),
+        opponent_ai: badge(db, column(row, other)?).await?,
     })
 }

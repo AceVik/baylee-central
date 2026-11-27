@@ -88,6 +88,7 @@ pub(super) fn needs_acceptance(request: &Request) -> bool {
             | Request::Advent { .. }
             | Request::Ranked { request: central_api::ranked::Request::Ai {
                 request: central_api::ranked::ai::Request::Offer { .. }
+                    | central_api::ranked::ai::Request::Carousel { .. }
             } | central_api::ranked::Request::Join { .. } | central_api::ranked::Request::Replicate {
                 request: central_api::ranked::replica::SeatRequest::Join { .. }
                     | central_api::ranked::replica::SeatRequest::ApproveHosts { .. }

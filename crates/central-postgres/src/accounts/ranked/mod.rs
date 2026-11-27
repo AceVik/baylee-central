@@ -7,6 +7,7 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, TransactionTrai
 
 mod ai;
 pub(super) mod boards;
+mod carousel;
 mod credentials;
 mod export;
 mod fill_in;
@@ -110,9 +111,10 @@ impl AccountStore {
                 let Some(session @ Session::Native(_)) = session else {
                     return Err(Error::Rejected);
                 };
-                // An offer writes under the session; the work only reads.
-                let offer = matches!(request, api::ai::Request::Offer { .. });
-                let me = actor(&db, session, offer).await?;
+                // An offer writes under the session and the carousel writes a
+                // match; the work only reads.
+                let write = !matches!(request, api::ai::Request::Work);
+                let me = actor(&db, session, write).await?;
                 api::Response::Ai {
                     response: ai::handle(&db, me, session.digest(), &request).await?,
                 }

@@ -104,10 +104,12 @@ fn responds(request: &api::Request, reply: &api::Response, owner: Option<api::Id
     }
 }
 
-/// An AI runner's answer fits its question: offers answered as offers, and
+/// An AI runner's answer fits its question: offers answered as offers;
 /// work only for this account's own seats, at most [`api::ai::MAX_GAMES`] of
 /// them: an administrator who lowers `max_games` below the live matches
-/// does not shorten the list, whose matches still have to be played.
+/// does not shorten the list, whose matches still have to be played; and a
+/// carousel seat only this account's, in the format asked for and against
+/// an AI.
 fn ai_responds(
     request: &api::ai::Request,
     reply: &api::ai::Response,
@@ -123,6 +125,13 @@ fn ai_responds(
                     .iter()
                     .all(|a| Some(a.account) == owner && a.seat < 2)
         }
+        (Q::Carousel { format }, A::Seated { assignment }) => {
+            owner == Some(assignment.account)
+                && assignment.seat < 2
+                && assignment.format == *format
+                && assignment.opponent_ai.is_some()
+        }
+        (Q::Carousel { .. }, A::Unseated { .. }) => true,
         _ => false,
     }
 }
@@ -151,6 +160,28 @@ impl Session {
             return Err(Error::Rejected);
         };
         Ok(response)
+    }
+
+    /// Ask the carousel for a match between this AI account and another AI
+    /// in `format` now (`docs/ai-players.md` section 7): its seat in the
+    /// match made, which [`Self::ai`]'s work lists from now on too, or why
+    /// none was made, which says when asking again can help.
+    ///
+    /// # Errors
+    /// Rejects foreign endpoints, a person's account and mismatched replies,
+    /// a seat against a person among them.
+    pub fn ai_carousel(
+        &self,
+        transport: &impl Transport,
+        format: api::Format,
+    ) -> Result<Result<api::Assignment, api::ai::Unseated>, Error> {
+        match self.ai(transport, api::ai::Request::Carousel { format })? {
+            api::ai::Response::Seated { assignment } => Ok(Ok(assignment)),
+            api::ai::Response::Unseated { reason } => Ok(Err(reason)),
+            api::ai::Response::Offered { .. } | api::ai::Response::Work { .. } => {
+                Err(Error::Rejected)
+            }
+        }
     }
 
     /// Preview the explicitly selected pool in this account's private deck history.
@@ -281,5 +312,80 @@ mod tests {
         ));
         assert!(!responds(&request, &work(2), Some([9; 16])));
         assert!(!responds(&request, &work(2), None));
+    }
+
+    /// A carousel seat is this account's, in the format it asked for, and
+    /// against an AI; a reason is read as it comes; the carousel's answers
+    /// answer no other request.
+    #[test]
+    fn a_carousel_seat_is_the_account_s_own_against_an_ai() {
+        let owner = [1; 16];
+        let assignment = api::Assignment {
+            match_id: [7; 16],
+            host_id: [2; 16],
+            origin: "https://play.example".into(),
+            format: api::Format::Highlander,
+            account: owner,
+            seat: 1,
+            deck: [3; 32],
+            game: None,
+            opponent_ai: Some(api::ai::AiBadge {
+                kind: api::ai::AiKind::Net,
+                label: "Netz".into(),
+            }),
+        };
+        let request = api::Request::Ai {
+            request: api::ai::Request::Carousel {
+                format: api::Format::Highlander,
+            },
+        };
+        let seated = |assignment: api::Assignment| api::Response::Ai {
+            response: api::ai::Response::Seated { assignment },
+        };
+        assert!(responds(&request, &seated(assignment.clone()), Some(owner)));
+        for wrong in [
+            api::Assignment {
+                account: [9; 16],
+                ..assignment.clone()
+            },
+            api::Assignment {
+                seat: 2,
+                ..assignment.clone()
+            },
+            api::Assignment {
+                format: api::Format::Standard,
+                ..assignment.clone()
+            },
+            api::Assignment {
+                opponent_ai: None,
+                ..assignment.clone()
+            },
+        ] {
+            assert!(!responds(&request, &seated(wrong), Some(owner)));
+        }
+        assert!(!responds(&request, &seated(assignment.clone()), None));
+        for reason in [
+            api::ai::Unseated::Off,
+            api::ai::Unseated::Offer,
+            api::ai::Unseated::Tomorrow,
+            api::ai::Unseated::Later,
+        ] {
+            let reply = api::Response::Ai {
+                response: api::ai::Response::Unseated { reason },
+            };
+            assert!(responds(&request, &reply, Some(owner)));
+            let work = api::Request::Ai {
+                request: api::ai::Request::Work,
+            };
+            assert!(!responds(&work, &reply, Some(owner)));
+        }
+        let offered = api::Response::Ai {
+            response: api::ai::Response::Offered { until: None },
+        };
+        assert!(!responds(&request, &offered, Some(owner)));
+        let work = api::Request::Ai {
+            request: api::ai::Request::Work,
+        };
+        assert!(!responds(&work, &seated(assignment), Some(owner)));
     }
 }

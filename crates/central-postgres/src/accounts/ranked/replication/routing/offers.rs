@@ -125,6 +125,37 @@ pub(in crate::accounts::ranked) async fn allocate(
     }
 }
 
+/// The hosts that could take one more match with an AI seat and still keep
+/// `$1` slots, offering a compatibility digest when `compatible`.
+fn room(compatible: bool) -> String {
+    format!(
+        "{OFFERS} AND h.capacity - load.games > $1{}",
+        if compatible {
+            " AND h.compatibility IS NOT NULL"
+        } else {
+            ""
+        }
+    )
+}
+
+/// Whether some host could take a match with an AI seat and keep `reserve`
+/// slots, read without a lock: a cheap check before the AIs' locks are
+/// taken, which [`allocate_single`] makes again under the host's.
+pub(in crate::accounts::ranked) async fn room_single(
+    db: &DatabaseTransaction,
+    compatible: bool,
+    reserve: i16,
+) -> Result<bool, Error> {
+    Ok(db
+        .query_one_raw(statement(
+            &format!("{} LIMIT 1", room(compatible)),
+            vec![reserve.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .is_some())
+}
+
 /// One host for a match with an AI seat, never a pair (`docs/ai-players.md`
 /// section 3): it must keep `reserve` slots free for people after this match,
 /// and offer a compatibility digest when the person's ticket is `replicable`.
@@ -134,14 +165,7 @@ pub(in crate::accounts::ranked) async fn allocate_single(
     compatible: bool,
     reserve: i16,
 ) -> Result<Option<Host>, Error> {
-    let room = format!(
-        "{OFFERS} AND h.capacity - load.games > $1{}",
-        if compatible {
-            " AND h.compatibility IS NOT NULL"
-        } else {
-            ""
-        }
-    );
+    let room = room(compatible);
     let Some(first) = db
         .query_one_raw(statement(
             &format!("{room} ORDER BY {ORDER} LIMIT 1"),
