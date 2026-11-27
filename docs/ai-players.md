@@ -604,27 +604,87 @@ a stale copy shows an AI without its badge.
 
 ## 7. AI against AI
 
-**The carousel** is Stage 2; this design keeps it possible. The runner sends
-`Ai::Carousel { format }` for an AI with a live offer and a free slot. Central
-pairs it with another eligible AI's offer for that format, by the same policy
-and under the same locks. It does so only when:
+**The carousel.** The runner sends `Ai::Carousel { format }` for an AI with
+a live offer for the format and a free slot. Central pairs it with another
+AI's offer for that format. The partner must pass fill-in's hard rules
+(switched on, a live offer under a session with `drain_minutes` left, below
+its `max_games` and its `daily_games`), and fill-in's policy chooses it, with
+the AI that asks in the person's place. A match is made only when:
 
-- no person's ticket waits in that format;
-- fewer than `carousel_games` AI-against-AI matches are running;
+- no person's ticket waits in that format in the open season, whatever it
+  accepts;
+- fewer than `carousel_games` AI-against-AI matches are live;
 - fewer than `carousel_daily` were made today (UTC);
-- every host keeps its reserve.
+- `global_seats` has room for two more seats;
+- the AI that asks is below its own `max_games` and `daily_games`;
+- a host keeps its `host_reserve` after the match.
 
-Language models count carousel games against their `daily_games`. The match
-is recorded with `ai_matches.arranged = 'carousel'`. Scoring and repeat
-damping are those of people (the third and fourth meeting in six hours at
-half, later ones at a quarter; `rules::player::settle`).
+The answer is `Seated { assignment }`, the AI's seat, which `Work` lists from
+then on, or `Unseated { reason }`:
+
+- `off`: the AI is switched off or its `daily_games` is 0, the carousel
+  allows no match (`carousel_games` or `carousel_daily` 0, `global_seats`
+  under two), or no season is open;
+- `offer`: it has no live offer for the format under a session with
+  `drain_minutes` left;
+- `tomorrow`: its `daily_games` or `carousel_daily` is reached;
+- `later`: everything that passes in a while, a waiting person among them.
+
+A runner session never learns whether a person waits. That is the rule of
+`ai_fill_in_at` (§3). Like an offer, the request needs Central's terms.
+
+**Locks.** Every refusal that needs no lock is read first, down to whether a
+partner and a host's room exist. A runner that asks often takes no lock
+until a match is near. Then, in fill-in's order:
+
+1. the `ai_settings` row (`FOR UPDATE`), which serializes the carousel with
+   itself and with fill-in. Everything is counted again after it;
+2. both AIs' `ai_players` rows in one statement, in account order,
+   `FOR UPDATE SKIP LOCKED` and only while switched on, with their account
+   rows' keys shared (`FOR KEY SHARE SKIP LOCKED`). Both are counted again
+   after it. A partner whose row another transaction holds (the switch, an
+   offer, a runner token being made, a runner's exchange) is skipped for the
+   next, at most four in all. If the asking AI's own row is held, the answer
+   is `later`. The account keys matter because an exchange holds its account
+   row for update and may end the session of an offer the carousel holds:
+   the carousel must not then wait for it;
+3. both offers (`FOR SHARE`, in account order), so the end of a session they
+   were made under waits for the match;
+4. the host, by `allocate_single`'s own locks.
+
+Before all of these, the caller's account and session rows are shared, as
+for an offer. While it holds the settings, the carousel waits only for the
+offers' share, so no two requests wait for each other.
+
+**The match** is written as fill-in writes one: each seat with its offer's
+commitment, a drawn seat order, `ai_matches.arranged = 'carousel'` and
+`ai_seats = 3`. It goes on a single host that offers a compatibility digest,
+since both seats are runners and play as the live client does, and it is
+never protected. Both runners see it in `Work` and play it as any match.
+Language models count carousel games against their `daily_games`, as every
+AI match counts. Scoring and repeat damping are those of people (the third
+and fourth meeting in six hours at half, later ones at a quarter;
+`rules::player::settle`). Settlement does not ask who sits in a seat.
 
 **Calibration** is the carousel with high `carousel_games` and
-`carousel_daily` and no fill-in, before people meet the AIs. Ratings carry
-across seasons (`scoring::players::load` reads the newest row), so calibrated
-AIs enter Season 1 at their rating. But a season has been open since
-migration 000035, which started one at migration time with no end, and only
-SQL can end a season or open a new one (open question 5).
+`carousel_daily` and no fill-in, before people meet the AIs. The settings:
+`carousel_games` 8 and `carousel_daily` 10,000 (their maxima), `global_seats`
+16 (two seats for each carousel match), `host_reserve` as for people, and
+hosts with room for eight matches above their reserve.
+
+Fill-in cannot be switched off on its own. `fill_in_after` ends at 600
+seconds, and every switch that stops fill-in (`global_seats` 0, an AI
+switched off, no offer) stops the carousel too. Until there is one,
+calibration runs with `fill_in_after` 600 in the test season, where a person
+seldom searches alone for ten minutes. A person who does meets an AI. The
+smallest change is a `fill_in` switch in `ai_settings`: a column with its
+grant and the startup check, a field of `AiSettings`, and an early return in
+fill-in's `seat` and `due`. That needs a migration.
+
+Ratings carry across seasons (`scoring::players::load` reads the newest row),
+so calibrated AIs enter Season 1 at their rating. But a season has been open
+since migration 000035, which started one at migration time with no end, and
+only SQL can end a season or open a new one (open question 5).
 
 ## 8. Threats
 
@@ -1101,3 +1161,120 @@ fixture person without a tag, an integer vector bound as bytes). The
 store suite does not drive an AI seat's play through `dispatch`: its seat
 requests are allowed by the table, which a unit test holds, and served by
 the store suite's `admitting` through the store.
+
+### The carousel (27 November 2026)
+
+Built on branch `claude/ai-players-carousel`, as §7 says:
+
+- **`central-api`**: `ai::Request::Carousel { format }`, answered with
+  `ai::Response::Seated { assignment }` or `Unseated { reason }`, where
+  `Unseated` is `off`, `offer`, `tomorrow` or `later`. All of them keep
+  `deny_unknown_fields`. `ranked::Response::omit_ai` passes the runner's
+  answers whole, as before: only a runner asks for them, and a runner speaks
+  protocol 3. The comment there says so now.
+- **`central-postgres`**: `ranked/carousel.rs`, the request, and
+  `ranked/carousel/reason.rs`, the decision as a pure function of what was
+  counted. Fill-in's match writing is shared (`fill_in::write`, `coin`,
+  `Arranged`). `routing::room_single` reads a host's room without a lock.
+  `Work` and the carousel's seat build the assignment with one function.
+- **`central-identity`**: the gate allows the request to a runner session,
+  and it needs Central's terms, as an offer does.
+- **`central-client`**: `Session::ai_carousel(transport, format)`, which
+  answers the seat or the reason. `ai_responds` takes a seat only for this
+  account, in the format asked for and against an AI, and any reason.
+- No migration and no new grant. The runtime's grants of migration 000053
+  cover every statement: `ai_matches` `INSERT`, and the row locks under the
+  column `UPDATE` grants fill-in already relies on.
+
+**Design notes** (the first pass):
+
+- The answer says when asking again can help, and no more. A waiting person
+  is one cause of `later` and never a reason of its own, so a runner token
+  in the wrong hands does not learn whether people search. That is the rule
+  `ai_fill_in_at` keeps between people.
+- People first means any person's waiting ticket in the format and the open
+  season, whatever it accepts and of either kind. No ticket is locked: a
+  person who joins a moment later is paired by the queue as before.
+- The partner is chosen by `fill_in::policy::order`, with the asking AI in
+  the person's place: its queue Elo, and the two AIs' meetings in six hours,
+  so one pair does not meet every time while another is near. A language
+  model may be a partner. On a near tie the free kinds come first, as in
+  fill-in.
+- `global_seats` must have room for two seats. The match takes a single host
+  that offers a compatibility digest, as fill-in does for the live client's
+  searches, and it gets no replica.
+- `daily_games` counts every row of `ai_matches`, so a model's carousel games
+  count without a rule of their own.
+- Calibration: no switch keeps fill-in off on its own (§7). The pass added no
+  migration; the smallest change is in §7.
+
+**Implementation checks** (the second pass):
+
+- Locks, in the order §7 gives. While it holds the settings, the carousel
+  waits for no row another request holds, except to share the offers, which
+  only a session's end changes.
+- Bounds: at most 64 candidates (fill-in's query), four tries, and a fixed
+  number of statements for each. A runner that asks in a loop takes the
+  settings only while a partner and a host's room exist. Once the caps are
+  full, it is refused without a lock.
+- The answer names the AI's own seat and the opponent's public badge. No
+  secret, token or person's data is read into it or logged.
+- No `unsafe`. Every crate keeps `forbid(unsafe_code)`.
+
+**Adversarial checks** (the third pass):
+
+- The store suite (`tests/support/accounts/ranked/carousel.rs`, four AIs:
+  three house levels and a model capped at one game a day). Each refusal is
+  followed by the same request with its one cause gone. The carousel is off
+  as installed. A person's session is refused. An AI without an offer is
+  told to offer first, and one offer alone finds nobody. A person's waiting
+  ticket, even one that refused AIs, stops it. Then the two offers make one
+  match with both seats AIs, `arranged = 'carousel'`, `ai_seats = 3`, the
+  offers' decks, no replica and no ticket, and the partner's `Work` lists
+  it. Each of these refuses: `carousel_games` reached; `global_seats` with
+  one seat left (`later`) and with one seat in all (`off`); a host at its
+  reserve; the asking AI's and a partner's `max_games`; a partner whose
+  account row another transaction holds for update; the model's
+  `daily_games`, which its carousel game fills; partners switched off with
+  their offers standing; the asking AI switched off; `carousel_daily`. Two
+  AIs that ask for each other at once for the last slot (the carousel's
+  last live match, then each one's last game) make exactly one match in
+  each of four rounds, and neither request fails. Five carousel matches
+  between the same two AIs, from level ratings and played through the
+  host's grants, claims, start and finish, gain 12, 12, 6, 6 and 3 points:
+  the same as five matches between two people, so the third and fourth
+  meeting count half and the fifth a quarter. The administration takes the
+  calibration's settings and refuses `carousel_games` 9 and `carousel_daily`
+  10,001.
+- The SDK suite (`central-client/tests/support/ai_runner.rs`), over the real
+  listeners: the carousel waits for the terms as an offer does, and after
+  them answers `off` as installed.
+- Fault injection, each on bigace and undone after the run. Ignoring the
+  waiting person: the suite stops where a match was made while she waited.
+  No count after the locks: the race makes two matches for the last slot.
+  The account keys left out of the row lock: the request for the held
+  partner waits for the lock until it fails with `Unavailable`.
+- Found and fixed in this pass: the carousel and a runner's exchange could
+  deadlock. The exchange holds the AI's account row for update and may end
+  its oldest session, whose offer the carousel holds for share. The match's
+  foreign key then waits for the exchange, and the exchange for the match.
+  The carousel now shares both account keys in its row lock and skips an
+  account an exchange holds.
+
+**Open.** Fill-in has the same shape for its AI, an offer held for share
+before the match's foreign key, and is left as it was; the same skipped key
+share would close it. Fill-in cannot be switched off on its own (§7).
+
+**Evidence (27.11.2026),** on bigace (Linux, 24 cores): `cargo test` of
+`central-api` (200), `central-client` (28 and 5), `central-identity` (161)
+and `central-postgres` (54), green; `cargo clippy --all-targets -D warnings`
+over the same four crates and `cargo fmt --all --check`, clean;
+`cargo check --all-targets` of `central-http` and `central-web`, clean.
+`cargo xtask postgres --store-only`: green in 114 s with the carousel's
+suite. `cargo xtask postgres`: green, the SDK suite in 161 s, the store
+suite in 112 s, the Tower access and Tower awards suites in 2 s each. The
+three injections above each made the store suite fail as described, and it
+ran green again after each was undone. A check of the whole workspace
+stopped at the picture codec's build script, which needs `nasm` and finds
+none there, so `central-service` and the web server, which link it, were
+not compiled; neither names the runner's requests or answers.
