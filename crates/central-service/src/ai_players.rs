@@ -8,15 +8,19 @@
 //!
 //! Standard output carries a new token's text and nothing else, exactly
 //! once, after the plan committed; or, for a listing, the listing. What was
-//! done goes to standard error, without a secret.
+//! done goes to standard error, without a secret, and so does what is wrong
+//! with a plan: every fault at once, each in its place
+//! (`players[3].display_name "KI-DeepSeek-Flash": 17 characters, at most
+//! 16`), found before the database is asked where the plan alone shows it,
+//! and never a word of the login.
 use super::production::{Database, parse, read_settings};
 use central_api::Token;
 use central_api::admin::AiPlayerSettings;
 use central_api::ai_runner::{AiRunnerTokenInfo, token_text};
 use central_api::ranked::ai::AiKind;
 use central_postgres::{
-    AiApplied, AiPlan, AiPlayerPlan, AiSettingsPlan, PlayerOutcome, RunnerTokenPlan,
-    ai_runner_tokens, apply_ai_plan, connect_server,
+    AiApplied, AiPlan, AiPlayerPlan, AiSettingsPlan, PlanFault, PlayerOutcome, RunnerTokenPlan,
+    ai_runner_tokens, apply_ai_plan, connect_server, plan_faults,
 };
 use serde::Deserialize;
 use std::process::ExitCode;
@@ -126,16 +130,53 @@ fn uuid_bytes(text: &str) -> Result<[u8; 16], ()> {
     Ok(id)
 }
 
-/// The plan the input asks for; a listing beside anything else, and a
-/// token id that is none, are refused.
-fn plan(input: &Input) -> Result<AiPlan, ()> {
+/// What the operator asks, whichever way the input was read.
+struct Parts<'a> {
+    players: &'a [Player],
+    settings: Option<&'a Settings>,
+    revoke: &'a [String],
+    token: Option<&'a NewToken>,
+    list: bool,
+}
+
+impl Input {
+    fn parts(&self) -> Parts<'_> {
+        Parts {
+            players: &self.players,
+            settings: self.settings.as_ref(),
+            revoke: &self.revoke,
+            token: self.token.as_ref(),
+            list: self.list,
+        }
+    }
+}
+
+/// The plan the input asks for, or every fault of its shape: a listing
+/// beside anything else, nothing asked, a token id that is none.
+fn plan(input: &Parts<'_>) -> Result<AiPlan, Vec<String>> {
     let changes = !input.players.is_empty()
         || input.settings.is_some()
         || !input.revoke.is_empty()
         || input.token.is_some();
-    if input.list == changes {
-        // a listing alone, or changes alone; neither is no request
-        return Err(());
+    let mut wrong = Vec::new();
+    if input.list && changes {
+        wrong.push(
+            "list: a listing goes alone, without players, settings, revoke or token".to_owned(),
+        );
+    } else if !input.list && !changes {
+        wrong.push("nothing asked: give players, settings, revoke, token, or list".to_owned());
+    }
+    let mut revoke = Vec::with_capacity(input.revoke.len());
+    for (index, text) in input.revoke.iter().enumerate() {
+        match uuid_bytes(text) {
+            Ok(id) => revoke.push(id),
+            Err(()) => wrong.push(format!(
+                "revoke[{index}] {text:?}: a runner token's id, such as 0192f0c4-7b1a-7cde-8f00-000000000001"
+            )),
+        }
+    }
+    if !wrong.is_empty() {
+        return Err(wrong);
     }
     Ok(AiPlan {
         players: input
@@ -154,7 +195,7 @@ fn plan(input: &Input) -> Result<AiPlan, ()> {
                 enabled: player.enabled,
             })
             .collect(),
-        settings: input.settings.as_ref().map(|settings| AiSettingsPlan {
+        settings: input.settings.map(|settings| AiSettingsPlan {
             fill_in: settings.fill_in,
             fill_in_after: settings.fill_in_after,
             drain_minutes: settings.drain_minutes,
@@ -163,17 +204,80 @@ fn plan(input: &Input) -> Result<AiPlan, ()> {
             carousel_games: settings.carousel_games,
             carousel_daily: settings.carousel_daily,
         }),
-        revoke: input
-            .revoke
-            .iter()
-            .map(|id| uuid_bytes(id))
-            .collect::<Result<_, _>>()?,
-        token: input.token.as_ref().map(|token| RunnerTokenPlan {
+        revoke,
+        token: input.token.map(|token| RunnerTokenPlan {
             name: token.name.clone(),
             accounts: token.accounts.clone(),
             days: token.days,
         }),
     })
+}
+
+/// The plan of `parts`, or every fault it has before the database is
+/// asked: its shape's ([`plan`]) and then its fields' (`plan_faults`). The
+/// command makes a token's secret exactly when the plan makes a token.
+fn checked(parts: &Parts<'_>) -> Result<AiPlan, Vec<String>> {
+    let plan = plan(parts)?;
+    let faults = plan_faults(&plan, plan.token.is_some());
+    if faults.is_empty() {
+        Ok(plan)
+    } else {
+        Err(faults)
+    }
+}
+
+/// The input's shape without the login: read when [`Input`] could not be,
+/// to say what is wrong without quoting the login. Its `database` is read
+/// past unseen, so no word of it reaches a message.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Shape {
+    #[serde(default)]
+    database: Option<serde::de::IgnoredAny>,
+    #[serde(default)]
+    players: Vec<Player>,
+    #[serde(default)]
+    settings: Option<Settings>,
+    #[serde(default)]
+    revoke: Vec<String>,
+    #[serde(default)]
+    token: Option<NewToken>,
+    #[serde(default)]
+    list: bool,
+}
+
+/// Why `bytes` is no input, every fault at once, for standard error: the
+/// parser's words on the plan's part, or that the login is missing or is
+/// none with every fault of the plan beside it; never what the login holds.
+fn unread(bytes: &[u8]) -> Vec<String> {
+    let shape = match serde_json::from_slice::<Shape>(bytes) {
+        Ok(shape) => shape,
+        Err(error) => return vec![format!("the input: {error}")],
+    };
+    let login = if shape.database.is_some() {
+        "database: the migrator login, with host, port, name, user, password and ca_certificate, and nothing else"
+    } else {
+        "database: missing; the migrator login comes in it"
+    };
+    let parts = Parts {
+        players: &shape.players,
+        settings: shape.settings.as_ref(),
+        revoke: &shape.revoke,
+        token: shape.token.as_ref(),
+        list: shape.list,
+    };
+    let mut wrong = vec![login.to_owned()];
+    if let Err(faults) = checked(&parts) {
+        wrong.extend(faults);
+    }
+    wrong
+}
+
+/// Each fault on its own line of standard error, before the refusal.
+fn say(faults: &[String]) {
+    for fault in faults {
+        eprintln!("central: {fault}");
+    }
 }
 
 /// What the plan did, for standard error: names, tags, ids and counts.
@@ -256,36 +360,49 @@ pub(super) async fn run() -> ExitCode {
 }
 
 async fn apply() -> Result<(), ()> {
-    let bytes = read_settings()?;
-    let mut input: Input = parse(&bytes)?;
+    let Ok(bytes) = read_settings() else {
+        say(&["the input could not be read, or is larger than the launcher takes".to_owned()]);
+        return Err(());
+    };
+    let Ok(mut input) = parse::<Input>(&bytes) else {
+        say(&unread(&bytes));
+        return Err(());
+    };
     drop(bytes);
-    let plan = plan(&input)?;
-    let database = input.database.server()?;
+    // Every fault the plan has on its own, all at once, before the database.
+    let plan = checked(&input.parts()).map_err(|faults| say(&faults))?;
+    let Ok(database) = input.database.server() else {
+        say(&["database: the login is not one this command can use (host, port, name, user, password, ca_certificate)".to_owned()]);
+        return Err(());
+    };
     let list = input.list;
     drop(input);
-    let db = connect_server(database).await.map_err(|_| ())?;
+    let Ok(db) = connect_server(database).await else {
+        say(&["database: could not connect with that login".to_owned()]);
+        return Err(());
+    };
     if list {
-        let tokens = ai_runner_tokens(&db).await.map_err(|_| ());
-        let closed = db.close().await.map_err(|_| ());
-        let tokens = tokens?;
-        closed?;
+        let tokens = ai_runner_tokens(&db).await;
+        let closed = db.close().await;
+        let Ok(tokens) = tokens else {
+            say(&["the database failed while listing".to_owned()]);
+            return Err(());
+        };
         for token in &tokens {
             println!("{}", listed(token));
         }
         eprintln!("central: {} runner tokens listed", tokens.len());
-        return Ok(());
+        return closed.map_err(|_| ());
     }
     let secret = plan
         .token
         .as_ref()
         .map(|_| Token::generate())
         .transpose()
-        .map_err(|_| ())?;
-    let applied = apply_ai_plan(&db, &plan, secret.as_ref())
-        .await
-        .map_err(|_| ());
+        .map_err(|_| say(&["no randomness for a token's secret".to_owned()]))?;
+    let applied = apply_ai_plan(&db, &plan, secret.as_ref()).await;
     let closed = db.close().await;
-    let applied = applied?;
+    let applied = applied.map_err(|fault: PlanFault| say(&fault.faults))?;
     report(&applied);
     // Committed: the token works now, so its text is shown, this once. A
     // connection that fails to close after the commit changes nothing of it.
@@ -310,26 +427,31 @@ mod tests {
 
     #[test]
     fn a_listing_goes_alone_and_something_is_asked() {
-        assert!(plan(&input(&format!(r#"{{{LOGIN},"list":true}}"#))).is_ok());
-        assert!(plan(&input(&format!(r"{{{LOGIN}}}"))).is_err());
+        let planned = |json: String| plan(&input(&json).parts());
+        assert!(planned(format!(r#"{{{LOGIN},"list":true}}"#)).is_ok());
+        assert_eq!(
+            planned(format!(r"{{{LOGIN}}}")).unwrap_err(),
+            ["nothing asked: give players, settings, revoke, token, or list"]
+        );
         assert!(
-            plan(&input(&format!(
+            planned(format!(
                 r#"{{{LOGIN},"list":true,"revoke":["0192f0c4-7b1a-7cde-8f00-000000000001"]}}"#
-            )))
+            ))
             .is_err()
         );
     }
 
     #[test]
     fn a_whole_plan_reads_as_its_parts() {
-        let read = plan(&input(&format!(
+        let read = checked(&input(&format!(
             r#"{{{LOGIN},
               "players":[{{"display_name":"KI-Haus-Expert","tag":6699,"kind":"house",
                 "profile":"house:expert","label":"Haus-KI · Expert","max_games":4,"enabled":true}}],
               "settings":{{"fill_in":false,"carousel_games":8,"carousel_daily":10000,"global_seats":16}},
               "revoke":["0192f0c47b1a7cde8f00000000000001"],
               "token":{{"name":"runner-1","accounts":["KI-Haus-Expert"]}}}}"#
-        )))
+        ))
+        .parts())
         .unwrap();
         assert_eq!(read.players.len(), 1);
         assert_eq!(read.players[0].tag, 6699);

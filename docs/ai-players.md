@@ -1498,3 +1498,21 @@ a renewal stays within them), renews none and mints none once the token has
 passed, and the social check's control asks a person for contact. On bigace
 at that tree, in a fresh build directory: `cargo xtask postgres` green (SDK
 155 s, store 110 s, Tower 2 s each).
+
+**The operator command's faults (27.11.2026),** after the dress rehearsal on
+acenb, where a display name of 17 characters refused a plan with no more
+than "rejected". The command now says every fault of a plan at once, each in
+its place (`players[3].display_name "KI-DeepSeek-Flash": 17 characters, at
+most 16`), before the database is asked, by the same rules the
+administration takes (`operator/faults.rs` `plan_faults`, a unit test holding
+it to `AiPlayerSettings::valid`, `AiSettings::valid` and `validate_new`);
+what only the database shows (a tag a person holds, a name under another
+tag, another mind, an unknown token account or id, a live token's name)
+names its place too (`PlanFault`). A login that is no login is said so and
+never quoted: the input is read a second time with the login read past
+unseen. The network-facing requests keep their one `Rejected`. Evidence on
+bigace: `central-postgres` (lib 58), `central-service` (51, the CLI's 9: a
+new test sends six faulty plans, a bad login and an empty input, and finds
+every fault once, the refusal last and no canary of the login), clippy and
+fmt clean, the store suite green (95 s; each refusal of the operator's
+suite names its place).

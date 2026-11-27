@@ -748,9 +748,26 @@ transaction, whole or not at all:
 
 What was done goes to standard error: each player's name, tag and outcome,
 the settings as written, each revocation with the number of sessions it
-ended, and the new token's id and expiry. A refusal is one line,
-`AI players rejected the input, found it ambiguous, or failed; nothing was
-changed`, and changes nothing.
+ended, and the new token's id and expiry. A refused plan changes nothing.
+The command names every fault first, one line each, each in its place, and
+ends with `AI players rejected the input, found it ambiguous, or failed;
+nothing was changed`:
+
+```text
+central: players[3].display_name "KI-DeepSeek-Flash": 17 characters, at most 16
+central: players[3].max_games 0: 1 to 16
+central: token.accounts[1] "Bob": not an AI player's name (KI-...)
+central: AI players rejected the input, found it ambiguous, or failed; nothing was changed
+```
+
+Everything the plan shows on its own (names, prefixes, tags, kinds,
+profiles, labels, limits, settings, the token's fields, ids, a repeated tag
+or name) is listed at once, before the database is asked. What only the
+database shows comes after: a tag a person or another AI holds, a name under
+another tag, another mind, a token account no AI player has, a live token
+of the same name, an unknown id to revoke. A login that is not one is said
+so, never quoted. These words are the operator command's alone; the
+network's requests keep their one refusal.
 
 `{"database": {…}, "list": true}` alone lists the runner tokens on standard
 output, one line each: id, name, accounts, expiry, last use, revocation,

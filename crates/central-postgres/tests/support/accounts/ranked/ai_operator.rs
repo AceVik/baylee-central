@@ -233,49 +233,62 @@ async fn clean(db: &DatabaseConnection, alpha: [u8; 16]) {
     .await;
 }
 
-/// Each ambiguous or wrong plan is refused whole: the new player it also
-/// asks for is not made, and nothing else changes.
+/// Each ambiguous or wrong plan is refused whole, saying what and where:
+/// the new player it also asks for is not made, and nothing else changes.
 async fn refusals(db: &DatabaseConnection, alpha: [u8; 16]) {
     let beta = || wanted("KI-Op-Beta", BETA, "Haus-KI · Expert");
     let mut other_profile = wanted("KI-Op-Alpha", ALPHA, "Haus-KI · Meister");
     other_profile.settings.profile = "house:novice".into();
     let secret = Token::generate().unwrap();
-    for (case, plan, token, refusal) in [
+    for (case, plan, token, refusal, said) in [
+        (
+            "a name too long, before the database is asked",
+            vec![beta(), wanted("KI-Op-Much-Too-Long", ALPHA + 9, "x")],
+            None,
+            Error::Rejected,
+            "players[1].display_name \"KI-Op-Much-Too-Long\": 19 characters, at most 16",
+        ),
         (
             "the tag under another name",
             vec![beta(), wanted("KI-Op-Gamma", ALPHA, "x")],
             None,
             Error::Conflict,
+            "the tag is AI player \"KI-Op-Alpha\"'s",
         ),
         (
             "the name under another tag",
             vec![beta(), wanted("KI-Op-Alpha", ALPHA + 7, "x")],
             None,
             Error::Conflict,
+            "an AI player of that name has the tag #7fff0a01",
         ),
         (
             "a person's tag",
             vec![beta(), wanted("KI-Op-Gamma", PERSON, "x")],
             None,
             Error::Conflict,
+            "players[1] \"KI-Op-Gamma\"#7fff0a03: the tag is a person's",
         ),
         (
             "another mind",
             vec![beta(), other_profile.clone()],
             None,
             Error::Conflict,
+            "it plays as house \"house:expert\"; a mind is fixed",
         ),
         (
             "a token for a name no AI holds",
             vec![beta()],
             Some(runner("op-runner-2", &["KI-Op-Nobody"])),
             Error::Rejected,
+            "token.accounts[0] \"KI-Op-Nobody\": no AI player has that name",
         ),
         (
             "a second live token of one name",
             vec![beta()],
             Some(runner("op-runner-1", &["KI-Op-Alpha"])),
             Error::Conflict,
+            "token.name \"op-runner-1\": a live token has that name",
         ),
     ] {
         let secret = token.is_some().then_some(&secret);
@@ -284,10 +297,12 @@ async fn refusals(db: &DatabaseConnection, alpha: [u8; 16]) {
             token,
             ..AiPlan::default()
         };
-        assert_eq!(
-            apply_ai_plan(db, &plan, secret).await.err(),
-            Some(refusal),
-            "{case}"
+        let fault = apply_ai_plan(db, &plan, secret).await.unwrap_err();
+        assert_eq!(fault.error, refusal, "{case}");
+        assert!(
+            fault.faults.iter().any(|f| f.contains(said)),
+            "{case}: {:?}",
+            fault.faults
         );
         assert_eq!(
             count(
@@ -306,9 +321,11 @@ async fn refusals(db: &DatabaseConnection, alpha: [u8; 16]) {
         revoke: vec![[9; 16]],
         ..AiPlan::default()
     };
-    assert_eq!(
-        apply_ai_plan(db, &unknown, None).await.err(),
-        Some(Error::Rejected)
+    let fault = apply_ai_plan(db, &unknown, None).await.unwrap_err();
+    assert_eq!(fault.error, Error::Rejected);
+    assert!(
+        fault.faults[0].ends_with(": no runner token has that id"),
+        "{fault:?}"
     );
     // The account stays as the last good plan left it.
     assert_eq!(label(db, alpha).await, "Haus-KI · Meister");

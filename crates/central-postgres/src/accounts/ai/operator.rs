@@ -16,14 +16,15 @@ use super::lifecycle::{change, create};
 use super::{get, settings, switch, unavailable, write_settings};
 use crate::accounts::ai_runner::{listed, make, revoke};
 use crate::accounts::{Error, Token, statement, uuid};
-use central_api::admin::{AI_PLAYERS, AiPlayerSettings, AiSettings};
-use central_api::ai_runner::{AiRunnerTokenInfo, LISTED_TOKENS, MAX_ACCOUNTS};
-use central_api::owner::{MAX_TOKEN_DAYS, token_name};
+use central_api::admin::{AiPlayerSettings, AiSettings};
+use central_api::ai_runner::{AiRunnerTokenInfo, LIVE_TOKENS, TOKENS_PER_DAY};
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, DatabaseTransaction, QueryResult, TransactionTrait,
     prelude::Uuid,
 };
-use std::collections::BTreeSet;
+
+mod faults;
+pub use faults::plan_faults;
 
 /// One AI player as the operator wants it. Its tag and display name name
 /// it: an AI with both is the one meant, and none with either is made.
@@ -133,38 +134,36 @@ pub struct AiApplied {
     pub token: Option<([u8; 16], i64)>,
 }
 
-/// The plan's own consistency, before anything is asked: settings in their
-/// bounds, distinct tags and names, at most [`AI_PLAYERS`] players, distinct
-/// revocations, and a token whose name, lifetime and list fit, presented
-/// exactly when one is to be made.
-fn checked(plan: &AiPlan, token: Option<&Token>) -> Result<(), Error> {
-    let mut tags = BTreeSet::new();
-    let mut names = BTreeSet::new();
-    let players_fit = plan.players.len() <= AI_PLAYERS
-        && plan.players.iter().all(|player| {
-            player.settings.valid()
-                && central_api::profile::valid_tag(player.tag)
-                && tags.insert(player.tag)
-                && names.insert(player.settings.display_name.as_str())
-        });
-    let revoked: BTreeSet<_> = plan.revoke.iter().collect();
-    let revocations_fit = revoked.len() == plan.revoke.len() && plan.revoke.len() <= LISTED_TOKENS;
-    let token_fits = match (&plan.token, token) {
-        (None, None) => true,
-        (Some(wanted), Some(_)) => {
-            let listed: BTreeSet<_> = wanted.accounts.iter().collect();
-            token_name(&wanted.name).is_ok()
-                && (1..=MAX_TOKEN_DAYS).contains(&wanted.days)
-                && !wanted.accounts.is_empty()
-                && wanted.accounts.len() <= MAX_ACCOUNTS
-                && listed.len() == wanted.accounts.len()
+/// Why the operator's plan was refused: the error the store would answer,
+/// and, for the operator's standard error alone, what was wrong and where
+/// (`players[3].display_name "KI-DeepSeek-Flash": 17 characters, at most
+/// 16`). It names no secret; the network-facing requests keep their one
+/// `Rejected`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PlanFault {
+    /// The error.
+    pub error: Error,
+    /// What was wrong, each in its place; empty for a storage failure.
+    pub faults: Vec<String>,
+}
+
+impl PlanFault {
+    fn at(error: Error, fault: String) -> Self {
+        Self {
+            error,
+            faults: vec![fault],
         }
-        _ => false,
-    };
-    if players_fit && revocations_fit && token_fits {
-        Ok(())
-    } else {
-        Err(Error::Rejected)
+    }
+}
+
+/// A store failure, which says nothing of the plan.
+impl From<Error> for PlanFault {
+    fn from(error: Error) -> Self {
+        let fault = match error {
+            Error::Unavailable => "the database failed or could not be reached".to_owned(),
+            other => format!("refused ({other:?})"),
+        };
+        Self::at(error, fault)
     }
 }
 
@@ -179,13 +178,24 @@ fn held(row: &QueryResult) -> Result<(String, String, String, i16, Option<i32>),
     ))
 }
 
-/// Bring one AI player to the plan: made when neither its tag nor its name
-/// is taken, changed when an AI holds both and its label or limits differ.
-/// Anything else is ambiguous and refused: a tag a person holds or an AI of
-/// another name, a name another AI holds under another tag, another kind or
-/// profile.
-async fn player(tx: &DatabaseTransaction, wanted: &AiPlayerPlan) -> Result<PlayerApplied, Error> {
-    let tag = i32::try_from(wanted.tag).map_err(|_| Error::Rejected)?;
+/// Bring one AI player, the plan's `index`th, to the plan: made when
+/// neither its tag nor its name is taken, changed when an AI holds both and
+/// its label or limits differ. Anything else is ambiguous and refused,
+/// saying which: a tag a person holds or an AI of another name, a name
+/// another AI holds under another tag, another kind or profile.
+async fn player(
+    tx: &DatabaseTransaction,
+    index: usize,
+    wanted: &AiPlayerPlan,
+) -> Result<PlayerApplied, PlanFault> {
+    let settings = &wanted.settings;
+    let at = format!(
+        "players[{index}] {:?}#{:x}",
+        settings.display_name, wanted.tag
+    );
+    let refused = |error, why: &str| PlanFault::at(error, format!("{at}: {why}"));
+    let tag =
+        i32::try_from(wanted.tag).map_err(|_| refused(Error::Rejected, "tag out of range"))?;
     let found = tx
         .query_all_raw(statement(
             "SELECT a.id, a.display_name, a.tag, p.kind, p.profile, p.label, p.max_games,
@@ -194,28 +204,52 @@ async fn player(tx: &DatabaseTransaction, wanted: &AiPlayerPlan) -> Result<Playe
              LEFT JOIN central_identity.ai_players p ON p.account_id = a.id
              WHERE a.tag = $1 OR (p.account_id IS NOT NULL AND a.display_name = $2)
              ORDER BY a.id",
-            vec![tag.into(), wanted.settings.display_name.clone().into()],
+            vec![tag.into(), settings.display_name.clone().into()],
         ))
         .await
         .map_err(unavailable)?;
-    let settings = &wanted.settings;
     let (account, outcome) = match found.as_slice() {
         [] => {
-            let (account, _) = create(tx, None, settings, wanted.tag).await?;
+            let (account, _) = create(tx, None, settings, wanted.tag)
+                .await
+                .map_err(|error| match error {
+                    Error::Conflict => refused(error, "another account took the tag meanwhile"),
+                    other => other.into(),
+                })?;
             (Uuid::from_bytes(account), PlayerOutcome::Created)
         }
         [row] => {
-            let same = get::<bool>(row, "ai")?
-                && get::<Option<i32>>(row, "tag")? == Some(tag)
-                && get::<Option<String>>(row, "display_name")?.as_deref()
-                    == Some(settings.display_name.as_str());
-            if !same {
-                return Err(Error::Conflict);
+            let ai: bool = get(row, "ai")?;
+            let held_tag: Option<i32> = get(row, "tag")?;
+            let held_name: Option<String> = get(row, "display_name")?;
+            if !ai {
+                return Err(refused(Error::Conflict, "the tag is a person's"));
+            }
+            if held_tag != Some(tag) {
+                let held_tag = held_tag.map_or_else(|| "none".to_owned(), |t| format!("#{t:x}"));
+                return Err(refused(
+                    Error::Conflict,
+                    &format!("an AI player of that name has the tag {held_tag}"),
+                ));
+            }
+            if held_name.as_deref() != Some(settings.display_name.as_str()) {
+                return Err(refused(
+                    Error::Conflict,
+                    &format!(
+                        "the tag is AI player {:?}'s; a name is changed on the website",
+                        held_name.unwrap_or_default()
+                    ),
+                ));
             }
             let account: Uuid = get(row, "id")?;
             let (kind, profile, label, max_games, daily) = held(row)?;
             if Some(kind.as_str()) != settings.kind.as_str() || profile != settings.profile {
-                return Err(Error::Conflict);
+                return Err(refused(
+                    Error::Conflict,
+                    &format!(
+                        "it plays as {kind} {profile:?}; a mind is fixed, a new one is a new AI player"
+                    ),
+                ));
             }
             let daily = daily.map(u32::try_from).transpose().map_err(unavailable)?;
             if label == settings.label
@@ -228,7 +262,12 @@ async fn player(tx: &DatabaseTransaction, wanted: &AiPlayerPlan) -> Result<Playe
                 (account, PlayerOutcome::Changed)
             }
         }
-        _ => return Err(Error::Conflict),
+        _ => {
+            return Err(refused(
+                Error::Conflict,
+                "the tag and the name belong to two accounts",
+            ));
+        }
     };
     let switched = match wanted.enabled {
         Some(enabled) => switch(tx, None, account, enabled).await?,
@@ -243,8 +282,9 @@ async fn player(tx: &DatabaseTransaction, wanted: &AiPlayerPlan) -> Result<Playe
     })
 }
 
-/// The one AI player named `name`; none or several is refused.
-async fn named(tx: &DatabaseTransaction, name: &str) -> Result<[u8; 16], Error> {
+/// The one AI player named `name`, the token's `index`th account; none or
+/// several is refused, saying which.
+async fn named(tx: &DatabaseTransaction, index: usize, name: &str) -> Result<[u8; 16], PlanFault> {
     let rows = tx
         .query_all_raw(statement(
             "SELECT a.id FROM central_identity.accounts a
@@ -256,7 +296,14 @@ async fn named(tx: &DatabaseTransaction, name: &str) -> Result<[u8; 16], Error> 
         .map_err(unavailable)?;
     match rows.as_slice() {
         [row] => Ok(get::<Uuid>(row, "id")?.into_bytes()),
-        _ => Err(Error::Rejected),
+        [] => Err(PlanFault::at(
+            Error::Rejected,
+            format!("token.accounts[{index}] {name:?}: no AI player has that name"),
+        )),
+        _ => Err(PlanFault::at(
+            Error::Rejected,
+            format!("token.accounts[{index}] {name:?}: two AI players have that name"),
+        )),
     }
 }
 
@@ -266,10 +313,10 @@ async fn token(
     tx: &DatabaseTransaction,
     wanted: &RunnerTokenPlan,
     token: &Token,
-) -> Result<([u8; 16], i64), Error> {
+) -> Result<([u8; 16], i64), PlanFault> {
     let mut accounts = Vec::with_capacity(wanted.accounts.len());
-    for name in &wanted.accounts {
-        accounts.push(named(tx, name).await?);
+    for (index, name) in wanted.accounts.iter().enumerate() {
+        accounts.push(named(tx, index, name).await?);
     }
     let twin = tx
         .query_one_raw(statement(
@@ -283,29 +330,52 @@ async fn token(
         .await
         .map_err(unavailable)?;
     if twin.is_some() {
-        return Err(Error::Conflict);
+        return Err(PlanFault::at(
+            Error::Conflict,
+            format!(
+                "token.name {:?}: a live token has that name; revoke it in the same plan to rotate",
+                wanted.name
+            ),
+        ));
     }
-    make(tx, None, &wanted.name, &accounts, wanted.days, token).await
+    make(tx, None, &wanted.name, &accounts, wanted.days, token)
+        .await
+        .map_err(|error| match error {
+            Error::Busy => PlanFault::at(
+                error,
+                format!(
+                    "token: {LIVE_TOKENS} runner tokens are live, or {TOKENS_PER_DAY} were made today"
+                ),
+            ),
+            other => other.into(),
+        })
 }
 
 /// Apply `plan` in one transaction under the migrator's login `db`, as the
-/// operator, and answer what it did. `token` is the new runner token's
-/// secret, present exactly when the plan makes one; only its digest is
-/// stored, and the caller shows it once after this returns.
+/// operator, and answer what it did. `secret` is the new runner token's,
+/// present exactly when the plan makes one; only its digest is stored, and
+/// the caller shows it once after this returns. Every fault the plan has
+/// on its own ([`plan_faults`]) is found before the database is asked.
 ///
 /// # Errors
-/// `Rejected` for a plan that does not fit ([`checked`]), settings out of
-/// bounds, an unknown token to revoke, a token account that names no AI
+/// `Rejected` for a plan that does not fit ([`plan_faults`], every fault
+/// listed), an unknown token to revoke, a token account that names no AI
 /// player or several; `Conflict` for an ambiguous player (a tag or name
 /// held otherwise, another kind or profile) and a live token of the same
-/// name; `Busy` past the tokens' caps; storage failure. Nothing is written
-/// then.
+/// name; `Busy` past the tokens' caps; storage failure. Each says where;
+/// nothing is written then.
 pub async fn apply_ai_plan(
     db: &DatabaseConnection,
     plan: &AiPlan,
     secret: Option<&Token>,
-) -> Result<AiApplied, Error> {
-    checked(plan, secret)?;
+) -> Result<AiApplied, PlanFault> {
+    let faults = plan_faults(plan, secret.is_some());
+    if !faults.is_empty() {
+        return Err(PlanFault {
+            error: Error::Rejected,
+            faults,
+        });
+    }
     let tx = db.begin().await.map_err(unavailable)?;
     tx.query_all_raw(statement(
         "SELECT a.id FROM central_identity.accounts a JOIN central_identity.account_roles r
@@ -331,11 +401,19 @@ pub async fn apply_ai_plan(
     ))
     .await
     .map_err(unavailable)?;
-    for wanted in &plan.players {
-        applied.players.push(player(&tx, wanted).await?);
+    for (index, wanted) in plan.players.iter().enumerate() {
+        applied.players.push(player(&tx, index, wanted).await?);
     }
-    for id in &plan.revoke {
-        let ended = revoke(&tx, None, uuid(*id)).await?;
+    for (index, id) in plan.revoke.iter().enumerate() {
+        let ended = revoke(&tx, None, uuid(*id))
+            .await
+            .map_err(|error| match error {
+                Error::Rejected => PlanFault::at(
+                    error,
+                    format!("revoke[{index}] {}: no runner token has that id", uuid(*id)),
+                ),
+                other => other.into(),
+            })?;
         applied.revoked.push((*id, ended.len()));
     }
     if let (Some(wanted), Some(secret)) = (&plan.token, secret) {
@@ -360,76 +438,6 @@ pub async fn ai_runner_tokens(db: &DatabaseConnection) -> Result<Vec<AiRunnerTok
 #[cfg(test)]
 mod tests {
     use super::*;
-    use central_api::ranked::ai::AiKind;
-
-    fn house(name: &str) -> AiPlayerSettings {
-        AiPlayerSettings {
-            kind: AiKind::House,
-            profile: "house:expert".into(),
-            label: "Haus-KI · Expert".into(),
-            max_games: 4,
-            daily_games: None,
-            display_name: name.into(),
-        }
-    }
-
-    fn plan(players: Vec<AiPlayerPlan>, token: Option<RunnerTokenPlan>) -> AiPlan {
-        AiPlan {
-            players,
-            settings: None,
-            revoke: Vec::new(),
-            token,
-        }
-    }
-
-    fn one(name: &str, tag: u32) -> AiPlayerPlan {
-        AiPlayerPlan {
-            settings: house(name),
-            tag,
-            enabled: Some(true),
-        }
-    }
-
-    /// A plan that does not fit is refused before anything is asked: a
-    /// repeated tag or name, a person's name, a token without its secret
-    /// or a secret without a token, a token's name, lifetime or list out
-    /// of bounds, a revocation named twice.
-    #[test]
-    fn a_plan_that_does_not_fit_is_refused_whole() {
-        let secret = Token::generate().unwrap();
-        let runner = |accounts: Vec<&str>, days| RunnerTokenPlan {
-            name: "runner-1".into(),
-            accounts: accounts.into_iter().map(str::to_owned).collect(),
-            days,
-        };
-        let fits = plan(
-            vec![one("KI-Haus-Expert", 0x1a2b)],
-            Some(runner(vec!["KI-Haus-Expert"], 90)),
-        );
-        assert_eq!(checked(&fits, Some(&secret)), Ok(()));
-        assert_eq!(checked(&plan(vec![], None), None), Ok(()));
-        for (wrong, with) in [
-            (plan(vec![one("KI-A1", 7), one("KI-B1", 7)], None), false),
-            (plan(vec![one("KI-A1", 7), one("KI-A1", 8)], None), false),
-            (plan(vec![one("Person", 7)], None), false),
-            (plan(vec![one("AI-Bot", 7)], None), false),
-            (plan(vec![], Some(runner(vec!["KI-A1"], 90))), false),
-            (plan(vec![], None), true),
-            (plan(vec![], Some(runner(vec!["KI-A1"], 0))), true),
-            (plan(vec![], Some(runner(vec!["KI-A1"], 367))), true),
-            (plan(vec![], Some(runner(vec![], 90))), true),
-            (plan(vec![], Some(runner(vec!["KI-A1", "KI-A1"], 90))), true),
-        ] {
-            let secret = with.then_some(&secret);
-            assert_eq!(checked(&wrong, secret), Err(Error::Rejected), "{wrong:?}");
-        }
-        let mut twice = plan(vec![], None);
-        twice.revoke = vec![[1; 16], [1; 16]];
-        assert_eq!(checked(&twice, None), Err(Error::Rejected));
-        let mut unfair = plan(vec![one("KI-Seer", 9)], None);
-        unfair.players[0].settings.profile = "house:seer".into();
-        assert_eq!(checked(&unfair, None), Err(Error::Rejected));
-    }
 
     /// The settings the plan leaves out stay as they are.
     #[test]
