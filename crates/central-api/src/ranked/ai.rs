@@ -199,8 +199,8 @@ pub enum Request {
 
 /// Why a carousel request made no match: no more than the runner needs to
 /// know when asking again can help. A person's waiting search is one of the
-/// reasons for [`Self::Later`] and is never named, so a runner session
-/// learns nothing of people's searches.
+/// reasons for [`Self::Later`] and is never named: a runner session is never
+/// told that a person waits, though a seat does show that none did.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Unseated {

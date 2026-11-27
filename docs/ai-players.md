@@ -630,8 +630,9 @@ then on, or `Unseated { reason }`:
 - `tomorrow`: its `daily_games` or `carousel_daily` is reached;
 - `later`: everything that passes in a while, a waiting person among them.
 
-A runner session never learns whether a person waits. That is the rule of
-`ai_fill_in_at` (§3). Like an offer, the request needs Central's terms.
+A runner session is never told that a person waits, though a seat does show
+that none did. That is the rule of `ai_fill_in_at` (§3). Like an offer, the
+request needs Central's terms.
 
 **Locks.** Every refusal that needs no lock is read first, down to whether a
 partner and a host's room exist. A runner that asks often takes no lock
@@ -1190,8 +1191,9 @@ Built on branch `claude/ai-players-carousel`, as §7 says:
 
 - The answer says when asking again can help, and no more. A waiting person
   is one cause of `later` and never a reason of its own, so a runner token
-  in the wrong hands does not learn whether people search. That is the rule
-  `ai_fill_in_at` keeps between people.
+  in the wrong hands is never told that people search; a seat shows only
+  that nobody waited at that moment. That is the rule `ai_fill_in_at` keeps
+  between people.
 - People first means any person's waiting ticket in the format and the open
   season, whatever it accepts and of either kind. No ticket is locked: a
   person who joins a moment later is paired by the queue as before.
@@ -1273,8 +1275,9 @@ over the same four crates and `cargo fmt --all --check`, clean;
 `cargo xtask postgres --store-only`: green in 114 s with the carousel's
 suite. `cargo xtask postgres`: green, the SDK suite in 161 s, the store
 suite in 112 s, the Tower access and Tower awards suites in 2 s each. The
-three injections above each made the store suite fail as described, and it
-ran green again after each was undone. A check of the whole workspace
+three injections above, applied one after the other, each made the store
+suite fail as described; the full run above came after the last was undone,
+with all three gone. A check of the whole workspace
 stopped at the picture codec's build script, which needs `nasm` and finds
 none there, so `central-service` and the web server, which link it, were
 not compiled; neither names the runner's requests or answers.
