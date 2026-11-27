@@ -102,11 +102,16 @@ async fn count(
 
 /// Lock the two AIs' rows in account order, skipping a row the switch, an
 /// offer or another transaction holds, and only while each is switched on.
-/// Answers the accounts locked.
+/// Each account row's key is shared too, as the match's foreign keys will
+/// share it, skipped while a runner's exchange holds the row for update: an
+/// exchange that ends the session of a held offer waits for this match, so
+/// this match must never wait for it. Answers the accounts locked.
 async fn lock(db: &DatabaseTransaction, pair: [Uuid; 2]) -> Result<Vec<Uuid>, Error> {
     db.query_all_raw(statement(
-        "SELECT account_id FROM central_identity.ai_players
-         WHERE account_id IN ($1, $2) AND enabled ORDER BY account_id FOR UPDATE SKIP LOCKED",
+        "SELECT p.account_id FROM central_identity.ai_players p
+         JOIN central_identity.accounts a ON a.id = p.account_id
+         WHERE p.account_id IN ($1, $2) AND p.enabled ORDER BY p.account_id
+         FOR UPDATE OF p SKIP LOCKED FOR KEY SHARE OF a SKIP LOCKED",
         vec![pair[0].into(), pair[1].into()],
     ))
     .await
