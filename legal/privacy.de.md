@@ -1,5 +1,5 @@
-<!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-26 -->
+<!-- version: 2026-11-27 -->
+<!-- updated: 2026-11-27 -->
 
 # Datenschutzerklärung von Baylee Central
 
@@ -44,6 +44,7 @@ Datenschutzbeauftragten gibt es nicht, weil keine Pflicht dazu besteht.
 - **verschlüsselte Objekte (Einstellungen, Gateway-Liste, Deck-Sicherungen, Chat-Verlauf) mit Größe, Stand und Zeitpunkt** – geräteübergreifende Sicherung. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Profilbild (freiwillig):** ein quadratisches Bild mit 256 × 256 Pixeln (AVIF und PNG, bei einem bewegten Bild eine Animation aus höchstens 100 Einzelbildern) ohne die Angaben des Fotos (etwa Ort, Kamera oder Zeit), sein Fingerabdruck (SHA-256) und wann du es gesetzt hast, unter einem zufälligen Schlüssel – es neben deinem Anzeigenamen zeigen; jeder kann es unter seiner Adresse sehen, auch ohne Anmeldung. *Art. 6 Abs. 1 lit. b DSGVO.* Meldungen über ein Bild (meldender Account, Fingerabdruck des Bilds, Grund, freiwilliger Hinweis, Zeitpunkt; die Person, deren Bild es ist, erfährt nie, wer gemeldet hat) und die Zahl deiner hochgeladenen Bilder (zehn in der Stunde, dreißig am Tag) – rechtswidrige und missbräuchliche Bilder entfernen. *Art. 6 Abs. 1 lit. f DSGVO (unser Interesse an einem Dienst ohne solche Inhalte)*
 - **Daily- und Weekly-Aufgaben und Tower-Expeditionen:** Versuche, Ergebnisse, genutzte Hinweise, gewählte Verbesserungen, verbleibende Leben und Abzeichen-Fortschritt; vom offiziellen Gateway Ergebnis und gemessene Zeit einer Partie – die Aufgaben anbieten und auswerten. In einer Rangliste erscheinen dein Anzeigename, Tag und Ergebnis nur, wenn du sie für diese Aufgabe oder Saison freigibst. *Art. 6 Abs. 1 lit. b DSGVO*
+- **Tower Echoes** (tower.baylee.app, ein eigener Dienst desselben Verantwortlichen): deine Runs mit dem gewählten Startdeck, Einkäufen, Ausrüstung, Gold, gewählten Karten und verkauften Karten, jedes Duell mit seinem Ergebnis und seiner Spielaufzeichnung und der Stand deines Decks und deiner Ausrüstung vor jedem Duell, dazu deine Zustimmung zur Echo-Nutzung und deine beste abgeschlossene Expedition je Kohorte. Hast du beim Start eines Runs zugestimmt, teilen wir diesen Stand anderen Spielern als Gegner („Echo“) zu; sie spielen im Duell gegen dein Deck und deine Ausrüstung. In der Tower-Rangliste erscheinen dein Anzeigename und Tag nur, wenn du sie freigibst; Central liefert sie dem Tower-Dienst bei deiner Anmeldung. Bestätigte Siege und abgeschlossene Expeditionen meldet der Tower-Dienst an Baylee Central für deine dauerhaften Tower-Medaillen. – Tower Echoes anbieten, Gegner zuteilen, Duelle prüfen und werten. *Art. 6 Abs. 1 lit. b DSGVO*
 - **Ranglistenpartien (Ranked):** deine Anmeldungen zur Warteschlange (Format, Saison, deine Elo-Zahl in diesem Moment und ein Fingerabdruck deines Decks); die Partien, die wir dir zuteilen (Gegner, die Gateways, auf denen sie laufen, deine Zustimmung zu ihnen und ihren Bedingungen, Zeitpunkte, Ergebnis); deine Decks als Fingerabdrücke der Karten mit ihrer Anzahl, nie Deckname oder Notizen; je Format, Saison und Deck Elo-Zahl, Partien, Siege, Niederlagen und Unentschieden, Platzierungsfortschritt, Liga und Division, dazu deine Abzeichen und die Hüllen und Spielmatten, die du damit freischaltest – Gegner zuteilen, die Partie auf geprüften Gateways austragen und werten, Ranglisten führen. Solange eine Partie läuft, verwahren wir außerdem ihre Eröffnung, beide Decks, die Spielentscheidungen und die Bedenkzeiten beider Spieler, damit ein zweites Gateway sie nachspielen und prüfen oder nach einem Ausfall übernehmen kann. Deine Verbindung zur Partie läuft über Baylee Central; das Gateway der Partie sieht darüber unsere IP-Adresse, nicht deine. Die Ranglisten jeder Saison sind öffentlich: Jeder, auch ohne Anmeldung, sieht dort jeden, der in dieser Saison eine gewertete Ranglistenpartie gespielt hat, mit Anzeigenamen, Tag, Elo-Zahl, Liga, Division, Partien, Siegen, Niederlagen und Unentschieden, auf der Deck-Rangliste mit einer Kennung des Decks, aus der sich seine Karten nicht ablesen lassen. Das gilt auch, wenn du dein Spielerprofil abgeschaltet hast; wer in keiner dieser Ranglisten erscheinen möchte, spielt keine Ranglistenpartien. *Art. 6 Abs. 1 lit. b DSGVO*
 - **angenommene Fassungen unserer Bedingungen und der Bedingungen der Gateways, auf denen du spielst, mit Zeitpunkt** – Nachweis der Annahme, Anzeige neuer Fassungen. *Art. 6 Abs. 1 lit. b und c DSGVO*
 - **eingetragene Gateways, ihre Adressen, Beschreibung und Administratoren** – Gateway-Verzeichnis und Verwaltung. *Art. 6 Abs. 1 lit. b DSGVO*
@@ -171,6 +172,8 @@ Zustellung verhindern.
   Partie selbst, und zwar erst, nachdem du ihnen und ihren aktuellen
   Bedingungen zugestimmt hast; ein Gateway, das eine unterbrochene Partie
   übernimmt, erst nach deiner erneuten Zustimmung.
+  Das Gateway, auf dem du ein Duell in Tower Echoes spielst, erhält vom
+  Tower-Dienst die Decks und die Ausrüstung beider Seiten dieses Duells.
 - **Andere Spieler:** Deine Kontakte und die Mitglieder deiner Gruppen sehen
   deinen Anzeigenamen mit Tag und die Nachrichten, die du ihnen schickst;
   deine Freunde außerdem, solange die Baylee-App mit Central verbunden ist
@@ -180,6 +183,9 @@ Zustellung verhindern.
   ohne Anmeldung, ebenso deinen Eintrag in einer Rangliste, die du freigibst,
   und deine Einträge in den Ranglisten der Ranglistenpartien (Abschnitt 3).
   Dein Gegner in einer Ranglistenpartie sieht deinen Anzeigenamen mit Tag.
+  In Tower Echoes spielen andere Spieler gegen dein Echo, also gegen dein
+  Deck und deine Ausrüstung vor einem deiner Duelle, wenn du dem beim Start
+  des Runs zugestimmt hast.
 - **Behörden** erhalten Daten nur, wenn wir gesetzlich dazu verpflichtet sind.
 
 Eine Übermittlung in Länder außerhalb des Europäischen Wirtschaftsraums
@@ -229,6 +235,19 @@ entscheidest du.
 - Aufgaben, Expeditionen und Ranglisteneinträge bleiben bis zur Löschung
   deines Kontos; einen Ranglisteneintrag nimmst du jederzeit zurück, indem
   du die Freigabe ausschaltest.
+- Daten aus Tower Echoes (Runs, Duelle mit ihren Spielaufzeichnungen, Echos
+  und Bestleistungen) bewahren wir bis zum Ende der Season auf, in der sie
+  entstanden sind; eine Season dauert etwa sechs Monate. Das gilt auch, wenn
+  du dein Konto vorher löschst: Andere Spieler haben gegen dein Echo gespielt,
+  und ihre geprüften Ergebnisse und die Rangliste der Season beruhen darauf.
+  Mit der Löschung deines Kontos nehmen wir deinen Anzeigenamen und Tag aus
+  der Tower-Rangliste, spätestens am folgenden Tag; danach hängen diese Daten
+  nur noch an einer zufälligen Kennung, die keinem Konto mehr zugeordnet ist.
+  *Art. 6 Abs. 1 lit. f DSGVO (unser berechtigtes Interesse an einer fairen,
+  nachprüfbaren Season für alle, die in ihr gespielt haben).* Deine
+  Tower-Medaillen bei Baylee Central werden mit deinem Konto gelöscht. Einen
+  Ranglisteneintrag nimmst du jederzeit zurück, indem du die Freigabe
+  ausschaltest.
 - Ranglistenpartien mit ihren Ergebnissen, Elo-Zahlen, Deck-Fingerabdrücke,
   Abzeichen und freigeschalteten Hüllen und Spielmatten bleiben bis zur
   Löschung deines Kontos. Anmeldungen zur Warteschlange löschen wir täglich,

@@ -1,5 +1,5 @@
-<!-- version: 2026-11-25 -->
-<!-- updated: 2026-11-26 -->
+<!-- version: 2026-11-27 -->
+<!-- updated: 2026-11-27 -->
 
 # Baylee Central privacy policy
 
@@ -43,6 +43,7 @@ data protection officer, as none is required.
 - **Encrypted objects (settings, gateway list, deck backups, chat history) with size, revision and time** – backup across devices. *Art. 6(1)(b) GDPR*
 - **Profile picture (optional):** a square picture of 256 × 256 pixels (AVIF and PNG, and for a moving picture an animation of at most 100 frames) without the photo's details (such as place, camera or time), its fingerprint (SHA-256) and when you set it, under a random key – showing it beside your display name; anyone can see it at its address, signed in or not. *Art. 6(1)(b) GDPR.* Reports about a picture (the reporting account, the picture's fingerprint, the reason, an optional note, the time; the person whose picture it is never learns who reported it) and the count of your uploads (ten an hour, thirty a day) – removing unlawful and abusive pictures. *Art. 6(1)(f) GDPR (our interest in a service free of such content)*
 - **Daily and weekly challenges and Tower expeditions:** attempts, results, hints used, chosen upgrades, remaining lives and badge progress; from the official gateway, a game's result and measured time – offering and scoring the challenges. Your display name, tag and result appear on a leaderboard only if you enable it for that challenge or season. *Art. 6(1)(b) GDPR*
+- **Tower Echoes** (tower.baylee.app, a separate service of the same controller): your runs with the starting deck you chose, purchases, equipment, gold, the cards you chose and the cards you sold, every duel with its result and its game record, and your deck and equipment before each duel, as well as your consent to echo use and your best completed expedition per cohort. If you agreed when you started a run, we assign that state to other players as an opponent (an "echo"); in the duel they play against your deck and equipment. Your display name and tag appear on the Tower leaderboard only if you publish them; Central passes them to the Tower service when you sign in. The Tower service reports verified victories and completed expeditions to Baylee Central for your permanent Tower medals. – offering Tower Echoes, assigning opponents, verifying and scoring duels. *Art. 6(1)(b) GDPR*
 - **Ranked play:** your entries in the queue (format, season, your Elo rating at that moment and a fingerprint of your deck); the games we pair you for (opponent, the gateways they run on, your approval of those gateways and their terms, times, result); your decks as fingerprints of the cards with their counts, never a deck name or notes; per format, season and deck your Elo rating, games, wins, losses and draws, placement progress, league and division, and your badges and the sleeves and playmats they unlock – pairing opponents, having the game played and scored on verified gateways, keeping the boards. While a game runs we also hold its opening, both decks, both players' decisions and their decision time, so that a second gateway can replay and check it or take it over after an outage. Your connection to the game runs through Baylee Central; the game's gateway sees our IP address there, not yours. The boards of every season are public: anyone, signed in or not, sees there everyone who played a rated ranked game that season, with display name, tag, Elo rating, league, division, games, wins, losses and draws, on the deck board with an identifier of the deck from which its cards cannot be read. This holds even if you turned your player profile off; whoever wants to appear on none of these boards does not play ranked games. *Art. 6(1)(b) GDPR*
 - **The versions of our terms and of the terms of the gateways you play on that you accepted, with the time** – proof of acceptance, showing new versions. *Art. 6(1)(b) and (c) GDPR*
 - **Listed gateways, their addresses, description and administrators** – gateway directory and management. *Art. 6(1)(b) GDPR*
@@ -157,6 +158,8 @@ only after you choose to enable notifications; OS/browser settings can block del
   that gateway only, together with your deck and the game itself, and only
   after you approved them and their current terms; a gateway that takes over
   an interrupted game only after you approve it again.
+  The gateway on which you play a Tower Echoes duel receives from the Tower
+  service the decks and equipment of both sides of that duel.
 - **Other players:** your contacts and the members of your groups see your
   display name and tag and the messages you send them; your friends also see
   that you are online, and whether you are away, playing or sitting at a
@@ -166,6 +169,9 @@ only after you choose to enable notifications; OS/browser settings can block del
   your entry on a leaderboard you enable, and your entries on the boards of
   ranked play (section 3). Your opponent in a ranked game sees your display
   name and tag.
+  In Tower Echoes, other players play against your echo, that is, against
+  your deck and equipment before one of your duels, if you agreed to that
+  when you started the run.
 - **Authorities** receive data only where we are legally obliged.
 
 Data is transferred to countries outside the European Economic Area only if
@@ -209,6 +215,17 @@ you sign in there or entrust a ranked game to them is your decision.
   browser that showed it may keep a copy for up to an hour.
 - Challenges, expeditions and leaderboard entries stay until you delete your
   account; you withdraw a leaderboard entry at any time by switching it off.
+- Tower Echoes data (runs, duels with their game records, echoes and best
+  results) is kept until the end of the season it was made in; a season
+  lasts about six months. This also holds if you delete your account before
+  then: other players played against your echo, and their verified results
+  and the season's leaderboard rest on it. When your account is deleted we
+  take your display name and tag off the Tower leaderboard, by the following
+  day at the latest; after that the data is tied only to a random identifier
+  that no account resolves to any more. *Art. 6(1)(f) GDPR (our legitimate
+  interest in a fair, verifiable season for everyone who played in it).*
+  Your Tower medals at Baylee Central are deleted with your account. You
+  withdraw a leaderboard entry at any time by switching it off.
 - Ranked games with their results, Elo ratings, deck fingerprints, badges and
   unlocked sleeves and playmats stay until you delete your account. Entries
   in the queue are deleted daily once they are a day old, counted from the

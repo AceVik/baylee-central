@@ -1,6 +1,6 @@
 # Legal texts of Baylee Central
 
-**Status: the terms and the privacy policy are at version 2026-11-25** (ranked play added on 26.11.2026, below; the
+**Status: the terms are at version 2026-11-25, the privacy policy at 2026-11-27** (Tower Echoes, below; ranked play added on 26.11.2026, below; the
 minimum age, below; before it 2026-11-19). The
 privacy policy's presence text (§ 5a's new paragraph, § 7's new point) was
 reviewed by the owner on 19.11.2026; the status his later decision of the same
@@ -196,3 +196,31 @@ instead of "until the account is deleted", and the website's ranked part
 names the daily deletion and that ranked data is in the account's data
 export (#101 adds it). Published together with #101; written by the
 implementing agent, the owner's review is still to come.
+
+**Privacy policy 2026-11-27: Tower Echoes.** Tower Echoes, the run mode of
+the Baylee client, is a separate service of the same controller
+(`tower.baylee.app`, Baylee's `baylee-tower-service`); Central keeps only its
+permanent medals (`docs/tower-echoes.md`). On 27.11.2026 the owner decided
+that its data is not deleted with a Central account but kept for the whole
+season, about six months, and that the end of a season is the next major
+update's ("Daten für Towerrun erhalten bleiben für die ganze Season", "eine
+Season dauert ca. 6 Monate"); the coordinator, for him, chose to change only
+the privacy policy and leave the terms as they are, so nobody is asked to
+accept anything again (a new privacy policy is shown, not accepted). Under
+Art. 17 GDPR this holds only because a deleted account is pseudonymised
+there: § 7 says the Tower leaderboard drops the display name and tag by the
+following day, after which the data hangs on a random identifier no account
+resolves to, and names the legitimate interest (Art. 6(1)(f)) of everyone who
+played against the echo in a fair, verifiable season. Baylee's Tower service
+withdraws the names with a daily check of the accounts it lists against
+Central's award ingestion, which answers "account gone" for a deleted one.
+§ 3 gains an item for Tower Echoes (runs, duels and records, the pre-duel
+state other players meet as an echo, the consent, the best expedition, the
+names on publication only, the medals reported to Central), § 6 says what
+the duel's gateway and the other players receive, § 7 how long. The
+website's privacy section "tower" described the earlier Central expedition,
+which is not offered, and now describes Tower Echoes in its eleven
+languages, the nine beside German and English machine translations. The
+deletion at a season's end must exist before the first season ends. Written
+by the implementing agent; the owner's review of the German sentences is
+still to come.
