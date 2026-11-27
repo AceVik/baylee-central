@@ -6,14 +6,13 @@
 --
 -- The maker and the revoker are account ids without a reference: a token and
 -- what it did outlive them. Unlike a report token, a runner token does not
--- end with its maker's role. A token without a maker, and a revocation
--- without a revoker, are the operator's (`central-service --ai-players-stdin`).
+-- end with its maker's role. A revocation without a revoker is the operator's.
 CREATE TABLE central_identity.ai_runner_tokens (
     id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7()
         CHECK (pg_catalog.uuid_extract_version(id) IS NOT DISTINCT FROM 7),
     name text NOT NULL CHECK (octet_length(name) BETWEEN 1 AND 64),
     digest bytea NOT NULL UNIQUE CHECK (octet_length(digest) = 32),
-    created_by uuid,
+    created_by uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
     expires_at timestamptz NOT NULL,
     revoked_at timestamptz,

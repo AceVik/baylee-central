@@ -667,6 +667,7 @@ async fn crowding(
         let AiResponse::Work {
             settings,
             assignments,
+            ..
         } = ai(store, bot, AiRequest::Work).await.unwrap()
         else {
             panic!("work");
@@ -803,6 +804,7 @@ async fn switching(
             .set_ai_settings(
                 cookie,
                 Some(&AiSettings {
+                    fill_in: true,
                     fill_in_after: 60,
                     drain_minutes: 120,
                     global_seats: 8,

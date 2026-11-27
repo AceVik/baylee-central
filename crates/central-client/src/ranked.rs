@@ -118,9 +118,18 @@ fn ai_responds(
     use api::ai::{Request as Q, Response as A};
     match (request, reply) {
         (Q::Offer { offers }, A::Offered { until }) => offers.is_empty() == until.is_none(),
-        (Q::Work, A::Work { assignments, .. }) => {
+        (
+            Q::Work,
+            A::Work {
+                assignments,
+                finished,
+                ..
+            },
+        ) => {
             owner.is_some()
                 && assignments.len() <= usize::from(api::ai::MAX_GAMES)
+                && finished.len() <= usize::from(api::ai::FINISHED)
+                && finished.iter().all(|f| f.seat < 2)
                 && assignments
                     .iter()
                     .all(|a| Some(a.account) == owner && a.seat < 2)
@@ -297,6 +306,7 @@ mod tests {
                     max_games: 1,
                 },
                 assignments: (0..count).map(seat).collect(),
+                finished: Vec::new(),
             },
         };
         let request = api::Request::Ai {

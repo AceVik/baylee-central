@@ -88,16 +88,17 @@ fn info(row: &QueryResult, accounts: Vec<AiRunnerAccount>) -> Result<AiRunnerTok
 }
 
 /// Write one audit event about a runner token in `db`'s transaction: its
-/// id, never its name or its digest.
+/// id, never its name or its digest; an administrator's, or the operator's
+/// (`actor` none).
 async fn audit(
     db: &impl ConnectionTrait,
-    actor: Uuid,
+    actor: Option<Uuid>,
     action: Action,
     token: Uuid,
 ) -> Result<(), Error> {
     db.execute_raw(statement(
         "INSERT INTO central_identity.audit_events (actor_kind, actor_account, action, ai_runner_token_id)
-         VALUES ('admin', $1, $2, $3)",
+         VALUES (CASE WHEN $1::uuid IS NULL THEN 'operator' ELSE 'admin' END, $1, $2, $3)",
         vec![actor.into(), action.as_str().into(), token.into()],
     ))
     .await
@@ -295,50 +296,7 @@ impl AccountStore {
     ) -> Result<Vec<AiRunnerTokenInfo>, Error> {
         let tx = self.db.begin().await.map_err(unavailable)?;
         Self::administrator(&tx, browser).await?;
-        let rows = tx
-            .query_all_raw(statement(
-                &format!(
-                    "SELECT {INFO_COLUMNS}
-                     FROM central_identity.ai_runner_tokens t
-                     LEFT JOIN central_identity.accounts c ON c.id = t.created_by
-                     LEFT JOIN central_identity.accounts v ON v.id = t.revoked_by
-                     WHERE COALESCE(t.revoked_at, t.expires_at) > pg_catalog.clock_timestamp() - interval '30 days'
-                     ORDER BY ({LIVE_TOKEN}) DESC, t.id DESC LIMIT $1"
-                ),
-                vec![limit(LISTED_TOKENS)],
-            ))
-            .await
-            .map_err(unavailable)?;
-        let ids = rows
-            .iter()
-            .map(|row| row.try_get::<Uuid>("", "id").map_err(unavailable))
-            .collect::<Result<Vec<_>, Error>>()?;
-        let mut listed: BTreeMap<[u8; 16], Vec<AiRunnerAccount>> = BTreeMap::new();
-        for row in tx
-            .query_all_raw(statement(
-                "SELECT r.token_id, a.id, a.display_name, a.tag
-                 FROM central_identity.ai_runner_accounts r
-                 JOIN central_identity.accounts a ON a.id = r.account_id
-                 WHERE r.token_id = ANY($1) ORDER BY r.token_id, a.id",
-                vec![ids.into()],
-            ))
-            .await
-            .map_err(unavailable)?
-        {
-            let (display_name, tag) = super::profiles::columns(&row)?;
-            listed
-                .entry(id(&row, "token_id")?)
-                .or_default()
-                .push(AiRunnerAccount {
-                    id: id(&row, "id")?,
-                    display_name,
-                    tag,
-                });
-        }
-        let tokens = rows
-            .iter()
-            .map(|row| info(row, listed.remove(&id(row, "id")?).unwrap_or_default()))
-            .collect::<Result<Vec<_>, Error>>()?;
+        let tokens = listed(&tx).await?;
         tx.commit().await.map_err(unavailable)?;
         Ok(tokens)
     }
@@ -366,71 +324,9 @@ impl AccountStore {
         // Every administrator's row is locked, so two makings are counted
         // one after the other.
         let (tx, actor) = self.acting_administrator(browser).await?;
-        let counts = tx
-            .query_one_raw(statement(
-                &format!(
-                    "SELECT count(*) FILTER (WHERE {LIVE_TOKEN})::bigint AS live,
-                         count(*) FILTER (WHERE t.created_at > pg_catalog.clock_timestamp() - interval '1 day')::bigint AS today
-                     FROM central_identity.ai_runner_tokens t"
-                ),
-                vec![],
-            ))
-            .await
-            .map_err(unavailable)?
-            .ok_or(Error::Unavailable)?;
-        let full = |column, most: usize| {
-            counts
-                .try_get::<i64>("", column)
-                .map(|held| usize::try_from(held).unwrap_or(usize::MAX) >= most)
-                .map_err(unavailable)
-        };
-        if full("live", LIVE_TOKENS)? || full("today", TOKENS_PER_DAY)? {
-            return Err(Error::Busy);
-        }
-        // Each must be an AI player, kept one until the listing is written.
-        let ids: Vec<Uuid> = accounts.iter().map(|account| uuid(*account)).collect();
-        let players = tx
-            .query_all_raw(statement(
-                "SELECT account_id FROM central_identity.ai_players
-                 WHERE account_id = ANY($1) ORDER BY account_id FOR KEY SHARE",
-                vec![ids.clone().into()],
-            ))
-            .await
-            .map_err(unavailable)?;
-        if players.len() != ids.len() {
-            return Err(Error::Rejected);
-        }
-        // One clock reading for both ends, so a 366-day token meets the
-        // table's bound exactly rather than by a few microseconds over.
-        let row = tx
-            .query_one_raw(statement(
-                "WITH now AS (SELECT pg_catalog.clock_timestamp() AS at)
-                 INSERT INTO central_identity.ai_runner_tokens
-                     (name, digest, created_by, created_at, expires_at)
-                 SELECT $1, $2, $3, now.at, now.at + pg_catalog.make_interval(days => $4) FROM now
-                 RETURNING id, floor(extract(epoch FROM expires_at))::bigint AS expires_at",
-                vec![
-                    name.into(),
-                    token.digest().to_vec().into(),
-                    actor.into(),
-                    i32::from(days).into(),
-                ],
-            ))
-            .await
-            .map_err(unavailable)?
-            .ok_or(Error::Unavailable)?;
-        let made: Uuid = row.try_get("", "id").map_err(unavailable)?;
-        let expires_at: i64 = row.try_get("", "expires_at").map_err(unavailable)?;
-        tx.execute_raw(statement(
-            "INSERT INTO central_identity.ai_runner_accounts (token_id, account_id)
-             SELECT $1, pg_catalog.unnest($2::uuid[])",
-            vec![made.into(), ids.into()],
-        ))
-        .await
-        .map_err(unavailable)?;
-        audit(&tx, actor, Action::AiRunnerTokenCreated, made).await?;
+        let made = make(&tx, Some(actor), name, accounts, days, token).await?;
         tx.commit().await.map_err(unavailable)?;
-        Ok((made.into_bytes(), expires_at))
+        Ok(made)
     }
 
     /// Revoke the runner token `token` for the administrator behind
@@ -449,49 +345,200 @@ impl AccountStore {
         token: [u8; 16],
     ) -> Result<Vec<[u8; 32]>, Error> {
         let (tx, actor) = self.acting_administrator_fresh(browser, false).await?;
-        let token = uuid(token);
-        // Waits for an exchange that holds the row; one that comes later
-        // waits for this and finds the token revoked.
-        let revoked = tx
-            .execute_raw(statement(
-                "UPDATE central_identity.ai_runner_tokens
-                 SET revoked_at = pg_catalog.clock_timestamp(), revoked_by = $2
-                 WHERE id = $1 AND revoked_at IS NULL",
-                vec![token.into(), actor.into()],
-            ))
-            .await
-            .map_err(unavailable)?
-            .rows_affected()
-            == 1;
-        if !revoked {
-            tx.query_one_raw(statement(
-                "SELECT 1 AS known FROM central_identity.ai_runner_tokens WHERE id = $1",
-                vec![token.into()],
-            ))
-            .await
-            .map_err(unavailable)?
-            .ok_or(Error::Rejected)?;
-            tx.commit().await.map_err(unavailable)?;
-            return Ok(Vec::new());
-        }
-        // A statement of its own, after the update: it sees the session of
-        // an exchange the update waited for.
-        let ended = tx
-            .query_all_raw(statement(
-                "SELECT digest FROM central_identity.sessions WHERE runner_token = $1
-                 ORDER BY digest FOR UPDATE",
-                vec![token.into()],
-            ))
-            .await
-            .map_err(unavailable)?
-            .iter()
-            .map(digest)
-            .collect::<Result<Vec<_>, Error>>()?;
-        end(&tx, &ended).await?;
-        audit(&tx, actor, Action::AiRunnerTokenRevoked, token).await?;
+        let ended = revoke(&tx, Some(actor), uuid(token)).await?;
         tx.commit().await.map_err(unavailable)?;
         Ok(ended)
     }
+}
+
+/// The runner tokens in `db`: the live ones first, then those revoked or
+/// expired in the last 30 days, each group newest first, with the accounts
+/// each lists. Never a digest.
+///
+/// # Errors
+/// Storage failure.
+pub(crate) async fn listed(db: &impl ConnectionTrait) -> Result<Vec<AiRunnerTokenInfo>, Error> {
+    let rows = db
+        .query_all_raw(statement(
+            &format!(
+                "SELECT {INFO_COLUMNS}
+                 FROM central_identity.ai_runner_tokens t
+                 LEFT JOIN central_identity.accounts c ON c.id = t.created_by
+                 LEFT JOIN central_identity.accounts v ON v.id = t.revoked_by
+                 WHERE COALESCE(t.revoked_at, t.expires_at) > pg_catalog.clock_timestamp() - interval '30 days'
+                 ORDER BY ({LIVE_TOKEN}) DESC, t.id DESC LIMIT $1"
+            ),
+            vec![limit(LISTED_TOKENS)],
+        ))
+        .await
+        .map_err(unavailable)?;
+    let ids = rows
+        .iter()
+        .map(|row| row.try_get::<Uuid>("", "id").map_err(unavailable))
+        .collect::<Result<Vec<_>, Error>>()?;
+    let mut listed: BTreeMap<[u8; 16], Vec<AiRunnerAccount>> = BTreeMap::new();
+    for row in db
+        .query_all_raw(statement(
+            "SELECT r.token_id, a.id, a.display_name, a.tag
+             FROM central_identity.ai_runner_accounts r
+             JOIN central_identity.accounts a ON a.id = r.account_id
+             WHERE r.token_id = ANY($1) ORDER BY r.token_id, a.id",
+            vec![ids.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+    {
+        let (display_name, tag) = super::profiles::columns(&row)?;
+        listed
+            .entry(id(&row, "token_id")?)
+            .or_default()
+            .push(AiRunnerAccount {
+                id: id(&row, "id")?,
+                display_name,
+                tag,
+            });
+    }
+    rows.iter()
+        .map(|row| info(row, listed.remove(&id(row, "id")?).unwrap_or_default()))
+        .collect()
+}
+
+/// Make the runner token whose digest is `token`'s in `tx`, for an
+/// administrator or the operator (`actor` none), after the caller locked
+/// every administrator's row, so that two makings are counted one after
+/// the other: the caps, every listed account an AI player, the token and
+/// its list, and the audit event. The caller validated `name`, `accounts`
+/// and `days` ([`validate_new`]). Answers its id and expiry.
+///
+/// # Errors
+/// `Rejected` for an account that is no AI player; `Busy` past
+/// [`LIVE_TOKENS`] live tokens or [`TOKENS_PER_DAY`] new ones in a day;
+/// storage failure.
+pub(crate) async fn make(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    name: &str,
+    accounts: &[[u8; 16]],
+    days: u16,
+    token: &Token,
+) -> Result<([u8; 16], i64), Error> {
+    validate_new(name, accounts, days)?;
+    let counts = tx
+        .query_one_raw(statement(
+            &format!(
+                "SELECT count(*) FILTER (WHERE {LIVE_TOKEN})::bigint AS live,
+                     count(*) FILTER (WHERE t.created_at > pg_catalog.clock_timestamp() - interval '1 day')::bigint AS today
+                 FROM central_identity.ai_runner_tokens t"
+            ),
+            vec![],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Unavailable)?;
+    let full = |column, most: usize| {
+        counts
+            .try_get::<i64>("", column)
+            .map(|held| usize::try_from(held).unwrap_or(usize::MAX) >= most)
+            .map_err(unavailable)
+    };
+    if full("live", LIVE_TOKENS)? || full("today", TOKENS_PER_DAY)? {
+        return Err(Error::Busy);
+    }
+    // Each must be an AI player, kept one until the listing is written.
+    let ids: Vec<Uuid> = accounts.iter().map(|account| uuid(*account)).collect();
+    let players = tx
+        .query_all_raw(statement(
+            "SELECT account_id FROM central_identity.ai_players
+             WHERE account_id = ANY($1) ORDER BY account_id FOR KEY SHARE",
+            vec![ids.clone().into()],
+        ))
+        .await
+        .map_err(unavailable)?;
+    if players.len() != ids.len() {
+        return Err(Error::Rejected);
+    }
+    // One clock reading for both ends, so a 366-day token meets the
+    // table's bound exactly rather than by a few microseconds over.
+    let row = tx
+        .query_one_raw(statement(
+            "WITH now AS (SELECT pg_catalog.clock_timestamp() AS at)
+             INSERT INTO central_identity.ai_runner_tokens
+                 (name, digest, created_by, created_at, expires_at)
+             SELECT $1, $2, $3, now.at, now.at + pg_catalog.make_interval(days => $4) FROM now
+             RETURNING id, floor(extract(epoch FROM expires_at))::bigint AS expires_at",
+            vec![
+                name.into(),
+                token.digest().to_vec().into(),
+                actor.into(),
+                i32::from(days).into(),
+            ],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Unavailable)?;
+    let made: Uuid = row.try_get("", "id").map_err(unavailable)?;
+    let expires_at: i64 = row.try_get("", "expires_at").map_err(unavailable)?;
+    tx.execute_raw(statement(
+        "INSERT INTO central_identity.ai_runner_accounts (token_id, account_id)
+         SELECT $1, pg_catalog.unnest($2::uuid[])",
+        vec![made.into(), ids.into()],
+    ))
+    .await
+    .map_err(unavailable)?;
+    audit(tx, actor, Action::AiRunnerTokenCreated, made).await?;
+    Ok((made.into_bytes(), expires_at))
+}
+
+/// Revoke the runner token `token` in `tx`, for an administrator or the
+/// operator (`actor` none), and end every session it minted. One revoked
+/// already changes nothing. Answers the digests of the sessions it ended.
+///
+/// # Errors
+/// `Rejected` for an unknown token; storage failure.
+pub(crate) async fn revoke(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    token: Uuid,
+) -> Result<Vec<[u8; 32]>, Error> {
+    // Waits for an exchange that holds the row; one that comes later
+    // waits for this and finds the token revoked.
+    let revoked = tx
+        .execute_raw(statement(
+            "UPDATE central_identity.ai_runner_tokens
+             SET revoked_at = pg_catalog.clock_timestamp(), revoked_by = $2
+             WHERE id = $1 AND revoked_at IS NULL",
+            vec![token.into(), actor.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .rows_affected()
+        == 1;
+    if !revoked {
+        tx.query_one_raw(statement(
+            "SELECT 1 AS known FROM central_identity.ai_runner_tokens WHERE id = $1",
+            vec![token.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Rejected)?;
+        return Ok(Vec::new());
+    }
+    // A statement of its own, after the update: it sees the session of
+    // an exchange the update waited for.
+    let ended = tx
+        .query_all_raw(statement(
+            "SELECT digest FROM central_identity.sessions WHERE runner_token = $1
+             ORDER BY digest FOR UPDATE",
+            vec![token.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .iter()
+        .map(digest)
+        .collect::<Result<Vec<_>, Error>>()?;
+    end(tx, &ended).await?;
+    audit(tx, actor, Action::AiRunnerTokenRevoked, token).await?;
+    Ok(ended)
 }
 
 #[cfg(test)]

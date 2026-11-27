@@ -194,7 +194,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        53
+        54
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -307,9 +307,8 @@ async fn assert_seaql_table_shape(operator: &sea_orm::DatabaseConnection) {
     );
 }
 
-/// The history as sea-orm-migration 2.0.4 left it, and a database one migration
-/// behind: the runner reads the one and finishes the other.
-/// Migration 000054 undone, the newest first, for [`history_as_sea_orm_left_it`]:
+/// Migrations 000055 and 000054 undone, the newest first, for [`history_as_sea_orm_left_it`]
+/// (000055 changes only tables this drops):
 /// the runner tokens' tables and columns, and the one-session rule as 000007 left it.
 async fn undo_runner_tokens(operator: &sea_orm::DatabaseConnection) {
     operator
@@ -325,6 +324,8 @@ async fn undo_runner_tokens(operator: &sea_orm::DatabaseConnection) {
         .unwrap();
 }
 
+/// The history as sea-orm-migration 2.0.4 left it, and a database one migration
+/// behind: the runner reads the one and finishes the other.
 async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // The history has the shape sea-orm-migration 2.0.4 gave it, so a database
     // that crate migrated is read by this runner as it was written.
@@ -405,7 +406,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        53
+        54
     );
     assert_eq!(
         scalar(

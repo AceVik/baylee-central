@@ -122,6 +122,9 @@ impl Fields {
 /// The settings for every AI as typed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SettingsFields {
+    /// Whether fill-in runs: carried as read, set by the operator's command
+    /// for calibration (`docs/ai-players.md` §7).
+    pub(super) fill_in: bool,
     pub(super) fill_in_after: String,
     pub(super) drain_minutes: String,
     pub(super) global_seats: String,
@@ -133,6 +136,7 @@ pub(super) struct SettingsFields {
 impl SettingsFields {
     pub(super) fn of(settings: &AiSettings) -> Self {
         SettingsFields {
+            fill_in: settings.fill_in,
             fill_in_after: settings.fill_in_after.to_string(),
             drain_minutes: settings.drain_minutes.to_string(),
             global_seats: settings.global_seats.to_string(),
@@ -149,6 +153,7 @@ impl SettingsFields {
             text.trim().parse().map_err(|_| id)
         }
         let settings = AiSettings {
+            fill_in: self.fill_in,
             fill_in_after: number(&self.fill_in_after, "ai-fill-in-after")?,
             drain_minutes: number(&self.drain_minutes, "ai-drain")?,
             global_seats: number(&self.global_seats, "ai-global-seats")?,
@@ -274,6 +279,7 @@ mod tests {
     #[test]
     fn the_settings_are_checked_in_their_ranges() {
         let held = AiSettings {
+            fill_in: true,
             fill_in_after: 60,
             drain_minutes: 120,
             global_seats: 8,

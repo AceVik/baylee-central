@@ -463,6 +463,12 @@ operations:
   `Offer` takes the AI row, so that a switch-off waits for it and then
   withdraws what it stored. A disabled AI gets an answer too, so its running
   matches can end.
+  It also lists the account's matches settled in the last day, newest first,
+  at most 32 (`FINISHED`), each a `Finished { match_id, format, seat, result,
+  elo, delta, settled_at, opponent_ai }` read from the receipt written when
+  it was settled: a runner with several matches in one format tells which
+  ended how by the match id, not by its standing. A match that left the live
+  list and is not among them was voided. The field is absent while empty.
 - `Carousel { format }` belongs to Stage 2 (§7).
 
 The runner reads `Work` every two seconds while it offers, well inside a
@@ -533,6 +539,28 @@ Ending running matches as well needs the AI's sessions to end: an
 administrator revokes the runner token, or takes the account off its list,
 which ends the sessions it minted in the same transaction (§2). Switching off
 needs no recent password (open question 6, recommended and taken).
+
+**The operator's command.** The live operator signs in to the website as no
+administrator, and no operator account is appointed one for this (owner,
+27.11.2026). `central-service --ai-players-stdin` does what this page does
+under the migrator login: it creates and changes AI players, switches them,
+sets the settings for every AI (calibration's among them), revokes runner
+tokens and makes one for a runner machine, or lists them
+([operations](operations.md) §"AI players"). A plan is applied in one
+transaction through the same functions as the page (`ai/lifecycle.rs`
+`create` and `change`, `ai.rs` `switch` and `write_settings`, `ai_runner.rs`
+`make` and `revoke`), and its audit events name the operator as their actor
+(`actor_kind = 'operator'`; a token without a maker,
+`ai_runner_tokens.created_by IS NULL`, is the operator's). It is idempotent
+where it can be: an AI named by its display name and tag that is there with
+the same mind is reported, not made again, and anything ambiguous refuses the
+whole plan. A new token's text goes to standard output alone, once, after the
+commit.
+
+**Fill-in's switch.** `ai_settings.fill_in` (migration 000055, on by
+default) stops fill-in alone: the countdown goes, and a fill-in that waited
+for the settings' row reads it again under that lock. The carousel goes on,
+so calibration (§7) runs with no person meeting an AI.
 
 ## 6. Labelling
 
@@ -755,13 +783,21 @@ changes: `sessions` and `audit_events` have table-wide grants, which cover a
 new column. The previous binary writes sessions without the column, so they
 fall under the old rule, and its startup check passes over the new tables.
 
+**Migration 000055**, `m20261127_000055_ai_operator_fill_in`, comes after 000053
+and 000054 ran on test stacks, so neither is edited: it lets a runner token
+have no maker (`created_by` drops `NOT NULL`: the operator's) and adds
+`ai_settings.fill_in boolean NOT NULL DEFAULT true`. The runtime gains
+`UPDATE (fill_in)`. A binary of this branch from before it checks the
+settings' grants exactly, so it runs over 000055 only before the new grant
+is applied; the previous `main` binary names none of these tables.
+
 **The runtime's grants**, exact, in `ops/grants.sql` and the startup check
 (`accounts/grants.rs`):
 
 | Table | Grant |
 | --- | --- |
 | `ai_players` | `SELECT, INSERT, DELETE`; `UPDATE (label, enabled, max_games, daily_games, changed_at, changed_by)`. `kind`, `profile`, `set_at` and `set_by` are never updated. |
-| `ai_settings` | `SELECT`; `UPDATE` of every column except the key |
+| `ai_settings` | `SELECT`; `UPDATE` of every column except the key, `fill_in` (000055) among them |
 | `ai_offers` | `SELECT, INSERT, DELETE`; `UPDATE (session_digest, commitment, renewed_at, expires_at)` |
 | `ranked_ticket_ai` | `SELECT, INSERT` |
 | `ai_matches` | `SELECT, INSERT` |
@@ -1281,3 +1317,80 @@ with all three gone. A check of the whole workspace
 stopped at the picture codec's build script, which needs `nasm` and finds
 none there, so `central-service` and the web server, which link it, were
 not compiled; neither names the runner's requests or answers.
+
+### The website, the operator's command, fill-in's switch and the runner's results (27 November 2026)
+
+- **The website** (`central-web`): the AI label (a mark by kind and the
+  badge's text, the kind in words for screen readers) beside every AI
+  account's name the site shows: the public player page, a chat mention's
+  preview, the administration's account list and account page (no role or
+  reset code is offered for an AI), the reset-code search and the audit's
+  tables, which name the eight `ai.*` actions. The administration's page
+  `/account/admin/ai` lists the AI players and creates, changes, switches
+  and removes them, holds the settings for every AI with "stop every AI",
+  and makes, shows once and revokes runner tokens. The site renders no
+  ranked board, so the board filter has nowhere to go there yet; a client's
+  board takes it (§6). Open: the chat's people search (`social::Person`)
+  carries no badge, and finds an AI account unlabelled but for its `KI-`
+  name.
+- **The operator's command** (§5, [operations](operations.md) §"AI
+  players"): `central-service --ai-players-stdin`, `ai/operator.rs` in the
+  store. The administration's change functions were split so that both
+  paths take one: `lifecycle.rs` `create` and `change`, `ai.rs` `switch` and
+  `write_settings`, `ai_runner.rs` `make`, `revoke` and `listed`; each
+  audit writer takes an actor that may be none, the operator. A plan's
+  locks follow the administration's and fill-in's order: the
+  administrators' rows, the settings' row, the revoked tokens and their
+  sessions, the AI accounts and rows, the new token.
+- **Migration 000055** (§9): a token without a maker, and fill-in's switch.
+  000053 and 000054 are not edited, since test stacks ran them.
+- **`Work`'s results** (§4): `finished`, the last day's receipts of the
+  account, at most 32, newest first.
+
+Design pass for these, in short. Assets: the AI accounts' integrity, the
+runner token's secret, the settings, the people's queue. Callers: the
+operator, holding the migrator login; an administrator at the same time; a
+runner. Invariants: the operator's command can do nothing the page cannot,
+through the same code, with the same checks and audit; a plan is whole or
+nothing; the token's text appears once, on standard output, after the
+commit, and nowhere else; anything that could name two things is refused;
+no edited migration.
+
+Implementation pass. The plan's own bounds are checked before the
+database is asked (`checked`: settings, distinct tags and names, the token's
+name, lifetime and list, a secret exactly with a token). A player is named
+by its display name and tag together: neither taken creates it, both on one
+AI of the same mind reports or changes it, and a tag a person or another AI
+holds, the name under another tag, or another kind or profile refuses the
+plan. A token's accounts are named by display name and each must name one
+AI; a live token of the same name refuses it, so rotating revokes the old
+one in the same plan. The command reads its input as `--appoint-admin-stdin`
+does (the login in the JSON, never an argument; unknown fields refused),
+answers one refusal line that echoes nothing, writes what it did to
+standard error and the token's text alone to standard output. A listing
+goes alone and prints no digest or text.
+
+Adversarial checks, as run. The store suite (`ai_operator.rs`): one plan
+creates a switched-on AI with no password, writes calibration's settings
+and a working token whose maker is none, and audits each change with the
+operator as the actor; the same plan again reports it, a new label changes
+it; six ambiguous or wrong plans (the tag under another name, the name
+under another tag, a person's tag, another mind, a token for a name no AI
+holds, a second live token of one name) and an unknown revocation are
+refused whole, and the new player each also asked for is not there
+afterwards; an operator's revocation ends the token's session in its
+transaction, and the listing shows the token as the operator's and revoked.
+Unit tests: the plan's bounds (ten wrong plans), settings left out stay,
+the input's shapes (a listing alone, unknown fields refused, the id's
+forms). The CLI suite: the mode is listed, refuses an extra argument
+without echoing it, and refuses empty and wrong input with its one line and
+no secret. The carousel suite: after five carousel matches each runner's
+`Work` lists the five with their results and the same deltas as the
+receipts. Fill-in's switch reads again under the settings' lock.
+
+**Evidence (27.11.2026),** on bigace (Ubuntu, x86-64), never this Mac:
+`cargo test` of `central-api` (200), `central-client` (28 and 5),
+`central-identity` (161), `central-web` (172), `central-migration` (8),
+`central-postgres` (lib 56), `central-service` (lib 51, CLI 8);
+`cargo clippy --all-targets -D warnings` over those crates and `cargo fmt
+--check`, clean; `cargo xtask postgres --store-only`, green.

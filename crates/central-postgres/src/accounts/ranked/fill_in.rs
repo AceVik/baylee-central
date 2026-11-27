@@ -159,7 +159,7 @@ pub(super) async fn due(
         return Ok(None);
     };
     let settings = ai::settings(db, false).await?;
-    if settings.global_seats == 0 {
+    if settings.global_seats == 0 || !settings.fill_in {
         return Ok(None);
     }
     let available = db
@@ -210,7 +210,11 @@ pub(super) async fn seat(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
         .await
         .map_err(unavailable)?
         .is_some();
-    if !waited || settings.global_seats == 0 || person_waiting(db, ticket).await? {
+    if !waited
+        || !settings.fill_in
+        || settings.global_seats == 0
+        || person_waiting(db, ticket).await?
+    {
         return Ok(());
     }
     let candidates = eligible(db, me, &format, models, settings.drain_minutes, None).await?;
@@ -232,7 +236,9 @@ pub(super) async fn seat(db: &DatabaseTransaction, ticket: &QueryResult) -> Resu
         return Ok(());
     }
     let settings = ai::settings(db, true).await?;
-    if seats_live(db).await? >= i64::from(settings.global_seats) {
+    // Asked again under the lock: fill-in switched off for calibration
+    // seats nothing from that commit on.
+    if !settings.fill_in || seats_live(db).await? >= i64::from(settings.global_seats) {
         return Ok(());
     }
     let elo: i32 = column(ticket, "queue_elo")?;

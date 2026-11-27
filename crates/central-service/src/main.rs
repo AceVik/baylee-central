@@ -8,6 +8,7 @@ use std::process::ExitCode;
 
 mod accounts;
 mod advent_import;
+mod ai_players;
 mod cards_ingest;
 mod funding;
 mod gateway_push;
@@ -20,13 +21,14 @@ mod reports_import;
 mod restore;
 
 /// Every mode, in the order the usage names them; `--modes` prints them.
-const MODES: [&str; 18] = [
+const MODES: [&str; 19] = [
     "--dev",
     "--dev-accounts-stdin",
     "--accounts-stdin",
     "--check-accounts-stdin",
     "--migrate-stdin",
     "--appoint-admin-stdin",
+    "--ai-players-stdin",
     "--sweep-stdin",
     "--after-restore-stdin",
     "--erase-accounts-stdin",
@@ -62,6 +64,7 @@ async fn main() -> ExitCode {
         Some("--accounts-stdin") => return production::run_service().await,
         Some("--migrate-stdin") => return production::run_migration().await,
         Some("--appoint-admin-stdin") => return production::run_appoint_admin().await,
+        Some("--ai-players-stdin") => return ai_players::run().await,
         Some("--sweep-stdin") => return production::run_sweep().await,
         Some("--after-restore-stdin") => return restore::run_after_restore().await,
         Some("--erase-accounts-stdin") => return restore::run_erase().await,

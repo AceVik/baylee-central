@@ -7,6 +7,7 @@ use central_api::ranked::ai::{AiBadge, AiKind};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
 mod lifecycle;
+pub(crate) mod operator;
 
 /// An `accounts` row, named `accounts` in its statement, that is no AI
 /// player: the condition the sessionless flows put on the account they
@@ -77,6 +78,7 @@ fn settings_of(row: &QueryResult) -> Result<AiSettings, Error> {
     let small =
         |name| -> Result<u8, Error> { u8::try_from(get::<i16>(row, name)?).map_err(unavailable) };
     Ok(AiSettings {
+        fill_in: get(row, "fill_in")?,
         fill_in_after: u16::try_from(get::<i16>(row, "fill_in_after")?).map_err(unavailable)?,
         drain_minutes: u16::try_from(get::<i16>(row, "drain_minutes")?).map_err(unavailable)?,
         global_seats: small("global_seats")?,
@@ -103,16 +105,18 @@ pub(crate) async fn settings(db: &impl ConnectionTrait, lock: bool) -> Result<Ai
     settings_of(&row)
 }
 
+/// Write one audit event in `tx`: an administrator's, or the operator's
+/// (`actor` none, `central-service --ai-players-stdin`). Ids and numbers only.
 async fn audit(
     tx: &DatabaseTransaction,
-    actor: Uuid,
+    actor: Option<Uuid>,
     action: Action,
     account: Option<Uuid>,
     detail: Option<String>,
 ) -> Result<(), Error> {
     tx.execute_raw(statement(
         "INSERT INTO central_identity.audit_events (actor_kind, actor_account, action, account_id, detail)
-         VALUES ('admin', $1, $2, $3, $4::jsonb)",
+         VALUES (CASE WHEN $1::uuid IS NULL THEN 'operator' ELSE 'admin' END, $1, $2, $3, $4::jsonb)",
         vec![actor.into(), action.as_str().into(), account.into(), detail.into()],
     ))
     .await
@@ -215,42 +219,8 @@ impl AccountStore {
         account: [u8; 16],
         enabled: bool,
     ) -> Result<(), Error> {
-        let account = Uuid::from_bytes(account);
         let (tx, actor) = self.acting_administrator_fresh(browser, enabled).await?;
-        let before: bool = get(
-            &tx.query_one_raw(statement(
-                "SELECT enabled FROM central_identity.ai_players WHERE account_id = $1 FOR UPDATE",
-                vec![account.into()],
-            ))
-            .await
-            .map_err(unavailable)?
-            .ok_or(Error::Rejected)?,
-            "enabled",
-        )?;
-        if before == enabled {
-            return tx.commit().await.map_err(unavailable);
-        }
-        tx.execute_raw(statement(
-            "UPDATE central_identity.ai_players SET enabled = $2,
-               changed_at = pg_catalog.clock_timestamp(), changed_by = $3 WHERE account_id = $1",
-            vec![account.into(), enabled.into(), actor.into()],
-        ))
-        .await
-        .map_err(unavailable)?;
-        if !enabled {
-            tx.execute_raw(statement(
-                "DELETE FROM central_identity.ai_offers WHERE account_id = $1",
-                vec![account.into()],
-            ))
-            .await
-            .map_err(unavailable)?;
-        }
-        let action = if enabled {
-            Action::AiEnabled
-        } else {
-            Action::AiDisabled
-        };
-        audit(&tx, actor, action, Some(account), None).await?;
+        switch(&tx, Some(actor), Uuid::from_bytes(account), enabled).await?;
         tx.commit().await.map_err(unavailable)
     }
 
@@ -299,38 +269,107 @@ impl AccountStore {
         } else {
             next.global_seats = 0;
         }
+        write_settings(&tx, Some(actor), &next).await?;
+        tx.commit().await.map_err(unavailable)
+    }
+}
+
+/// Switch the AI `account` on or off in `tx`, for an administrator or the
+/// operator (`actor` none), as [`AccountStore::set_ai_enabled`] says: its
+/// row locked, its offers withdrawn when it goes off, audited when it
+/// changes. Answers whether it changed.
+///
+/// # Errors
+/// `Rejected` for an account that is no AI player; storage failure.
+pub(crate) async fn switch(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    account: Uuid,
+    enabled: bool,
+) -> Result<bool, Error> {
+    let before: bool = get(
+        &tx.query_one_raw(statement(
+            "SELECT enabled FROM central_identity.ai_players WHERE account_id = $1 FOR UPDATE",
+            vec![account.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .ok_or(Error::Rejected)?,
+        "enabled",
+    )?;
+    if before == enabled {
+        return Ok(false);
+    }
+    tx.execute_raw(statement(
+        "UPDATE central_identity.ai_players SET enabled = $2,
+           changed_at = pg_catalog.clock_timestamp(), changed_by = $3 WHERE account_id = $1",
+        vec![account.into(), enabled.into(), actor.into()],
+    ))
+    .await
+    .map_err(unavailable)?;
+    if !enabled {
         tx.execute_raw(statement(
-            "UPDATE central_identity.ai_settings SET fill_in_after = $1, drain_minutes = $2,
-               global_seats = $3, host_reserve = $4, carousel_games = $5, carousel_daily = $6,
-               changed_at = pg_catalog.clock_timestamp(), changed_by = $7",
-            vec![
-                i16::try_from(next.fill_in_after)
-                    .map_err(|_| Error::Rejected)?
-                    .into(),
-                i16::try_from(next.drain_minutes)
-                    .map_err(|_| Error::Rejected)?
-                    .into(),
-                i16::from(next.global_seats).into(),
-                i16::from(next.host_reserve).into(),
-                i16::from(next.carousel_games).into(),
-                i32::try_from(next.carousel_daily)
-                    .map_err(|_| Error::Rejected)?
-                    .into(),
-                actor.into(),
-            ],
+            "DELETE FROM central_identity.ai_offers WHERE account_id = $1",
+            vec![account.into()],
         ))
         .await
         .map_err(unavailable)?;
-        let detail = format!(
-            "{{\"fill_in_after\":{},\"drain_minutes\":{},\"global_seats\":{},\"host_reserve\":{},\"carousel_games\":{},\"carousel_daily\":{}}}",
-            next.fill_in_after,
-            next.drain_minutes,
-            next.global_seats,
-            next.host_reserve,
-            next.carousel_games,
-            next.carousel_daily
-        );
-        audit(&tx, actor, Action::AiSettingsChanged, None, Some(detail)).await?;
-        tx.commit().await.map_err(unavailable)
     }
+    let action = if enabled {
+        Action::AiEnabled
+    } else {
+        Action::AiDisabled
+    };
+    audit(tx, actor, action, Some(account), None).await?;
+    Ok(true)
+}
+
+/// Write `next` as the settings for every AI in `tx`, whose row the caller
+/// locked ([`settings`] with `lock`), for an administrator or the operator
+/// (`actor` none), with the audit's numbers.
+///
+/// # Errors
+/// `Rejected` for values out of range; storage failure.
+pub(crate) async fn write_settings(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    next: &AiSettings,
+) -> Result<(), Error> {
+    if !next.valid() {
+        return Err(Error::Rejected);
+    }
+    tx.execute_raw(statement(
+        "UPDATE central_identity.ai_settings SET fill_in = $1, fill_in_after = $2,
+           drain_minutes = $3, global_seats = $4, host_reserve = $5, carousel_games = $6,
+           carousel_daily = $7, changed_at = pg_catalog.clock_timestamp(), changed_by = $8",
+        vec![
+            next.fill_in.into(),
+            i16::try_from(next.fill_in_after)
+                .map_err(|_| Error::Rejected)?
+                .into(),
+            i16::try_from(next.drain_minutes)
+                .map_err(|_| Error::Rejected)?
+                .into(),
+            i16::from(next.global_seats).into(),
+            i16::from(next.host_reserve).into(),
+            i16::from(next.carousel_games).into(),
+            i32::try_from(next.carousel_daily)
+                .map_err(|_| Error::Rejected)?
+                .into(),
+            actor.into(),
+        ],
+    ))
+    .await
+    .map_err(unavailable)?;
+    let detail = format!(
+        "{{\"fill_in\":{},\"fill_in_after\":{},\"drain_minutes\":{},\"global_seats\":{},\"host_reserve\":{},\"carousel_games\":{},\"carousel_daily\":{}}}",
+        u8::from(next.fill_in),
+        next.fill_in_after,
+        next.drain_minutes,
+        next.global_seats,
+        next.host_reserve,
+        next.carousel_games,
+        next.carousel_daily
+    );
+    audit(tx, actor, Action::AiSettingsChanged, None, Some(detail)).await
 }

@@ -3,7 +3,10 @@
 //! matches, and a match against another AI.
 use super::{Error, api, carousel, column, statement, unavailable};
 use crate::accounts::ai::{LIVE, badge};
-use api::ai::{AiBadge, AiKind, MAX_GAMES, MAX_OFFERS, Offer, Request, Response, Settings};
+use api::ai::{
+    AiBadge, AiKind, FINISHED, Finished, MAX_GAMES, MAX_OFFERS, MatchResult, Offer, Request,
+    Response, Settings,
+};
 use sea_orm::{ConnectionTrait, DatabaseTransaction, QueryResult, prelude::Uuid};
 
 /// How long an offer stands without renewal.
@@ -129,7 +132,51 @@ async fn work(db: &DatabaseTransaction, me: Uuid, row: &QueryResult) -> Result<R
     Ok(Response::Work {
         settings,
         assignments,
+        finished: finished(db, me).await?,
     })
+}
+
+/// The account's matches settled in the last day, newest first, at most
+/// [`FINISHED`]: the receipts written in the transaction that settled each,
+/// read from the AI's seat.
+async fn finished(db: &DatabaseTransaction, me: Uuid) -> Result<Vec<Finished>, Error> {
+    let rows = db
+        .query_all_raw(statement(
+            "SELECT r.match_id, r.format, r.outcome, r.elo, r.delta,
+                 floor(extract(epoch FROM r.settled_at))::bigint AS settled_at,
+                 m.account_a <> r.account_id AS second,
+                 p.kind AS ai_kind, p.label AS ai_label
+             FROM central_identity.ranked_receipts r
+             JOIN central_identity.ranked_matches m ON m.id = r.match_id
+             LEFT JOIN central_identity.ai_players p ON p.account_id = r.opponent_id
+             WHERE r.account_id = $1
+             AND r.settled_at > pg_catalog.clock_timestamp() - interval '1 day'
+             ORDER BY r.settled_at DESC, r.match_id DESC LIMIT $2",
+            vec![me.into(), i64::from(FINISHED).into()],
+        ))
+        .await
+        .map_err(unavailable)?;
+    rows.iter()
+        .map(|row| {
+            Ok(Finished {
+                match_id: column::<Uuid>(row, "match_id")?.into_bytes(),
+                format: column::<String>(row, "format")?
+                    .parse()
+                    .map_err(unavailable)?,
+                seat: u8::from(column::<bool>(row, "second")?),
+                result: match column::<i16>(row, "outcome")? {
+                    1 => MatchResult::Win,
+                    0 => MatchResult::Draw,
+                    -1 => MatchResult::Loss,
+                    _ => return Err(Error::Unavailable),
+                },
+                elo: column(row, "elo")?,
+                delta: column(row, "delta")?,
+                settled_at: column(row, "settled_at")?,
+                opponent_ai: crate::accounts::ai::badge_of(row)?,
+            })
+        })
+        .collect()
 }
 
 /// The account's seat in the match the carousel has just made.

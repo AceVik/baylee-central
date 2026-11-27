@@ -8,6 +8,7 @@ use central_postgres::RankedHostCredential::{Official, Registered};
 use sea_orm::{ConnectionTrait, DbBackend, Statement, prelude::Uuid};
 
 mod ai;
+mod ai_operator;
 mod ai_runner;
 mod boards;
 mod carousel;
@@ -368,6 +369,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     .unwrap();
     ai::run(store, db, keys).await;
     ai_runner::run(store, db, keys).await;
+    ai_operator::run(store, db, keys).await;
     carousel::run(store, db, keys).await;
 }
 

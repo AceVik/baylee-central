@@ -393,7 +393,7 @@ function admin(w: World, asked: Asked, answer: Answer, done: (other: boolean) =>
     case "ai_settings":
       return answer({
         answer: "ai_settings",
-        settings: { fill_in_after: 60, drain_minutes: 120, global_seats: 8, host_reserve: 2, carousel_games: 0, carousel_daily: 0 },
+        settings: { fill_in: true, fill_in_after: 60, drain_minutes: 120, global_seats: 8, host_reserve: 2, carousel_games: 0, carousel_daily: 0 },
         changed_at: null,
       });
     case "ai_runner_tokens":

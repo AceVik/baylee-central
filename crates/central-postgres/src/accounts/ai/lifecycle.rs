@@ -6,7 +6,9 @@ use crate::accounts::{AccountStore, Action, Error, Token, deletion, statement};
 use central_api::admin::AiPlayerSettings;
 use central_api::profile::valid_tag;
 use central_api::reports::hex;
-use sea_orm::{ConnectionTrait, DatabaseTransaction, SqlErr, prelude::Uuid};
+use sea_orm::{
+    ConnectionTrait, DatabaseTransaction, QueryResult, SqlErr, Statement, prelude::Uuid,
+};
 
 /// The credential every AI account holds: fixed bytes that no OPAQUE record
 /// parses. A record has the fixed length of a registration upload
@@ -88,6 +90,183 @@ fn taken(error: &sea_orm::DbErr) -> Error {
     }
 }
 
+/// The parts of a new AI account that nothing opens: an unguessable login
+/// name, the master key's wrappers and a document, all random.
+struct Sealed {
+    name: String,
+    wrapped: Vec<u8>,
+    recovery: Vec<u8>,
+    document: Vec<u8>,
+}
+
+impl Sealed {
+    fn new() -> Result<Self, Error> {
+        Ok(Self {
+            name: login()?,
+            wrapped: sealed(WRAPPED)?,
+            recovery: sealed(WRAPPED)?,
+            document: sealed(DOCUMENT)?,
+        })
+    }
+
+    /// The account row with `tag`: registered, the sealed credential,
+    /// restored, named.
+    fn row(&self, settings: &AiPlayerSettings, tag: i32) -> Statement {
+        statement(
+            "INSERT INTO central_identity.accounts (source, username_key, credential,
+                wrapped_master, recovery_wrapped_master, document, document_revision,
+                restored, display_name, display_name_at, tag)
+             VALUES ('registered', $1, $2, $3, $4, $5, 1, true, $6,
+                pg_catalog.clock_timestamp(), $7)
+             RETURNING id, tag",
+            vec![
+                self.name.clone().into(),
+                SEALED_CREDENTIAL.to_vec().into(),
+                self.wrapped.clone().into(),
+                self.recovery.clone().into(),
+                self.document.clone().into(),
+                settings.display_name.clone().into(),
+                tag.into(),
+            ],
+        )
+    }
+}
+
+/// The settings' checks, the same for every path that creates or changes an
+/// AI: the kind as stored and the daily cap as a column.
+fn checked(settings: &AiPlayerSettings) -> Result<(&'static str, Option<i32>), Error> {
+    let kind = settings.kind.as_str().ok_or(Error::Rejected)?;
+    if !settings.valid() {
+        return Err(Error::Rejected);
+    }
+    let daily = settings
+        .daily_games
+        .map(i32::try_from)
+        .transpose()
+        .map_err(|_| Error::Rejected)?;
+    Ok((kind, daily))
+}
+
+/// A tag as its column holds it, refused out of range.
+fn tag_column(tag: u32) -> Result<i32, Error> {
+    if !valid_tag(tag) {
+        return Err(Error::Rejected);
+    }
+    i32::try_from(tag).map_err(|_| Error::Rejected)
+}
+
+/// After the account row: the AI's row, switched off, and `ai.created`, for
+/// an administrator or the operator (`actor` none). Answers id and tag.
+async fn created(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    settings: &AiPlayerSettings,
+    row: &QueryResult,
+) -> Result<([u8; 16], u32), Error> {
+    let (kind, daily) = checked(settings)?;
+    let account: Uuid = get(row, "id")?;
+    let tag = u32::try_from(get::<i32>(row, "tag")?).map_err(unavailable)?;
+    tx.execute_raw(statement(
+        "INSERT INTO central_identity.ai_players
+           (account_id, kind, profile, label, max_games, daily_games, set_by, changed_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)",
+        vec![
+            account.into(),
+            kind.into(),
+            settings.profile.clone().into(),
+            settings.label.clone().into(),
+            i16::from(settings.max_games).into(),
+            daily.into(),
+            actor.into(),
+        ],
+    ))
+    .await
+    .map_err(unavailable)?;
+    audit(
+        tx,
+        actor,
+        Action::AiCreated,
+        Some(account),
+        Some(detail(settings)),
+    )
+    .await?;
+    Ok((account.into_bytes(), tag))
+}
+
+/// Create an AI player with `tag` in `tx`, for an administrator or the
+/// operator (`actor` none): the account row ([`Sealed`]) and [`created`].
+/// The one creation both [`AccountStore::create_ai_player`] and the
+/// operator's command take.
+///
+/// # Errors
+/// `Rejected` for settings out of bounds and a tag out of range;
+/// `Conflict` for a tag another account holds; storage failure.
+pub(crate) async fn create(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    settings: &AiPlayerSettings,
+    tag: u32,
+) -> Result<([u8; 16], u32), Error> {
+    checked(settings)?;
+    let tag = tag_column(tag)?;
+    let row = tx
+        .query_one_raw(Sealed::new()?.row(settings, tag))
+        .await
+        .map_err(|e| taken(&e))?
+        .ok_or(Error::Unavailable)?;
+    created(tx, actor, settings, &row).await
+}
+
+/// Change the AI `account`'s label, limits and display name in `tx`, for
+/// an administrator or the operator (`actor` none), audited. Its kind and
+/// profile stay as created.
+///
+/// # Errors
+/// `Rejected` for settings out of bounds and an account that is no AI
+/// player; `Conflict` for another kind or profile; storage failure.
+pub(crate) async fn change(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    account: Uuid,
+    settings: &AiPlayerSettings,
+) -> Result<(), Error> {
+    let (kind, daily) = checked(settings)?;
+    let (held_kind, held_profile) = lock(tx, account).await?;
+    if held_kind != kind || held_profile != settings.profile {
+        return Err(Error::Conflict);
+    }
+    tx.execute_raw(statement(
+        "UPDATE central_identity.ai_players SET label = $2, max_games = $3,
+           daily_games = $4, changed_at = pg_catalog.clock_timestamp(), changed_by = $5
+         WHERE account_id = $1",
+        vec![
+            account.into(),
+            settings.label.clone().into(),
+            i16::from(settings.max_games).into(),
+            daily.into(),
+            actor.into(),
+        ],
+    ))
+    .await
+    .map_err(unavailable)?;
+    tx.execute_raw(statement(
+        "UPDATE central_identity.accounts SET display_name = $2,
+           display_name_at = pg_catalog.clock_timestamp()
+         WHERE id = $1 AND display_name IS DISTINCT FROM $2",
+        vec![account.into(), settings.display_name.clone().into()],
+    ))
+    .await
+    .map_err(unavailable)?;
+    audit(
+        tx,
+        actor,
+        Action::AiChanged,
+        Some(account),
+        Some(detail(settings)),
+    )
+    .await
+}
+
 impl AccountStore {
     /// Create an AI player for a fresh administrator: a new account with no
     /// password ([`SEALED_CREDENTIAL`], wrappers and a document nothing
@@ -107,78 +286,24 @@ impl AccountStore {
         settings: &AiPlayerSettings,
         tag: Option<u32>,
     ) -> Result<([u8; 16], u32), Error> {
-        let kind = settings.kind.as_str().ok_or(Error::Rejected)?;
-        if !settings.valid() || tag.is_some_and(|tag| !valid_tag(tag)) {
-            return Err(Error::Rejected);
-        }
-        let daily = settings
-            .daily_games
-            .map(i32::try_from)
-            .transpose()
-            .map_err(|_| Error::Rejected)?;
-        let tag = tag
-            .map(i32::try_from)
-            .transpose()
-            .map_err(|_| Error::Rejected)?;
-        let (name, credential) = (login()?, SEALED_CREDENTIAL.to_vec());
-        let (wrapped, recovery, document) = (sealed(WRAPPED)?, sealed(WRAPPED)?, sealed(DOCUMENT)?);
+        checked(settings)?;
+        tag.map(tag_column).transpose()?;
         let (tx, actor) = self.acting_administrator(browser).await?;
-        let insert = |tag: i32| {
-            statement(
-                "INSERT INTO central_identity.accounts (source, username_key, credential,
-                    wrapped_master, recovery_wrapped_master, document, document_revision,
-                    restored, display_name, display_name_at, tag)
-                 VALUES ('registered', $1, $2, $3, $4, $5, 1, true, $6,
-                    pg_catalog.clock_timestamp(), $7)
-                 RETURNING id, tag",
-                vec![
-                    name.clone().into(),
-                    credential.clone().into(),
-                    wrapped.clone().into(),
-                    recovery.clone().into(),
-                    document.clone().into(),
-                    settings.display_name.clone().into(),
-                    tag.into(),
-                ],
-            )
+        // The administrator's tag or none: never another one drawn instead.
+        let made = if let Some(tag) = tag {
+            create(&tx, Some(actor), settings, tag).await?
+        } else {
+            let sealed = Sealed::new()?;
+            let row = self
+                .first_free_tag(&tx, None, None, Error::Unavailable, |tag| {
+                    sealed.row(settings, tag)
+                })
+                .await?
+                .ok_or(Error::Unavailable)?;
+            created(&tx, Some(actor), settings, &row).await?
         };
-        let row = match tag {
-            // The administrator's tag or none: never another one drawn instead.
-            Some(tag) => tx.query_one_raw(insert(tag)).await.map_err(|e| taken(&e))?,
-            None => {
-                self.first_free_tag(&tx, None, None, Error::Unavailable, insert)
-                    .await?
-            }
-        }
-        .ok_or(Error::Unavailable)?;
-        let account: Uuid = get(&row, "id")?;
-        let tag = u32::try_from(get::<i32>(&row, "tag")?).map_err(unavailable)?;
-        tx.execute_raw(statement(
-            "INSERT INTO central_identity.ai_players
-               (account_id, kind, profile, label, max_games, daily_games, set_by, changed_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $7)",
-            vec![
-                account.into(),
-                kind.into(),
-                settings.profile.clone().into(),
-                settings.label.clone().into(),
-                i16::from(settings.max_games).into(),
-                daily.into(),
-                actor.into(),
-            ],
-        ))
-        .await
-        .map_err(unavailable)?;
-        audit(
-            &tx,
-            actor,
-            Action::AiCreated,
-            Some(account),
-            Some(detail(settings)),
-        )
-        .await?;
         tx.commit().await.map_err(unavailable)?;
-        Ok((account.into_bytes(), tag))
+        Ok(made)
     }
 
     /// Change an AI player's label, limits and display name for a fresh
@@ -194,51 +319,9 @@ impl AccountStore {
         account: [u8; 16],
         settings: &AiPlayerSettings,
     ) -> Result<(), Error> {
-        let kind = settings.kind.as_str().ok_or(Error::Rejected)?;
-        if !settings.valid() {
-            return Err(Error::Rejected);
-        }
-        let daily = settings
-            .daily_games
-            .map(i32::try_from)
-            .transpose()
-            .map_err(|_| Error::Rejected)?;
-        let account = Uuid::from_bytes(account);
+        checked(settings)?;
         let (tx, actor) = self.acting_administrator(browser).await?;
-        let (held_kind, held_profile) = lock(&tx, account).await?;
-        if held_kind != kind || held_profile != settings.profile {
-            return Err(Error::Conflict);
-        }
-        tx.execute_raw(statement(
-            "UPDATE central_identity.ai_players SET label = $2, max_games = $3,
-               daily_games = $4, changed_at = pg_catalog.clock_timestamp(), changed_by = $5
-             WHERE account_id = $1",
-            vec![
-                account.into(),
-                settings.label.clone().into(),
-                i16::from(settings.max_games).into(),
-                daily.into(),
-                actor.into(),
-            ],
-        ))
-        .await
-        .map_err(unavailable)?;
-        tx.execute_raw(statement(
-            "UPDATE central_identity.accounts SET display_name = $2,
-               display_name_at = pg_catalog.clock_timestamp()
-             WHERE id = $1 AND display_name IS DISTINCT FROM $2",
-            vec![account.into(), settings.display_name.clone().into()],
-        ))
-        .await
-        .map_err(unavailable)?;
-        audit(
-            &tx,
-            actor,
-            Action::AiChanged,
-            Some(account),
-            Some(detail(settings)),
-        )
-        .await?;
+        change(&tx, Some(actor), Uuid::from_bytes(account), settings).await?;
         tx.commit().await.map_err(unavailable)
     }
 
@@ -281,7 +364,7 @@ impl AccountStore {
             })
             .collect::<Result<Vec<[u8; 32]>, Error>>()?;
         deletion::remove(&tx, account).await?;
-        audit(&tx, actor, Action::AiRemoved, Some(account), None).await?;
+        audit(&tx, Some(actor), Action::AiRemoved, Some(account), None).await?;
         tx.commit().await.map_err(unavailable)?;
         Ok(ended)
     }

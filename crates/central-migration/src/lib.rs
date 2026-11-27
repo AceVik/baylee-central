@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 53] = migrations![
+const MIGRATIONS: [Migration; 54] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -89,6 +89,7 @@ const MIGRATIONS: [Migration; 53] = migrations![
     "m20261125_000052_report_tokens",
     "m20261126_000053_ai_players",
     "m20261126_000054_ai_runner_tokens",
+    "m20261127_000055_ai_operator_fill_in",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -212,7 +213,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 53);
+        assert_eq!(MIGRATIONS.len(), 54);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -244,7 +245,7 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(53));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(54));
         assert_eq!(
             pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
             Some("m20261119_000033_presence")
@@ -350,9 +351,9 @@ mod tests {
     #[test]
     fn ai_runner_tokens_migration_keeps_people_s_one_session_rule() {
         let m = MIGRATIONS
-            .last()
+            .iter()
+            .find(|m| m.name == "m20261126_000054_ai_runner_tokens")
             .expect("runner tokens migration is present");
-        assert_eq!(m.name, "m20261126_000054_ai_runner_tokens");
         for said in [
             "CREATE TABLE central_identity.ai_runner_tokens",
             "pg_catalog.uuid_extract_version(id) IS NOT DISTINCT FROM 7",
@@ -382,5 +383,23 @@ mod tests {
         // No existing table gains or loses a grant here: sessions and the
         // audit have table-wide grants that cover a new column.
         assert!(!m.sql.contains("GRANT"));
+    }
+
+    /// After 000053 and 000054 ran on test stacks, what the operator's command
+    /// and calibration need comes as a migration of its own: an operator's
+    /// token without a maker, and fill-in's switch, on by default.
+    #[test]
+    fn ai_operator_migration_only_relaxes_the_maker_and_adds_the_switch() {
+        let m = MIGRATIONS.last().expect("AI operator migration is present");
+        assert_eq!(m.name, "m20261127_000055_ai_operator_fill_in");
+        for said in [
+            "ALTER TABLE central_identity.ai_runner_tokens ALTER COLUMN created_by DROP NOT NULL",
+            "ALTER TABLE central_identity.ai_settings ADD COLUMN fill_in boolean NOT NULL DEFAULT true",
+        ] {
+            assert!(m.sql.contains(said), "{said}");
+        }
+        // The column's grant is ops/grants.sql's, as every grant is.
+        assert!(!m.sql.contains("GRANT"));
+        assert!(!m.sql.contains("DROP TABLE"));
     }
 }

@@ -87,7 +87,7 @@ fn bad_reserved_environment_is_rejected_without_echoing_values() {
 }
 
 /// The usage: every mode, in the order `--modes` names them.
-const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --sweep-stdin | --after-restore-stdin | --erase-accounts-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key | --modes";
+const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --ai-players-stdin | --sweep-stdin | --after-restore-stdin | --erase-accounts-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key | --modes";
 
 #[test]
 fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
@@ -101,6 +101,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         // the closed beta's keys went on 11.11.2026, and their mode with them
         &["--issue-beta-keys-stdin"],
         &["--appoint-admin-stdin", "PRIVATE_ARG_CANARY"],
+        &["--ai-players-stdin", "PRIVATE_ARG_CANARY"],
         &["--sweep-stdin", "--dev"],
         &["--legacy-import-stdin", "PRIVATE_ARG_CANARY"],
         &["--legacy-deadline-stdin", "--dev"],
@@ -140,6 +141,10 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         (
             "--appoint-admin-stdin",
             "central: appointment rejected configuration, found no enrolled account of that name, or failed",
+        ),
+        (
+            "--ai-players-stdin",
+            "central: AI players rejected the input, found it ambiguous, or failed; nothing was changed",
         ),
         (
             "--sweep-stdin",

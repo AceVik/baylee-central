@@ -175,6 +175,45 @@ pub const MAX_OFFERS: usize = 3;
 /// does not shorten while more are live.
 pub const MAX_GAMES: u8 = 16;
 
+/// The most settled matches [`Response::Work`] lists.
+pub const FINISHED: u8 = 32;
+
+/// How a settled match ended for this account.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchResult {
+    /// It won.
+    Win,
+    /// It lost.
+    Loss,
+    /// Neither seat won.
+    Draw,
+}
+
+/// One of the account's settled matches, as [`Response::Work`] lists it:
+/// the receipt a person's `Finished` carries, from the AI's seat.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Finished {
+    /// Central's match ID, as in its assignment.
+    pub match_id: super::Id,
+    /// Competitive format.
+    pub format: Format,
+    /// This account's seat.
+    pub seat: u8,
+    /// How it ended for this account.
+    pub result: MatchResult,
+    /// Its rating after the match, in Elo points.
+    pub elo: i32,
+    /// The change of its rating.
+    pub delta: i32,
+    /// When it was settled, Unix seconds.
+    pub settled_at: i64,
+    /// The opponent's badge when the opponent was an AI (the carousel).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opponent_ai: Option<AiBadge>,
+}
+
 /// The runner's operations, on a native session of an AI account.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -252,6 +291,13 @@ pub enum Response {
         /// Every live match (reserved or playing), at most [`MAX_GAMES`]: more
         /// than `max_games` while an administrator has just lowered it.
         assignments: Vec<Assignment>,
+        /// Its matches settled in the last day, newest first, at most
+        /// [`FINISHED`]: each with its result and rating change, so a runner
+        /// playing several matches in one format knows which ended how. A
+        /// match that left `assignments` and is not here was voided. Absent
+        /// on the wire while empty.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        finished: Vec<Finished>,
     },
     /// The carousel made a match now: the account's seat in it, which
     /// [`Self::Work`] lists from now on too. The opponent is an AI.

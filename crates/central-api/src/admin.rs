@@ -377,6 +377,10 @@ pub struct AiPlayerSettings {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AiSettings {
+    /// Whether fill-in runs at all. Off for calibration: the carousel then
+    /// plays alone (`docs/ai-players.md` §7). On unless set off.
+    #[serde(default = "fill_in_default")]
+    pub fill_in: bool,
     /// Seconds a search waits before an AI may fill it, 30 to 600.
     pub fill_in_after: u16,
     /// Minutes an AI's session must have left before its cap, 30 to 600.
@@ -389,6 +393,11 @@ pub struct AiSettings {
     pub carousel_games: u8,
     /// Matches between two AIs a UTC day, 0 to 10,000.
     pub carousel_daily: u32,
+}
+
+/// Fill-in runs unless the settings say otherwise.
+const fn fill_in_default() -> bool {
+    true
 }
 
 impl AiSettings {

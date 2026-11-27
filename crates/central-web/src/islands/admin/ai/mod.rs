@@ -1118,6 +1118,7 @@ mod tests {
             },
             AdminRequest::SetAiSettings {
                 settings: SettingsFields::of(&AiSettings {
+                    fill_in: true,
                     fill_in_after: 60,
                     drain_minutes: 120,
                     global_seats: 8,

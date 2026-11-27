@@ -13,7 +13,7 @@ use super::{
 use super::{replicas, setup_gateway};
 use central_api::admin::{AiPlayerSettings, AiSettings};
 use central_api::ranked::ai::{
-    AiKind, AiOpponents, Offer, Request as AiRequest, Response as AiResponse, Unseated,
+    AiKind, AiOpponents, MatchResult, Offer, Request as AiRequest, Response as AiResponse, Unseated,
 };
 use central_api::ranked::{Format, HostRequest, Outcome, PoolEntry, QueueState, Request};
 use central_api::wire::GatewayPurpose;
@@ -361,6 +361,7 @@ async fn opening(
     refused(store, db, &bots.a, Unseated::Off).await;
     // The calibration's settings pass the administration's bounds.
     let calibration = AiSettings {
+        fill_in: false,
         fill_in_after: 600,
         drain_minutes: 120,
         global_seats: 16,
@@ -766,6 +767,7 @@ async fn scoring(
     }
     assert_eq!(carousel, people, "an AI's match scores as people's");
     assert_eq!(carousel, [12, 12, 6, 6, 3]);
+    results_in_work(store, bots, &carousel).await;
     // Both AIs' ratings moved; the carousel's matches show in their records.
     assert_eq!(
         count(
@@ -777,4 +779,31 @@ async fn scoring(
         .await,
         2
     );
+}
+
+/// Each runner reads every match's result and rating change in its work,
+/// newest first, from its own seat: several in one format stay apart.
+async fn results_in_work(store: &AccountStore, bots: &Bots, carousel: &[i64]) {
+    for (bot, sign, result) in [
+        (&bots.a, 1, MatchResult::Win),
+        (&bots.b, -1, MatchResult::Loss),
+    ] {
+        let AiResponse::Work { finished, .. } =
+            ai(store, &bot.session, AiRequest::Work).await.unwrap()
+        else {
+            panic!("work");
+        };
+        let last: Vec<_> = finished.iter().take(5).collect();
+        let deltas: Vec<i64> = last.iter().rev().map(|f| i64::from(f.delta)).collect();
+        assert_eq!(
+            deltas,
+            carousel.iter().map(|d| sign * d).collect::<Vec<_>>()
+        );
+        assert!(last.iter().all(|f| f.result == result
+            && f.format == Format::Highlander
+            && f.opponent_ai.is_some()
+            && f.seat < 2));
+        let ids: std::collections::BTreeSet<_> = last.iter().map(|f| f.match_id).collect();
+        assert_eq!(ids.len(), 5);
+    }
 }

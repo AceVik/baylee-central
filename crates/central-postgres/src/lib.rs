@@ -14,6 +14,10 @@ pub mod cards_import;
 mod connection;
 mod legacy;
 mod pending;
+pub use accounts::ai::operator::{
+    AiApplied, AiPlan, AiPlayerPlan, AiSettingsPlan, PlayerApplied, PlayerOutcome, RunnerTokenPlan,
+    ai_runner_tokens, apply_ai_plan,
+};
 pub use accounts::{
     ALL_STORED, AUDIT_YEARS, AccountStore, Action, Appointed, Approval, AuditPage,
     CHAT_SENDER_SHARE, CLOSED_TICKET_HOURS, Claim, Concerns, Credential, EMAIL_FRESH_MINUTES,
