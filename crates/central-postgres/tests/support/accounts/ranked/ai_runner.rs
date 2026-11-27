@@ -160,7 +160,7 @@ async fn making(
     assert!(
         (90 * 86_400 - 3_600..=90 * 86_400 + 3_600).contains(&(info.expires_at - info.created_at))
     );
-    assert_eq!(info.created_by, admin.id);
+    assert_eq!(info.created_by, Some(admin.id));
     assert_eq!(
         info.accounts.iter().map(|a| a.id).collect::<Vec<_>>(),
         vec![bot]

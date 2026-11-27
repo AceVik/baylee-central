@@ -109,8 +109,9 @@ pub struct AiRunnerTokenInfo {
     /// The AI accounts it lists, by id; one that is no AI any more has left
     /// the list.
     pub accounts: Vec<AiRunnerAccount>,
-    /// The administrator who made it.
-    pub created_by: [u8; 16],
+    /// The administrator who made it, or none for the operator
+    /// (`central-service --ai-players-stdin`).
+    pub created_by: Option<[u8; 16]>,
     /// That account's display name today, if it has one.
     pub created_by_name: Option<String>,
     /// That account's tag, if it has one.
@@ -216,7 +217,7 @@ mod tests {
                 display_name: Some("KI-Haus-Expert".into()),
                 tag: Some(0x3fa2),
             }],
-            created_by: [2; 16],
+            created_by: Some([2; 16]),
             created_by_name: Some("Synthetic".into()),
             created_by_tag: None,
             created_at: 1_800_000_000,

@@ -74,7 +74,7 @@ fn info(row: &QueryResult, accounts: Vec<AiRunnerAccount>) -> Result<AiRunnerTok
         id: id(row, "id")?,
         name: row.try_get("", "name").map_err(unavailable)?,
         accounts,
-        created_by: id(row, "created_by")?,
+        created_by: optional_id(row, "created_by")?,
         created_by_name: row.try_get("", "created_by_name").map_err(unavailable)?,
         created_by_tag: tag("created_by_tag")?,
         created_at: time("created_at")?.ok_or(Error::Unavailable)?,
