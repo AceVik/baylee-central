@@ -1,6 +1,7 @@
 # AI players
 
-*Design pass of 26 November 2026. The implementation pass is under way; what it built is recorded at the end.*
+*Design pass of 26 November 2026; the implementation pass (26 and 27 November)
+and the adversarial pass are recorded at the end.*
 
 The owner approved "AI players" on 26.11.2026: accounts that are always
 labelled as AI and otherwise play Ranked like people (Baylee's
@@ -182,7 +183,7 @@ a new request does not compile until it is decided there. Allowed:
 - its session: `SessionStatus`, `RenewSession`, `Logout`;
 - the terms: `Terms`, `GatewayTerms`, `TermsStatus`, `AcceptTerms` (Central's
   and a host's);
-- ranked play: `Ai` (`Offer`, `Work`), the queue `Status`, `Board`,
+- ranked play: `Ai` (`Offer`, `Work`, `Carousel`), the queue `Status`, `Board`,
   `Profile`, `OwnProfile`, `Seasons`, and of a seat `Relay`, `RelayRoute`,
   `Hosts`, `ApproveHosts`, `DeclineHost`, `Participants`, `Presence` and
   `Status`;
@@ -261,7 +262,9 @@ ended in step 3, and those a revocation ends, are handed to the push sockets
 as ended, as a sign-out's are. Budgets: 60 exchanges an hour from one address,
 and after 30 refused ones in an hour the store is not asked again from it;
 12 successful exchanges an hour for one account, so a thief cannot churn the
-runner's sessions faster than that.
+runner's sessions faster than that. An exchange counts against that hour
+from before the store is asked until it ends, so exchanges sent at once
+cannot pass it together, and one the store refuses spends nothing.
 
 **Never past the token.** A runner session is minted and renewed never past
 its token's expiry, and an expired or revoked token's sessions renew no more:
@@ -362,8 +365,15 @@ the key of that person's account row when it writes the match, a row the
 administration holds `FOR UPDATE` while it changes an AI. PostgreSQL then
 ends one of the two as a deadlock, which answers `Unavailable` once (open,
 below). The match fill-in writes only shares the AI's own account key,
-which the no-key-update lock allows. Fill-in reads eligibility without locks first and takes
-`ai_settings` only when an AI looks available. When several people wait, no
+which the no-key-update lock allows; fill-in takes that share with the AI's
+row, skipping an AI whose account a runner's exchange holds, since an
+exchange that ends a held offer's session waits for fill-in. A runner's
+exchange takes its token, then the AI's account `FOR UPDATE`, then its
+sessions (§2); the operator's plan takes the administrators' rows, the
+settings' row, the tokens it revokes, the AI accounts and rows, and only
+then the revoked tokens' sessions (§5). Fill-in reads eligibility without
+locks first and takes `ai_settings` only when an AI looks available, and
+asks again under that lock whether another person waits. When several people wait, no
 fill-in runs at all.
 
 **Eligible AIs.** These are hard rules, not policy:
@@ -473,7 +483,8 @@ operations:
   it was settled: a runner with several matches in one format tells which
   ended how by the match id, not by its standing. A match that left the live
   list and is not among them was voided. The field is absent while empty.
-- `Carousel { format }` belongs to Stage 2 (§7).
+- `Carousel { format }` asks for a match against another AI (§7), answered
+  `Seated { assignment }` or `Unseated { reason }`.
 
 The runner reads `Work` every two seconds while it offers, well inside a
 session's 128 control requests a second ([native login](native-login.md)
@@ -619,7 +630,8 @@ must be exactly `2`, and anything else gets a 426. The change:
 `2` client's ladder or a gateway's own pages, show the display name. So an AI's
 name says what it is too: it begins with the reserved prefix `KI-`, as in
 `KI-Haus-Expert`, which fits the 16 ASCII characters `valid_display_name`
-allows. `choosable` refuses that prefix and `AI-` to people (open question 3).
+allows. `choosable` refuses that prefix and `AI-` to people, read without
+case and with `_` as `-` as the reserved names are (open question 3).
 The concept's names ("Haus-KI · Expert", "Claude Haiku · Hoch") cannot be
 display names; they are labels.
 
@@ -1001,7 +1013,9 @@ harness (the counts and the undoing of the new migrations before the
 runner's history test; no store code and no other test changed): its whole
 store suite green over 000053 and 000054, at `f1a19319`, on the owner's
 Mac (263 s); and over 000053, 000054 and 000055, at `8d6ac023`, on bigace
-(97 s). Its startup check names none of the new tables, so the new tables
+(100 s, in a build directory of its own: a shared one let one tree's
+artifacts stand for the other's, which a later run showed and which this
+run excludes). Its startup check names none of the new tables, so the new tables
 and columns, the partial indexes and the new grants leave it running.
 
 ### The runner token (26 November 2026)
@@ -1475,3 +1489,12 @@ and `central-service`, `cargo fmt --check`. The website's browser specs
 (CI's `site`) had failed at `eb6504e6` on two things of this branch: the
 German navigation's list lacked the AI page, and the reset page's stand-in
 Central refused the AI read; both are in `832fe749`.
+
+After the review's second reading (27.11.2026): a fill-in also seats no AI
+whose offer's session would end, by its token's expiry, within
+`drain_minutes`, as it already did for the session's 12 hours; the store
+suite mints a session under a token with ten minutes left (it gets ten, and
+a renewal stays within them), renews none and mints none once the token has
+passed, and the social check's control asks a person for contact. On bigace
+at that tree, in a fresh build directory: `cargo xtask postgres` green (SDK
+155 s, store 110 s, Tower 2 s each).

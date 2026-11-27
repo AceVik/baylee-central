@@ -77,6 +77,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     }
     let (alpha, token_id, session) = first(store, db).await;
     again(db, alpha).await;
+    token_bound(store, db, alpha).await;
     unfindable(store, &someone_session).await;
     refusals(db, alpha).await;
     revoking(store, db, token_id, &session).await;
@@ -365,4 +366,79 @@ async fn unfindable(store: &AccountStore, someone: &Token) {
                 .is_err()
         );
     }
+    // The control: the same person may ask a person for contact.
+    store
+        .social(
+            session,
+            SocialRequest::Contact {
+                tag: SEEN,
+                change: ContactAction::Request,
+            },
+        )
+        .await
+        .unwrap();
+}
+
+/// A runner session never outlives its token: minted no later than the
+/// token's end, and renewed no more once it has passed.
+async fn token_bound(store: &AccountStore, db: &DatabaseConnection, alpha: [u8; 16]) {
+    let secret = Token::generate().unwrap();
+    let plan = AiPlan {
+        token: Some(runner("op-runner-short", &["KI-Op-Alpha"])),
+        ..AiPlan::default()
+    };
+    let (token_id, _) = apply_ai_plan(db, &plan, Some(&secret))
+        .await
+        .unwrap()
+        .token
+        .unwrap();
+    let id = Uuid::from_bytes(token_id);
+    // Ten minutes left: the session gets ten, not thirty.
+    sql(
+        db,
+        "UPDATE central_identity.ai_runner_tokens
+         SET expires_at = pg_catalog.clock_timestamp() + interval '10 minutes' WHERE id = $1",
+        vec![id.into()],
+    )
+    .await;
+    let session = Token::generate().unwrap();
+    let minted = store
+        .ai_runner_session(&secret, alpha, &session)
+        .await
+        .unwrap();
+    assert_eq!(
+        count(
+            db,
+            "SELECT count(*) AS n FROM central_identity.sessions s
+             JOIN central_identity.ai_runner_tokens r ON r.id = s.runner_token
+             WHERE r.id = $1 AND s.expires_at <= r.expires_at
+             AND s.expires_at < pg_catalog.clock_timestamp() + interval '11 minutes'",
+            vec![id.into()],
+        )
+        .await,
+        1
+    );
+    let renewed = store.renew_session(&session).await.unwrap();
+    assert!(
+        renewed <= minted.expires_at + 1,
+        "renewal stays within the token"
+    );
+    // The token past its end: the live session renews no more.
+    sql(
+        db,
+        "UPDATE central_identity.ai_runner_tokens
+         SET expires_at = GREATEST(created_at + interval '1 microsecond',
+             pg_catalog.clock_timestamp() - interval '1 millisecond') WHERE id = $1",
+        vec![id.into()],
+    )
+    .await;
+    assert_eq!(store.renew_session(&session).await, Err(Error::Rejected));
+    // An expired token mints nothing either.
+    assert_eq!(
+        store
+            .ai_runner_session(&secret, alpha, &Token::generate().unwrap())
+            .await
+            .err(),
+        Some(Error::Rejected)
+    );
 }

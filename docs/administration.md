@@ -316,3 +316,13 @@ older than 30 minutes. `AdminAccount` carries no badge, so the accounts'
 list, an account's page and the reset code's search read `AiPlayers` once
 and mark every AI account in them; an AI's page offers neither the role nor
 a reset code. The audit names the eight `ai.*` actions in words.
+
+**Without the website.** The live operator signs in to the website as no
+administrator, and no operator account is appointed one for this.
+`central-service --ai-players-stdin` does what the page does, under the
+migrator login from standard input: it creates and changes AI players,
+switches them, sets the settings for every AI, revokes runner tokens and
+makes one for a runner machine, or lists them, in one transaction through
+the same code, its audit events naming the operator as their actor
+([operations](operations.md) §"AI players"). The page shows such a token's
+maker as the operator.

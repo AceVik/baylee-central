@@ -13,13 +13,16 @@ pub(super) mod policy;
 pub(super) const TRIES: usize = 4;
 
 /// An AI's live offer for format `$2`, made under a native session that is
-/// live and has `$3` minutes left before its cap.
+/// live and has `$3` minutes left before its cap: its 12 hours, or its
+/// runner token's end when that comes first, so no AI is seated in a match
+/// its session cannot outlast.
 pub(super) const OFFERED: &str = "EXISTS (SELECT 1 FROM central_identity.ai_offers o
     JOIN central_identity.sessions s ON s.digest = o.session_digest AND s.account_id = o.account_id
     JOIN central_identity.accounts a ON a.id = s.account_id AND a.credential_revision = s.credential_revision
     WHERE o.account_id = p.account_id AND o.format = $2 AND o.expires_at > pg_catalog.clock_timestamp()
       AND s.kind = 'native' AND s.expires_at > pg_catalog.clock_timestamp() AND a.restored
-      AND COALESCE(s.proven_at, s.created_at) + interval '12 hours'
+      AND LEAST(COALESCE(s.proven_at, s.created_at) + interval '12 hours',
+          (SELECT r.expires_at FROM central_identity.ai_runner_tokens r WHERE r.id = s.runner_token))
           > pg_catalog.clock_timestamp() + pg_catalog.make_interval(mins => $3))";
 
 /// What a ticket accepts: none, or whether a language model may come too.
