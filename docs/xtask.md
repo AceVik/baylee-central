@@ -359,20 +359,25 @@ picture, each in a worker process of its own (`photo.jpg` 5 and 3 %,
 
 A profile that matches nothing is no cheap failure. Built from a profile of
 one function no build has, the whole selection did not finish in 80 minutes
-(46102057709) nor in 50 (46113854970): the compiler reported 57 829
-functions without counts, then stood in `central-web-server` for the rest of
-the time. Step 5 would refuse such a build, but only after it; a profile is
-therefore only ever used for the commit and the toolchain that made it, and
-a caller with a deadline has to bound the build.
+(46102057709) nor in 50 (46113854970). In the second run its log grew to
+57 829 lines within seven minutes, nearly all of them the blank line the
+compiler writes after each report of a function without counts, which the
+task counted and did not show (the last six lines were such blank lines, so
+the reports reached the count through cargo); then it stood in
+`central-web-server` for the rest of the time. Step 5 would refuse such a
+build, but only after it; a profile is therefore only ever used for the
+commit and the toolchain that made it, and a caller with a deadline has to
+bound the build.
 
 The deploy hook does not use this build yet: it builds `--release` for
 `x86-64-v3` on the server ([operations](operations.md#deploying-with-the-gateway)).
 
 No profile reaches the website's WebAssembly: the stable toolchain has no
 profiling runtime for `wasm32-unknown-unknown` (`-C profile-generate` there
-fails for want of `profiler_builtins`, tried with 1.100.0 on 28.11.2026), and
-a native build's profile cannot stand in, because the functions' names carry
-crate hashes that differ between the targets.
+fails for want of `profiler_builtins`, tried with 1.100.0 on 28.11.2026). A
+native build's profile is not expected to stand in (not tried): the
+functions' names carry crate hashes that cargo derives with the target, so
+they would not match.
 
 ## What the tasks guarantee
 
