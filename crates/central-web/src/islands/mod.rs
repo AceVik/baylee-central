@@ -40,6 +40,7 @@ mod picture;
 mod player;
 mod pow;
 mod push;
+mod ranked;
 mod reset;
 mod session;
 mod time;
@@ -66,5 +67,7 @@ pub(crate) use impressum::Impressum;
 pub(crate) use invite::InviteCard;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use player::PlayerProfile;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use ranked::RankedLadder;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use reset::Reset;

@@ -14,6 +14,7 @@ mod info;
 mod invite;
 mod legal;
 mod player;
+mod ranked;
 mod security;
 
 /// The document for `page`.
@@ -22,6 +23,7 @@ pub fn document(page: Page, cx: &Context<'_>) -> impl IntoView + use<> {
         Page::Home => home::page(cx),
         Page::Download => download::page(cx),
         Page::Gateways => info::gateways(cx),
+        Page::Ranked => ranked::page(cx),
         Page::Faq => info::faq(cx),
         Page::Security => security::page(cx),
         Page::Contact => info::contact(cx),

@@ -371,6 +371,26 @@ pub const CPU: &[Shape] = &[
     Rect("16", "16", "4", "4", "2"),
     Rect("8", "8", "8", "8", "1"),
 ];
+/// `trophy`: the leaderboards' mark.
+pub const TROPHY: &[Shape] = &[
+    Path("M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"),
+    Path("M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"),
+    Path("M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"),
+    Path("M4 22h16"),
+    Path("M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"),
+    Path("M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"),
+];
+/// `medal`: the first three places of a leaderboard.
+pub const MEDAL: &[Shape] = &[
+    Path(
+        "M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15",
+    ),
+    Path("M11 12 5.12 2.2"),
+    Path("m13 12 5.88-9.8"),
+    Path("M8 7h8"),
+    Circle("12", "17", "5"),
+    Path("M12 18v-2h-.5"),
+];
 
 /// The icon, hidden from assistive technology: its control names itself.
 pub fn glyph(shapes: &'static [Shape]) -> AnyView {

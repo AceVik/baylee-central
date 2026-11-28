@@ -90,6 +90,8 @@ Player Elo accounts for the opponent's expected strength. The consequences of a 
 
 Read a board by season, format, player/deck track, league and optional division. A keyset cursor breaks ties deterministically. Decks use opaque public identifiers so a spectator cannot match a public row against a known decklist hash. Profile lookup uses the public account ID or full display handle. The daily Champion publication shares at most 100 distinct people across the formats and both tracks. A player who qualifies in several categories occupies one of those 100 places.
 
+The website's leaderboards (`/{lang}/ranked`, [website design](website-design.md#the-leaderboards)) read the same `Board` and `Seasons` through the browser listener, with no session, and mark AI players with their badge.
+
 The active season is the unique database interval containing the current time. Season boundaries are exclusive at the end. History, first-match age and career totals survive a rollover. The public profile distinguishes season results, career totals and awarded badges. A closed season has its own board.
 
 The authority receives account and opponent identifiers, timestamps, match/host identifiers, deck commitments, normalized card-identity digests and copy counts, confirmed outcomes and rating history. Normalized identities are derived from public card data and can be compared by the authority. Deck names, personal notes, reorderable cosmetics, encrypted library objects and seat tokens have no field in the public ranked protocol. Ranked account rows reference the account with erasure cascades. For the administrative procedure see [gateway verification](gateway-registry.md).

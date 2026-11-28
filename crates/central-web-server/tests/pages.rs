@@ -2347,3 +2347,51 @@ async fn the_player_profile_page_renders_with_clean_url() {
         assert!(!html.contains("(Quellcode einsehbar)"), "{path}");
     }
 }
+
+/// The leaderboards (`/{lang}/ranked`) are a listed, indexed page in the
+/// bar and the footer: their head is the server's, the board an island
+/// that says without script that it needs script, and the sitemap lists
+/// the page in every language.
+#[tokio::test]
+async fn the_leaderboards_are_a_listed_island_page() {
+    let app = app(true);
+    for lang in [Lang::En, Lang::De] {
+        let path = Page::Ranked.path(lang);
+        let (status, _, html) = get(&app, &path, &[]).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert!(html.contains("RankedLadder"), "{path}: the island");
+        assert!(html.contains("<leptos-island"), "{path}: an island");
+        assert!(
+            html.contains(&format!(
+                "<a href=\"{path}\" aria-current=\"page\">{}</a>",
+                central_web::words::nav_ranked(lang)
+            )),
+            "{path}: the bar's link, current"
+        );
+        assert!(
+            html.contains(central_web::words::ranked_script(lang)),
+            "{path}: the line without script"
+        );
+        assert!(
+            html.contains("\"@type\":\"CollectionPage\""),
+            "{path}: structured data"
+        );
+        assert!(
+            !html.contains("<meta name=\"robots\" content=\"noindex"),
+            "{path}: indexed"
+        );
+    }
+    let (_, _, home) = get(&app, "/en/", &[]).await;
+    assert!(
+        home.contains("href=\"/en/ranked\""),
+        "linked from every page's bar"
+    );
+    let (_, _, sitemap) = get(&app, "/sitemap.xml", &[]).await;
+    for lang in Lang::ALL {
+        assert!(
+            sitemap.contains(&format!("https://baylee.app{}", Page::Ranked.path(lang))),
+            "the sitemap in {}",
+            lang.code()
+        );
+    }
+}

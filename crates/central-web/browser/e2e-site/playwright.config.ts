@@ -17,7 +17,8 @@ import { defineConfig, devices } from "@playwright/test";
 // spec; the phone project (Pixel 7) runs only the specs whose subject
 // depends on the layout (PHONE_SPECS below: the pages and their bar, the
 // languages, the strip, the dialogs, the theme, the messenger, the
-// registration's steps, the installable app, the security page). The other
+// registration's steps, the installable app, the security page, the
+// leaderboards). The other
 // specs test behaviour no width changes (the administration's and the
 // account's flows, mail, feedback, pictures, passwords, ...), so a second
 // run at a phone's width would only repeat them. A test that sets its own
@@ -42,7 +43,7 @@ const command =
       ? "target/debug/central-web --dev target/site crates/central-web-server/tests/data"
       : `printf '%s' '${settings}' | target/debug/central-web --config-stdin`;
 
-const PHONE_SPECS = /\/(site|strip|dialogs|theme|chat|recovery|pwa|security)\.spec\.ts$/;
+const PHONE_SPECS = /\/(site|strip|dialogs|theme|chat|recovery|pwa|security|ranked)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: ".",

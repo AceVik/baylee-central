@@ -144,6 +144,13 @@ async fn send_once(request: &Request) -> Result<Response, Failure> {
 }
 
 const fn may_refresh_after(request: &Request) -> bool {
+    // a public read needs no session, so an expired one must not stop it
+    // (the leaderboards' boards and seasons)
+    if let Request::Ranked { request } = request
+        && request.is_public()
+    {
+        return false;
+    }
     !matches!(
         request,
         Request::RefreshSession
@@ -550,6 +557,34 @@ mod tests {
         }));
         assert!(!may_refresh_after(&Request::RefreshSession));
         assert!(may_refresh_after(&Request::ProfileDetails));
+    }
+
+    /// A visitor whose remembered session ran out still reads the public
+    /// leaderboards; the account's own ranked data still refreshes first.
+    #[test]
+    fn public_ranked_reads_do_not_wait_for_a_session() {
+        use central_api::ranked::{self, Format, League, Track};
+        let board = Request::Ranked {
+            request: ranked::Request::Board {
+                season: None,
+                format: Format::Standard,
+                track: Track::Player,
+                league: League::Champion,
+                division: None,
+                after: None,
+                players: ranked::ai::BoardPlayers::Everyone,
+            },
+        };
+        assert!(!may_refresh_after(&board));
+        assert!(!may_refresh_after(&Request::Ranked {
+            request: ranked::Request::Seasons { before: None },
+        }));
+        assert!(may_refresh_after(&Request::Ranked {
+            request: ranked::Request::Export {
+                table: ranked::export::Table::Seasons,
+                after: None,
+            },
+        }));
     }
 
     #[test]

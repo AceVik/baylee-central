@@ -220,8 +220,8 @@ Each lives in one stylesheet named after it and one component under
   `--text-xs`, never alone without the word.
 - **The AI badge** (`.ai-badge`, `islands/ui/ai_badge.rs`): beside every
   name of an account Central marks as an AI player ([AI
-  players](ai-players.md) §6), on the public profile, in a mention's preview
-  and in the administration: an info pill with the kind's mark (a house AI
+  players](ai-players.md) §6), on the public profile, on the leaderboards,
+  in a mention's preview and in the administration: an info pill with the kind's mark (a house AI
   and an unknown kind the bot, a language model the sparkles, the trained
   AI the chip) and the administrator's label, cut with an ellipsis rather
   than wrapped. The kind is its pointer tip, and a screen reader hears
@@ -405,7 +405,7 @@ WCAG 2.1 AA, mobile first:
 
 | area | paths | frame |
 | --- | --- | --- |
-| Public | `/`, `/download`, `/cards`, `/gateways`, `/contact`, `/donate`, legal pages | the bar, sections, the footer |
+| Public | `/`, `/download`, `/cards`, `/gateways`, `/ranked`, `/contact`, `/donate`, legal pages | the bar, sections, the footer |
 | Account | `/account`, `/account/chat`, `/account/contacts`, `/account/security`, `/account/gateways` | the app frame; the messenger on chat and contacts |
 | Administration | `/admin` (the overview), `/admin/feedback`, `/admin/feedback/<id>`, `/admin/users`, `/admin/users/<id>`, `/admin/gateways`, `/admin/audit`, `/admin/legacy`, `/admin/ai` | the app frame, loaded only for an administrator |
 | Sign-in | `/signin`, `/register`, `/reset` | a dialog over the page that asked; at its own address, over the start page |
@@ -418,7 +418,9 @@ language, with a page that says so and leads to the start page
 (`Page::REMOVED`, `Page::Gone`). `/challenges` is one since 18.11.2026:
 Daily and Weekly tasks, the Tower, their rankings and the consent to be
 listed in them are shown by the game client, and the website shows none of
-it. A page whose content lives on elsewhere on the site is a permanent
+it. The boards of ranked play are another matter: they are public without
+consent (the privacy notice's ranked part), and since 28.11.2026 the
+website shows them at `/ranked` ([below](#the-leaderboards)). A page whose content lives on elsewhere on the site is a permanent
 redirect instead (`/cards` to `/#cards`).
 
 The three forms (signing in, registering, a new password with a reset code)
@@ -560,6 +562,62 @@ Types allow one more policy for this, `baylee-nav`, which passes a string
 to the parser for that one use and vouches for no other script address.
 What the strip counts is a visit (`central-web-server`, `views.rs`): a document sent to a
 navigation that did not start on one of the site's own pages and is not a reload. Going from page to page is never counted again, whether the page is put in place here or loads a document (another language, the account area).
+
+### The leaderboards
+
+`/ranked` (`pages/ranked.rs`, the island `islands/ranked/`,
+`style/ranked.css`) shows the public boards of ranked play
+([global ranked play](ranked.md) §"Publication and storage") as the Baylee
+client's leaderboards show them, owner's wish of 28.11.2026: a season, a
+format (Standard, Highlander, Commander), the players' or the decks'
+ladder, a league or one of its divisions, forty places a page, each with
+Elo, wins, losses and draws. The page asks Central's public `Board` and
+`Seasons` reads through `/api/v1`, the very requests the client makes: no
+session (`may_refresh_after` leaves them out, so an expired session stops
+nothing), no new endpoint, the directory's budget of sixty a minute.
+
+- **The bar** (`.ladder-tools`, glass): the three formats as chips in the
+  middle, then four fields of one width (two and two on a tablet, one above
+  the other on a phone), each under its small label: the ladder (players,
+  decks), who (everyone, people, AI players: `Board.players`), the league
+  (a menu: the highest league with standings first, then every league from
+  Champion down, a league with divisions a group of its own with all of
+  them first) and the season (the running one, then every season Central
+  lists with its dates). The chips are `.chip-btn`, the menus the gateway
+  directory's sort field (`.dir-sort`). What is chosen stands in the address
+  (`?format= &track= &who= &league=gold-2 &season=<id>`), defaults left out;
+  a value the page does not know falls back to its default.
+- **The highest league with standings.** Central serves one league at a
+  time. Where the address names none, the page asks from Champion down and
+  shows the first league anybody stands in (at most twelve questions, the
+  newest answer winning), and remembers it for that season, format, ladder
+  and filter, so coming back costs one question. "Refresh" forgets it.
+- **The board** (`.ladder`, glass): the league's badge (`badges.js`, as on
+  the profiles) over its name and a line naming format, ladder, filter and
+  season; "Refresh" as a round button in its corner. The rows have one
+  height and the same columns: the place (Champion's published place, else
+  the place on this board, a medal before the first three, as in the
+  client), the rank's badge, the portrait in the rank's frame (a deck's
+  mark on the deck ladder), the handle linking the public profile with the
+  AI badge beside an AI player's name, the rank and a deck's own id under
+  it, the season's wins, losses and draws with its games (in placement: the
+  games of the ten), and the Elo in the information accent. Figures are
+  tabular. On a phone the portrait goes and the record moves under the name.
+- **Nothing jumps.** Every control of the bar is 44 px high whatever is
+  chosen; the board's body is as tall as the eight rows the first answer
+  waits in (`.bone`s that pulse, still under reduced motion), and a board
+  without rows keeps that height; while the next answer is on its way the
+  rows on screen stay, dimmed under `aria-busy`. The pages are two ghost
+  buttons and the count between them ("Page 2 · 40 places"); a button with
+  no page to go to says so (`aria-disabled`) and keeps its place. After a
+  turn the board's title takes the focus, and a live line says the page.
+- **States** each in their own words, the trophy (a warning's mark for a
+  failure) over a sentence and the way on: an empty group ("show everyone"
+  where a filter narrowed it, "show the highest league with standings"
+  where a league was named), nobody anywhere this season (the download),
+  no season running (earlier seasons in the menu), too many requests
+  (429), and a failure with "Try again".
+- **Without script** a line says the boards need it.
 
 ### The gateway directory
 

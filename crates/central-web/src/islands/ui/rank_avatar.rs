@@ -16,6 +16,8 @@ use super::super::session;
 /// Pixel size presets for ranked avatar discs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AvatarSize {
+    /// Small avatar (`36px`, a leaderboard's row).
+    Small,
     /// Medium avatar (`64px`, player preview overlay).
     Medium,
     /// Large avatar (`96px`, overview / profile / public player).
@@ -25,6 +27,7 @@ pub enum AvatarSize {
 impl AvatarSize {
     const fn px(self) -> u32 {
         match self {
+            Self::Small => 36,
             Self::Medium => 64,
             Self::Large => 96,
         }
@@ -32,6 +35,7 @@ impl AvatarSize {
 
     const fn class(self) -> &'static str {
         match self {
+            Self::Small => "rank-avatar rank-avatar-sm",
             Self::Medium => "rank-avatar rank-avatar-md",
             Self::Large => "rank-avatar rank-avatar-lg",
         }
