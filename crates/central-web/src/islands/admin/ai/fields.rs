@@ -3,7 +3,7 @@
 //! that a form passes before anything is sent.
 
 use central_api::admin::{AdminAiPlayer, AiPlayerSettings, AiSettings};
-use central_api::ranked::ai::{AiKind, MAX_GAMES};
+use central_api::ranked::ai::{AiKind, MAX_CAROUSEL_GAMES, MAX_GAMES, MAX_GLOBAL_SEATS};
 
 use crate::words::{self, Lang};
 
@@ -119,6 +119,13 @@ impl Fields {
     }
 }
 
+/// The form's most `global_seats`, as the field shows it:
+/// [`MAX_GLOBAL_SEATS`].
+pub(super) const GLOBAL_SEATS_MOST: &str = "32";
+/// The form's most `carousel_games`, as the field shows it:
+/// [`MAX_CAROUSEL_GAMES`].
+pub(super) const CAROUSEL_GAMES_MOST: &str = "16";
+
 /// The settings for every AI as typed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SettingsFields {
@@ -168,11 +175,11 @@ impl SettingsFields {
             "ai-fill-in-after"
         } else if !(30..=600).contains(&settings.drain_minutes) {
             "ai-drain"
-        } else if settings.global_seats > 16 {
+        } else if settings.global_seats > MAX_GLOBAL_SEATS {
             "ai-global-seats"
         } else if settings.host_reserve > 64 {
             "ai-host-reserve"
-        } else if settings.carousel_games > 8 {
+        } else if settings.carousel_games > MAX_CAROUSEL_GAMES {
             "ai-carousel-games"
         } else {
             "ai-carousel-daily"
@@ -300,7 +307,7 @@ mod tests {
         );
         assert_eq!(off(|f| f.drain_minutes = "601".into()), Err("ai-drain"));
         assert_eq!(
-            off(|f| f.global_seats = "17".into()),
+            off(|f| f.global_seats = "33".into()),
             Err("ai-global-seats")
         );
         assert_eq!(
@@ -312,7 +319,7 @@ mod tests {
             Err("ai-host-reserve")
         );
         assert_eq!(
-            off(|f| f.carousel_games = "9".into()),
+            off(|f| f.carousel_games = "17".into()),
             Err("ai-carousel-games")
         );
         assert_eq!(
@@ -322,6 +329,18 @@ mod tests {
         assert_eq!(
             off(|f| f.global_seats = "0".into()).map(|s| s.global_seats),
             Ok(0)
+        );
+        // The fields show the API's bounds.
+        assert_eq!(GLOBAL_SEATS_MOST, MAX_GLOBAL_SEATS.to_string());
+        assert_eq!(CAROUSEL_GAMES_MOST, MAX_CAROUSEL_GAMES.to_string());
+        // The most: 32 seats, and the carousel alone fills them.
+        assert_eq!(
+            off(|f| {
+                f.global_seats = "32".into();
+                f.carousel_games = "16".into();
+            })
+            .map(|s| (s.global_seats, s.carousel_games)),
+            Ok((32, 16))
         );
     }
 }

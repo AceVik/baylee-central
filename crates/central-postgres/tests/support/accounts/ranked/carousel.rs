@@ -359,14 +359,15 @@ async fn opening(
     // As installed: no carousel game at all.
     set(db, 0, 0, 8, 2).await;
     refused(store, db, &bots.a, Unseated::Off).await;
-    // The calibration's settings pass the administration's bounds.
+    // The calibration's settings pass the administration's bounds: every
+    // AI seat (32), all of them in the carousel (16 matches).
     let calibration = AiSettings {
         fill_in: false,
         fill_in_after: 600,
         drain_minutes: 120,
-        global_seats: 16,
+        global_seats: 32,
         host_reserve: 2,
-        carousel_games: 8,
+        carousel_games: 16,
         carousel_daily: 10_000,
     };
     store
@@ -375,7 +376,11 @@ async fn opening(
         .unwrap();
     for wrong in [
         AiSettings {
-            carousel_games: 9,
+            carousel_games: 17,
+            ..calibration
+        },
+        AiSettings {
+            global_seats: 33,
             ..calibration
         },
         AiSettings {
@@ -384,6 +389,19 @@ async fn opening(
         },
     ] {
         assert!(store.set_ai_settings(cookie, Some(&wrong)).await.is_err());
+    }
+    // The table's own bounds are the same (migration 000057), whoever writes.
+    for (column, most) in [("global_seats", 32_i16), ("carousel_games", 16_i16)] {
+        for (value, holds) in [(most, true), (most + 1, false)] {
+            let wrote = db
+                .execute_raw(Statement::from_sql_and_values(
+                    DbBackend::Postgres,
+                    format!("UPDATE central_identity.ai_settings SET {column} = $1"),
+                    vec![value.into()],
+                ))
+                .await;
+            assert_eq!(wrote.is_ok(), holds, "{column} {value}");
+        }
     }
     set(db, 1, 1000, 8, 2).await;
     refused(store, db, &bots.b, Unseated::Offer).await;

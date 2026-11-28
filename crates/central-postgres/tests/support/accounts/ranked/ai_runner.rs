@@ -100,7 +100,12 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         [(&pia.0, pia.1), (&quinn.0, quinn.1)],
     )
     .await;
+    relayed(store, db, (&held, token_id), bot, &pia.0).await;
     revoking(store, db, &admin, (&token, token_id), bot, &held, &sids).await;
+    // Revoked: none of its sessions is a runner's relay any more.
+    for session in &held {
+        assert_eq!(store.relay_runner(session).await, Ok(None));
+    }
     people(store, db, keys, outsider_identity).await;
     grants(db).await;
 
@@ -506,6 +511,58 @@ async fn revoking(
         .await,
         1
     );
+}
+
+/// Whose relay a socket ticket for a session is (`AccountStore::relay_runner`,
+/// which Central's relay asks when it issues one): each runner session names
+/// its AI account; a person's session and one that does not exist name none,
+/// and so does a runner session whose token is revoked or expired, though the
+/// exchange never leaves one alive then, and a session past its expiry.
+async fn relayed(
+    store: &AccountStore,
+    db: &DatabaseConnection,
+    (held, token_id): (&[Token], [u8; 16]),
+    bot: [u8; 16],
+    person: &Token,
+) {
+    for session in held {
+        assert_eq!(store.relay_runner(session).await, Ok(Some(bot)));
+    }
+    assert_eq!(store.relay_runner(person).await, Ok(None));
+    assert_eq!(
+        store.relay_runner(&Token::generate().unwrap()).await,
+        Ok(None)
+    );
+    let token = Uuid::from_bytes(token_id);
+    for (aged, restored) in [
+        (
+            "UPDATE central_identity.ai_runner_tokens SET revoked_at = pg_catalog.clock_timestamp()
+             WHERE id = $1",
+            "UPDATE central_identity.ai_runner_tokens SET revoked_at = NULL WHERE id = $1",
+        ),
+        (
+            "UPDATE central_identity.ai_runner_tokens SET created_at = created_at - interval '1 day',
+               expires_at = pg_catalog.clock_timestamp() - interval '1 second' WHERE id = $1",
+            "UPDATE central_identity.ai_runner_tokens
+             SET expires_at = pg_catalog.clock_timestamp() + interval '90 days' WHERE id = $1",
+        ),
+    ] {
+        sql(db, aged, vec![token.into()]).await;
+        assert_eq!(store.relay_runner(&held[0]).await, Ok(None), "{aged}");
+        sql(db, restored, vec![token.into()]).await;
+        assert_eq!(store.relay_runner(&held[0]).await, Ok(Some(bot)), "{restored}");
+    }
+    // The first session past its expiry: no runner's relay, the others still.
+    sql(
+        db,
+        "UPDATE central_identity.sessions SET created_at = created_at - interval '1 hour',
+           proven_at = proven_at - interval '1 hour',
+           expires_at = pg_catalog.clock_timestamp() - interval '1 second' WHERE digest = $1",
+        vec![digest(&held[0]).to_vec().into()],
+    )
+    .await;
+    assert_eq!(store.relay_runner(&held[0]).await, Ok(None));
+    assert_eq!(store.relay_runner(&held[1]).await, Ok(Some(bot)));
 }
 
 /// A person's second native sign-in still replaces their first.

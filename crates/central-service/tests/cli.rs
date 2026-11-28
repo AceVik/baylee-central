@@ -347,7 +347,7 @@ fn the_ai_players_command_names_every_fault_and_never_the_login() {
         ),
         (
             format!(
-                r#"{{{login},"players":[{},{}],"settings":{{"carousel_games":9}},"token":{{"name":"r1","accounts":["Bob"],"days":400}}}}"#,
+                r#"{{{login},"players":[{},{}],"settings":{{"global_seats":33,"carousel_games":17}},"token":{{"name":"r1","accounts":["Bob"],"days":400}}}}"#,
                 player("KI-DeepSeek-Flash", 0),
                 player("Haus", 4)
             ),
@@ -356,7 +356,8 @@ fn the_ai_players_command_names_every_fault_and_never_the_login() {
                 "central: players[0].max_games 0: 1 to 16",
                 r#"central: players[1].display_name "Haus": begins with KI-, an AI player's prefix"#,
                 "central: players[1].tag 6699: also players[0].tag",
-                "central: settings.carousel_games 9: 0 to 8",
+                "central: settings.global_seats 33: 0 to 32",
+                "central: settings.carousel_games 17: 0 to 16",
                 "central: token.days 400: 1 to 366",
                 r#"central: token.accounts[0] "Bob": not an AI player's name (KI-...)"#,
             ],

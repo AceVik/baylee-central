@@ -13,8 +13,14 @@
 //! listener's ([`SOCKETS`]), a signed native session, and then the account
 //! service's own checks (`central-identity`'s `live.rs`). Once upgraded, a
 //! socket lives in the listener's set of sockets, not among its connections,
-//! with its own idle limit, lifetime and shutdown.
+//! with its own idle limit, lifetime and shutdown. A game relay
+//! (`ranked_socket.rs`) is admitted by the same budgets; once its ticket
+//! proves it is an AI runner's, it leaves its address for the runners' own
+//! budget (`runners.rs`).
 mod frame;
+mod runners;
+
+pub(crate) use runners::{RUNNER_RELAYS, Replaced, RunnerSeat};
 
 use super::{in_flight::Client, native::failure};
 use axum::{
@@ -54,10 +60,14 @@ pub(crate) const BROWSER_LINE: &[u8] = b"GET /api/v1/ws HTTP/1.1\r\n";
 /// for an ordinary one. A client sends its request's head at once.
 const FIRST_LINE: Duration = Duration::from_secs(1);
 
-/// Push sockets one listener holds at once. Each is a connection of its own
-/// besides the listener's 128 (`central-service`), and the service's file
-/// descriptors are 1,024 unless its unit raises them: 512 sockets, both
-/// listeners' connections and the database's leave room below that.
+/// Push sockets one listener holds at once, the account listener's game
+/// relays among them. Each is a connection of its own besides the
+/// listener's 128 (`central-service`), and a relay holds one more, to its
+/// host. The service's file descriptors are 1,024 unless its unit raises
+/// them: one listener's 512 sockets, both listeners' connections and the
+/// database's leave room below that, but both listeners full (each has a set
+/// of its own) do not, so the unit should raise them (`docs/operations.md`
+/// §"Supervision").
 pub(crate) const SOCKETS: usize = 512;
 /// Push sockets one client address holds at once: a sixteenth, so filling
 /// the listener takes sixteen addresses with eight signed-in accounts each
@@ -138,20 +148,42 @@ struct Shared {
     stop: watch::Receiver<bool>,
     held: Mutex<Held>,
     dials: Mutex<super::browser::Book>,
+    /// The runners' proven relay dials (`runners.rs`).
+    runner_dials: Mutex<runners::RunnerDials>,
 }
 
-/// The sockets held: each address's, and their sum.
+/// The sockets held: each address's, the runners' proven relays
+/// (`runners.rs`), and their sum.
 #[derive(Default)]
 struct Held {
     by_client: BTreeMap<Client, u8>,
+    runners: runners::Runners,
     total: usize,
 }
 
-/// A socket's place among the listener's and its address's; given back
-/// when it is dropped, however the socket ends.
+impl Held {
+    /// One socket of `client` fewer.
+    fn leave(&mut self, client: Client) {
+        if let Some(count) = self.by_client.get_mut(&client) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.by_client.remove(&client);
+            }
+        }
+    }
+}
+
+/// A socket's place among the listener's and its address's, or, once it
+/// proved it is a runner's relay, among the runners' (`runners.rs`); given
+/// back when it is dropped, however the socket ends.
 pub(crate) struct Seat {
     shared: Arc<Shared>,
     client: Option<Client>,
+    /// When the address's dial was spent for it, so that it can be given
+    /// back once the socket proves it is a runner's.
+    dialed: Option<std::time::Instant>,
+    /// Its place among the runners' relays, and the serial it holds it by.
+    runner: Option<(RunnerSeat, u64)>,
 }
 
 impl Drop for Seat {
@@ -162,16 +194,18 @@ impl Drop for Seat {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         held.total = held.total.saturating_sub(1);
-        if let Some(client) = self.client
-            && let Some(count) = held.by_client.get_mut(&client)
-        {
-            *count = count.saturating_sub(1);
-            if *count == 0 {
-                held.by_client.remove(&client);
-            }
+        if let Some(client) = self.client {
+            held.leave(client);
+        }
+        if let Some((seat, serial)) = self.runner {
+            held.runners.release(seat, serial);
         }
     }
 }
+
+/// The window of an address's dials ([`ADDRESS_DIALS`]) and of an AI
+/// account's ([`RUNNER_DIALS`](runners::RUNNER_DIALS)).
+const DIAL_WINDOW: Duration = Duration::from_secs(60);
 
 impl Upgrades {
     /// A place for one more socket from `client`, unless the listener or
@@ -193,21 +227,21 @@ impl Upgrades {
         Some(Seat {
             shared: Arc::clone(&self.0),
             client,
+            dialed: None,
+            runner: None,
         })
     }
 
-    /// Spend one of `client`'s dials in its minute.
-    fn dial(&self, client: Client) -> bool {
-        self.0
-            .dials
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .charge(
-                client,
-                std::time::Instant::now(),
-                ADDRESS_DIALS,
-                Duration::from_secs(60),
-            )
+    /// Spend one of `client`'s dials in its minute: when it was spent, or
+    /// `None` when the minute's are spent.
+    fn dial(&self, client: Client) -> Option<std::time::Instant> {
+        let mut dials = self.0.dials.lock().unwrap_or_else(PoisonError::into_inner);
+        // Read under the lock: a charge is then never older than the window
+        // that holds it, so a refund (`runners.rs`) finds that window.
+        let now = std::time::Instant::now();
+        dials
+            .charge(client, now, ADDRESS_DIALS, DIAL_WINDOW)
+            .then_some(now)
     }
 }
 
@@ -230,6 +264,7 @@ impl Sockets {
                 stop: stopped,
                 held: Mutex::default(),
                 dials: Mutex::default(),
+                runner_dials: Mutex::default(),
             })),
             jobs: receiver,
             stop,
@@ -248,6 +283,21 @@ impl Sockets {
 
 #[cfg(test)]
 impl Upgrades {
+    /// For the relay's tests: a socket from `client`, admitted as the
+    /// listener admits one, its address's dial and place spent.
+    pub(crate) fn admitted(&self, client: Client) -> Option<Seat> {
+        let dialed = self.dial(client)?;
+        let mut place = self.place(Some(client))?;
+        place.dialed = Some(dialed);
+        Some(place)
+    }
+
+    /// For the relay's tests: the sockets `client` counts.
+    pub(crate) fn counted(&self, client: Client) -> u8 {
+        let held = self.0.held.lock().unwrap_or_else(PoisonError::into_inner);
+        held.by_client.get(&client).copied().unwrap_or(0)
+    }
+
     /// For the server's tests: a socket on `upgraded` that echoes what it
     /// reads until the sockets stop, then says `bye` and ends.
     pub(crate) fn echo(&self, upgraded: hyper::upgrade::OnUpgrade) {
@@ -513,10 +563,12 @@ impl Opening {
             .get::<Upgrades>()
             .cloned()
             .ok_or(Refusal::Invalid)?;
-        if from.is_some_and(|client| !upgrades.dial(client)) {
-            return Err(Refusal::Busy);
-        }
-        let place = upgrades.place(from).ok_or(Refusal::Busy)?;
+        let dialed = match from {
+            Some(client) => Some(upgrades.dial(client).ok_or(Refusal::Busy)?),
+            None => None,
+        };
+        let mut place = upgrades.place(from).ok_or(Refusal::Busy)?;
+        place.dialed = dialed;
         Ok(Self {
             upgrades,
             place,

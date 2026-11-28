@@ -56,12 +56,41 @@ pub(crate) struct Grant {
     pub(crate) seat: u8,
     pub(crate) development: bool,
     pub(crate) upstream_ticket: Zeroizing<String>,
+    /// The AI account whose runner holds the session, as the store said when
+    /// Central issued the ticket (`IdentityService::relay_runner`); `None`
+    /// for every other session. Nothing the client sends sets it: the client
+    /// holds a random handle, and this stays in Central's memory.
+    pub(crate) runner: Option<[u8; 16]>,
     fence: Fence,
     // Revalidate the signed session's expiration, revocation and scoped route on each renewal.
     authorization: Zeroizing<String>,
 }
 
 impl Grant {
+    /// The ranked match the grant is for.
+    pub(crate) const fn match_id(&self) -> Id {
+        self.fence.match_id
+    }
+
+    /// For the relay socket's tests: a grant for seat `seat` of `match_id`,
+    /// a runner's when `runner` names an AI account.
+    #[cfg(test)]
+    pub(crate) fn synthetic(runner: Option<[u8; 16]>, match_id: Id, seat: u8) -> Self {
+        Self {
+            origin: "https://primary.invalid".into(),
+            game: [3; 16],
+            seat,
+            development: false,
+            upstream_ticket: Zeroizing::new("a".repeat(64)),
+            runner,
+            fence: Fence {
+                match_id,
+                generation: 0,
+            },
+            authorization: Zeroizing::new("synthetic".into()),
+        }
+    }
+
     pub(crate) async fn current(&self, identity: &IdentityService) -> bool {
         let Ok(session @ Presented::Session(_)) = identity.present(&self.authorization, None)
         else {
@@ -158,12 +187,17 @@ impl Relay {
                 if after.game != Some(game) {
                     return Err(Error::Conflict);
                 }
+                // Central's own word on whose relay this is, never the client's.
+                // Unanswered, it is no runner's: the socket keeps the address's
+                // budget, the stricter one, and a person's ticket is not lost.
+                let runner = identity.relay_runner(owner).await.unwrap_or(None);
                 let grant = Grant {
                     origin: after.origin,
                     game,
                     seat: after.seat,
                     development,
                     upstream_ticket: Zeroizing::new(ticket.expose().to_owned()),
+                    runner,
                     fence,
                     authorization: Zeroizing::new(authorization.to_owned()),
                 };

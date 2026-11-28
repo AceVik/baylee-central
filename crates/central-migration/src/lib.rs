@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 55] = migrations![
+const MIGRATIONS: [Migration; 56] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -91,6 +91,7 @@ const MIGRATIONS: [Migration; 55] = migrations![
     "m20261126_000054_ai_runner_tokens",
     "m20261127_000055_ai_operator_fill_in",
     "m20261128_000056_ranked_season_finish_awards",
+    "m20261128_000057_ai_global_seats",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -214,7 +215,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 55);
+        assert_eq!(MIGRATIONS.len(), 56);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -246,7 +247,7 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(55));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(56));
         assert_eq!(
             pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
             Some("m20261119_000033_presence")
@@ -412,14 +413,48 @@ mod tests {
     #[test]
     fn season_finish_awards_migration_only_adds_the_switch() {
         let m = MIGRATIONS
-            .last()
+            .iter()
+            .find(|m| m.name == "m20261128_000056_ranked_season_finish_awards")
             .expect("season finish awards migration is present");
-        assert_eq!(m.name, "m20261128_000056_ranked_season_finish_awards");
         assert!(m.sql.contains(
             "ALTER TABLE central_identity.ranked_seasons\n    ADD COLUMN finish_awards boolean NOT NULL DEFAULT true"
         ));
         assert!(!m.sql.contains("GRANT"));
         assert!(!m.sql.contains("DROP"));
         assert!(!m.sql.contains("UPDATE"));
+    }
+
+    /// More AI seats at once: the two CHECKs of the settings are widened, to
+    /// 32 seats and 16 matches between two AIs, under the names 000053 gave
+    /// them, and nothing else changes: no row, no grant, no table.
+    #[test]
+    fn ai_global_seats_migration_only_widens_the_two_checks() {
+        let m = MIGRATIONS.last().expect("AI seats migration is present");
+        assert_eq!(m.name, "m20261128_000057_ai_global_seats");
+        for said in [
+            "DROP CONSTRAINT ai_settings_global_seats_check",
+            "ADD CONSTRAINT ai_settings_global_seats_check CHECK (global_seats BETWEEN 0 AND 32)",
+            "DROP CONSTRAINT ai_settings_carousel_games_check",
+            "ADD CONSTRAINT ai_settings_carousel_games_check CHECK (carousel_games BETWEEN 0 AND 16)",
+        ] {
+            assert!(m.sql.contains(said), "{said}");
+        }
+        let statements = m
+            .sql
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("--"))
+            .collect::<String>();
+        assert_eq!(statements.matches(';').count(), 1, "one statement");
+        assert!(statements.starts_with("ALTER TABLE central_identity.ai_settings"));
+        for absent in [
+            "GRANT",
+            "UPDATE",
+            "INSERT",
+            "DELETE",
+            "DROP TABLE",
+            "DEFAULT",
+        ] {
+            assert!(!statements.contains(absent), "{absent}");
+        }
     }
 }

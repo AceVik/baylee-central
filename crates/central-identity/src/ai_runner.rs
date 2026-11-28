@@ -75,4 +75,17 @@ impl IdentityService {
             clear_cookies: false,
         })
     }
+
+    /// The AI account whose runner holds the native session `session`, or
+    /// `None` for any other session, a person's among them: the store's word,
+    /// read when Central's relay issues a socket ticket for the session and
+    /// kept with it, so that a runner's relay sockets are counted in a budget
+    /// of their own (`central-http`'s `ws.rs`), never by anything the client
+    /// says.
+    ///
+    /// # Errors
+    /// Storage failure.
+    pub async fn relay_runner(&self, session: &Token) -> Result<Option<[u8; 16]>, Error> {
+        self.store.relay_runner(session).await
+    }
 }

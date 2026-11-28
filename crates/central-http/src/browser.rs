@@ -774,18 +774,18 @@ impl Budgets {
 }
 
 /// One budget: each address's window (its start and the units spent), and
-/// when the windows that had passed were last forgotten.
-#[derive(Default)]
-pub(crate) struct Book(BTreeMap<Client, (Instant, u32)>, Option<Instant>);
+/// when the windows that had passed were last forgotten. It counts by
+/// address unless it is given another key (an AI account's, `ws.rs`).
+pub(crate) struct Book<K = Client>(BTreeMap<K, (Instant, u32)>, Option<Instant>);
 
-impl Book {
-    pub(crate) fn charge(
-        &mut self,
-        client: Client,
-        now: Instant,
-        limit: u32,
-        period: Duration,
-    ) -> bool {
+impl<K> Default for Book<K> {
+    fn default() -> Self {
+        Self(BTreeMap::new(), None)
+    }
+}
+
+impl<K: Copy + Ord> Book<K> {
+    pub(crate) fn charge(&mut self, client: K, now: Instant, limit: u32, period: Duration) -> bool {
         let used = self.window(client, now, period);
         if *used >= limit {
             return false;
@@ -796,7 +796,7 @@ impl Book {
 
     /// One more unit of `client`, never refused: its units in this window,
     /// this one included.
-    fn count(&mut self, client: Client, now: Instant, period: Duration) -> u32 {
+    fn count(&mut self, client: K, now: Instant, period: Duration) -> u32 {
         let used = self.window(client, now, period);
         *used = used.saturating_add(1);
         *used
@@ -804,20 +804,32 @@ impl Book {
 
     /// Whether `client` has spent `limit` in the window it is in at `now`;
     /// nothing is spent or remembered.
-    pub(crate) fn spent(&self, client: Client, now: Instant, limit: u32, period: Duration) -> bool {
+    pub(crate) fn spent(&self, client: K, now: Instant, limit: u32, period: Duration) -> bool {
         self.0
             .get(&client)
             .is_some_and(|(start, used)| now.duration_since(*start) < period && *used >= limit)
     }
 
+    /// Give back one unit `client` was charged at `charged`, while the window
+    /// that charged it is still its window: a unit of a window that has passed
+    /// or started again is never given to the next one.
+    pub(crate) fn refund(&mut self, client: K, charged: Instant, period: Duration) {
+        if let Some((start, used)) = self.0.get_mut(&client)
+            && *start <= charged
+            && charged.duration_since(*start) < period
+        {
+            *used = used.saturating_sub(1);
+        }
+    }
+
     /// The units `client` spent in the window it has.
-    fn used(&self, client: Client) -> u32 {
+    fn used(&self, client: K) -> u32 {
         self.0.get(&client).map_or(0, |(_, used)| *used)
     }
 
     /// The units `client` spent in its window, which starts now when it has
     /// none; the windows that passed are forgotten and room is made first.
-    fn window(&mut self, client: Client, now: Instant, period: Duration) -> &mut u32 {
+    fn window(&mut self, client: K, now: Instant, period: Duration) -> &mut u32 {
         // The caller's own window, once passed, starts again.
         if self
             .0

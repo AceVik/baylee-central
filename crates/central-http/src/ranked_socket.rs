@@ -15,6 +15,7 @@ use axum::{
     response::{IntoResponse as _, Response},
 };
 use central_identity::IdentityService;
+use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use std::{sync::Arc, time::Duration};
 use tokio::{
@@ -24,9 +25,16 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
-/// Each relay needs two file descriptors and shares the listener's existing
-/// per-address socket and dial limits with push connections.
-static SLOTS: Semaphore = Semaphore::const_new(64);
+/// Relays at once. Each needs two file descriptors, and they are not raised:
+/// the service's descriptors leave no room (`ws.rs`'s [`ws::SOCKETS`]).
+/// Before its ticket a relay shares the listener's per-address socket and
+/// dial limits with push connections; once its ticket proves it is an AI
+/// runner's, it counts in the runners' budget instead (`ws/runners.rs`).
+const RELAY_SLOTS: usize = 64;
+static SLOTS: Semaphore = Semaphore::const_new(RELAY_SLOTS);
+// The runners hold at most half of the slots, so the other half stays with
+// people (`docs/ai-players.md`, "More AI seats at once").
+const _: () = assert!(2 * ws::RUNNER_RELAYS <= RELAY_SLOTS);
 const AUTH_TIME: Duration = Duration::from_secs(3);
 const DIAL_TIME: Duration = Duration::from_secs(6);
 const RECHECK: Duration = Duration::from_secs(3);
@@ -53,17 +61,22 @@ pub(super) fn dial(
     let Ok(slot) = SLOTS.try_acquire() else {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     };
-    opening.start(request, move |place, upgrade, mut stop| async move {
-        let (_slot, _place) = (slot, place);
+    opening.start(request, move |mut place, upgrade, mut stop| async move {
+        let _slot = slot;
         tokio::select! {
-            ()=serve(relay,identity,upgrade)=>{},
+            ()=serve(relay,identity,upgrade,&mut place)=>{},
             _=stop.changed()=>{},
             ()=tokio::time::sleep(Duration::from_hours(12))=>{},
         }
     })
 }
 
-async fn serve(relay: Relay, identity: Arc<IdentityService>, upgrade: hyper::upgrade::OnUpgrade) {
+async fn serve(
+    relay: Relay,
+    identity: Arc<IdentityService>,
+    upgrade: hyper::upgrade::OnUpgrade,
+    place: &mut ws::Seat,
+) {
     let Ok(Ok(io)) = timeout(AUTH_TIME, upgrade).await else {
         return;
     };
@@ -71,18 +84,42 @@ async fn serve(relay: Relay, identity: Arc<IdentityService>, upgrade: hyper::upg
     let Ok(Ok(ticket)) = timeout(AUTH_TIME, first_ticket(&mut client)).await else {
         return;
     };
-    let Ok(mut grant) = relay.take(&ticket[..]) else {
+    let Ok(grant) = relay.take(&ticket[..]) else {
         return;
     };
     drop(ticket);
+    // A ticket of a session that ended since takes no budget and replaces
+    // no relay of its seat.
     if !live(&grant, &identity).await {
         return;
     }
+    let Some(replaced) = budget(&grant, place) else {
+        return;
+    };
+    tokio::select! {
+        ()=play(grant,&identity,client)=>{},
+        ()=replaced.wait()=>{},
+    }
+}
+
+/// The budget a relay keeps once its ticket proved what it is and its
+/// session still stands, before its host is dialled: a grant Central issued
+/// for an AI runner's session moves it from its address to the runners' own
+/// (`ws/runners.rs`), or refuses it there (`None`); every other relay keeps
+/// the budget it was admitted under.
+fn budget(grant: &Grant, place: &mut ws::Seat) -> Option<ws::Replaced> {
+    match grant.runner {
+        None => Some(ws::Replaced::never()),
+        Some(account) => place.runner(ws::RunnerSeat::new(account, grant.match_id(), grant.seat)),
+    }
+}
+
+async fn play(mut grant: Grant, identity: &IdentityService, client: TokioIo<Upgraded>) {
     let Ok(Ok(mut host)) = timeout(DIAL_TIME, upstream::open(&grant)).await else {
         return;
     };
     drop(std::mem::take(&mut grant.upstream_ticket));
-    if !live(&grant, &identity).await {
+    if !live(&grant, identity).await {
         return;
     }
     let (native_read, native_write) = tokio::io::split(client);
@@ -90,10 +127,9 @@ async fn serve(relay: Relay, identity: Arc<IdentityService>, upgrade: hyper::upg
     tokio::select! {
         _=frames::forward(native_read,gateway_write,frames::From::Native)=>{},
         _=frames::forward(gateway_read,native_write,frames::From::Gateway)=>{},
-        ()=revoked(&grant,&identity)=>{},
+        ()=revoked(&grant,identity)=>{},
     }
 }
-
 async fn live(grant: &Grant, identity: &IdentityService) -> bool {
     timeout(RECHECK_TIME, grant.current(identity))
         .await

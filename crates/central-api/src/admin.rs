@@ -385,11 +385,13 @@ pub struct AiSettings {
     pub fill_in_after: u16,
     /// Minutes an AI's session must have left before its cap, 30 to 600.
     pub drain_minutes: u16,
-    /// AI seats at once, 0 to 16; a match between two AIs takes two.
+    /// AI seats at once, 0 to [`MAX_GLOBAL_SEATS`](crate::ranked::ai::MAX_GLOBAL_SEATS)
+    /// (32); a match between two AIs takes two.
     pub global_seats: u8,
     /// Slots each host keeps for people, 0 to 64.
     pub host_reserve: u8,
-    /// Matches between two AIs at once, 0 to 8.
+    /// Matches between two AIs at once, 0 to
+    /// [`MAX_CAROUSEL_GAMES`](crate::ranked::ai::MAX_CAROUSEL_GAMES) (16).
     pub carousel_games: u8,
     /// Matches between two AIs a UTC day, 0 to 10,000.
     pub carousel_daily: u32,
@@ -408,9 +410,9 @@ impl AiSettings {
             && self.fill_in_after <= 600
             && self.drain_minutes >= 30
             && self.drain_minutes <= 600
-            && self.global_seats <= 16
+            && self.global_seats <= crate::ranked::ai::MAX_GLOBAL_SEATS
             && self.host_reserve <= 64
-            && self.carousel_games <= 8
+            && self.carousel_games <= crate::ranked::ai::MAX_CAROUSEL_GAMES
             && self.carousel_daily <= 10_000
     }
 }
@@ -1243,6 +1245,51 @@ mod tests {
         assert_eq!(
             crate::encode(&listed).unwrap(),
             br#"{"answer":"ai_runner_tokens","tokens":[]}"#
+        );
+    }
+
+    /// The settings for every AI: 32 seats at once and 16 matches between two
+    /// AIs, one past either refused, and the carousel alone can fill every
+    /// seat.
+    #[test]
+    fn the_ai_settings_reach_thirty_two_seats_and_sixteen_carousel_matches() {
+        use crate::ranked::ai::{MAX_CAROUSEL_GAMES, MAX_GAMES, MAX_GLOBAL_SEATS};
+        assert_eq!(
+            (MAX_GLOBAL_SEATS, MAX_CAROUSEL_GAMES, MAX_GAMES),
+            (32, 16, 16)
+        );
+        assert_eq!(MAX_CAROUSEL_GAMES * 2, MAX_GLOBAL_SEATS);
+        let most = AiSettings {
+            fill_in: false,
+            fill_in_after: 600,
+            drain_minutes: 120,
+            global_seats: 32,
+            host_reserve: 2,
+            carousel_games: 16,
+            carousel_daily: 10_000,
+        };
+        assert!(most.valid());
+        assert!(
+            AiSettings {
+                global_seats: 0,
+                carousel_games: 0,
+                ..most
+            }
+            .valid()
+        );
+        assert!(
+            !AiSettings {
+                global_seats: 33,
+                ..most
+            }
+            .valid()
+        );
+        assert!(
+            !AiSettings {
+                carousel_games: 17,
+                ..most
+            }
+            .valid()
         );
     }
 }
