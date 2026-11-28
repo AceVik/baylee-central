@@ -5,7 +5,7 @@
 //! breaks. These words go to the operator's standard error and nowhere
 //! else: the network-facing requests keep their one `Rejected`. A plan holds
 //! no secret, so a value may be quoted.
-use super::{AiPlan, AiPlayerPlan, AiSettingsPlan, RunnerTokenPlan};
+use super::{AiPlan, AiPlayerPlan, AiSettingsPlan, RemoveTarget, RunnerTokenPlan};
 use central_api::admin::AI_PLAYERS;
 use central_api::ai_runner::{LISTED_TOKENS, MAX_ACCOUNTS};
 use central_api::gateway::shown_char;
@@ -205,6 +205,49 @@ fn token_faults(token: &RunnerTokenPlan) -> Vec<String> {
     wrong
 }
 
+/// What is wrong with the plan's removals: too many, one named twice, a
+/// name that is no AI player's or a tag out of range, and one that a player
+/// of the same plan names too (a plan does not make and remove one AI).
+fn remove_faults(plan: &AiPlan) -> Vec<String> {
+    let mut wrong = Vec::new();
+    if plan.remove.len() > AI_PLAYERS {
+        wrong.push(format!(
+            "remove: {} AI players, at most {AI_PLAYERS}",
+            plan.remove.len()
+        ));
+    }
+    let mut seen: BTreeMap<&RemoveTarget, usize> = BTreeMap::new();
+    for (index, wanted) in plan.remove.iter().enumerate() {
+        if let Some(before) = first(&mut seen, wanted, index) {
+            wrong.push(format!(
+                "remove[{index}] \"{wanted}\": also remove[{before}]"
+            ));
+            continue;
+        }
+        let RemoveTarget::Named { display_name, tag } = wanted else {
+            continue;
+        };
+        if !ai_name(display_name) {
+            wrong.push(format!(
+                "remove[{index}] \"{wanted}\": not an AI player's name (KI-...)"
+            ));
+        }
+        if !valid_tag(*tag) {
+            wrong.push(format!("remove[{index}] \"{wanted}\": tag 1 to {MAX_TAG}"));
+        }
+        if let Some(player) = plan
+            .players
+            .iter()
+            .position(|p| p.tag == *tag || p.settings.display_name == *display_name)
+        {
+            wrong.push(format!(
+                "remove[{index}] \"{wanted}\": players[{player}] names it too; a plan does not make and remove one AI player"
+            ));
+        }
+    }
+    wrong
+}
+
 /// Every fault of `plan`, field by field, in the plan's order; none when it
 /// fits. `secret` says whether the caller brought a token's secret, which
 /// it must exactly when the plan makes a token.
@@ -250,6 +293,7 @@ pub fn plan_faults(plan: &AiPlan, secret: bool) -> Vec<String> {
             wrong.push(format!("revoke[{index}]: also revoke[{before}]"));
         }
     }
+    wrong.extend(remove_faults(plan));
     if let Some(token) = &plan.token {
         wrong.extend(token_faults(token));
     }
@@ -373,6 +417,7 @@ mod tests {
                 ..AiSettingsPlan::default()
             }),
             revoke: vec![[1; 16], [1; 16]],
+            remove: Vec::new(),
             token: Some(RunnerTokenPlan {
                 name: " runner".into(),
                 accounts: vec![
@@ -415,6 +460,45 @@ mod tests {
             plan_faults(&fits, true),
             ["token: a secret exactly when a token is made"]
         );
+    }
+
+    /// A removal names an AI player once, by its id or by an AI's name and
+    /// a tag in range, and never one a player of the same plan names.
+    #[test]
+    fn removals_are_said_where_they_cannot_be() {
+        let named = |name: &str, tag: u32| RemoveTarget::Named {
+            display_name: name.into(),
+            tag,
+        };
+        let plan = AiPlan {
+            players: vec![player("KI-Haus-Expert")],
+            remove: vec![
+                named("KI-GPT-Astra", 0x1b66),
+                named("KI-GPT-Astra", 0x1b66),
+                named("Bob", 0),
+                named("KI-Haus-Expert", 0x1b67),
+                RemoveTarget::Id([7; 16]),
+            ],
+            ..AiPlan::default()
+        };
+        let faults = plan_faults(&plan, false);
+        for said in [
+            "remove[1] \"KI-GPT-Astra#1b66\": also remove[0]",
+            "remove[2] \"Bob#0\": not an AI player's name (KI-...)",
+            "remove[2] \"Bob#0\": tag 1 to 2147483647",
+            "remove[3] \"KI-Haus-Expert#1b67\": players[0] names it too; a plan does not make and remove one AI player",
+        ] {
+            assert!(
+                faults.iter().any(|fault| fault == said),
+                "{said}: {faults:?}"
+            );
+        }
+        assert_eq!(faults.len(), 4, "{faults:?}");
+        let fits = AiPlan {
+            remove: vec![named("KI-GPT-Astra", 0x1b66), RemoveTarget::Id([7; 16])],
+            ..AiPlan::default()
+        };
+        assert_eq!(plan_faults(&fits, false), Vec::<String>::new());
     }
 
     /// The settings' bounds are the administration's: a value the plan

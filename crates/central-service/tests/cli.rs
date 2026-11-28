@@ -365,7 +365,7 @@ fn the_ai_players_command_names_every_fault_and_never_the_login() {
         (
             format!(r#"{{{login},"list":true,"revoke":["nope"]}}"#),
             vec![
-                "central: list: a listing goes alone, without players, settings, revoke or token",
+                "central: list: a listing goes alone, without players, settings, revoke, remove or token",
                 r#"central: revoke[0] "nope": a runner token's id"#,
             ],
         ),
@@ -388,6 +388,14 @@ fn the_ai_players_command_names_every_fault_and_never_the_login() {
         (
             String::new(),
             vec!["central: the input: EOF while parsing a value"],
+        ),
+        (
+            format!(r#"{{{login},"remove":["KI-GPT-Astra","KI-GPT-Sol#1b67","KI-GPT-Sol#1b67"]}}"#),
+            vec![r#"central: remove[0] "KI-GPT-Astra": an AI player's name with its tag"#],
+        ),
+        (
+            format!(r#"{{{login},"remove":["KI-GPT-Sol#1b67","KI-GPT-Sol#1b67"]}}"#),
+            vec![r#"central: remove[1] "KI-GPT-Sol#1b67": also remove[0]"#],
         ),
     ] {
         let output = run_with_stdin("--ai-players-stdin", input.as_bytes());

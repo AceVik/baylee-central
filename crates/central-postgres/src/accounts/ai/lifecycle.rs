@@ -326,11 +326,8 @@ impl AccountStore {
     }
 
     /// Remove an AI player that has never been seated and holds no ticket
-    /// that is not closed, for a fresh administrator: its account goes as
-    /// a person's deletion takes one (`deletion::remove`), with everything
-    /// it holds by cascade, its runner sessions and their sids among them,
-    /// and the audit's `ai.removed`. Answers the digests of the sessions
-    /// that ended, for their push sockets.
+    /// that is not closed, for a fresh administrator ([`remove`]). Answers
+    /// the digests of the sessions that ended, for their push sockets.
     ///
     /// # Errors
     /// `Rejected` without a fresh administrator and for an account that is
@@ -340,34 +337,53 @@ impl AccountStore {
         browser: &Token,
         account: [u8; 16],
     ) -> Result<Vec<[u8; 32]>, Error> {
-        let account = Uuid::from_bytes(account);
         let (tx, actor) = self.acting_administrator(browser).await?;
-        lock(&tx, account).await?;
-        if has_played(&tx, account).await? {
-            return Err(Error::Conflict);
-        }
-        // After the locks: an exchange waits for the account row, so no
-        // session is minted for it from here to the commit.
-        let ended = tx
-            .query_all_raw(statement(
-                "SELECT digest FROM central_identity.sessions WHERE account_id = $1",
-                vec![account.into()],
-            ))
-            .await
-            .map_err(unavailable)?
-            .iter()
-            .map(|row| {
-                get::<Vec<u8>>(row, "digest")?
-                    .as_slice()
-                    .try_into()
-                    .map_err(unavailable)
-            })
-            .collect::<Result<Vec<[u8; 32]>, Error>>()?;
-        deletion::remove(&tx, account).await?;
-        audit(&tx, Some(actor), Action::AiRemoved, Some(account), None).await?;
+        let ended = remove(&tx, Some(actor), Uuid::from_bytes(account)).await?;
         tx.commit().await.map_err(unavailable)?;
         Ok(ended)
     }
+}
+
+/// Remove the AI `account` in `tx`, for an administrator or the operator
+/// (`actor` none), while it has never been seated and holds no ticket that
+/// is not closed: its account goes as a person's deletion takes one
+/// (`deletion::remove`), with everything it holds by cascade, its runner
+/// sessions and their sids among them, and the audit's `ai.removed`. The
+/// one removal the administration's page and the operator's command take.
+/// Answers the digests of the sessions that ended.
+///
+/// # Errors
+/// `Rejected` for an account that is no AI player; `Conflict` once it has
+/// played; storage failure.
+pub(crate) async fn remove(
+    tx: &DatabaseTransaction,
+    actor: Option<Uuid>,
+    account: Uuid,
+) -> Result<Vec<[u8; 32]>, Error> {
+    lock(tx, account).await?;
+    if has_played(tx, account).await? {
+        return Err(Error::Conflict);
+    }
+    // After the locks: an exchange waits for the account row, so no
+    // session is minted for it from here to the commit.
+    let ended = tx
+        .query_all_raw(statement(
+            "SELECT digest FROM central_identity.sessions WHERE account_id = $1",
+            vec![account.into()],
+        ))
+        .await
+        .map_err(unavailable)?
+        .iter()
+        .map(|row| {
+            get::<Vec<u8>>(row, "digest")?
+                .as_slice()
+                .try_into()
+                .map_err(unavailable)
+        })
+        .collect::<Result<Vec<[u8; 32]>, Error>>()?;
+    deletion::remove(tx, account).await?;
+    audit(tx, actor, Action::AiRemoved, Some(account), None).await?;
+    Ok(ended)
 }
 
 #[cfg(test)]
