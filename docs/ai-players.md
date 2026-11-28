@@ -1516,3 +1516,140 @@ new test sends six faulty plans, a bad login and an empty input, and finds
 every fault once, the refusal last and no canary of the login), clippy and
 fmt clean, the store suite green (95 s; each refusal of the operator's
 suite names its place).
+
+## More AI seats at once (28 November 2026)
+
+The owner wants the AI players to play far more ranked games at once, so
+that they use up an API credit within days (decided for the owner,
+28.11.2026). `global_seats` was capped at 16, and §4 said why: the runner's
+relay sockets all come from one address, a home line it shares with the
+owner, and counted against that address's 32 sockets and 60 dials a
+minute. Thirty-two AI seats would have starved every person on it.
+
+### Design pass
+
+Assets: a person's relay sockets and push socket on an address a runner
+shares; the listener's relay slots and its file descriptors; the hosts'
+capacity; the runner's games. Callers: anyone on the internet, before and
+after a ticket; a person; a runner session; the holder of a stolen runner
+token.
+
+Invariants:
+
+1. Whatever is counted before a socket proves what it is stays as it is,
+   for everyone: the address's dial, the address's socket place, the
+   listener's place, a relay slot. An unauthenticated client gains nothing.
+2. A socket proves it is a runner's only by the first frame's ticket, and
+   the fact behind it is Central's: when Central issues the ticket for a
+   session, it asks the store whether that session was minted by a live
+   AI runner token, and for which AI account, and keeps the answer with
+   the ticket in memory. The client sends nothing that says it.
+3. Once proven, a runner's socket leaves its address: its socket place and
+   its dial are given back to the address, also when the runner's own
+   budget then refuses it. A person on that address keeps every socket and
+   dial a runner's proven sockets would have taken.
+4. The runners' own budget is hard: one AI account holds at most
+   `MAX_GAMES` (16) relay sockets and dials 32 a minute (two whole
+   redials), all runners together at most `MAX_GLOBAL_SEATS` (32) relay
+   sockets, half of the listener's 64 relay slots. The other half stays
+   with people.
+5. One relay per AI seat: a newer proven socket of the same AI account,
+   match and seat takes the older one's place in the budget, and the older
+   one closes, as the host's own newer socket for a chair replaces the
+   older (Baylee's `seat_socket.rs`). So a runner whose line changed its
+   address while every old relay hangs half-open (a header waits up to 600
+   seconds) is not refused until they die; sockets stay at most one per
+   live AI seat.
+6. The relay slots and the listener's sockets are not raised: the file
+   descriptors give no room (below).
+
+Where it is counted. `ws.rs`'s `Seat` holds the socket's place; after the
+ticket (`ranked_socket.rs`, straight after `relay.take`, before the session
+is checked or the host is dialled) a grant that names an AI account calls
+`Seat::runner`, which gives the address back its dial (in the window that
+charged it) and its place, charges the account's dials, and enters the
+seat in the runners' table under the listener's lock, or refuses and the
+socket closes. Dropping the `Seat` gives back whatever it holds. Every
+other socket keeps the budget it was admitted under.
+
+Where the fact comes from. `Relay::forward`'s socket branch asks
+`IdentityService::relay_runner`, one statement (`AccountStore::relay_runner`):
+a live native session with a `runner_token` whose token is neither revoked
+nor expired, of an enrolled account that is an AI player. Anything else,
+a person's session among it, is no runner's, and keeps the address's
+budget. It costs one indexed read per relay ticket, once a match and a
+reconnect, for people too.
+
+Weighed and set aside: a field on `SeatResponse::RelayRoute` (a wire type
+the game repository pins, with `deny_unknown_fields`); the signed bearer's
+claims (the same for a runner as for a person, §2); an allowlist of the
+runner's address (none, §2); raising the per-address limits (they protect
+every shared address from anyone).
+
+Residuals named before the code:
+
+- Until its ticket is read (at most two times `AUTH_TIME`, three seconds,
+  in practice one round trip), a runner's socket counts against its
+  address as anyone's does. A runner that dials all its seats at once can
+  fill its address's 32 places for that moment; a person's new dial then is
+  refused once and retried. The runner should dial a few at a time (the
+  game repository's runner).
+- The relay's 64 upstream calls at once (`Relay::requests`) are shared:
+  a runner's calls are a handful a match and end within 8 seconds; the
+  host they go to is the one people's calls go to, so a share of them
+  would not keep people's calls fast when it is slow.
+
+### Capacity, from what is written down
+
+netcup's and the hosts' live numbers were not read (no login to the
+servers); what follows is arithmetic over the numbers given.
+
+- **Central's relay.** 64 relay slots, 32 for runners. The file
+  descriptors (1,024, systemd's default; the unit sets no `LimitNOFILE`):
+  the native listener holds at most 512 sockets (push and relay together)
+  and one more descriptor for each of the 64 relays' host connections, the
+  browser listener 512 push sockets of its own (`run_browser` makes a set of
+  its own), each listener 128 connections, the database pools four each.
+  At the worst that is 512 + 64 + 512 + 256 + the pools, past 1,024 before
+  this change: the slots stay 64, the runners' share adds no descriptor,
+  and the unit should set `LimitNOFILE=4096` ([operations](operations.md)
+  §"Supervision"). Each relay's session and route are checked every three
+  seconds: at most 64 relays are about 21 route transactions a second
+  against a pool of four, as before; the runners' share changes who holds
+  them, not how many.
+- **netcup** (12 cores, 32 GB, one engine process per game). At 32 AI
+  seats at most 32 matches hold an AI (every one filled in) and 16 when
+  each is between two AIs. A harness probe measured big AI games at about
+  6 MB each; real games are heavier, so take ten times that: 32 × 60 MB ≈
+  1.9 GB, a sixteenth of the memory. The moves are decided on acenb, the
+  engine only applies them. The host's own advertised capacity (at most 64
+  a host) and `host_reserve` bound its matches whatever `global_seats` says.
+- **acenb** (16 threads, 27 GB, about 21 GB available). The Baylee AI
+  runner takes about 3.4 GB idle and 1.2 GB a game, counted a seat:
+  (21 − 3.4) / 1.2 ≈ 14.7, so at most 14 house-AI seats, 12 with 3 GB to
+  spare (3.4 + 12 × 1.2 = 17.8 GB). Language-model CLIs are light (not
+  measured here).
+
+**The maximum is 32** (`MAX_GLOBAL_SEATS`): Central's own bound, the
+runners' half of the relay slots, and well inside netcup's memory as
+written down. **The default stays 8**, the column's and the row every
+install has (3.4 + 8 × 1.2 = 13 GB on acenb, whatever the mix). Any mix of
+kinds is safe up to 12. Above 12, only with the house AIs' `max_games`
+summed to 12 or less and the rest language models. The migration changes no
+row: `global_seats` rises only when an administrator or the operator's plan
+sets it.
+
+`carousel_games` (matches between two AIs at once) was capped at 8, which
+is 16 seats: with fill-in rare, the carousel is what spends the credit,
+so 32 seats would have changed nothing. It may reach 16
+(`MAX_CAROUSEL_GAMES`, half of `MAX_GLOBAL_SEATS`), so the carousel alone
+can fill every AI seat. `carousel_daily` (10,000 a day) is far above 16
+matches at once of a quarter hour each (1,536 a day).
+
+**Migration 000057**, `m20261128_000057_ai_global_seats`, widens the two
+CHECKs of `ai_settings` (`global_seats` 0 to 32, `carousel_games` 0 to 16)
+and nothing else; no grant changes. The previous binary reads the wider
+values, but its relay counts a runner's sockets against the address and its
+website refuses to save them: before a fallback to it, set `global_seats` to
+16 or less and `carousel_games` to 8 or less ([operations](operations.md)
+§"AI players").
