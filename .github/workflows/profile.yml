@@ -1,0 +1,106 @@
+name: profile
+
+# The profile of every commit on main (docs/xtask.md §"Profile-guided
+# builds"): CI trains it here, and the deploy hook on the server builds that
+# commit from it (docs/operations.md §"Deploying with the gateway"). It lies
+# as `central-<commit>.profdata.xz`, with the toolchain that made it in
+# `central-<commit>.profdata.rustc`, in the public pre-release
+# `central-profiles`, which the server reads without a token: the files hold
+# the counts of a synthetic training and the names of this public code's
+# functions, nothing else. A commit without a profile is built without one.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: profile-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # Every dependency's build script runs here, so this job can write
+  # nothing but its artifact.
+  train:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Assert runner supports x86-64-v3 (AVX2, BMI2, FMA)
+        shell: bash
+        run: |
+          grep -qw avx2 /proc/cpuinfo
+          grep -qw bmi2 /proc/cpuinfo
+          grep -qw fma /proc/cpuinfo
+      # The deploy hook's own list of what x86-64-v3 needs, read on an
+      # x86-64-v3 machine: a flag it names wrongly would refuse every server.
+      - name: The deploy hook's CPU check passes here
+        run: bash ops/deploy-hook check-cpu
+      - name: Install pinned toolchain with llvm-tools
+        run: rustup toolchain install 1.100.0 --profile minimal --component llvm-tools --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: central-pgo
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo fetch --locked
+      - name: Build tools, ffmpeg for the training's pictures
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake nasm ffmpeg brotli xz-utils
+      - name: The site the training serves
+        run: cargo xtask site
+      - name: Train
+        run: cargo xtask pgo --profile-only --out target/pgo-profile --target-cpu x86-64-v3
+      - name: Name the profile after its commit
+        shell: bash
+        run: |
+          mkdir -p target/profile-out
+          xz -T0 -6 -c target/pgo-profile/central.profdata > "target/profile-out/central-${GITHUB_SHA}.profdata.xz"
+          cp target/pgo-profile/central.profdata.rustc "target/profile-out/central-${GITHUB_SHA}.profdata.rustc"
+          ls -l target/profile-out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: central-profile
+          path: target/profile-out/
+          retention-days: 3
+          if-no-files-found: error
+
+  # Write access and nothing checked out or built: the artifact goes into
+  # the pre-release, and only the newest 30 profiles stay.
+  publish:
+    needs: [train]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: central-profile
+          path: profile
+      - name: Into the pre-release central-profiles
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view central-profiles > /dev/null 2>&1; then
+            gh release create central-profiles --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Central build profiles" \
+              --notes "Profiles of main's commits, which the deploy hook builds from (docs/xtask.md, Profile-guided builds). Not a release of Central."
+          fi
+          gh release upload central-profiles profile/* --clobber
+          gh release view central-profiles --json assets \
+            --jq '.assets | sort_by(.createdAt) | reverse | .[60:] | .[].name' \
+            | while read -r name; do
+                gh release delete-asset central-profiles "$name" --yes
+              done

@@ -46,6 +46,10 @@ jobs:
           cargo xtask policy --compiler-probe
           cargo xtask crypto-scope
           cargo xtask chrono-scope
+      # The deploy hook refuses a machine without what x86-64-v3 needs; its
+      # list of CPU flags, read on this x86-64-v3 runner, must pass.
+      - name: The deploy hook's CPU check passes on an x86-64-v3 runner
+        run: bash ops/deploy-hook check-cpu
 
   lint:
     runs-on: ubuntu-26.04
