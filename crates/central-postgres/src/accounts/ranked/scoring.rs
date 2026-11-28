@@ -81,13 +81,7 @@ impl Career {
             0 => self.draws += 1,
             _ => return Err(Error::Unavailable),
         }
-        self.rank = rules::rank(
-            elo,
-            self.games(),
-            (now - self.first).whole_days(),
-            0,
-            self.rank,
-        );
+        self.rank = rules::rank(elo, self.games(), (now - self.first).whole_days(), 0);
         self.last = now;
         Ok(())
     }
@@ -124,7 +118,6 @@ fn published(
         career.games(),
         (now - career.first).whole_days(),
         (now - career.last).whole_days(),
-        career.rank,
     );
     let league = if champion.is_some() {
         10

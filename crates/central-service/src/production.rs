@@ -572,6 +572,84 @@ async fn swept() -> Result<(central_postgres::Swept, central_postgres::LegacySwe
     Ok((swept, legacy))
 }
 
+/// What `--rerank-stdin` takes: the migration document, and whether to
+/// write; without `apply` it is a dry run.
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+struct Reranking {
+    database: Database,
+    #[serde(default)]
+    #[zeroize(skip)]
+    apply: bool,
+}
+
+/// Give every placed ranked record the rank the rule of the day gives it
+/// (`docs/ranked.md` §"Progress and deck edits"; once after the rule changed
+/// on 28.11.2026), under the migrator login. Each record the rule places
+/// elsewhere goes to standard output as one tab-separated line: track,
+/// format, season, account, Elo, games, league.division stored and under the
+/// rule. Standard error says how many, how many higher, and whether they
+/// were written or it was a dry run.
+pub(super) async fn run_rerank() -> ExitCode {
+    let Ok((changes, applied)) = reranked().await else {
+        eprintln!("central: re-ranking rejected configuration or failed; nothing written");
+        return ExitCode::FAILURE;
+    };
+    let mut stdout = std::io::stdout().lock();
+    if changes
+        .iter()
+        .try_for_each(|c| {
+            writeln!(
+                stdout,
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}.{}\t{}.{}",
+                c.track,
+                c.format,
+                c.season,
+                c.account,
+                c.elo,
+                c.games,
+                c.before.0,
+                c.before.1,
+                c.after.0,
+                c.after.1
+            )
+        })
+        .and_then(|()| stdout.flush())
+        .is_err()
+    {
+        eprintln!("central: re-ranking output failed");
+        return ExitCode::FAILURE;
+    }
+    let players = changes.iter().filter(|c| c.track == "player").count();
+    let higher = changes.iter().filter(|c| c.promoted()).count();
+    eprintln!(
+        "central: {players} player and {} deck ranks the rule places elsewhere, {higher} higher and {} lower; {}",
+        changes.len() - players,
+        changes.len() - higher,
+        if applied {
+            "written"
+        } else {
+            "dry run, nothing written"
+        }
+    );
+    ExitCode::SUCCESS
+}
+
+async fn reranked() -> Result<(Vec<central_postgres::Rerank>, bool), ()> {
+    let bytes = read_settings()?;
+    let mut settings: Reranking = parse(&bytes)?;
+    drop(bytes);
+    let apply = settings.apply;
+    let database = settings.database.server()?;
+    drop(settings);
+    let db = connect_server(database).await.map_err(|_| ())?;
+    let changes = central_postgres::rerank(&db, apply).await.map_err(|_| ());
+    let closed = db.close().await.map_err(|_| ());
+    let changes = changes?;
+    closed?;
+    Ok((changes, apply))
+}
+
 /// Write a fresh OPAQUE setup and bridge credential as one JSON document.
 /// Refuses a terminal: the secrets belong in a file the operator redirects to.
 pub(super) fn generate_secrets() -> ExitCode {
@@ -909,6 +987,14 @@ mod tests {
         assert!(parse::<Migration>(sweep.as_bytes()).is_ok());
         let longer = format!(r#"{{"database":{},"years":1}}"#, database());
         assert!(parse::<Migration>(longer.as_bytes()).is_err());
+        // The re-ranking takes it too, and whether to write: a dry run unless told.
+        let dry = parse::<Reranking>(sweep.as_bytes()).expect("the migration document");
+        assert!(!dry.apply);
+        let apply = format!(r#"{{"database":{},"apply":true}}"#, database());
+        assert!(parse::<Reranking>(apply.as_bytes()).expect("apply").apply);
+        let odd = format!(r#"{{"database":{},"apply":"yes"}}"#, database());
+        assert!(parse::<Reranking>(odd.as_bytes()).is_err());
+        assert!(parse::<Reranking>(longer.as_bytes()).is_err());
     }
 
     #[test]

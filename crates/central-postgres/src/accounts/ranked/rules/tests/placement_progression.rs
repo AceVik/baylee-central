@@ -1,6 +1,6 @@
 //! First passage to Master and Grandmaster at a steady ten games per calendar day.
 
-use super::{Field, Outcome, Rank, SEEDS, draw, player, rank, rounded, settle};
+use super::{ELITE_AGE_DAYS, Field, Outcome, SEEDS, draw, player, rank, rounded, settle};
 
 fn report(first_days: &mut [i32]) {
     first_days.sort_unstable();
@@ -24,7 +24,6 @@ fn elite_first_passage() {
             for stream in 0..64 {
                 let mut rng = seed << 40 | stream;
                 let mut pilot = player(1500, 0);
-                let mut badge = Rank::default();
                 let (mut reached_master, mut reached_gm) = (false, false);
                 for game in 1..=3200 {
                     let rival_skill = Field::Dense.opponent(pilot);
@@ -37,14 +36,15 @@ fn elite_first_passage() {
                     };
                     pilot = settle([pilot, player(rival_skill, 500)], outcome, [0; 2], 0)[0];
                     let day = (game - 1) / 10 + 1;
-                    badge = rank(rounded(pilot.score), game, i64::from(day - 1), 0, badge);
+                    let badge = rank(rounded(pilot.score), game, i64::from(day - 1), 0);
+                    // Master and above ask for six months since the first game
                     if badge.league >= 8 && !reached_master {
-                        assert!(day >= 200);
+                        assert!(day > ELITE_AGE_DAYS);
                         master.push(day);
                         reached_master = true;
                     }
                     if badge.league >= 9 && !reached_gm {
-                        assert!(day >= 250);
+                        assert!(day > ELITE_AGE_DAYS);
                         grandmaster.push(day);
                         reached_gm = true;
                     }

@@ -1,28 +1,34 @@
+//! Public leagues and divisions follow the Elo alone, as in chess or League of
+//! Legends (owner, 28.11.2026): a higher Elo is never a lower rank. Confirmed
+//! games count only for the ten placement games; Master and above also ask
+//! for six months since the first game and recent activity.
+
 /// Maximum number of simultaneously published player Champion titles worldwide.
 pub(crate) const CHAMPION_LIMIT: i32 = 100;
 /// Minimum public score for eligibility for a Champion title.
 pub(crate) const CHAMPION_ELO: i32 = 2490;
-/// Minimum confirmed results for eligibility for a Champion title.
-pub(crate) const CHAMPION_GAMES: i32 = 3000;
+/// Confirmed results before a record is placed and has a public rank.
+pub(crate) const PLACED_AFTER: i32 = 10;
 /// Minimum elapsed whole days since a first ranked game for Master and above.
 pub(crate) const ELITE_AGE_DAYS: i32 = 184;
 /// Maximum inactivity in whole days for the elite ranks.
 pub(crate) const ELITE_IDLE_DAYS: i32 = 14;
 
 // Index is the public league identifier. Each entry sets the league's minimum
-// integer Elo, confirmed matches and number of numbered divisions.
-const GATES: [(i32, i32, i32); 11] = [
-    (0, 0, 0),
-    (1200, 20, 3),
-    (1320, 60, 3),
-    (1440, 120, 3),
-    (1560, 240, 3),
-    (1680, 440, 4),
-    (1840, 800, 4),
-    (2000, 1240, 4),
-    (2240, 2000, 0),
-    (2350, 2500, 0),
-    (CHAMPION_ELO, CHAMPION_GAMES, 0),
+// integer Elo and number of numbered divisions, which split the league's Elo
+// span evenly.
+const GATES: [(i32, i32); 11] = [
+    (0, 0),
+    (1200, 3),
+    (1320, 3),
+    (1440, 3),
+    (1560, 3),
+    (1680, 4),
+    (1840, 4),
+    (2000, 4),
+    (2240, 0),
+    (2350, 0),
+    (CHAMPION_ELO, 0),
 ];
 const MASTER: usize = 8;
 const CHAMPION: usize = 10;
@@ -43,30 +49,20 @@ fn elite_eligible(age_days: i64, idle_days: i64) -> bool {
 /// Determine eligibility before global top-100 selection and tiebreaking.
 #[cfg(test)]
 pub(crate) fn champion_eligible(elo: i32, games: i32, age_days: i64, idle_days: i64) -> bool {
-    let (points, matches, _) = GATES[CHAMPION];
-    elo >= points && games >= matches && elite_eligible(age_days, idle_days)
+    elo >= CHAMPION_ELO && games >= PLACED_AFTER && elite_eligible(age_days, idle_days)
 }
 
-/// Compute the local public rank up to Grandmaster. The standings publisher
-/// assigns the scarce Champion titles. Durations are elapsed whole days since
-/// the first and most recent confirmed match for this ranked record.
-pub(crate) fn rank(elo: i32, games: i32, age_days: i64, idle_days: i64, previous: Rank) -> Rank {
-    if games < 10 {
+/// Compute the local public rank up to Grandmaster from the Elo alone, once
+/// placed. The standings publisher assigns the scarce Champion titles.
+/// Durations are elapsed whole days since the first and most recent confirmed
+/// match for this ranked record; they gate only Master and above.
+pub(crate) fn rank(elo: i32, games: i32, age_days: i64, idle_days: i64) -> Rank {
+    if games < PLACED_AFTER {
         return Rank {
             league: -1,
             division: 0,
         };
     }
-    // A ten-game placement can earn at most Bronze. Silver and higher use
-    // confirmed volume exclusively, independently of the opponent field.
-    let placement_credit = elo.saturating_sub(1400).clamp(0, 200) * 110 / 200;
-    let volume = |tier: usize| {
-        if tier <= 3 {
-            games.saturating_add(placement_credit)
-        } else {
-            games
-        }
-    };
     let until = if elite_eligible(age_days, idle_days) {
         CHAMPION
     } else {
@@ -74,10 +70,9 @@ pub(crate) fn rank(elo: i32, games: i32, age_days: i64, idle_days: i64, previous
     };
     let tier = GATES[..until]
         .iter()
-        .enumerate()
-        .rposition(|(tier, &(points, matches, _))| elo >= points && volume(tier) >= matches)
+        .rposition(|&(points, _)| elo >= points)
         .unwrap_or(0);
-    let (points, matches, divisions) = GATES[tier];
+    let (points, divisions) = GATES[tier];
     let league = i32::try_from(tier).expect("eleven leagues");
     if divisions == 0 {
         return Rank {
@@ -85,20 +80,15 @@ pub(crate) fn rank(elo: i32, games: i32, age_days: i64, idle_days: i64, previous
             division: 0,
         };
     }
-
-    let (next_points, next_matches, _) = GATES[tier + 1];
+    let (next_points, _) = GATES[tier + 1];
+    let span = next_points - points;
     let mut division = divisions;
     for step in 1..divisions {
-        let numeral = divisions - step;
-        // Once held, a division has a 15-point demotion buffer. League
-        // boundaries and match counts are always strict.
-        let held = league == previous.league && (1..=numeral).contains(&previous.division);
-        let threshold = |span| (span * step + divisions - 1) / divisions;
-        let required = points + threshold(next_points - points) - if held { 15 } else { 0 };
-        if elo < required || volume(tier) < matches + threshold(next_matches - matches) {
+        // The step's share of the league's span, rounded up.
+        if elo < points + (span * step + divisions - 1) / divisions {
             break;
         }
-        division = numeral;
+        division = divisions - step;
     }
     Rank { league, division }
 }

@@ -16,6 +16,7 @@ mod credentials;
 mod export;
 mod grants;
 mod replicas;
+mod rerank;
 mod scoring;
 
 const ORIGIN: &str = "https://ranked-test.example";
@@ -371,6 +372,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
     ai_runner::run(store, db, keys).await;
     ai_operator::run(store, db, keys).await;
     carousel::run(store, db, keys).await;
+    rerank::run(db).await;
 }
 
 async fn admission(store: &AccountStore, alice: &Token, bob: &Token) {

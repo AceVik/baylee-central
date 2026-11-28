@@ -87,7 +87,7 @@ fn bad_reserved_environment_is_rejected_without_echoing_values() {
 }
 
 /// The usage: every mode, in the order `--modes` names them.
-const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --ai-players-stdin | --sweep-stdin | --after-restore-stdin | --erase-accounts-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key | --modes";
+const USAGE: &str = "usage: central-service --dev | --dev-accounts-stdin | --accounts-stdin | --check-accounts-stdin | --migrate-stdin | --appoint-admin-stdin | --ai-players-stdin | --sweep-stdin | --rerank-stdin | --after-restore-stdin | --erase-accounts-stdin | --legacy-import-stdin | --legacy-deadline-stdin | --import-reports-stdin | --advent-import-stdin | --ranked-cosmetics-import-stdin | --cards-ingest-stdin | --generate-secrets | --generate-token-key | --modes";
 
 #[test]
 fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
@@ -103,6 +103,7 @@ fn an_explicit_mode_is_required_and_extra_arguments_are_rejected() {
         &["--appoint-admin-stdin", "PRIVATE_ARG_CANARY"],
         &["--ai-players-stdin", "PRIVATE_ARG_CANARY"],
         &["--sweep-stdin", "--dev"],
+        &["--rerank-stdin", "PRIVATE_ARG_CANARY"],
         &["--legacy-import-stdin", "PRIVATE_ARG_CANARY"],
         &["--legacy-deadline-stdin", "--dev"],
         &["--import-reports-stdin", "PRIVATE_ARG_CANARY"],
@@ -145,6 +146,10 @@ fn production_modes_reject_missing_or_invalid_input_without_echoing_it() {
         (
             "--sweep-stdin",
             "central: sweep rejected configuration or failed",
+        ),
+        (
+            "--rerank-stdin",
+            "central: re-ranking rejected configuration or failed; nothing written",
         ),
         (
             "--after-restore-stdin",

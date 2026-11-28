@@ -6,7 +6,7 @@ mod player;
 
 pub(crate) use deck::{deck_after_match, deck_start};
 pub(crate) use ladder::{
-    CHAMPION_ELO, CHAMPION_GAMES, CHAMPION_LIMIT, ELITE_AGE_DAYS, ELITE_IDLE_DAYS, Rank, rank,
+    CHAMPION_ELO, CHAMPION_LIMIT, ELITE_AGE_DAYS, ELITE_IDLE_DAYS, PLACED_AFTER, Rank, rank,
 };
 pub(crate) use player::{EVIDENCE_GAP, PLACEMENT_GAMES, Player, queue_elo, settle};
 #[cfg(test)]

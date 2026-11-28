@@ -1,5 +1,7 @@
 # Ten-game player and deck placements
 
+*28.11.2026: leagues and divisions follow the Elo alone since this day ([ranked play](ranked.md#progress-and-deck-edits)); the game-count gates, the Bronze cap of the ten-game reveal and the division buffer this study measured are gone. Its rating results stand; its league counts describe the earlier rule.*
+
 On 22 November 2026 the production ranked rules processed 2,764,800 simulated victories and defeats across 27,648 new careers. The three tracks share these rules and keep separate records. Each of nine scenarios used six fixed seeds with 512 careers per seed. A career lasted 100 games at ten games per simulated day. The first deck started at 1500 Elo. The experiment supplied opponents directly and measured the rating and league decisions after each match.
 
 In the dense field, opponents were established accounts with true skill equal to the nearest 50-point interval around the seeker's provisional matchmaking Elo. Each opponent brought a 1500-Elo deck. In the two-player fields the returning rival kept its earned player and deck ratings. Its intrinsic strength stayed fixed, as did the seeker's. The chance of winning was 4% plus 92% of the logistic Elo probability. Player strength alone determined outcomes. Deck Elo therefore measures how much of an initially unknown player's strength was attributed to their deck. These are controlled synthetic estimates.
