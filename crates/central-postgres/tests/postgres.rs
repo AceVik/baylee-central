@@ -194,7 +194,7 @@ async fn verify_migrations(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM seaql_migrations"
         )
         .await,
-        55
+        56
     );
 
     history_as_sea_orm_left_it(operator).await;
@@ -331,6 +331,8 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
     // that crate migrated is read by this runner as it was written.
     assert_seaql_table_shape(operator).await;
     // Rebuild the suffix over the pre-presence schema. Older files would fail if run twice.
+    // 000056 and 000057 change only tables dropped here (`ranked_seasons`, `ai_settings`),
+    // so neither needs an undo of its own.
     undo_runner_tokens(operator).await;
     operator
         .execute_unprepared(
@@ -406,7 +408,7 @@ async fn history_as_sea_orm_left_it(operator: &sea_orm::DatabaseConnection) {
             "SELECT count(*)::bigint AS value FROM public.seaql_migrations"
         )
         .await,
-        55
+        56
     );
     assert_eq!(
         scalar(

@@ -924,11 +924,11 @@ fn settings_view(p: &Page) -> impl IntoView + use<> {
                         |f| f.fill_in_after.clone(), |f, v| f.fill_in_after = v)}
                     {field("ai-drain", words::ai_drain(lang), words::ai_drain_hint(lang), ("30", "600"),
                         |f| f.drain_minutes.clone(), |f, v| f.drain_minutes = v)}
-                    {field("ai-global-seats", words::ai_global_seats(lang), words::ai_global_seats_hint(lang), ("0", "16"),
+                    {field("ai-global-seats", words::ai_global_seats(lang), words::ai_global_seats_hint(lang), ("0", "32"),
                         |f| f.global_seats.clone(), |f, v| f.global_seats = v)}
                     {field("ai-host-reserve", words::ai_host_reserve(lang), words::ai_host_reserve_hint(lang), ("0", "64"),
                         |f| f.host_reserve.clone(), |f, v| f.host_reserve = v)}
-                    {field("ai-carousel-games", words::ai_carousel_games(lang), words::ai_carousel_games_hint(lang), ("0", "8"),
+                    {field("ai-carousel-games", words::ai_carousel_games(lang), words::ai_carousel_games_hint(lang), ("0", "16"),
                         |f| f.carousel_games.clone(), |f, v| f.carousel_games = v)}
                     {field("ai-carousel-daily", words::ai_carousel_daily(lang), words::ai_carousel_daily_hint(lang), ("0", "10000"),
                         |f| f.carousel_daily.clone(), |f, v| f.carousel_daily = v)}

@@ -359,3 +359,38 @@ async fn a_ticket_is_one_whole_binary_message_of_64_hex_digits() {
         assert!(first_ticket(&mut &input[..]).await.is_err());
     }
 }
+
+/// After the ticket: a grant Central issued for a person's session keeps
+/// the socket on its address; one for an AI runner's session moves it to
+/// the runners' budget, which takes one relay a seat, the newer in the
+/// older's place, and a ticket for the account's seventeenth seat closes.
+#[tokio::test]
+async fn a_ticket_decides_the_budget_and_only_central_s_grant_names_a_runner() {
+    use super::{Grant, budget, ws};
+    let home = crate::in_flight::Client::from(std::net::IpAddr::from([198, 51, 100, 7]));
+    let sockets = ws::Sockets::new();
+    let upgrades = &sockets.upgrades;
+    let mut person = upgrades.admitted(home).unwrap();
+    assert!(budget(&Grant::synthetic(None, [1; 16], 0), &mut person).is_some());
+    assert_eq!(
+        upgrades.counted(home),
+        1,
+        "a person's relay stays on its address"
+    );
+    let ai = [9; 16];
+    let mut relays = Vec::new();
+    for game in 0..16 {
+        let mut relay = upgrades.admitted(home).unwrap();
+        let replaced = budget(&Grant::synthetic(Some(ai), [game; 16], 1), &mut relay).unwrap();
+        relays.push((relay, replaced));
+    }
+    assert_eq!(upgrades.counted(home), 1, "the runner's sixteen left it");
+    let mut over = upgrades.admitted(home).unwrap();
+    assert!(budget(&Grant::synthetic(Some(ai), [16; 16], 1), &mut over).is_none());
+    let mut again = upgrades.admitted(home).unwrap();
+    let _kept = budget(&Grant::synthetic(Some(ai), [0; 16], 1), &mut again).unwrap();
+    let (_old, old_replaced) = relays.remove(0);
+    tokio::time::timeout(std::time::Duration::from_secs(1), old_replaced.wait())
+        .await
+        .expect("the seat's older relay is told to close");
+}

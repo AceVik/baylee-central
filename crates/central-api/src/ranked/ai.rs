@@ -175,6 +175,17 @@ pub const MAX_OFFERS: usize = 3;
 /// does not shorten while more are live.
 pub const MAX_GAMES: u8 = 16;
 
+/// The most AI seats at once, all AIs together
+/// ([`AiSettings::global_seats`](crate::admin::AiSettings::global_seats)); a
+/// match between two AIs takes two. Central's relay keeps as many sockets
+/// for the runners and as many again for people (`docs/ai-players.md`).
+pub const MAX_GLOBAL_SEATS: u8 = 32;
+
+/// The most matches between two AIs at once
+/// ([`AiSettings::carousel_games`](crate::admin::AiSettings::carousel_games)):
+/// two seats each, so the carousel alone can fill every AI seat.
+pub const MAX_CAROUSEL_GAMES: u8 = MAX_GLOBAL_SEATS / 2;
+
 /// The most settled matches [`Response::Work`] lists.
 pub const FINISHED: u8 = 32;
 

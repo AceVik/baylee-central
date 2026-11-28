@@ -756,11 +756,11 @@ fn an_address_dials_sixty_times_a_minute() {
     let sockets = Sockets::new();
     let client = Client::from(std::net::IpAddr::from([198, 51, 100, 9]));
     for _ in 0..ADDRESS_DIALS {
-        assert!(sockets.upgrades.dial(client));
+        assert!(sockets.upgrades.dial(client).is_some());
     }
-    assert!(!sockets.upgrades.dial(client));
+    assert!(sockets.upgrades.dial(client).is_none());
     let other = Client::from(std::net::IpAddr::from([198, 51, 100, 10]));
-    assert!(sockets.upgrades.dial(other));
+    assert!(sockets.upgrades.dial(other).is_some());
 }
 
 #[tokio::test]

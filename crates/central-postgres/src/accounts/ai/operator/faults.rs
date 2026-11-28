@@ -12,7 +12,8 @@ use central_api::gateway::shown_char;
 use central_api::owner::{MAX_TOKEN_DAYS, MAX_TOKEN_NAME};
 use central_api::profile::{MAX_TAG, ai_name, valid_tag};
 use central_api::ranked::ai::{
-    AiKind, LABEL_CHARS, MAX_GAMES, UNFAIR_PROFILES, valid_label, valid_profile,
+    AiKind, LABEL_CHARS, MAX_CAROUSEL_GAMES, MAX_GAMES, MAX_GLOBAL_SEATS, UNFAIR_PROFILES,
+    valid_label, valid_profile,
 };
 use std::collections::BTreeMap;
 
@@ -147,13 +148,18 @@ fn settings_faults(settings: &AiSettingsPlan) -> Vec<String> {
         30,
         600,
     );
-    range("global_seats", settings.global_seats.map(u32::from), 0, 16);
+    range(
+        "global_seats",
+        settings.global_seats.map(u32::from),
+        0,
+        u32::from(MAX_GLOBAL_SEATS),
+    );
     range("host_reserve", settings.host_reserve.map(u32::from), 0, 64);
     range(
         "carousel_games",
         settings.carousel_games.map(u32::from),
         0,
-        8,
+        u32::from(MAX_CAROUSEL_GAMES),
     );
     range("carousel_daily", settings.carousel_daily, 0, MOST_DAILY);
     wrong
@@ -362,7 +368,8 @@ mod tests {
             players: vec![player("KI-Haus-Expert"), second, player("KI-Haus-Expert")],
             settings: Some(AiSettingsPlan {
                 fill_in_after: Some(5),
-                carousel_games: Some(9),
+                global_seats: Some(33),
+                carousel_games: Some(17),
                 ..AiSettingsPlan::default()
             }),
             revoke: vec![[1; 16], [1; 16]],
@@ -384,7 +391,8 @@ mod tests {
             "players[2].tag 6699: also players[0].tag",
             "players[2].display_name \"KI-Haus-Expert\": also players[0].display_name",
             "settings.fill_in_after 5: 30 to 600",
-            "settings.carousel_games 9: 0 to 8",
+            "settings.global_seats 33: 0 to 32",
+            "settings.carousel_games 17: 0 to 16",
             "revoke[1]: also revoke[0]",
             "token.name \" runner\": no space at its start or end",
             "token.days 400: 1 to 366",
@@ -396,7 +404,7 @@ mod tests {
                 "{said}: {faults:?}"
             );
         }
-        assert_eq!(faults.len(), 12, "{faults:?}");
+        assert_eq!(faults.len(), 13, "{faults:?}");
         // A plan that fits has none; the secret goes with a token alone.
         let fits = AiPlan {
             players: vec![player("KI-Haus-Expert")],
@@ -427,9 +435,9 @@ mod tests {
             AiSettingsPlan {
                 fill_in_after: Some(30),
                 drain_minutes: Some(600),
-                global_seats: Some(16),
+                global_seats: Some(32),
                 host_reserve: Some(64),
-                carousel_games: Some(8),
+                carousel_games: Some(16),
                 carousel_daily: Some(10_000),
                 ..AiSettingsPlan::default()
             },

@@ -100,7 +100,12 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection, keys: &Se
         [(&pia.0, pia.1), (&quinn.0, quinn.1)],
     )
     .await;
+    relayed(store, &held, bot, &pia.0).await;
     revoking(store, db, &admin, (&token, token_id), bot, &held, &sids).await;
+    // Revoked: none of its sessions is a runner's relay any more.
+    for session in &held {
+        assert_eq!(store.relay_runner(session).await, Ok(None));
+    }
     people(store, db, keys, outsider_identity).await;
     grants(db).await;
 
@@ -505,6 +510,20 @@ async fn revoking(
         )
         .await,
         1
+    );
+}
+
+/// Whose relay a socket ticket for a session is (`AccountStore::relay_runner`,
+/// which Central's relay asks when it issues one): each runner session names
+/// its AI account, a person's session and one that does not exist name none.
+async fn relayed(store: &AccountStore, held: &[Token], bot: [u8; 16], person: &Token) {
+    for session in held {
+        assert_eq!(store.relay_runner(session).await, Ok(Some(bot)));
+    }
+    assert_eq!(store.relay_runner(person).await, Ok(None));
+    assert_eq!(
+        store.relay_runner(&Token::generate().unwrap()).await,
+        Ok(None)
     );
 }
 

@@ -447,7 +447,7 @@ mod tests {
             r#"{{{LOGIN},
               "players":[{{"display_name":"KI-Haus-Expert","tag":6699,"kind":"house",
                 "profile":"house:expert","label":"Haus-KI · Expert","max_games":4,"enabled":true}}],
-              "settings":{{"fill_in":false,"carousel_games":8,"carousel_daily":10000,"global_seats":16}},
+              "settings":{{"fill_in":false,"carousel_games":16,"carousel_daily":10000,"global_seats":32}},
               "revoke":["0192f0c47b1a7cde8f00000000000001"],
               "token":{{"name":"runner-1","accounts":["KI-Haus-Expert"]}}}}"#
         ))

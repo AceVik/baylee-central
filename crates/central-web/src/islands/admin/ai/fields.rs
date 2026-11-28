@@ -3,7 +3,7 @@
 //! that a form passes before anything is sent.
 
 use central_api::admin::{AdminAiPlayer, AiPlayerSettings, AiSettings};
-use central_api::ranked::ai::{AiKind, MAX_GAMES};
+use central_api::ranked::ai::{AiKind, MAX_CAROUSEL_GAMES, MAX_GAMES, MAX_GLOBAL_SEATS};
 
 use crate::words::{self, Lang};
 
@@ -168,11 +168,11 @@ impl SettingsFields {
             "ai-fill-in-after"
         } else if !(30..=600).contains(&settings.drain_minutes) {
             "ai-drain"
-        } else if settings.global_seats > 16 {
+        } else if settings.global_seats > MAX_GLOBAL_SEATS {
             "ai-global-seats"
         } else if settings.host_reserve > 64 {
             "ai-host-reserve"
-        } else if settings.carousel_games > 8 {
+        } else if settings.carousel_games > MAX_CAROUSEL_GAMES {
             "ai-carousel-games"
         } else {
             "ai-carousel-daily"
@@ -300,7 +300,7 @@ mod tests {
         );
         assert_eq!(off(|f| f.drain_minutes = "601".into()), Err("ai-drain"));
         assert_eq!(
-            off(|f| f.global_seats = "17".into()),
+            off(|f| f.global_seats = "33".into()),
             Err("ai-global-seats")
         );
         assert_eq!(
@@ -312,7 +312,7 @@ mod tests {
             Err("ai-host-reserve")
         );
         assert_eq!(
-            off(|f| f.carousel_games = "9".into()),
+            off(|f| f.carousel_games = "17".into()),
             Err("ai-carousel-games")
         );
         assert_eq!(
@@ -322,6 +322,15 @@ mod tests {
         assert_eq!(
             off(|f| f.global_seats = "0".into()).map(|s| s.global_seats),
             Ok(0)
+        );
+        // The most: 32 seats, and the carousel alone fills them.
+        assert_eq!(
+            off(|f| {
+                f.global_seats = "32".into();
+                f.carousel_games = "16".into();
+            })
+            .map(|s| (s.global_seats, s.carousel_games)),
+            Ok((32, 16))
         );
     }
 }

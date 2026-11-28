@@ -180,6 +180,7 @@ async fn idle_expiry_clears_handles_and_socket_grants() {
         seat: 0,
         development: false,
         upstream_ticket: zeroize::Zeroizing::new(private('a').expose().to_owned()),
+        runner: None,
         fence: scope.fence,
         authorization: zeroize::Zeroizing::new("synthetic".into()),
     };

@@ -287,6 +287,42 @@ impl AccountStore {
         })
     }
 
+    /// The AI account whose runner holds the native session `session`:
+    /// live, minted by a runner token that is neither revoked nor expired,
+    /// of an enrolled account that is an AI player. `None` for every other
+    /// session, a person's among them. Central's relay keeps the answer with
+    /// the socket ticket it issues for the session, so that a runner's relay
+    /// sockets are counted in a budget of their own and not against its
+    /// address (`docs/ai-players.md`, "More AI seats at once"); nothing a
+    /// client sends decides it.
+    ///
+    /// # Errors
+    /// Storage failure.
+    pub async fn relay_runner(&self, session: &Token) -> Result<Option<[u8; 16]>, Error> {
+        let row = self
+            .db
+            .query_one_raw(statement(
+                "SELECT s.account_id FROM central_identity.sessions s
+                 JOIN central_identity.accounts a
+                   ON a.id = s.account_id AND a.credential_revision = s.credential_revision
+                 JOIN central_identity.ai_players p ON p.account_id = s.account_id
+                 JOIN central_identity.ai_runner_tokens t ON t.id = s.runner_token
+                 WHERE s.digest = $1 AND s.kind = 'native'
+                   AND s.expires_at > pg_catalog.clock_timestamp()
+                   AND a.credential IS NOT NULL
+                   AND t.revoked_at IS NULL AND t.expires_at > pg_catalog.clock_timestamp()",
+                vec![session.digest().to_vec().into()],
+            ))
+            .await
+            .map_err(unavailable)?;
+        row.map(|row| {
+            row.try_get::<Uuid>("", "account_id")
+                .map(Uuid::into_bytes)
+                .map_err(unavailable)
+        })
+        .transpose()
+    }
+
     /// The runner tokens for the administrator behind `browser`: the live
     /// ones first, then those revoked or expired in the last 30 days, each
     /// group newest first, with the accounts each lists.
