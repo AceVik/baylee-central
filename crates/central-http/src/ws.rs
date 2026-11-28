@@ -148,8 +148,8 @@ struct Shared {
     stop: watch::Receiver<bool>,
     held: Mutex<Held>,
     dials: Mutex<super::browser::Book>,
-    /// Each AI account's proven relay dials ([`RUNNER_DIALS`](runners::RUNNER_DIALS)).
-    runner_dials: Mutex<super::browser::Book<[u8; 16]>>,
+    /// The runners' proven relay dials (`runners.rs`).
+    runner_dials: Mutex<runners::RunnerDials>,
 }
 
 /// The sockets held: each address's, the runners' proven relays
@@ -235,11 +235,11 @@ impl Upgrades {
     /// Spend one of `client`'s dials in its minute: when it was spent, or
     /// `None` when the minute's are spent.
     fn dial(&self, client: Client) -> Option<std::time::Instant> {
+        let mut dials = self.0.dials.lock().unwrap_or_else(PoisonError::into_inner);
+        // Read under the lock: a charge is then never older than the window
+        // that holds it, so a refund (`runners.rs`) finds that window.
         let now = std::time::Instant::now();
-        self.0
-            .dials
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+        dials
             .charge(client, now, ADDRESS_DIALS, DIAL_WINDOW)
             .then_some(now)
     }

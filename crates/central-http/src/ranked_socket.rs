@@ -88,6 +88,11 @@ async fn serve(
         return;
     };
     drop(ticket);
+    // A ticket of a session that ended since takes no budget and replaces
+    // no relay of its seat.
+    if !live(&grant, &identity).await {
+        return;
+    }
     let Some(replaced) = budget(&grant, place) else {
         return;
     };
@@ -97,9 +102,9 @@ async fn serve(
     }
 }
 
-/// The budget a relay keeps once its ticket proved what it is, before its
-/// session is checked or its host dialled: a grant Central issued for an AI
-/// runner's session moves it from its address to the runners' own
+/// The budget a relay keeps once its ticket proved what it is and its
+/// session still stands, before its host is dialled: a grant Central issued
+/// for an AI runner's session moves it from its address to the runners' own
 /// (`ws/runners.rs`), or refuses it there (`None`); every other relay keeps
 /// the budget it was admitted under.
 fn budget(grant: &Grant, place: &mut ws::Seat) -> Option<ws::Replaced> {
@@ -110,9 +115,6 @@ fn budget(grant: &Grant, place: &mut ws::Seat) -> Option<ws::Replaced> {
 }
 
 async fn play(mut grant: Grant, identity: &IdentityService, client: TokioIo<Upgraded>) {
-    if !live(&grant, identity).await {
-        return;
-    }
     let Ok(Ok(mut host)) = timeout(DIAL_TIME, upstream::open(&grant)).await else {
         return;
     };

@@ -119,6 +119,13 @@ impl Fields {
     }
 }
 
+/// The form's most `global_seats`, as the field shows it:
+/// [`MAX_GLOBAL_SEATS`].
+pub(super) const GLOBAL_SEATS_MOST: &str = "32";
+/// The form's most `carousel_games`, as the field shows it:
+/// [`MAX_CAROUSEL_GAMES`].
+pub(super) const CAROUSEL_GAMES_MOST: &str = "16";
+
 /// The settings for every AI as typed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct SettingsFields {
@@ -323,6 +330,9 @@ mod tests {
             off(|f| f.global_seats = "0".into()).map(|s| s.global_seats),
             Ok(0)
         );
+        // The fields show the API's bounds.
+        assert_eq!(GLOBAL_SEATS_MOST, MAX_GLOBAL_SEATS.to_string());
+        assert_eq!(CAROUSEL_GAMES_MOST, MAX_CAROUSEL_GAMES.to_string());
         // The most: 32 seats, and the carousel alone fills them.
         assert_eq!(
             off(|f| {

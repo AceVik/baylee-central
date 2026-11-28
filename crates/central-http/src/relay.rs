@@ -188,7 +188,9 @@ impl Relay {
                     return Err(Error::Conflict);
                 }
                 // Central's own word on whose relay this is, never the client's.
-                let runner = identity.relay_runner(owner).await?;
+                // Unanswered, it is no runner's: the socket keeps the address's
+                // budget, the stricter one, and a person's ticket is not lost.
+                let runner = identity.relay_runner(owner).await.unwrap_or(None);
                 let grant = Grant {
                     origin: after.origin,
                     game,

@@ -172,10 +172,11 @@ async fn a_newer_relay_of_a_seat_replaces_the_older_one() {
 }
 
 /// An AI account's proven dials: two whole redials a minute, replacing
-/// ones too. Another account's are its own, and the address's are given
-/// back whatever the runner's say.
+/// ones too. Past them the runner pays nothing and the address does: its
+/// dial stays spent, so a runner over its dials gains nothing over anyone.
+/// Another account's dials are its own.
 #[test]
-fn an_account_dials_two_redials_a_minute() {
+fn an_account_dials_two_redials_a_minute_and_past_them_its_address_pays() {
     assert_eq!(RUNNER_DIALS, 32);
     let sockets = Sockets::new();
     for _ in 0..RUNNER_DIALS {
@@ -188,7 +189,30 @@ fn an_account_dials_two_redials_a_minute() {
     let mut relay = admitted(&sockets.upgrades, home()).unwrap();
     assert!(relay.runner(seat(2, 0, 0)).is_some());
     drop(relay);
-    assert_eq!(room(&sockets, home()), (ADDRESS_SOCKETS, ADDRESS_DIALS));
+    assert_eq!(
+        room(&sockets, home()),
+        (ADDRESS_SOCKETS, ADDRESS_DIALS - 1),
+        "the refused dial alone stays spent"
+    );
+}
+
+/// All runners together dial two whole redials of their relays a minute,
+/// about what one address may: AI accounts beyond count do not multiply
+/// the dials their address is spared.
+#[test]
+fn all_runners_dial_two_redials_of_all_their_relays_a_minute() {
+    assert_eq!(ALL_RUNNER_DIALS, 64);
+    let sockets = Sockets::new();
+    for n in 0..4 {
+        for game in 0..16 {
+            let mut relay = admitted(&sockets.upgrades, home()).unwrap();
+            assert!(relay.runner(seat(n, game, 0)).is_some(), "{n} {game}");
+        }
+    }
+    let mut relay = admitted(&sockets.upgrades, home()).unwrap();
+    assert!(relay.runner(seat(9, 0, 0)).is_none(), "the sixty-fifth");
+    drop(relay);
+    assert_eq!(room(&sockets, home()).1, ADDRESS_DIALS - 1);
 }
 
 /// Whatever ends a relay gives back what it holds; a socket proves once.

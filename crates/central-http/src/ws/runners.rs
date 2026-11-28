@@ -7,14 +7,17 @@
 //! address's dial and place, the listener's place, a relay slot
 //! (`ranked_socket.rs`). Its ticket is Central's: it says an AI account only
 //! when Central found, as it issued it, that the session was minted by a live
-//! runner token (`IdentityService::relay_runner`). Then [`Seat::runner`]
-//! gives the address back its dial and its place, whether the runners'
-//! budget takes the socket or not, and counts it there instead:
+//! runner token (`IdentityService::relay_runner`). Once the ticket is taken
+//! and the session still stands, [`Seat::runner`] has the runners pay for the
+//! dial ([`RUNNER_DIALS`] a minute an AI account, [`ALL_RUNNER_DIALS`] all
+//! runners together). Only when they do does the address get back its dial,
+//! so a dial is paid once, by the runners or by the address, never by
+//! nobody. Then the address gets back its place too, and the socket counts
+//! in the runners' budget instead:
 //!
 //! - [`RUNNER_SOCKETS`] relays an AI account, [`RUNNER_RELAYS`] all runners
 //!   together, half of the listener's relay slots, so the other half stays
 //!   with people;
-//! - [`RUNNER_DIALS`] proven dials a minute an AI account;
 //! - one relay a seat: a newer one of the same account, match and seat takes
 //!   the older one's place, and the older one closes, as the host's newer
 //!   socket for a chair replaces its older one. So a runner whose line
@@ -24,6 +27,7 @@
 //! Past its budget the socket closes; its place at the listener goes when it
 //! does.
 use super::{PoisonError, Seat};
+use crate::browser::Book;
 use central_api::ranked::ai::{MAX_GAMES, MAX_GLOBAL_SEATS};
 use std::collections::BTreeMap;
 use tokio::sync::oneshot;
@@ -37,6 +41,29 @@ pub(crate) const RUNNER_RELAYS: usize = MAX_GLOBAL_SEATS as usize;
 /// Proven relay dials a minute of one AI account: two whole redials of its
 /// relays.
 pub(crate) const RUNNER_DIALS: u32 = 2 * MAX_GAMES as u32;
+/// Proven relay dials a minute of all runners together: two whole redials
+/// of their relays, about what one address dials ([`super::ADDRESS_DIALS`]),
+/// so the dials the runners take off their address are no more than it had.
+pub(crate) const ALL_RUNNER_DIALS: u32 = 2 * MAX_GLOBAL_SEATS as u32;
+
+/// The runners' dials: each AI account's, and all of theirs.
+#[derive(Default)]
+pub(super) struct RunnerDials {
+    accounts: Book<[u8; 16]>,
+    all: Book<()>,
+}
+
+impl RunnerDials {
+    /// Spend one of `account`'s dials and one of all runners', at `now`;
+    /// `false` when either is spent for the minute.
+    fn charge(&mut self, account: [u8; 16], now: std::time::Instant) -> bool {
+        self.accounts
+            .charge(account, now, RUNNER_DIALS, super::DIAL_WINDOW)
+            && self
+                .all
+                .charge((), now, ALL_RUNNER_DIALS, super::DIAL_WINDOW)
+    }
+}
 
 /// A runner's relay: the AI account, the ranked match and the seat it plays.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -149,32 +176,35 @@ impl Replaced {
 
 impl Seat {
     /// This socket proved it is the relay of `seat`, a runner's, by the
-    /// ticket Central issued for the runner's session. Its address gets
-    /// back the dial and the place it spent, and the socket is counted in
-    /// the runners' budget instead, or refused there (`None`), and then
-    /// closes. Only once a socket.
+    /// ticket Central issued for the runner's session. The runners pay for
+    /// its dial, and then its address gets back the dial and the place it
+    /// spent, and the socket is counted in the runners' budget instead. Past
+    /// the runners' dials the address keeps the dial spent; past them or
+    /// their relays the socket is refused (`None`), and then closes. Only
+    /// once a socket.
     pub(crate) fn runner(&mut self, seat: RunnerSeat) -> Option<Replaced> {
         if self.runner.is_some() {
             return None;
         }
-        let now = std::time::Instant::now();
-        // The address pays for no socket that proved it is a runner's,
-        // whether the runners' budget then takes it or not.
+        let paid = {
+            let mut dials = self
+                .shared
+                .runner_dials
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            dials.charge(seat.account, std::time::Instant::now())
+        };
+        if !paid {
+            return None;
+        }
+        // Paid by the runners: the address pays for no socket that proved
+        // it is a runner's, whether the runners' relays then take it or not.
         if let (Some(client), Some(dialed)) = (self.client, self.dialed.take()) {
             self.shared
                 .dials
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .refund(client, dialed, super::DIAL_WINDOW);
-        }
-        if !self
-            .shared
-            .runner_dials
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .charge(seat.account, now, RUNNER_DIALS, super::DIAL_WINDOW)
-        {
-            return None;
         }
         let mut held = self
             .shared
