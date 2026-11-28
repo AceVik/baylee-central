@@ -160,14 +160,15 @@ const DRAWN: [Drawn; 9] = [
         size: "1024x768",
         frames: 1,
         format: PNG,
-        encoder: &["-c:v", "png", "-pix_fmt", "rgba"],
+        encoder: &["-c:v", "png", "-pix_fmt", "rgb24"],
     },
     Drawn {
         name: "square.png",
         size: "256x256",
         frames: 1,
         format: PNG,
-        encoder: &["-c:v", "png", "-pix_fmt", "rgb24"],
+        // with alpha: an icon's PNG must be RGBA (`ico` below)
+        encoder: &["-c:v", "png", "-pix_fmt", "rgba"],
     },
     Drawn {
         name: "lossy.webp",
@@ -615,7 +616,8 @@ fn fixtures(dir: &Path) -> Result<Vec<Picture>> {
     Ok(found)
 }
 
-/// An ICO file holding `png` (256 × 256) as its one entry.
+/// An ICO file holding `png` (256 × 256, RGBA: Windows and the `image`
+/// crate read no other PNG in an icon) as its one entry.
 fn ico(png: &[u8]) -> Result<Vec<u8>> {
     let size = u32::try_from(png.len()).or_fail("The icon's picture is too large")?;
     let mut out = Vec::with_capacity(22 + png.len());
