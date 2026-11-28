@@ -247,7 +247,10 @@ fn build(root: &Path, files: &BTreeMap<String, Value>) -> Value {
         let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         (output.status.success() && !text.is_empty()).then_some(text)
     };
-    let version = git(&["describe", "--tags", "--abbrev=0"]);
+    // Only a release's tag names the version: `central-profiles`, the
+    // pre-release that holds the build profiles (`.github/workflows/profile.yml`),
+    // tags a commit on main too.
+    let version = git(&["describe", "--tags", "--abbrev=0", "--match", "v*"]);
     let ahead = version
         .as_deref()
         .and_then(|tag| git(&["rev-list", "--count", &format!("{tag}..HEAD")]))

@@ -216,6 +216,18 @@ wasm --check` passed in the same container. The resulting WASM SHA-256 is
 `cargo xtask site` takes the committed module (checked against its
 `SHA256SUMS`) and builds none of its own.
 
+**No SIMD** (measured 28.11.2026): the module's Argon2id, the browser's
+key stretching (64 MiB, three passes, four lanes, RustCrypto `argon2` 0.6,
+which has no WebAssembly SIMD path of its own), built once without and once
+with `-C target-feature=+simd128` in a scratch crate, took 133 against
+164 ms in Node 25 (V8) on Apple Silicon, the median of seven alternating
+runs (137 against 169 and 147 against 176 in two repeats): the compiler's
+own vectorisation makes it slower. The module stays without `simd128`,
+which would also lock browsers before Safari 16.4 out of signing in. A
+faster stretch would need a SIMD kernel, which this repository does not
+write itself (no custom cryptographic code); a reviewed crate with one would
+be the owner's decision.
+
 ## The site's assets (`site`)
 
 The server-rendered website (`crates/central-web`, [the proposal](proposals/frontend-rewrite.md))
