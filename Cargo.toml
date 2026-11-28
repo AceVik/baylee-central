@@ -20,8 +20,9 @@ pedantic = { level = "deny", priority = -1 }
 overflow-checks = true
 strip = "debuginfo"
 
-# Release profile with full FatLTO and single codegen unit for PGO builds
-# (`cargo xtask pgo`) targeting x86-64-v3 Linux production binaries.
+# What `cargo xtask pgo` ships (docs/xtask.md §"Profile-guided builds"):
+# fat link-time optimisation and one codegen unit, for the website and the
+# picture worker built from a profile and for central-service without one.
 [profile.release-pgo]
 inherits = "release"
 lto = "fat"

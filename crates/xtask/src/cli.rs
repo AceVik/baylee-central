@@ -60,7 +60,8 @@ pub enum Task {
     /// Synthesizes `/security` narrated `.opus` clips and step-sync `cues.json`
     /// manifests via `ElevenLabs` `eleven_v4`.
     SecurityAudio(security_audio::Options),
-    /// Automated PGO + `FatLTO` (`x86-64-v3`) build pipeline for production servers.
+    /// The profile-guided `FatLTO` (`x86-64-v3`) build of the production
+    /// servers: training, the check that the profile took, and a measurement.
     Pgo(pgo::Options),
 }
 
@@ -82,8 +83,10 @@ tasks:
   cards-ingest [bulk-path]      import Scryfall's all-cards catalog into local dev-site PostgreSQL
   security-audio [--lang <list>] [--voice-id <id>] [--dry-run] [--force]
                                 synthesize /security audio clips + cues.json via ElevenLabs v4 (reads ELEVENLABS_API_KEY from env)
-  pgo [--out <dir>] [--target-cpu <cpu>] [--profile-only]
-                                collect local HTTP/codec profiles and build PGO+FatLTO server binaries";
+  pgo [--out <dir>] [--target-cpu <cpu>] [--profile-only | --profile-use <file>] [--compare]
+                                train the website and the picture worker, build them from the profile
+                                (FatLTO) beside central-service, check that the profile took;
+                                --compare: measure against the deploy hook's build";
 
 fn parse_pgo(flags: &[String]) -> Result<Task> {
     let usage = || Fail::new(USAGE);
@@ -95,6 +98,18 @@ fn parse_pgo(flags: &[String]) -> Result<Task> {
             "--profile-only" => {
                 opts.profile_only = true;
                 at += 1;
+            }
+            "--compare" => {
+                opts.compare = true;
+                at += 1;
+            }
+            "--profile-use" => {
+                let raw = flags.get(at + 1).ok_or_else(usage)?;
+                if !pgo::valid_out_dir(raw) {
+                    return Err(Fail::new("invalid PGO profile path"));
+                }
+                opts.profile_use = Some(raw.clone());
+                at += 2;
             }
             "--out" => {
                 let raw = flags.get(at + 1).ok_or_else(usage)?;
@@ -125,11 +140,22 @@ fn parse_pgo(flags: &[String]) -> Result<Task> {
                     }
                     raw.clone_into(&mut opts.target_cpu);
                     at += 1;
+                } else if let Some(raw) = arg.strip_prefix("--profile-use=") {
+                    if !pgo::valid_out_dir(raw) {
+                        return Err(Fail::new("invalid PGO profile path"));
+                    }
+                    opts.profile_use = Some(raw.to_owned());
+                    at += 1;
                 } else {
                     return Err(usage());
                 }
             }
         }
+    }
+    if opts.profile_only && opts.profile_use.is_some() {
+        return Err(Fail::new(
+            "--profile-only trains a profile and --profile-use builds from one: choose one",
+        ));
     }
     Ok(Task::Pgo(opts))
 }
@@ -333,8 +359,41 @@ mod tests {
                 out: "target/pgo-custom".to_owned(),
                 target_cpu: "x86-64-v3".to_owned(),
                 profile_only: true,
+                profile_use: None,
+                compare: false,
+            })
+        );
+        assert_eq!(
+            parse(&vec_args(&[
+                "pgo",
+                "--profile-use",
+                "target/pgo-release/central.profdata",
+                "--compare",
+            ]))
+            .expect("valid pgo args"),
+            Task::Pgo(pgo::Options {
+                profile_use: Some("target/pgo-release/central.profdata".to_owned()),
+                compare: true,
+                ..pgo::Options::default()
+            })
+        );
+        assert_eq!(
+            parse(&vec_args(&["pgo", "--profile-use=p.profdata"])).expect("valid pgo args"),
+            Task::Pgo(pgo::Options {
+                profile_use: Some("p.profdata".to_owned()),
+                ..pgo::Options::default()
             })
         );
         assert!(parse(&vec_args(&["pgo", "--target-cpu", "bad cpu"])).is_err());
+        assert!(parse(&vec_args(&["pgo", "--profile-use"])).is_err());
+        assert!(
+            parse(&vec_args(&[
+                "pgo",
+                "--profile-only",
+                "--profile-use",
+                "p.profdata"
+            ]))
+            .is_err()
+        );
     }
 }

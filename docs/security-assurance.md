@@ -39,6 +39,47 @@ These are engineering passes, not independent external audits. Separate agent
 reviews and their scope are recorded below. Release still needs independent review
 and operational/legal gates.
 
+## Profile-guided builds, 28 November 2026
+
+Scope: `cargo xtask pgo` and its use in `release.yml` ([xtask](xtask.md#profile-guided-builds-pgo));
+no server code changed. The deploy hook's use of CI's profiles is a later change with its own passes.
+
+Design pass: the assets are the shipped binaries' behaviour and the release pipeline. A
+profile steers only the compiler's choices (inlining, layout, which code counts as hot);
+it cannot change what correct code does, and the shipped profile keeps the release
+profile's overflow checks. The risks are a build that is slower than it claims (a
+profile that took on nothing, or a training that leaves the real work cold, which
+profile-guided size optimisation then shrinks), a profile used by another toolchain,
+and a training that touches anything but loopback and synthetic data. Invariants:
+what is built from a profile is trained on what it does in production, or it is built
+without one (`central-service`); a profile is read only by the toolchain that made it;
+a build whose profile did not take does not ship; the training needs no secret, no
+network beyond loopback and no real data.
+
+Implementation pass: the training runs `central-web` in its deployed mode with GitHub and
+Central switched off, on a free loopback port, with the site, the synthetic fallback data
+and a count of page views in an owned temporary directory; the picture worker in a fresh
+process per picture at `/`, as systemd starts it, on pictures ffmpeg draws from its test
+pattern and the codec tests' synthetic fixtures. No program runs through a shell. Servers
+run in a process group of their own and are stopped with `SIGINT` (so the counts are
+written) or killed with the group; the temporary directories are removed. The build
+passes `--target`, so no build script or procedural macro is instrumented or written
+into. The profile's toolchain is `rustc -vV`, compared exactly. The check reads the
+compiler's own report, not a clock.
+
+Adversarial pass: a profile of one function no build has was built from end to end
+twice. The compiler's reports reached the count through cargo, and the build did not
+end within 80 and 50 minutes, so the full negative control is not a release step. The
+release run instead proves, on a one-line program, that this toolchain words a missing
+function as the check reads it. The profile built from in a second checkout with
+another Cargo home matched as fully as at home (0 of 89 709 functions without counts),
+so it does not depend on where it is built. The training drives refusals (a photo cut
+short, a PNG declared as a JPEG, bytes that are no picture) and fails when a picture it
+must convert is refused, which found that an icon's PNG must be RGBA. `--compare` runs
+the profiled binaries over every page and four pictures and fails when one stops
+answering; `smoke` runs on the profiled `central-service`. This is the implementing
+agent's engineering review, not an independent audit.
+
 ## Account download for never-restored accounts, 26 November 2026
 
 Design pass: a registered account that has only used the website never confirms a

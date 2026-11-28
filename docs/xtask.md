@@ -18,6 +18,7 @@ the gate starts never replace the running executable, which Windows refuses.
 | `cargo xtask secrets` | the secret scan of the tree and the full history, after the scanner's own regressions | `scripts/scan-secrets.ps1`, `scripts/test-secret-scanner.ps1` |
 | `cargo xtask wasm [--check]` | `central-web-crypto` built to WebAssembly with its wasm-bindgen glue, written to `crates/central-web/crypto/`; `--check` requires the committed files to equal a fresh build | (new, 2026-10-21) |
 | `cargo xtask site` | the server-rendered site's assets into `target/site/` ([below](#the-sites-assets-site)) | (new, 2026-11-10) |
+| `cargo xtask pgo [--compare] [--profile-only \| --profile-use <file>]` | the website and the picture worker trained, built from their profile and checked that it took, `central-service` beside them; `--compare` measures them against the deploy hook's build ([below](#profile-guided-builds-pgo)) | (new, 2026-11-25; rebuilt 2026-11-28) |
 
 `cargo xtask` is an alias (`.cargo/config.toml`) for
 `cargo run --locked --quiet -p xtask --`. The policy's regressions are
@@ -263,6 +264,124 @@ is served by `central-web` from `target/site/`, which this task writes:
 Unlike `wasm`, the output is not committed and not checked byte for byte:
 it is built where it is deployed.
 
+## Profile-guided builds (`pgo`)
+
+`cargo xtask pgo` builds what the production host runs (Linux x86-64,
+`--target-cpu x86-64-v3` unless another is given) under `[profile.release-pgo]`:
+fat link-time optimisation and one codegen unit. Two of the three binaries
+are built from a profile of their own work:
+
+- `central-web`, the server-rendered website, trained in its deployed mode
+  (`--config-stdin`, no GitHub, no Central) on the site `cargo xtask site`
+  built and the synthetic data of `crates/central-web-server/tests/data`:
+  every page its sitemap lists in every language (so a page added there is
+  trained without a change to the task; one it does not list must be added
+  to `SLUGS` in `crates/xtask/src/pgo/train.rs`), and under each of the
+  eleven language prefixes the listed pages, the sign-in,
+  registration, reset and offline pages, the account area as a visitor
+  without a session gets it, a player's profile, an invitation, a removed
+  page (410) and a missing one (404); the addresses without a language in
+  several browsers' languages (the redirects, `robots.txt`, the sitemap,
+  `funding.json`, the service worker); the card suggestions; every hashed
+  asset with Brotli, gzip and neither, and again with its `ETag`. Six
+  passes, with a count of page views as production may keep one.
+- `central-picture-worker`, one process per picture as systemd starts it:
+  pictures ffmpeg draws from its `testsrc2` pattern in each format a browser
+  uploads (JPEG at 1600 × 1200 and 720 × 1280, PNG with and without alpha,
+  lossy and lossless WebP, a still and a moving GIF, a BMP), an ICO around
+  the drawn PNG, an SVG, the codec tests' fixtures (AVIF, JPEG, WebP), the
+  worker's own AVIF answer read back, a photo cut short, a PNG declared as a
+  JPEG and bytes that are no picture. ffmpeg (with libwebp, as Ubuntu's has
+  it) must be on the `PATH`; no photo, no person.
+
+`central-service` is built the same way without a profile. Under a profile,
+code the training never ran counts as cold and is optimised for size
+(LLVM's profile-guided size optimisation), so a training that misses the real
+work makes that work slower. The service's work is sign-in, its database and
+the push socket, which need a database to train against; its development
+mode answers only its health checks. It stays without a profile until a
+training of its real requests exists.
+
+The steps, each of which stops the task when it fails:
+
+1. The two binaries instrumented (`-C profile-generate`), in `target/pgo-gen`.
+2. The training above; the counts go to `<out>/profraw`.
+3. `llvm-profdata merge` (the toolchain's `llvm-tools`) into
+   `<out>/central.profdata`, and `rustc -vV` beside it in
+   `central.profdata.rustc`: a profile is read only by the compiler that
+   made it.
+4. The two binaries from the profile (`-C profile-use`) in `target/pgo-use`,
+   emptied first: the flag names the same file whatever it holds, so cargo
+   cannot see a new profile, and a crate no commit touched would keep the
+   code an older profile made. `central-service` in `target/pgo-plain`.
+5. The profile must have taken. The build asks the compiler to name every
+   function it found no counts for (`-pgo-warn-missing-function`, and a
+   changed function's `hash mismatch`); the task counts those lines, shows
+   three, and fails above 5 % of the profile's own total of functions
+   (`llvm-profdata show`). A profile that matches nothing still builds
+   binaries that work: an unprofiled build under another name. Both builds
+   select the same packages with the same flags, so a profile that took
+   matches nearly every function.
+
+Then `<out>/dist/` holds the three binaries and their `SHA256SUMS.txt`.
+Every build passes `--target` with the host's triple, so the flags reach what
+ships and no build script or procedural macro, which would otherwise be
+instrumented too and write counts while the build runs.
+
+- `--profile-only` stops after step 3.
+- `--profile-use <file>` skips steps 1 to 3 and builds from a profile made
+  elsewhere, which must have its `.rustc` file beside it naming this exact
+  toolchain.
+- `--compare` builds what the deploy hook builds today (`cargo build
+  --release` with the same `-C target-cpu`, `target/pgo-baseline`) and times
+  both builds' `central-web` on a pass over the pages and both workers on
+  four pictures: nine rounds each after a warm-up, the builds taking turns
+  to go first, medians compared. A report and not a gate: a shared runner's
+  load moves the figures. A page's time includes the client's, so the
+  server's own gain is larger than the figure shown.
+
+`release.yml` runs `cargo xtask pgo --compare` for every tag and by hand
+(`workflow_dispatch`). Before it, a one-line program is built from a profile
+of one function it does not have, and the compiler's report must word a
+function without counts as step 5 reads it (`no profile data available for
+function`). By hand, `portability-check` builds from the profile again in a
+checkout and a Cargo home at other paths, as a server that builds from CI's
+profile does.
+
+Measured on 28.11.2026 on ubuntu-26.04 runners with four vCPUs (release
+runs 46102057709 and 46113854970, the same commit's code): 49 count files
+merged into a profile of 89 709 functions (55 MiB), of which the build from
+it reported none without counts, and none at the other paths either. The
+instrumented build took 14 to 19 minutes, the training 5 to 8 seconds, the
+build from the profile 10 to 13 minutes and `central-service` beside it 4 to
+8. Against the deploy hook's build, `--compare` gave 4 and 9 % less time for
+a pass over the website's 331 addresses (214.2 against 205.1 ms, 117.9
+against 107.0 ms; the client's time included) and 3 to 9 % less for a
+picture, each in a worker process of its own (`photo.jpg` 5 and 3 %,
+`screen.png` 9 and 5 %, `lossy.webp` 8 and 6 %, `moving.gif` 6 and 3 %).
+
+A profile that matches nothing is no cheap failure. Built from a profile of
+one function no build has, the whole selection did not finish in 80 minutes
+(46102057709) nor in 50 (46113854970). In the second run its log grew to
+57 829 lines within seven minutes, nearly all of them the blank line the
+compiler writes after each report of a function without counts, which the
+task counted and did not show (the last six lines were such blank lines, so
+the reports reached the count through cargo); then it stood in
+`central-web-server` for the rest of the time. Step 5 would refuse such a
+build, but only after it; a profile is therefore only ever used for the
+commit and the toolchain that made it, and a caller with a deadline has to
+bound the build.
+
+The deploy hook does not use this build yet: it builds `--release` for
+`x86-64-v3` on the server ([operations](operations.md#deploying-with-the-gateway)).
+
+No profile reaches the website's WebAssembly: the stable toolchain has no
+profiling runtime for `wasm32-unknown-unknown` (`-C profile-generate` there
+fails for want of `profiler_builtins`, tried with 1.100.0 on 28.11.2026). A
+native build's profile is not expected to stand in (not tried): the
+functions' names carry crate hashes that cargo derives with the target, so
+they would not match.
+
 ## What the tasks guarantee
 
 - No program runs through a shell; arguments are lists. A secret (a fixture
@@ -288,8 +407,9 @@ it is built where it is deployed.
 
 `cargo`, `rustc`, `git`, and for the tasks that need them `docker` and
 `openssl` (postgres), `curl` and `tar` (secrets: Windows 10 1803 and later
-ship both, as do macOS and the CI runners), and the wasm-bindgen CLI it
-installs itself (wasm). A missing tool fails its step
+ship both, as do macOS and the CI runners), the wasm-bindgen CLI it
+installs itself (wasm), and `llvm-profdata` (the toolchain's `llvm-tools`)
+and `ffmpeg` (pgo). A missing tool fails its step
 with that step's sentence.
 
 ## Dependencies

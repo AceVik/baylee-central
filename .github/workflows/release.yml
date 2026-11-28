@@ -4,6 +4,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      portability-check:
+        description: Also build from the profile in a checkout and a Cargo home at other paths
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -43,10 +48,14 @@ jobs:
           retention-days: 3
           if-no-files-found: error
 
+  # `cargo xtask pgo` (docs/xtask.md §"Profile-guided builds"): the training,
+  # the build from its profile, the check that the profile took, and the
+  # measurement against what the deploy hook builds (`--compare`, a report).
   build-pgo:
     needs: [site]
     runs-on: ubuntu-26.04
-    timeout-minutes: 45
+    # the pipeline takes about an hour; each check by hand adds a build
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -71,8 +80,20 @@ jobs:
         with:
           name: central-site
           path: target/site
-      - name: Automated PGO profile collection and FatLTO x86-64-v3 build
-        run: cargo xtask pgo --out target/pgo-release --target-cpu x86-64-v3
+      # The check below counts the compiler's report of functions without
+      # counts; this toolchain must word it as the check reads it.
+      - name: The compiler reports a function without counts as the check reads it
+        shell: bash
+        run: |
+          mkdir -p target/pgo-probe && cd target/pgo-probe
+          llvm_profdata="$(rustc --print target-libdir)/../bin/llvm-profdata"
+          printf ':ir\nno_such_function_in_central\n1\n1\n1\n' > unrelated.proftext
+          "$llvm_profdata" merge -o unrelated.profdata unrelated.proftext
+          printf 'fn main() { println!("{}", std::env::args().count()); }\n' > probe.rs
+          rustc -O -C profile-use="$PWD/unrelated.profdata" -C llvm-args=-pgo-warn-missing-function probe.rs 2> probe.log
+          grep -c 'no profile data available for function' probe.log
+      - name: Train, build from the profile (FatLTO, x86-64-v3), check it took, measure
+        run: cargo xtask pgo --out target/pgo-release --target-cpu x86-64-v3 --compare
       - name: Verify PGO central-service passes HTTP boundary and signal smoke test
         shell: bash
         run: |
@@ -108,8 +129,22 @@ jobs:
             target/pgo-release/${{ steps.pkg.outputs.archive }}.sha256
             target/pgo-release/dist/SHA256SUMS.txt
             target/pgo-release/central.profdata
+            target/pgo-release/central.profdata.rustc
           retention-days: 14
           if-no-files-found: error
+      # The server builds from a profile CI made, in a checkout and a Cargo
+      # home at other paths; the check must still find it taken there.
+      - name: Portability, the profile built from at other paths
+        if: github.event_name == 'workflow_dispatch' && inputs.portability-check
+        shell: bash
+        run: |
+          elsewhere="$RUNNER_TEMP/central-elsewhere"
+          git worktree add --detach "$elsewhere" HEAD
+          cp target/pgo-release/central.profdata target/pgo-release/central.profdata.rustc "$RUNNER_TEMP/"
+          cd "$elsewhere"
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home-elsewhere"
+          cargo fetch --locked
+          timeout 50m cargo xtask pgo --out target/pgo-elsewhere --target-cpu x86-64-v3 --profile-use "$RUNNER_TEMP/central.profdata"
 
   publish:
     needs: [build-pgo]
