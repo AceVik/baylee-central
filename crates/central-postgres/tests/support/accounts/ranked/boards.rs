@@ -118,6 +118,7 @@ pub(super) async fn run(store: &AccountStore, db: &DatabaseConnection) {
     );
     champion_board(store, db, season).await;
     archive_profile(store, season).await;
+    finish_without_awards(store, db, season).await;
     db.execute_unprepared(
         "DELETE FROM central_identity.accounts WHERE legacy_id LIKE 'boardfixture%'
             AND tag BETWEEN 600000001 AND 600000109;
@@ -269,6 +270,47 @@ async fn archive_profile(store: &AccountStore, season: [u8; 16]) {
         panic!("expected profile")
     };
     assert_eq!(awards, []);
+}
+
+/// The closed season's awards of the account `archive_profile` reads.
+async fn awards_of(store: &AccountStore, season: [u8; 16]) -> Vec<central_api::ranked::Award> {
+    let Response::Profile { awards, .. } = store
+        .ranked(
+            None,
+            Request::Profile {
+                target: ProfileTarget::Handle(central_api::profile::handle("Boarder", 600_000_106)),
+                season: Some(season),
+            },
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("expected profile")
+    };
+    awards
+}
+
+/// A season an operator closes without finish awards (the pre-season before
+/// Season 0, migration 000056) keeps its peaks and Champion places and
+/// awards no final standing; switched back, it does again.
+async fn finish_without_awards(store: &AccountStore, db: &DatabaseConnection, season: [u8; 16]) {
+    let switch = |on: bool| {
+        format!(
+            "UPDATE central_identity.ranked_seasons SET finish_awards={on} WHERE id='{}'",
+            Uuid::from_bytes(season)
+        )
+    };
+    db.execute_unprepared(&switch(false)).await.unwrap();
+    let awards = awards_of(store, season).await;
+    assert!(!awards.iter().any(|a| a.kind == AwardKind::SeasonFinish));
+    assert!(
+        awards
+            .iter()
+            .any(|a| a.kind == AwardKind::Peak && a.rank.champion_place == Some(1))
+    );
+    db.execute_unprepared(&switch(true)).await.unwrap();
+    let awards = awards_of(store, season).await;
+    assert!(awards.iter().any(|a| a.kind == AwardKind::SeasonFinish));
 }
 
 pub(super) async fn own_placements(store: &AccountStore, session: &super::Token, owner: [u8; 16]) {

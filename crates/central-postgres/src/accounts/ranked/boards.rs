@@ -19,9 +19,16 @@ const PAGE: usize = 40;
 const LEAGUES: [League; 11] = League::PLACED;
 const SEASONS: &str =
     "SELECT s.id,COALESCE(s.name,to_char(s.starts_at AT TIME ZONE 'UTC','YYYY-MM-DD')) AS name,
-    floor(extract(epoch FROM s.starts_at))::bigint AS starts,
+    s.finish_awards,floor(extract(epoch FROM s.starts_at))::bigint AS starts,
     floor(extract(epoch FROM s.ends_at))::bigint AS ends
     FROM central_identity.ranked_seasons s WHERE s.starts_at <= transaction_timestamp()";
+
+/// Whether the season's final standing is a distinction once it is final;
+/// an operator may close a season without (`finish_awards`, migration
+/// 000056: the pre-season before Season 0).
+fn finish_awards(row: &QueryResult) -> Result<bool, Error> {
+    column(row, "finish_awards")
+}
 
 fn season(row: &QueryResult) -> Result<Season, Error> {
     Ok(Season {
@@ -192,7 +199,7 @@ pub(super) async fn read(
         .ok_or(Error::Rejected)?;
     let season = season(&row)?;
     let season_id = uuid(season.id);
-    let finalized = publication::visible(db, season_id).await?;
+    let finish = publication::visible(db, season_id).await? && finish_awards(&row)?;
     match request {
         api::Request::Board {
             format,
@@ -232,7 +239,7 @@ pub(super) async fn read(
             };
             let id: Uuid = column(&identity, "id")?;
             let (name, tag) = super::super::profiles::columns(&identity)?;
-            let (formats, awards) = season_profile(db, season_id, &season, id, finalized).await?;
+            let (formats, awards) = season_profile(db, season_id, &season, id, finish).await?;
             Ok(api::Response::Profile {
                 season,
                 account: *id.as_bytes(),
@@ -252,11 +259,11 @@ async fn season_profile(
     season_id: Uuid,
     season: &Season,
     account: Uuid,
-    finalized: bool,
+    finish: bool,
 ) -> Result<(Vec<Standing>, Vec<Award>), Error> {
     let formats = standings::profile(db, season_id, account).await?;
     let mut awards = collection(db, account, season_id).await?;
-    if finalized {
+    if finish {
         awards.extend(
             formats
                 .iter()
@@ -294,8 +301,8 @@ pub(in crate::accounts) async fn account_ranked_badges(
     };
     let season = season(&row)?;
     let season_id = uuid(season.id);
-    let finalized = publication::visible(db, season_id).await?;
-    let (formats, awards) = season_profile(db, season_id, &season, account, finalized).await?;
+    let finish = publication::visible(db, season_id).await? && finish_awards(&row)?;
+    let (formats, awards) = season_profile(db, season_id, &season, account, finish).await?;
     Ok((Some(season), formats, awards))
 }
 
