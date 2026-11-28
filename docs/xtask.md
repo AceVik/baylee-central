@@ -274,7 +274,10 @@ are built from a profile of their own work:
 - `central-web`, the server-rendered website, trained in its deployed mode
   (`--config-stdin`, no GitHub, no Central) on the site `cargo xtask site`
   built and the synthetic data of `crates/central-web-server/tests/data`:
-  every page under each of the eleven language prefixes, the sign-in,
+  every page its sitemap lists in every language (so a page added there is
+  trained without a change to the task; one it does not list must be added
+  to `SLUGS` in `crates/xtask/src/pgo/train.rs`), and under each of the
+  eleven language prefixes the listed pages, the sign-in,
   registration, reset and offline pages, the account area as a visitor
   without a session gets it, a player's profile, an invitation, a removed
   page (410) and a missing one (404); the addresses without a language in

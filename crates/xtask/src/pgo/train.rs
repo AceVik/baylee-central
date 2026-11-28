@@ -40,7 +40,9 @@ pub(super) const LANGS: [&str; 11] = [
 /// listed ones, sign-in, registration, reset and offline, the account
 /// area's sections as a visitor without a session gets them, a player's
 /// profile, an invitation, a page removed for good (410) and one the site
-/// never had (404).
+/// never had (404). A page the sitemap lists is trained without being
+/// named here ([`listed`]); one it does not list has to be added here, or
+/// it is cold in the profiled build.
 pub(super) const SLUGS: [&str; 28] = [
     "",
     "download",
@@ -323,8 +325,12 @@ fn web(root: &Path, bin_dir: &Path, profile_file: &str) -> Result<()> {
         expect_status(&agent, &format!("{base}/en/"), 200)?;
         expect_status(&agent, &format!("{base}/en/nope"), 404)?;
         expect_status(&agent, &format!("{base}/en/challenges"), 410)?;
+        let listed = listed(&agent, &base);
+        if listed.is_empty() {
+            return Err(Fail::new("central-web's sitemap lists no page"));
+        }
         for round in 0..WEB_ROUNDS {
-            let (asked, answered) = pages(&agent, &base, round);
+            let (asked, answered) = pages(&agent, &base, round, &listed);
             if answered != asked {
                 return Err(Fail::new(format!(
                     "central-web answered {answered} of {asked} training requests"
@@ -337,33 +343,69 @@ fn web(root: &Path, bin_dir: &Path, profile_file: &str) -> Result<()> {
     after_cleanup(outcome, server.stop())
 }
 
-/// One pass over every address of the website at `base`: how many requests
+/// The addresses `base`'s sitemap lists: every listed page in every
+/// language, the ones [`SLUGS`] names and any added since.
+pub(super) fn listed(agent: &ureq::Agent, base: &str) -> Vec<String> {
+    let Some(sitemap) = fetch_body(agent, &format!("{base}/sitemap.xml")) else {
+        return Vec::new();
+    };
+    locations(&String::from_utf8_lossy(&sitemap))
+        .into_iter()
+        .filter(|url| url.starts_with(base))
+        .collect()
+}
+
+/// The `<loc>` addresses of a sitemap.
+fn locations(sitemap: &str) -> Vec<String> {
+    sitemap
+        .split("<loc>")
+        .skip(1)
+        .filter_map(|rest| rest.split_once("</loc>"))
+        .map(|(loc, _)| loc.trim().replace("&amp;", "&"))
+        .collect()
+}
+
+/// One pass over every address of the website at `base`, and the addresses
+/// of its sitemap (`listed`) that [`SLUGS`] does not name: how many requests
 /// it made and how many were answered (whatever their status).
-pub(super) fn pages(agent: &ureq::Agent, base: &str, round: usize) -> (usize, usize) {
+pub(super) fn pages(
+    agent: &ureq::Agent,
+    base: &str,
+    round: usize,
+    listed: &[String],
+) -> (usize, usize) {
     let encoding = ENCODINGS[round % ENCODINGS.len()];
     let mut asked = 0;
     let mut answered = 0;
-    let mut ask = |url: String, language: Option<&str>| {
+    let mut ask = |url: &str, language: Option<&str>| {
         asked += 1;
         let mut headers = vec![("Accept-Encoding", encoding)];
         if let Some(language) = language {
             headers.push(("Accept-Language", language));
         }
-        if fetch(agent, &url, &headers).is_some() {
+        if fetch(agent, url, &headers).is_some() {
             answered += 1;
         }
     };
+    let mut named = BTreeSet::new();
     for lang in LANGS {
         for slug in SLUGS {
-            ask(format!("{base}/{lang}/{slug}"), None);
+            let url = format!("{base}/{lang}/{slug}");
+            ask(&url, None);
+            named.insert(url);
+        }
+    }
+    for url in listed {
+        if !named.contains(url) {
+            ask(url, None);
         }
     }
     for (at, path) in ROOT_PATHS.iter().enumerate() {
         let language = ACCEPT_LANGUAGES[(at + round) % ACCEPT_LANGUAGES.len()];
-        ask(format!("{base}{path}"), Some(language));
+        ask(&format!("{base}{path}"), Some(language));
     }
     for query in CARD_QUERIES {
-        ask(format!("{base}/cards/suggest?q={query}"), None);
+        ask(&format!("{base}/cards/suggest?q={query}"), None);
     }
     (asked, answered)
 }
@@ -414,6 +456,17 @@ fn fetch(
         .read_to_vec()
         .ok()?;
     Some((status, etag))
+}
+
+/// `GET url`'s body, whatever the status, or `None` when nothing answered.
+fn fetch_body(agent: &ureq::Agent, url: &str) -> Option<Vec<u8>> {
+    let mut response = agent.get(url).call().ok()?;
+    response
+        .body_mut()
+        .with_config()
+        .limit(BODY_LIMIT)
+        .read_to_vec()
+        .ok()
 }
 
 fn expect_status(agent: &ureq::Agent, url: &str, expected: u16) -> Result<()> {
@@ -692,12 +745,33 @@ mod tests {
         // nothing answers on this port: every request is asked and none answered
         let agent = http_agent();
         let port = free_loopback_port().unwrap();
-        let (asked, answered) = pages(&agent, &format!("http://127.0.0.1:{port}"), 0);
+        let base = format!("http://127.0.0.1:{port}");
+        let (asked, answered) = pages(&agent, &base, 0, &[]);
         assert_eq!(
             asked,
             LANGS.len() * SLUGS.len() + ROOT_PATHS.len() + CARD_QUERIES.len()
         );
         assert_eq!(answered, 0);
+        // a listed page the slugs name is asked once; a new one is asked too
+        let listed = [format!("{base}/de/faq"), format!("{base}/de/ranked")];
+        let (with_listed, _) = pages(&agent, &base, 0, &listed);
+        assert_eq!(with_listed, asked + 1);
+    }
+
+    #[test]
+    fn reads_the_addresses_a_sitemap_lists() {
+        let sitemap = "<?xml version=\"1.0\"?>\n<urlset>\n  <url>\n    <loc>http://h/en/</loc>\n    \
+                       <xhtml:link href=\"http://h/de/\"/>\n  </url>\n  <url>\n    \
+                       <loc>http://h/de/faq?a=1&amp;b=2</loc>\n  </url>\n</urlset>\n";
+        assert_eq!(
+            locations(sitemap),
+            [
+                "http://h/en/".to_owned(),
+                "http://h/de/faq?a=1&b=2".to_owned()
+            ]
+        );
+        assert_eq!(locations("<urlset></urlset>"), Vec::<String>::new());
+        assert_eq!(locations("<loc>cut short"), Vec::<String>::new());
     }
 
     #[test]

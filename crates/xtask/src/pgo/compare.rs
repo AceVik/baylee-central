@@ -47,12 +47,16 @@ fn web(root: &Path, deployed: &Path, profiled: &Path) -> Result<()> {
     let outcome = (|| -> Result<()> {
         let agent = http_agent();
         let bases = [today.base(), trained.base()];
+        let listed = [
+            train::listed(&agent, &bases[0]),
+            train::listed(&agent, &bases[1]),
+        ];
         let mut times = [Vec::new(), Vec::new()];
         let mut requests = 0;
         for round in 0..=ROUNDS {
             for which in order(round) {
                 let started = Instant::now();
-                let (asked, answered) = train::pages(&agent, &bases[which], round);
+                let (asked, answered) = train::pages(&agent, &bases[which], round, &listed[which]);
                 let took = started.elapsed();
                 if answered != asked {
                     return Err(Fail::new("central-web stopped answering while measured"));
