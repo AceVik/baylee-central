@@ -153,7 +153,16 @@ disable access and body logging, and allow long-lived bidirectional streams.
 The native client sends its single-use relay credential in the first masked
 binary frame. Admission shares the push listener's per-address socket and dial
 limits. At most 64 game relays can run at once. Each uses one additional
-outbound file descriptor compared with a push socket.
+outbound file descriptor compared with a push socket. A relay whose credential
+Central issued for an AI runner's session (it asks the store as it issues one)
+leaves those per-address limits once the credential is read: its address gets
+back the dial and the place, and the relay counts in the runners' own budget
+instead: 16 an AI account, 32 for all runners together (half of the 64, so the
+other half stays with people), 32 such dials a minute an AI account, and one
+relay a seat, a newer one closing the older ([AI players](ai-players.md), "More
+AI seats at once"). Until its credential is read, a runner's relay counts
+against its address like anyone's: a runner that dials all its seats at once
+can fill its address's 32 places for that moment.
 
 Central creates a fresh connection to the currently authorized game host.
 Production requires public DNS answers, a trusted TLS certificate for the
@@ -183,11 +192,15 @@ handshake's headers and a bearer is answered `101`). Nothing about it is
 logged.
 
 - **File descriptors.** Each socket is a connection of its own besides the
-  listener's 128, up to 512 at once. The unit sets no `LimitNOFILE`, so the
-  service has systemd's 1,024: the sockets, both listeners' connections and the
-  database's fit below that. A unit that lowers it, or a change that raises
-  the sockets' limit, needs `LimitNOFILE` raised with it; at the limit an
-  `accept` that fails stops the listener.
+  listener's 128, up to 512 at once, and a game relay holds one more, to its
+  host (64 at most). The unit sets no `LimitNOFILE`, so the service has
+  systemd's 1,024. One listener's sockets, both listeners' connections and the
+  database's fit below that, but the browser listener has 512 sockets of its
+  own: both full, with the relays and the connections, are past 1,024 (512 +
+  64 + 512 + 256 and the pools). At the limit an `accept` that fails stops the
+  listener, so the unit should set `LimitNOFILE=4096`
+  ([below](#supervision)); a change that raises the sockets' or the relays'
+  limits needs it raised with them.
 - **The firewall** (`ops/central-limits.nft`, next section) counts a
   socket's connection to Caddy among the 512 an address holds.
 - **Its sessions** are checked once a minute in one statement for all
@@ -734,7 +747,12 @@ transaction, whole or not at all:
   is required for `"kind": "model"`. `house:seer` is refused.
 - **`settings`.** The settings for every AI; those left out stay. Calibration
   is `fill_in` false with high `carousel_games` and `carousel_daily`
-  (§7); `global_seats` 0 stops every AI.
+  (§7); `global_seats` 0 stops every AI. `global_seats` reaches 32 and
+  `carousel_games` 16 (migration 000057); `global_seats`' default stays 8.
+  What the runner machine carries bounds them first: on acenb the Baylee AI
+  takes about 3.4 GB and 1.2 GB a seat, so the house AIs' `max_games`
+  together stay at 12 or less, and seats past that are language models'
+  ([AI players](ai-players.md), "More AI seats at once").
 - **`revoke`.** Runner token ids, as the listing prints them. Each ends every
   session it minted in the same transaction; one revoked already is no
   error, an unknown id refuses the plan.
@@ -804,6 +822,12 @@ text.
   binary just before, which knows them once this is deployed. Before running
   any older binary by hand, end every runner session as the migrator:
   `DELETE FROM central_identity.sessions WHERE runner_token IS NOT NULL;`
+- **A binary from before the runners' relay budget** (migration 000057)
+  counts every runner relay against the runner's address again, 32 places
+  and 60 dials a minute it shares with people there, and its website refuses
+  the wider settings. Before falling back to one, set `global_seats` to 16 or
+  less and `carousel_games` to 8 or less (a plan with `settings` alone), and
+  wait until the AIs' live matches are down to that.
 
 ## Deleting and exporting accounts
 
@@ -1748,6 +1772,11 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 MemoryDenyWriteExecute=yes
 SystemCallFilter=@system-service
 ```
+
+`LimitNOFILE=4096` belongs in it too: both listeners' push sockets, the game
+relays and the connections can pass systemd's default of 1,024 together
+([the push socket](#the-push-socket)). Whether the deployed unit sets it was
+not read.
 
 ### Logs and how long they stay
 
