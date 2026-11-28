@@ -823,10 +823,14 @@ is applied; the previous `main` binary names none of these tables.
 **Migration 000057**, `m20261128_000057_ai_global_seats` (28.11.2026, the
 record "More AI seats at once"), widens two CHECKs of `ai_settings`, under
 the names 000053 gave them: `global_seats` 0 to 32 and `carousel_games` 0 to
-16. No row, grant or table changes; the settings keep what was set. The
-previous binary reads the wider values, but counts a runner's relays against
-its address and its website refuses to save them: before a fallback to it,
-the settings go back to `global_seats` 16 and `carousel_games` 8 or less.
+16. No row, grant or table changes; the settings keep what was set, so the
+deploy's own fallback to the previous binary is safe as long as nobody has
+raised them, and they are raised only once the deploy stands. The previous
+binary reads the wider values (its read checks no bound; only a change is
+checked, and stopping every AI still passes), but counts a runner's relays
+against its address and its website refuses to save them: before a fallback
+to it, the settings go back to `global_seats` 16 and `carousel_games` 8 or
+less.
 
 **The runtime's grants**, exact, in `ops/grants.sql` and the startup check
 (`accounts/grants.rs`):
@@ -1653,7 +1657,14 @@ servers); what follows is arithmetic over the numbers given.
   seat brings a person's relay. Up to 16 filled-in seats leave the people
   16 relays for each other, as before; at 32, none. Seats above 16 belong
   in the carousel, which takes no person's relay.
-- **netcup** (12 cores, 32 GB, one engine process per game). At 32 AI
+- **The firewall** (`ops/central-limits.nft`, whether it is loaded on the
+  server was not read) counts the runner's connections to Caddy as any
+  address's: 512 held and 300 new a minute after a burst of 300. Its 32
+  relays and a whole redial of them fit. Its requests (`Work` every two
+  seconds an AI account, offers, relay calls) fit only over kept
+  connections: the runner's transport (Baylee's `baylee-account`
+  `CentralHttp`) holds a `ureq` agent, whose pool keeps them; how many it
+  opens a minute was not measured.- **netcup** (12 cores, 32 GB, one engine process per game). At 32 AI
   seats at most 32 matches hold an AI (every one filled in) and 16 when
   each is between two AIs. A harness probe measured big AI games at about
   6 MB each; real games are heavier, so take ten times that: 32 × 60 MB ≈
@@ -1784,6 +1795,32 @@ statement; the ceilings under replacement and refusal; the listener's total
 and the relay slots unchanged; the constraint names and the store suite's
 writes on both sides of each bound; the bounds alike in the API, the
 operator's faults, the website, its eleven languages and the migration.
+
+**Evidence (28.11.2026),** on bigace (Ubuntu, x86-64), never this Mac, at
+the tree of `46f54e88` (the fixes of the adversarial pass; what followed
+changed docs alone): `cargo test` of `central-api` (202), `central-http`
+(182 and the transport suite's 7), `central-identity` (161),
+`central-migration` (10), `central-postgres` (lib 58), `central-service`
+(51, the CLI's 9) and `central-web` (182 and 7); `cargo clippy
+--all-targets -D warnings` over those seven crates and `cargo fmt --all
+--check`, clean; `cargo xtask postgres` green (the SDK suite 149 s, the
+store suite 106 s, both Tower suites 2 s). At the tree before the fixes
+(`46c2a634`) the same suites were green as well (SDK 160 s, store 97 s).
+
+**Left.**
+
+- Fill-in above 16 seats: seats past 16 belong in the carousel (capacity
+  notes above); a cap of 16 filled-in seats in the store, with a test that
+  seats seventeen, is a change of its own.
+- The runner should dial its relays a few at a time (Baylee's runner).
+- `LimitNOFILE=4096` on the service's unit ([operations](operations.md)
+  §"Supervision"): both listeners' sockets were already past 1,024 at the
+  worst before this change.
+- `Relay::forward`'s reading of `relay_runner` and `serve`'s order (the
+  session, then the budget, then the host) are held by reading, not by a
+  test of their own.
+- netcup's and the hosts' live numbers, the official gateway's advertised
+  capacity and the firewall on the server were not read.
 
 These are the implementing agents' engineering passes, not an independent
 audit; the owner's release gates still apply.

@@ -173,7 +173,7 @@ minute between checks, ten seconds for one).
 
 | limit | value | why |
 | --- | --- | --- |
-| sockets a listener | 512 | each is a file descriptor beside the listener's 128 connections; the unit's default of 1,024 descriptors keeps room. Raising it needs `LimitNOFILE` in the unit (`docs/operations.md`) |
+| sockets a listener | 512 | each is a file descriptor beside the listener's 128 connections (a game relay one more, to its host); one listener's fit the unit's default of 1,024 descriptors, but both listeners' together, with the relays and the connections, do not, so the unit should set `LimitNOFILE=4096` (`docs/operations.md` §"Supervision"). Raising it needs `LimitNOFILE` raised with it |
 | sockets an address | 32 | a sixteenth: filling the listener takes sixteen addresses with eight signed-in accounts each |
 | sockets an account | 4 | a client holds one; a redial before the old one's end is noticed holds a second for up to 75 seconds |
 | dials a minute, address | 60 | thirty clients redialling at their fastest; counted before anything is asked |
