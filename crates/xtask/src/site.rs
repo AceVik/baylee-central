@@ -629,12 +629,14 @@ fn bootstrap(template: &str, glue_url: &str, wasm_url: &str) -> Result<String> {
 }
 
 /// `CARGO_ENCODED_RUSTFLAGS` for `central-web-islands`: remaps local paths and
-/// enables baseline browser WebAssembly features (`simd128`, `bulk-memory`,
-/// `mutable-globals`, `nontrapping-fptoint`, `sign-ext`). Kept separate from
+/// names the browser WebAssembly features the islands use (`bulk-memory`,
+/// `mutable-globals`, `nontrapping-fptoint`, `sign-ext`), and `simd128` off:
+/// with it browsers before Safari 16.4 cannot run the islands, for 1 % in
+/// size (docs/xtask.md, the site's assets). Kept separate from
 /// `central-web-crypto` so `cargo xtask wasm --check` stays byte-locked.
 fn islands_rustflags(root: &Path, home: &Path) -> OsString {
     let mut flags = wasm::remap_flags(root, home);
-    flags.push("\u{1f}-C\u{1f}target-feature=+simd128,+bulk-memory,+mutable-globals,+nontrapping-fptoint,+sign-ext");
+    flags.push("\u{1f}-C\u{1f}target-feature=+bulk-memory,+mutable-globals,+nontrapping-fptoint,+sign-ext,-simd128");
     flags
 }
 
@@ -648,7 +650,6 @@ fn wasm_opt_args(input: &Path, output: &Path) -> Vec<OsString> {
         "--enable-nontrapping-float-to-int",
         "--enable-sign-ext",
         "--enable-reference-types",
-        "--enable-simd",
         "--strip-debug",
         "--strip-producers",
         "--strip-dwarf",
@@ -1351,7 +1352,7 @@ mod tests {
     }
 
     #[test]
-    fn islands_rustflags_append_simd_features_without_breaking_remap() {
+    fn islands_rustflags_keep_simd_off_without_breaking_remap() {
         let flags = super::islands_rustflags(
             std::path::Path::new("/work/repo"),
             std::path::Path::new("/work/home"),
@@ -1362,12 +1363,14 @@ mod tests {
         assert_eq!(parts[0], "--remap-path-prefix=/work/home=/cargo");
         assert_eq!(parts[1], "--remap-path-prefix=/work/repo=/central");
         assert_eq!(parts[2], "-C");
-        assert!(parts[3].contains("target-feature=+simd128"));
-        assert!(parts[3].contains("bulk-memory"));
+        assert!(parts[3].starts_with("target-feature="));
+        assert!(parts[3].contains("+bulk-memory"));
+        assert!(parts[3].ends_with(",-simd128"));
+        assert!(!parts[3].contains("+simd128"));
     }
 
     #[test]
-    fn wasm_opt_args_enable_size_convergence_simd_and_stripping() {
+    fn wasm_opt_args_enable_size_convergence_and_stripping_but_no_simd() {
         let args = super::wasm_opt_args(
             std::path::Path::new("in.wasm"),
             std::path::Path::new("out.wasm"),
@@ -1378,7 +1381,7 @@ mod tests {
             .collect();
         assert!(strs.contains(&"-Oz".to_owned()));
         assert!(strs.contains(&"--converge".to_owned()));
-        assert!(strs.contains(&"--enable-simd".to_owned()));
+        assert!(!strs.contains(&"--enable-simd".to_owned()));
         assert!(strs.contains(&"--strip-debug".to_owned()));
         assert_eq!(strs.last().map(String::as_str), Some("in.wasm"));
     }
