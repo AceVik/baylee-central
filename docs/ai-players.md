@@ -528,7 +528,8 @@ for the session), it gives the address back its dial and its place and counts
 in the runners' own budget: 16 relays an AI account (`MAX_GAMES`), 32 for
 all runners together (`MAX_GLOBAL_SEATS`, half of the listener's 64 relay
 slots, so the other half stays with people), 32 proven dials a minute an
-account, and one relay a seat, a newer one taking the older one's place.
+account and 64 for all runners (past them the address pays), and one relay
+a seat, a newer one taking the older one's place.
 So `global_seats` (default 8, at most 32) starves no person on the runner's
 address (the record "More AI seats at once" at the end). AI accounts hold no
 push socket (§2).
@@ -754,7 +755,7 @@ only SQL can end a season or open a new one (open question 5).
 | An old client gets an AI without a badge | An absent `ai` is `none`. Protocol `2` replies carry no new field, and AI names carry the prefix. | A protocol `2` Join waits past 60 s and gets no AI. A protocol `2` board decodes with the old types. |
 | Farming a fixed-strength AI | The repeat cost in the choice, the repeat damping (half, then a quarter), the AI's rating falling as it loses, one ticket and 24 joins an hour, a fixed profile, the switch | Policy tests: a person who keeps meeting one AI is offered another when one is near. Settlement tests for repeat damping with an AI seat. |
 | Exhausting the AIs | One ticket per person, 24 joins an hour, `max_games`, `global_seats`, a cancel before the claim freeing the slot, the carousel yielding to people, registration's own limits | Parallel fill-ins race for the last slot and exactly one wins. `max_games` holds under concurrency. |
-| Exhausting hosts or relays with AI matches, or starving people on the runner's address | `host_reserve`; `global_seats` at most 32; a runner's proven relays leave its address for the runners' own budget (16 an AI account, 32 together, half of the 64 relay slots, 32 dials a minute an account, one a seat), decided by Central's ticket alone (record "More AI seats at once") | Fill-in is refused when a host would fall below its reserve. A match between two AIs counts two seats. A person on the runner's address keeps every socket and dial; a socket that proves no runner's gains nothing; the ceilings hold and a closed relay gives back what it held. |
+| Exhausting hosts or relays with AI matches, or starving people on the runner's address | `host_reserve`; `global_seats` at most 32; a runner's proven relays leave its address for the runners' own budget (16 an AI account, 32 together, half of the 64 relay slots, 32 dials a minute an account and 64 together, one a seat), decided by Central's ticket alone (record "More AI seats at once") | Fill-in is refused when a host would fall below its reserve. A match between two AIs counts two seats. A person on the runner's address keeps every socket and dial; a socket that proves no runner's gains nothing; the ceilings hold and a closed relay gives back what it held. |
 | A dead runner leaves a person stranded | Offers live 45 s. A match the AI never claims becomes void after the 2-minute lease, as today. | Offer expiry. The void and the person's next search. |
 | The switch races a fill-in | The switch locks the AI row, and fill-in counts after the same lock. | Interleaved switch and fill-in: no match after the switch commits. |
 | Whether an account is an AI, or a person's preference, leaks | Public: kind and label. The administration only: profile, caps, who created it. A person's preference lives only in `ranked_ticket_ai`, in no reply but their own, in no host's work and no public view. `ai_fill_in_at` ignores other people's tickets. | Replies to the opponent, host work and public reads hold no preference. The host's assignment is unchanged. |
@@ -1590,6 +1591,10 @@ Invariants:
 6. The relay slots and the listener's sockets are not raised: the file
    descriptors give no room (below).
 
+*The adversarial pass below changed invariant 3 (a dial is given back only
+when the runners pay for it) and the order (the session is checked before
+the budget).*
+
 Where it is counted. `ws.rs`'s `Seat` holds the socket's place; after the
 ticket (`ranked_socket.rs`, straight after `relay.take`, before the session
 is checked or the host is dialled) a grant that names an AI account calls
@@ -1644,6 +1649,10 @@ servers); what follows is arithmetic over the numbers given.
   seconds: at most 64 relays are about 21 route transactions a second
   against a pool of four, as before; the runners' share changes who holds
   them, not how many.
+  The people's half holds the people facing AIs too: each filled-in AI
+  seat brings a person's relay. Up to 16 filled-in seats leave the people
+  16 relays for each other, as before; at 32, none. Seats above 16 belong
+  in the carousel, which takes no person's relay.
 - **netcup** (12 cores, 32 GB, one engine process per game). At 32 AI
   seats at most 32 matches hold an AI (every one filled in) and 16 when
   each is between two AIs. A harness probe measured big AI games at about
@@ -1680,3 +1689,101 @@ values, but its relay counts a runner's sockets against the address and its
 website refuses to save them: before a fallback to it, set `global_seats` to
 16 or less and `carousel_games` to 8 or less ([operations](operations.md)
 §"AI players").
+
+### Implementation pass
+
+Built on branch `claude/ai-seats`:
+
+- **`central-api`**: `ranked::ai::MAX_GLOBAL_SEATS` (32) and
+  `MAX_CAROUSEL_GAMES` (16), which `AiSettings::valid` takes.
+- **Migration 000057** (§9): the two CHECKs, nothing else.
+- **`central-postgres`**: `AccountStore::relay_runner`, one statement (a
+  live native session of the presented digest, its credential revision the
+  account's, joined to `ai_players` and to a runner token neither revoked
+  nor expired); the operator command's faults take the API's bounds
+  (`settings.global_seats 33: 0 to 32`).
+- **`central-identity`**: `IdentityService::relay_runner`, the store's word.
+- **`central-http`**: `Grant.runner`, set in `Relay::forward`'s socket
+  branch and kept in the vault with the grant; the client holds only the
+  random handle. `ranked_socket.rs`: after `relay.take` and a first check
+  of the session, `budget` calls `Seat::runner` for a runner's grant, and
+  the relay's work runs beside `Replaced::wait`, so a replaced relay ends.
+  `ws/runners.rs`: the runners' table, keyed by (AI account, match, seat),
+  each entry with the serial of the socket that holds it and the switch
+  (`oneshot`) that closes it once a newer one takes its place; a dropped
+  `Seat` frees its entry only while its serial holds it. The runners'
+  dials (`Book<[u8; 16]>` an account, `Book<()>` for all), and
+  `Book::refund`, which gives back one unit only into the window that
+  charged it. `Book` takes its key as a type parameter, an address by
+  default. `RELAY_SLOTS` stays 64, with `2 × RUNNER_RELAYS ≤ RELAY_SLOTS`
+  checked at compile time.
+- **`central-web`**: the form's ranges (from named constants a test holds to
+  the API's) and its hints in all eleven languages.
+
+Locks: the address's dials, the runners' dials and the listener's sockets
+are each taken alone, never one inside another, and poisoning is read
+through; `Seat::drop` takes the listener's alone. Whatever way a relay's
+task ends (its frames, its session, a stop, its twelve hours, a newer relay
+of its seat), its `Seat` drops and gives back what it holds. Nothing new is
+logged.
+
+### The adversarial pass (28 November 2026)
+
+A second agent reviewed the branch against `main` read-only, given the code
+and the design and not the implementer's conclusions, attacking it as an
+internet caller, a person on the runner's address, a runner session and the
+holder of a stolen runner token. Nothing high. What it found, and what
+changed:
+
+- **Low (near medium): a refused proven dial was paid by nobody.** The
+  address got its dial back before the account was charged, and a refused
+  charge spends nothing. A runner session past its dials, sending each
+  ticket late, could keep 32 sockets before their tickets on its address
+  (beside 32 relays: every relay slot), bounded only by the firewall's new
+  connections. Now the runners pay first (32 a minute an AI account, and
+  64 a minute all runners together, two whole redials of their relays,
+  about one address's 60); only then does the address get its dial back,
+  so each dial is paid once. A unit test holds the address's dial spent
+  past the account's and past all runners' dials.
+- **Low: a ticket of an ended session replaced its seat's live relay.** The
+  budget came before the first check of the session. The session is now
+  checked first: a ticket up to 15 seconds old of a session that ended
+  since takes no budget and closes no relay. A relay whose host dial then
+  fails has still closed its older one, which the runner replaces at its
+  next dial as the host would.
+- **Low (capacity): "the other half stays with people" counts the runners'
+  relays only.** With fill-in on, every filled-in AI seat brings a person's
+  relay, so at 32 filled-in seats the people's half is all people facing
+  AIs, and a match between two people finds no relay slot (before: at most
+  16 and 16). Not changed in code: fill-in seats an AI only for a person
+  who searched alone, and the carousel, which spends the credit, takes no
+  person's slot. Named in the capacity notes and the operations runbook:
+  above 16 seats, spend them in the carousel, or count people's matches
+  in. A cap of 16 filled-in seats in the store would keep the old envelope;
+  it is left for a later change with a test that seats seventeen.
+- **Nit: an unanswered runner read failed a person's ticket.** It is now
+  read as no runner's, the stricter budget.
+- **Nit: a dial's time was read before its book's lock,** so a dial that
+  lost the race for a new window lost its refund, and a window evicted and
+  made again could take one. The time is read under the lock.
+- **Tests:** the store suite now ages a runner's token (revoked, expired)
+  and a session (expired) while the session row stays, and each is no
+  runner's relay; the website's bounds are named constants a test holds to
+  the API's. `Relay::forward`'s reading and `serve`'s wiring are not covered
+  by a test of their own: they need a host to issue socket tickets, which
+  no suite here runs (the step after the ticket, `budget`, is tested with
+  Central's grants).
+- **Docs:** the record of this pass, here.
+
+What it found sound: no client input reaches `Grant.runner`, and a person's
+grant never touches the runners' table; the locks are never nested and read
+through poisoning; a seat is freed only by the serial that holds it; a
+socket proves once; one with no known address enters the budget and gets
+nothing back; replacement never crosses an account or a seat; the store's
+statement; the ceilings under replacement and refusal; the listener's total
+and the relay slots unchanged; the constraint names and the store suite's
+writes on both sides of each bound; the bounds alike in the API, the
+operator's faults, the website, its eleven languages and the migration.
+
+These are the implementing agents' engineering passes, not an independent
+audit; the owner's release gates still apply.

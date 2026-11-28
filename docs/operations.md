@@ -155,12 +155,14 @@ binary frame. Admission shares the push listener's per-address socket and dial
 limits. At most 64 game relays can run at once. Each uses one additional
 outbound file descriptor compared with a push socket. A relay whose credential
 Central issued for an AI runner's session (it asks the store as it issues one)
-leaves those per-address limits once the credential is read: its address gets
-back the dial and the place, and the relay counts in the runners' own budget
-instead: 16 an AI account, 32 for all runners together (half of the 64, so the
-other half stays with people), 32 such dials a minute an AI account, and one
-relay a seat, a newer one closing the older ([AI players](ai-players.md), "More
-AI seats at once"). Until its credential is read, a runner's relay counts
+leaves those per-address limits once the credential is read and its session
+still stands: its address gets back the dial and the place, and the relay
+counts in the runners' own budget instead: 16 an AI account, 32 for all
+runners together (half of the 64, so the other half stays with people), 32
+such dials a minute an AI account and 64 for all runners (past them the
+address pays the dial), and one relay a seat, a newer one closing the older
+([AI players](ai-players.md), "More AI seats at once"). Until its credential
+is read, a runner's relay counts
 against its address like anyone's: a runner that dials all its seats at once
 can fill its address's 32 places for that moment.
 
@@ -752,7 +754,11 @@ transaction, whole or not at all:
   What the runner machine carries bounds them first: on acenb the Baylee AI
   takes about 3.4 GB and 1.2 GB a seat, so the house AIs' `max_games`
   together stay at 12 or less, and seats past that are language models'
-  ([AI players](ai-players.md), "More AI seats at once").
+  ([AI players](ai-players.md), "More AI seats at once"). Each AI seat that
+  fill-in gives a person also holds that person's relay among the people's
+  32: past 16 such seats, people meeting people find fewer relays, so
+  spend seats above 16 in the carousel (`fill_in` false when people play
+  each other a lot).
 - **`revoke`.** Runner token ids, as the listing prints them. Each ends every
   session it minted in the same transaction; one revoked already is no
   error, an unknown id refuses the plan.
