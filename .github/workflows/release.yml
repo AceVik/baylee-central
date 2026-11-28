@@ -162,9 +162,14 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
+        # The notes start at the previous release's tag, never at
+        # `central-profiles` (the build profiles' pre-release, profile.yml).
         run: |
+          previous=$(gh release list --exclude-drafts --limit 100 --json tagName \
+            --jq "[.[].tagName | select(startswith(\"v\") and . != \"$TAG\")][0] // empty")
           gh release create "$TAG" \
             --title "Baylee Central $TAG" \
-            --generate-notes \
+            --generate-notes ${previous:+--notes-start-tag "$previous"} \
             release-out/*.tar.gz release-out/*.sha256 release-out/dist/SHA256SUMS.txt

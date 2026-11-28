@@ -2176,7 +2176,7 @@ including the one the gateway's timer starts for a new release tag.
   `sudo /etc/baylee/deploy-hooks.d/10-central manual <central revision>`
   stages and switches that revision at once; nothing holds games for it.
   For a build from the revision's profile, wait until `profile.yml` has run
-  for that commit on main (about 35 minutes after the merge; the asset
+  for that commit on main (about 25 minutes after the merge; the asset
   `central-<commit>.profdata.xz` is then in `central-profiles`); a deploy
   before that builds without one and says so.
 - **Before the hook is installed** on a new machine, or with another
