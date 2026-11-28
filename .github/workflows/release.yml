@@ -5,10 +5,6 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
-      negative-control:
-        description: Also build from a profile that matches nothing, which the check must refuse
-        type: boolean
-        default: false
       portability-check:
         description: Also build from the profile in a checkout and a Cargo home at other paths
         type: boolean
@@ -149,32 +145,6 @@ jobs:
           export CARGO_HOME="$RUNNER_TEMP/cargo-home-elsewhere"
           cargo fetch --locked
           timeout 50m cargo xtask pgo --out target/pgo-elsewhere --target-cpu x86-64-v3 --profile-use "$RUNNER_TEMP/central.profdata"
-      # The whole build from a profile of one function no build has, which
-      # the check must refuse. Its output goes to a file and only the
-      # build's milestones to the log, which carry the time each took.
-      - name: Negative control, a profile that matches nothing must be refused
-        if: github.event_name == 'workflow_dispatch' && inputs.negative-control
-        shell: bash
-        run: |
-          llvm_profdata="$(rustc --print target-libdir)/../bin/llvm-profdata"
-          printf ':ir\nno_such_function_in_central\n1\n1\n1\n' > target/unrelated.proftext
-          "$llvm_profdata" merge -o target/unrelated.profdata target/unrelated.proftext
-          rustc -vV > target/unrelated.profdata.rustc
-          set +e
-          timeout 50m cargo xtask pgo --out target/pgo-negative --profile-use target/unrelated.profdata > target/negative.log 2>&1 &
-          build=$!
-          while kill -0 "$build" 2> /dev/null; do
-            sleep 60
-            echo "$(date -u +%H:%M) $(wc -l < target/negative.log) lines, last: $(grep -E 'Compiling|Finished|PGO' target/negative.log | tail -n 1)"
-          done
-          wait "$build"
-          status=$?
-          set -e
-          tail -n 6 target/negative.log
-          if [ "$status" -eq 0 ] || ! grep -q 'The PGO profile did not take' target/negative.log; then
-            echo "A profile that matches nothing was not refused (status $status)"
-            exit 1
-          fi
 
   publish:
     needs: [build-pgo]

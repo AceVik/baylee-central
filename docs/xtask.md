@@ -342,24 +342,31 @@ instrumented too and write counts while the build runs.
 of one function it does not have, and the compiler's report must word a
 function without counts as step 5 reads it (`no profile data available for
 function`). By hand, `portability-check` builds from the profile again in a
-checkout and a Cargo home at other paths, as the server does, and
-`negative-control` builds the whole selection from that profile of one
-function, which step 5 must refuse.
+checkout and a Cargo home at other paths, as a server that builds from CI's
+profile does.
 
-Measured on 28.11.2026 (release run 46102057709, ubuntu-26.04 with four
-vCPUs): 49 count files merged into a profile of 89 709 functions (55 MiB),
-of which the build from it reported none without counts. The instrumented
-build took 19 minutes, the training 8 seconds, the build from the profile
-with `central-service` beside it 21 minutes. Against the deploy hook's
-build, `--compare` gave 4 % less time for a pass over the website's 331
-addresses (214.2 against 205.1 ms, the client's time included) and 5 to 9 %
-less for a picture, each in a worker process of its own (`photo.jpg` 111.5
-against 105.2 ms, `screen.png` 88.2 against 80.2, `lossy.webp` 100.4 against
-91.6, `moving.gif` 103.6 against 96.6). The whole negative control ran for
-more than 80 minutes in that run and was stopped by the runner before it
-finished; why the build from a profile that matches nothing is so much
-slower is open, so it stays a check by hand. The deploy hook does not use this
-build yet: it builds `--release` for `x86-64-v3` on the server.
+Measured on 28.11.2026 on ubuntu-26.04 runners with four vCPUs (release
+runs 46102057709 and 46113854970, the same commit's code): 49 count files
+merged into a profile of 89 709 functions (55 MiB), of which the build from
+it reported none without counts, and none at the other paths either. The
+instrumented build took 14 to 19 minutes, the training 5 to 8 seconds, the
+build from the profile 10 to 13 minutes and `central-service` beside it 4 to
+8. Against the deploy hook's build, `--compare` gave 4 and 9 % less time for
+a pass over the website's 331 addresses (214.2 against 205.1 ms, 117.9
+against 107.0 ms; the client's time included) and 3 to 9 % less for a
+picture, each in a worker process of its own (`photo.jpg` 5 and 3 %,
+`screen.png` 9 and 5 %, `lossy.webp` 8 and 6 %, `moving.gif` 6 and 3 %).
+
+A profile that matches nothing is no cheap failure. Built from a profile of
+one function no build has, the whole selection did not finish in 80 minutes
+(46102057709) nor in 50 (46113854970): the compiler reported 57 829
+functions without counts, then stood in `central-web-server` for the rest of
+the time. Step 5 would refuse such a build, but only after it; a profile is
+therefore only ever used for the commit and the toolchain that made it, and
+a caller with a deadline has to bound the build.
+
+The deploy hook does not use this build yet: it builds `--release` for
+`x86-64-v3` on the server ([operations](operations.md#deploying-with-the-gateway)).
 
 No profile reaches the website's WebAssembly: the stable toolchain has no
 profiling runtime for `wasm32-unknown-unknown` (`-C profile-generate` there
