@@ -123,8 +123,9 @@ fn who(lang: Lang, row: &Row) -> AnyView {
     let name = match (&row.name, row.tag) {
         (Some(name), Some(tag)) => {
             let tag = tag_text(tag);
+            let href = player_path(lang, name, &tag);
             view! {
-                <a class="handle-link ladder-handle" href=player_path(lang, name, &tag) translate="no">
+                <a class="handle-link ladder-handle" href=href translate="no">
                     <bdi>{name.clone()}</bdi>
                     <span class="tag handle-tag">{"#"}{tag}</span>
                 </a>

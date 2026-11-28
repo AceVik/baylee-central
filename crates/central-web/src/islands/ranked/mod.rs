@@ -174,9 +174,11 @@ impl Ladder {
         let pages = self.pages.get_untracked();
         let after = pages.last().copied();
         let known = self.top.with_value(|top| top.get(&choice.key()).copied());
+        let asked = self.asked;
+        let current = move || asked.get_value() == ticket;
         leptos::task::spawn_local(async move {
-            let shown = find(choice, after, known).await;
-            if self.asked.get_value() != ticket {
+            let shown = find(choice, after, known, current).await;
+            if !current() {
                 return;
             }
             if choice.league.is_none()
@@ -218,7 +220,7 @@ fn remember(choice: &Choice) {
     if let Some(window) = leptos::web_sys::window()
         && let (Ok(history), Ok(path)) = (window.history(), window.location().pathname())
     {
-        let address = format!("{path}{}", choice.to_search());
+        let address = format!("{path}{}", choice.query());
         let _ = history.replace_state_with_url(
             &leptos::wasm_bindgen::JsValue::NULL,
             "",
@@ -231,15 +233,20 @@ fn remember(choice: &Choice) {
 
 /// The board for `choice`: its league, the league remembered as the
 /// highest with standings, or else the first league from the top down
-/// that has any.
-async fn find(choice: Choice, after: Option<Cursor>, known: Option<League>) -> Shown {
+/// that has any. `current` says whether the question is still the newest.
+async fn find(
+    choice: Choice,
+    after: Option<Cursor>,
+    known: Option<League>,
+    current: impl Fn() -> bool,
+) -> Shown {
     let Some(league) = choice.league.or(known) else {
-        return search(choice).await;
+        return search(choice, current).await;
     };
     match board(choice, league, after).await {
         // the remembered league has emptied since: search again
         Ok((_, entries, _)) if entries.is_empty() && choice.league.is_none() => {
-            search(choice).await
+            search(choice, current).await
         }
         Ok((season, entries, _)) if entries.is_empty() => Shown::Empty {
             season,
@@ -256,10 +263,14 @@ async fn find(choice: Choice, after: Option<Cursor>, known: Option<League>) -> S
 }
 
 /// The first league from the top down with anybody in it; at most one
-/// question for each of the twelve leagues.
-async fn search(choice: Choice) -> Shown {
+/// question for each of the twelve leagues, and none once a newer question
+/// was asked (the budget is the visitor's).
+async fn search(choice: Choice, current: impl Fn() -> bool) -> Shown {
     let mut resolved = None;
     for league in TOP_DOWN {
+        if !current() {
+            return Shown::Waiting;
+        }
         match board(choice, league, None).await {
             Ok((season, entries, next)) if !entries.is_empty() => {
                 return Shown::Page {

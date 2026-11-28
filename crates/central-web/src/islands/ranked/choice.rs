@@ -130,7 +130,8 @@ impl Choice {
     /// The query string for the address, with a leading `?`; empty when
     /// everything is at its default.
     #[must_use]
-    pub fn to_search(&self) -> String {
+    #[cfg_attr(not(any(target_arch = "wasm32", test)), allow(dead_code))]
+    pub fn query(&self) -> String {
         let mut pairs: Vec<String> = Vec::new();
         if self.format != Format::Standard {
             pairs.push(format!("format={}", self.format.as_str()));
@@ -212,7 +213,7 @@ mod tests {
     /// back as the same choice.
     #[test]
     fn a_choice_stands_in_the_address_and_reads_back() {
-        assert_eq!(Choice::default().to_search(), "");
+        assert_eq!(Choice::default().query(), "");
         let choice = Choice {
             format: Format::Highlander,
             track: Track::Deck,
@@ -221,7 +222,7 @@ mod tests {
             division: Some(2),
             season: Some([0xab; 16]),
         };
-        let search = choice.to_search();
+        let search = choice.query();
         assert_eq!(
             search,
             format!(
@@ -234,7 +235,7 @@ mod tests {
             division: None,
             ..choice
         };
-        assert_eq!(Choice::from_search(&whole.to_search()), whole);
+        assert_eq!(Choice::from_search(&whole.query()), whole);
     }
 
     /// Whatever an address holds, the page shows a board: an unknown

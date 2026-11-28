@@ -63,7 +63,8 @@ function rows(kind: "person" | "ai" | "deck", league: string, count: number, fro
     row.account = [...template.account.slice(0, 14), 0x10 + (n >> 8), n & 0xff];
     row.name = kind === "ai" ? `KI-Haus-${n}` : `Synth${n}`;
     row.tag = 0x0100 + n;
-    row.standing.elo = 2600 - n * 7;
+    // people and AI players interleave by Elo, as on a real board
+    row.standing.elo = kind === "ai" ? 2597 - at * 14 : 2600 - at * 7;
     row.standing.rank = { league, division: null, champion_place: null };
     if (kind === "ai") row.ai = { kind: n % 3 === 0 ? "model" : "house", label: n % 3 === 0 ? "Sprachmodell" : "Haus-KI · Expert" };
     return row;
@@ -136,12 +137,20 @@ const board = (page: Page) => page.locator("section.ladder");
 const title = (page: Page) => page.locator("#ladder-title");
 const listed = (page: Page) => page.locator("ol.ladder-rows > li.ladder-row:not(.is-skeleton)");
 
+/** Where the bar stands on the page (not in the window, which may have scrolled). */
+const barPlace = (page: Page) =>
+  page.locator(".ladder-tools").evaluate((bar) => {
+    const box = bar.getBoundingClientRect();
+    return { top: box.top + window.scrollY, left: box.left, width: box.width, height: box.height };
+  });
+
 test("the page shows the highest league anybody stands in, AI players marked", async ({ page, baseURL }) => {
   const problems = errors(page);
   page.on("request", (request) => {
     if (!request.url().startsWith(baseURL ?? "")) problems.push(`elsewhere: ${request.url()}`);
   });
-  const stand = await central(page, { master: mixed("master", 45), gold: rows("person", "gold", 3) });
+  const master = mixed("master", 45);
+  const stand = await central(page, { master, gold: rows("person", "gold", 3) });
   await page.goto("/en/ranked");
   await expect(title(page)).toHaveText("Master");
   await expect(listed(page)).toHaveCount(40);
@@ -149,7 +158,7 @@ test("the page shows the highest league anybody stands in, AI players marked", a
   expect(stand.asked).toEqual(["champion", "grandmaster", "master"]);
   await expect(board(page)).toHaveAttribute("aria-busy", "false");
   const ai = listed(page).filter({ has: page.locator(".ai-badge") });
-  await expect(ai).toHaveCount(15);
+  await expect(ai).toHaveCount(master.slice(0, 40).filter((row) => row.ai).length);
   await expect(ai.first().locator(".ai-badge")).toContainText(/Haus-KI · Expert|Sprachmodell/);
   // a person's row carries no AI badge, and every name leads to its profile
   const person = listed(page).filter({ hasNot: page.locator(".ai-badge") }).first();
@@ -168,7 +177,7 @@ test("the pages turn without moving the bar, and the title takes the focus", asy
   const before = page.getByRole("button", { name: "Previous page" });
   const after = page.getByRole("button", { name: "Next page" });
   await expect(before).toHaveAttribute("aria-disabled", "true");
-  const bar = await page.locator(".ladder-tools").boundingBox();
+  const bar = await barPlace(page);
   await after.click();
   await expect(listed(page)).toHaveCount(5);
   await expect(page.locator(".ladder-count")).toHaveText("Page 2 · 5 places");
@@ -176,7 +185,7 @@ test("the pages turn without moving the bar, and the title takes the focus", asy
   await expect(title(page)).toBeFocused();
   await expect(after).toHaveAttribute("aria-disabled", "true");
   await expect(before).toHaveAttribute("aria-disabled", "false");
-  expect(await page.locator(".ladder-tools").boundingBox()).toEqual(bar);
+  expect(await barPlace(page)).toEqual(bar);
   await before.click();
   await expect(listed(page)).toHaveCount(40);
   await expect(page.locator(".ladder-count")).toHaveText("Page 1 · 40 places");
@@ -186,14 +195,13 @@ test("a choice stands in the address and the bar keeps its size for every choice
   const stand = await central(page, { master: mixed("master", 12), gold: [...rows("person", "gold", 2), ...rows("ai", "gold", 2, 50)] });
   await page.goto("/en/ranked");
   await expect(listed(page)).toHaveCount(12);
-  const tools = page.locator(".ladder-tools");
-  const size = await tools.boundingBox();
+  const size = await barPlace(page);
   await page.getByRole("button", { name: "Highlander" }).click();
   await expect(page).toHaveURL(/\/en\/ranked\?format=highlander$/);
   await page.getByRole("button", { name: "AI players" }).click();
   await page.locator("#ladder-league").selectOption("gold-2");
   await expect(page).toHaveURL(/\?format=highlander&who=ai&league=gold-2$/);
-  expect(await tools.boundingBox()).toEqual(size);
+  expect(await barPlace(page)).toEqual(size);
   const last = stand.bodies.at(-1)?.request.board;
   expect(last).toMatchObject({ format: "highlander", track: "player", league: "gold", division: 2, players: "ai" });
   // the address brings the same board back
@@ -250,7 +258,7 @@ test("an earlier season and the deck ladder read as Central lists them", async (
   const older = FIXTURE.older.id.map((b: number) => b.toString(16).padStart(2, "0")).join("");
   await page.locator("#ladder-season").selectOption(older);
   await expect(page).toHaveURL(new RegExp(`track=deck&season=${older}$`));
-  expect(stand.bodies.at(-1)?.request.board.season).toEqual(FIXTURE.older.id);
+  expect(stand.bodies.at(-1)?.request.board?.season).toEqual(FIXTURE.older.id);
   await expect(page.locator(".ladder-meta")).toContainText("Prolog");
 });
 

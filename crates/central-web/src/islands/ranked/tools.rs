@@ -14,7 +14,7 @@ use super::super::ui::badges::{format_name, league_name};
 use super::choice::{Choice, TOP_DOWN, divisions, league_key};
 use super::{Ladder, Seasons};
 use crate::data::id_hex;
-use crate::words::{self, Lang};
+use crate::words;
 
 /// A pressed or unpressed choice among few.
 fn chip(
