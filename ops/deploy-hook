@@ -49,6 +49,15 @@ LISTEN=127.0.0.1:28790
 DB_CONTAINER=baylee-postgres-1
 DB_GRANTOR=central_migrator
 DB_NAME=baylee_central
+# What the binaries are built for, and when from the profile CI made of the
+# revision (docs/xtask.md §"Profile-guided builds"), found at PROFILES:
+# `manual` in a deploy by hand only, `always` also in a gateway's deploy,
+# whose hooks have 15 minutes for `prepare`, `never`. PGO_MINUTES bounds
+# the build from a profile; past it the hook builds without one.
+TARGET_CPU=x86-64-v3
+PGO=manual
+PGO_MINUTES=40
+PROFILES=https://github.com/AceVik/baylee-central/releases/download/central-profiles
 if [[ -e $SETTINGS ]]; then
     [[ $(stat -c '%U %a' "$SETTINGS") =~ ^root\ [0-7][0145][0145]$ ]] \
         || { echo "central: $SETTINGS is not root's alone" >&2; exit 1; }
@@ -105,9 +114,10 @@ contains() {
     is_rev "$deployed" && as_builder git -C "$SRC" merge-base --is-ancestor "$1" "$deployed"
 }
 
-# Builds revision $1 and stages the service, the grants and the website.
+# Builds revision $1 in phase $2 (`prepare` or `manual`) and stages the
+# service, the grants and the website.
 stage() {
-    local rev=$1
+    local rev=$1 phase=$2
     if [[ $(cat "$STATE/staged" 2>/dev/null || true) == "$rev" && -x $STAGED/central-service \
         && -x $STAGED/central-web && -f $STAGED/site/manifest.json ]]; then
         say "$rev is staged already"
@@ -126,26 +136,108 @@ stage() {
         > "$STATE/grants.sql" || die "no ops/grants.sql in $rev"
     plain_sql "$STATE/grants.sql" || die "ops/grants.sql of $rev is empty or holds a backslash"
     say "building $rev"
-    # Central, the website, and the picture worker beside the service
-    # (docs/profile-pictures.md), each binary named: `--bin` limits the build
-    # to the binaries it names in every package given. The codecs' x86-64
-    # assembly needs nasm on the build host.
-    as_builder bash -c "cd '$SRC' && RUSTFLAGS=\"\${CENTRAL_RUSTFLAGS:--C target-cpu=x86-64-v3}\" cargo build -q --release --locked -p central-service \
-        -p central-web-server -p central-picture-codec \
-        --bin central-service --bin central-web --bin central-picture-worker"
+    build "$rev" "$phase"
     # the site, with the gateway's screenshots and fallback card status
+    command -v wasm-opt > /dev/null \
+        || say "wasm-opt (binaryen) is missing: the website's islands go out unoptimised"
     as_builder bash -c "cd '$SRC' && BAYLEE_SRC='$BAYLEE_SRC' cargo xtask site"
     rm -rf "$STAGED"
     install -d -m755 -o root -g root "$STAGED"
-    install -m755 -o root -g root "$SRC/target/release/central-service" "$STAGED/central-service"
-    install -m755 -o root -g root "$SRC/target/release/central-picture-worker" "$STAGED/central-picture-worker"
-    install -m755 -o root -g root "$SRC/target/release/central-web" "$STAGED/central-web"
+    install -m755 -o root -g root "$BUILT/central-service" "$STAGED/central-service"
+    install -m755 -o root -g root "$BUILT/central-picture-worker" "$STAGED/central-picture-worker"
+    install -m755 -o root -g root "$BUILT/central-web" "$STAGED/central-web"
     install -m644 -o root -g root "$STATE/grants.sql" "$STAGED/grants.sql"
     rm -f "$STATE/grants.sql"
     cp -R "$SRC/target/site" "$STAGED/site"
     chown -R root:root "$STAGED/site"
     echo "$rev" > "$STATE/staged"
     say "staged $rev"
+}
+
+# Whether this machine runs code built for TARGET_CPU: x86-64-v3 needs
+# AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT (`abm`), MOVBE and XSAVE. A
+# binary built for more than the CPU has dies on its first such instruction.
+cpu_ready() {
+    [[ $TARGET_CPU == x86-64-v3 ]] || return 0
+    local flag
+    for flag in avx avx2 bmi1 bmi2 f16c fma abm movbe xsave; do
+        grep -qw "$flag" /proc/cpuinfo 2> /dev/null || { say "this CPU lacks $flag"; return 1; }
+    done
+}
+
+# Builds Central, the website and the picture worker of revision $1 (each
+# binary named: `--bin` limits a build to the binaries it names in every
+# package given; the codecs' x86-64 assembly needs nasm) for TARGET_CPU, and
+# sets BUILT to where they are. In the phases PGO allows ($2 is `manual` or
+# `prepare`), from the profile CI made of that commit where there is one and
+# it takes (`cargo xtask pgo --profile-use`, which also checks that it names
+# this toolchain and builds central-service without one), within
+# PGO_MINUTES: a profile that matches nothing makes the build crawl. Else,
+# or when that fails, as a plain release build: a missing profile never
+# holds a deploy back.
+build() {
+    local rev=$1 phase=$2 work=$SRC/target/deploy-profile
+    cpu_ready || die "this machine cannot run code built for $TARGET_CPU; nothing was changed"
+    if pgo_in "$phase" && profile "$rev" "$work"; then
+        if as_builder timeout -k 30s "${PGO_MINUTES}m" bash -c "cd '$SRC' && cargo xtask pgo \
+            --profile-use '$work/central.profdata' --target-cpu '$TARGET_CPU' --out target/pgo-deploy"; then
+            BUILT=$SRC/target/pgo-deploy/dist
+            say "built $rev from its profile"
+            return
+        fi
+        say "the build from $rev's profile failed; building $rev without one"
+    fi
+    as_builder bash -c "cd '$SRC' && RUSTFLAGS='-C target-cpu=$TARGET_CPU' cargo build -q --release --locked \
+        -p central-service -p central-web-server -p central-picture-codec \
+        --bin central-service --bin central-web --bin central-picture-worker"
+    BUILT=$SRC/target/release
+}
+
+# Whether phase $1 builds from a profile (the setting PGO).
+pgo_in() {
+    case $PGO in
+        always) return 0 ;;
+        manual) [[ $1 == manual ]] ;;
+        never) return 1 ;;
+        *) die "PGO is manual, always or never, not $PGO" ;;
+    esac
+}
+
+# Fetches the profile CI made of revision $1 into $2, as the build user, with
+# the toolchain file beside it, and makes sure the toolchain has
+# llvm-profdata. HTTPS only, redirects included; at most 100 MiB packed and
+# 512 MiB unpacked (a profile is about 10 and 55). False when any of that
+# fails, a profile CI has not made yet included: the caller then builds
+# without one. A profile steers only the compiler's choices; one that is
+# not this commit's does not take, and the build refuses it
+# (docs/threat-model.md, "A replaced build profile").
+profile() {
+    local rev=$1 work=$2 url=$PROFILES/central-$1.profdata size
+    as_builder rm -rf "$work"
+    as_builder mkdir -p "$work"
+    if ! as_builder curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-time 300 --max-filesize 104857600 \
+            -o "$work/central.profdata.xz" "$url.xz" \
+        || ! as_builder curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-time 60 --max-filesize 4096 \
+            -o "$work/central.profdata.rustc" "$url.rustc"; then
+        say "no profile of $rev at $PROFILES; building without one"
+        return 1
+    fi
+    if ! as_builder bash -c "set -o pipefail; xz -dc '$work/central.profdata.xz' \
+            | head -c 536870913 > '$work/central.profdata'"; then
+        say "the profile of $rev does not unpack; building without one"
+        return 1
+    fi
+    size=$(stat -c %s "$work/central.profdata")
+    if (( size > 536870912 )); then
+        say "the profile of $rev unpacks to more than 512 MiB; building without one"
+        return 1
+    fi
+    if ! as_builder bash -c "cd '$SRC' && rustup component add llvm-tools > /dev/null 2>&1"; then
+        say "the toolchain has no llvm-tools and rustup cannot add them; building without the profile"
+        return 1
+    fi
 }
 
 # Installs what is staged: the service with its migrations and grants, then
@@ -271,6 +363,13 @@ back() {
     exit 1
 }
 
+# `10-central check-cpu`: whether this machine runs TARGET_CPU's code, for
+# the operator before the hook is installed; needs no root and changes nothing.
+if [[ ${1:-} == check-cpu ]]; then
+    cpu_ready || die "this machine cannot run code built for $TARGET_CPU"
+    say "this machine runs code built for $TARGET_CPU"
+    exit 0
+fi
 [[ $(id -u) == 0 ]] || die "run as root"
 install -d -m755 -o root -g root "$STATE"
 phase=${1:-}
@@ -286,13 +385,13 @@ case $phase in
             say "installed Central contains $central; nothing to do"
             rm -f "$STATE/staged"
         else
-            stage "$central"
+            stage "$central" prepare
         fi
         ;;
     before-switch) switch ;;
     after-switch) ;;
     manual)
-        stage "$rev"
+        stage "$rev" manual
         switch
         ;;
     *) die "unknown phase $phase" ;;

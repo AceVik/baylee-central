@@ -80,6 +80,34 @@ the profiled binaries over every page and four pictures and fails when one stops
 answering; `smoke` runs on the profiled `central-service`. This is the implementing
 agent's engineering review, not an independent audit.
 
+The deploy hook's builds from CI's profiles (the same day, the change after it):
+
+Design pass: a new input reaches the production host's build, the profile in the public
+pre-release, which `main`'s protection does not cover. Hostile cases considered: a
+replaced or oversized profile, a redirect off HTTPS, a profile of another commit or
+toolchain, one that matches nothing (whose build crawls), a CPU without what
+`TARGET_CPU` needs, and a gateway's deploy, whose hooks have 15 minutes for `prepare`.
+Invariants: no profile, or any doubt about it, means the plain build as before, never a
+held deploy; a profile changes no behaviour; no token or secret reaches the server for
+it; the job that writes the pre-release builds nothing.
+
+Implementation pass: the build user fetches with `curl` over HTTPS only (redirects too),
+at most 100 MiB packed, unpacks at most 512 MiB, and the hook names the file by the
+commit it builds. `cargo xtask pgo --profile-use` refuses another toolchain's profile
+and one that did not take; the hook bounds that build with `timeout` on its process
+group and builds plainly after any failure. A gateway's deploy builds plainly unless
+`PGO=always`. `cpu_ready` checks the nine CPU flags x86-64-v3 needs before any build;
+`check-cpu` asks it without root. In `profile.yml` the training job holds a read-only
+token and the publishing job has write access, checks nothing out and builds nothing.
+
+Adversarial pass: the cases a merge can show before a deploy are shown: the CPU list
+passes on CI's x86-64-v3 runner (`profile.yml`), the profile takes at other paths,
+and a profile that matches nothing crawls, which the deadline covers. The hook's
+fetch and build and `profile.yml`'s publishing first run after the merge; their
+first runs are watched, and the server's CPU is to be checked with `check-cpu`
+before the hook is installed. This is the implementing agent's engineering review,
+not an independent audit.
+
 ## Account download for never-restored accounts, 26 November 2026
 
 Design pass: a registered account that has only used the website never confirms a

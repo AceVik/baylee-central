@@ -2087,17 +2087,37 @@ including the one the gateway's timer starts for a new release tag.
 - **`prepare`.** As the build user it fetches and checks the revision out in
   `/opt/baylee-central/src`. It then takes `ops/grants.sql` out of the
   revision's commit, before anything is built, and only then builds
-  `central-service`, `central-web-server` and `central-picture-codec` in
-  release, each binary named (`--bin central-service --bin central-web
+  `central-service`, `central-web-server` and `central-picture-codec`, each
+  binary named (`--bin central-service --bin central-web
   --bin central-picture-worker`; on x86-64 the codecs need `nasm`,
-  [profile pictures](#profile-pictures)), and the site
+  [profile pictures](#profile-pictures)), for `TARGET_CPU` (`x86-64-v3`,
+  refused at once on a CPU without AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT,
+  MOVBE and XSAVE). In a deploy by hand (and in a gateway's too with
+  `PGO=always`), where CI has made the revision's profile
+  (`.github/workflows/profile.yml`: `central-<commit>.profdata.xz` and its
+  toolchain file in the public pre-release `central-profiles`, fetched with
+  `curl` over HTTPS, no token), it builds from it with `cargo xtask pgo
+  --profile-use` ([xtask](xtask.md#profile-guided-builds-pgo)): the website
+  and the worker from the profile, `central-service` without one, all with
+  fat link-time optimisation; the task refuses a profile of another
+  toolchain or one that did not take. That build may take `PGO_MINUTES`
+  (40): one from a profile that matches nothing did not end within 50
+  minutes in CI. Without a profile, or when that build fails or runs out of
+  time, it builds as before (`cargo build --release`) and says so: a
+  missing profile never holds a deploy back. A gateway's deploy builds
+  without a profile by default, since its hooks have 15 minutes for
+  `prepare`, and a cold build from a profile with fat link-time
+  optimisation took 14 to 21 minutes on CI's four vCPUs. The toolchain
+  needs `llvm-tools`, which the hook adds with `rustup` (network once).
+  Then the site
   (`cargo xtask site` with `BAYLEE_SRC`, for the gateway's screenshots and
   fallback card status). It stages the three binaries, the grants and the
   site in `/opt/baylee-central/staged`. The build user needs Rust's
   `wasm32-unknown-unknown` target and the pinned wasm-bindgen CLI
   ([xtask](xtask.md#the-sites-assets-site)); `brotli` and `gzip` on the
-  `PATH` make the compressed copies. A failed fetch answers "not ready" (75), so
-  the next timer run tries again.
+  `PATH` make the compressed copies, and `wasm-opt` (Ubuntu's `binaryen`)
+  shrinks the islands, about 15 % (the hook says when it is missing). A
+  failed fetch answers "not ready" (75), so the next timer run tries again.
 - **`before-switch`** (no game is running, admission is held): asks first
   whether the grants' login reaches the database and is no superuser, and
   whether the staged service accepts `/etc/baylee-central/central.json`
@@ -2120,12 +2140,21 @@ including the one the gateway's timer starts for a new release tag.
 - **By hand,** for a Central or website change between gateway releases:
   `sudo /etc/baylee/deploy-hooks.d/10-central manual <central revision>`
   stages and switches that revision at once; nothing holds games for it.
+  For a build from the revision's profile, wait until `profile.yml` has run
+  for that commit on main (about 35 minutes after the merge; the asset
+  `central-<commit>.profdata.xz` is then in `central-profiles`); a deploy
+  before that builds without one and says so.
+- **Before the hook is installed** on a new machine, or with another
+  `TARGET_CPU`: `10-central check-cpu` (no root, changes nothing) says
+  whether the machine runs that CPU's code; `prepare` refuses otherwise.
 
 Settings, all optional, in `/etc/baylee-central/deploy-hook.env` (root's,
 not writable by others): `BUILD_USER`, `BAYLEE_SRC`, `CENTRAL_ROOT`,
 `WEB_BIN`, `SITE_ROOT`, `WEB_UNIT`, `WEB_LISTEN`, `UNIT`, `LISTEN`,
-`DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`; the defaults are this
-deployment's. The website's Caddy block is the one in §"The server-rendered
+`DB_CONTAINER`, `DB_GRANTOR`, `DB_NAME`, `TARGET_CPU`, `PGO` (`manual`,
+`always` or `never`), `PGO_MINUTES` and `PROFILES` (where the profiles
+are); the defaults are this deployment's. (`CENTRAL_RUSTFLAGS` is gone: it never reached the
+build, which clears its environment.) The website's Caddy block is the one in §"The server-rendered
 website". The old static `WEB_ROOT` (`/opt/baylee-app/web`) is no longer
 written; remove it once Caddy no longer serves it.
 

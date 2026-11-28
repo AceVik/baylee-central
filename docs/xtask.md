@@ -372,8 +372,11 @@ build, but only after it; a profile is therefore only ever used for the
 commit and the toolchain that made it, and a caller with a deadline has to
 bound the build.
 
-The deploy hook does not use this build yet: it builds `--release` for
-`x86-64-v3` on the server ([operations](operations.md#deploying-with-the-gateway)).
+`profile.yml` trains a profile of every commit on main (`--profile-only`)
+and puts it in the public pre-release `central-profiles`; the deploy hook
+builds that commit from it on the server with `--profile-use`, bounded in
+time, and without a profile as before
+([operations](operations.md#deploying-with-the-gateway)).
 
 No profile reaches the website's WebAssembly: the stable toolchain has no
 profiling runtime for `wasm32-unknown-unknown` (`-C profile-generate` there
