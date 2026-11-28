@@ -247,7 +247,15 @@ is served by `central-web` from `target/site/`, which this task writes:
   addresses of its glue and its module written in (`islands.js`,
   `admin-islands.js`). A public module that holds one of the
   administration's marks (`site::ADMIN_ONLY`), or an administration's that
-  lacks one, fails the build;
+  lacks one, fails the build. Both are built with `simd128` beside the
+  toolchain's baseline features, then shrunk with `wasm-opt -Oz` where it is
+  installed (`CENTRAL_REQUIRE_WASM_OPT=1` requires it, as CI does; about
+  15 % smaller). Measured 28.11.2026 on the public module after
+  wasm-bindgen: with `simd128` 5 872 428 bytes (Brotli 1 093 039), without
+  5 972 556 (1 103 789), so SIMD makes it 1 % smaller after compression and
+  the compiler uses it in about 22 000 places; its effect on hydration was
+  not measured. The price is that browsers before Safari 16.4 (iOS 15)
+  cannot run the islands, and so cannot sign in;
 - the stylesheet: `crates/central-web/style/` joined in the order of
   `site::STYLES`, every `url("/assets/<name>")` rewritten to the hashed
   file (a missing one fails);
