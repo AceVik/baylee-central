@@ -18,6 +18,8 @@ mod queue;
 pub use queue::CLOSED_TICKET_HOURS;
 pub(super) use queue::sweep as sweep_tickets;
 pub(super) mod replication;
+mod rerank;
+pub use rerank::{Rerank, rerank};
 mod rules;
 mod scoring;
 

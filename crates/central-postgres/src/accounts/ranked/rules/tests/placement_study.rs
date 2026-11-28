@@ -1,7 +1,8 @@
 //! Reproducible offline study of the production policy, with no database or network.
 
 use super::super::{
-    Outcome, Player, Rank, deck_after_match, deck_start, queue_elo, rank, rounded, settle,
+    ELITE_AGE_DAYS, Outcome, Player, Rank, deck_after_match, deck_start, queue_elo, rank, rounded,
+    settle,
 };
 
 const SEEDS: [u64; 6] = [581, 1901, 3299, 7429, 8191, 13_007];
@@ -89,7 +90,6 @@ impl Study {
         let mut opponent = player(field.opponent(pilot), 500);
         let mut deck = 1500;
         let mut rival_deck = 1500;
-        let mut badge = Rank::default();
         let mut wins = 0;
         for game in 1..=100 {
             let rival_skill = field.opponent(pilot);
@@ -124,13 +124,7 @@ impl Study {
                 deck_after_match(deck, rival_deck, gap, outcome, game - 1),
                 deck_after_match(rival_deck, deck, -gap, reverse, 500 + game - 1),
             );
-            badge = rank(
-                rounded(pilot.score),
-                game,
-                i64::from((game - 1) / 10),
-                0,
-                badge,
-            );
+            let badge = rank(rounded(pilot.score), game, i64::from((game - 1) / 10), 0);
             if game < 10 {
                 assert_eq!(badge.league, -1, "published before placement completed");
             } else if game == 10 {

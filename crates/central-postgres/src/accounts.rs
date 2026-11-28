@@ -36,7 +36,7 @@ mod password;
 mod pictures;
 mod profiles;
 mod ranked;
-pub use ranked::{CLOSED_TICKET_HOURS, RankedHostCredential};
+pub use ranked::{CLOSED_TICKET_HOURS, RankedHostCredential, Rerank, rerank};
 mod recovery;
 mod registration;
 mod report_tokens;

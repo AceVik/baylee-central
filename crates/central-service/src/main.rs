@@ -21,7 +21,7 @@ mod reports_import;
 mod restore;
 
 /// Every mode, in the order the usage names them; `--modes` prints them.
-const MODES: [&str; 19] = [
+const MODES: [&str; 20] = [
     "--dev",
     "--dev-accounts-stdin",
     "--accounts-stdin",
@@ -30,6 +30,7 @@ const MODES: [&str; 19] = [
     "--appoint-admin-stdin",
     "--ai-players-stdin",
     "--sweep-stdin",
+    "--rerank-stdin",
     "--after-restore-stdin",
     "--erase-accounts-stdin",
     "--legacy-import-stdin",
@@ -66,6 +67,7 @@ async fn main() -> ExitCode {
         Some("--appoint-admin-stdin") => return production::run_appoint_admin().await,
         Some("--ai-players-stdin") => return ai_players::run().await,
         Some("--sweep-stdin") => return production::run_sweep().await,
+        Some("--rerank-stdin") => return production::run_rerank().await,
         Some("--after-restore-stdin") => return restore::run_after_restore().await,
         Some("--erase-accounts-stdin") => return restore::run_erase().await,
         Some("--legacy-import-stdin") => return legacy::run_import().await,

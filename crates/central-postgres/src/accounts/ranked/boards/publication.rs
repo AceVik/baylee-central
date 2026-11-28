@@ -114,7 +114,7 @@ async fn publish_holders(db: &DatabaseTransaction, season: Uuid) -> Result<(), E
         vec![
             season.into(),
             rules::CHAMPION_ELO.into(),
-            rules::CHAMPION_GAMES.into(),
+            rules::PLACED_AFTER.into(),
             rules::ELITE_AGE_DAYS.into(),
             rules::ELITE_IDLE_DAYS.into(),
             rules::CHAMPION_LIMIT.into(),

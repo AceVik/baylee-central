@@ -142,64 +142,74 @@ fn queue_calibrates_newcomers_and_draws_use_both_ratings() {
 }
 
 #[test]
-fn divisions_apply_hysteresis_only_to_previously_held_steps() {
-    let fresh = Rank::default();
-    let entry = Rank {
-        league: 5,
-        division: 4,
-    };
-    let third = Rank {
-        league: 5,
-        division: 3,
-    };
-    let second = Rank {
-        league: 5,
-        division: 2,
-    };
-    assert_eq!(rank(2500, 9, 0, 0, fresh).league, -1);
-    assert_eq!(rank(1400, 10, 0, 0, fresh), fresh);
-    assert_eq!(rank(2500, 10, 0, 0, fresh).league, 3);
-    assert_eq!(rank(2500, 239, 0, 0, fresh).league, 3);
-    assert_eq!(rank(2500, 240, 0, 0, fresh).league, 4);
-    assert_eq!(
-        rank(1200, 20, 0, 0, fresh),
-        Rank {
-            league: 1,
-            division: 3
+fn leagues_and_divisions_follow_the_elo_alone() {
+    let at = |league, division| Rank { league, division };
+    assert_eq!(rank(2500, 9, 0, 0).league, -1, "placement first");
+    assert_eq!(rank(1100, 10, 0, 0), at(0, 0));
+    // Wood's span 1200..1320 in three equal steps
+    assert_eq!(rank(1200, 10, 0, 0), at(1, 3));
+    assert_eq!(rank(1239, 10, 0, 0), at(1, 3));
+    assert_eq!(rank(1240, 10, 0, 0), at(1, 2));
+    assert_eq!(rank(1280, 10, 0, 0), at(1, 1));
+    assert_eq!(rank(1320, 10, 0, 0), at(2, 3));
+    // Gold's span 1680..1840 in four; no buffer for a division once held
+    assert_eq!(rank(1719, 10, 0, 0), at(5, 4));
+    assert_eq!(rank(1720, 10, 0, 0), at(5, 3));
+    assert_eq!(rank(1759, 700, 0, 0), at(5, 3));
+    assert_eq!(rank(1760, 76, 0, 0), at(5, 2));
+    assert_eq!(rank(1744, 700, 0, 0), at(5, 3));
+    // the number of games after placement changes nothing
+    for games in [10, 76, 107, 239, 240, 5000] {
+        assert_eq!(rank(1519, games, 0, 0), at(3, 2), "{games}");
+        assert_eq!(rank(1520, games, 0, 0), at(3, 1), "{games}");
+        assert_eq!(rank(2500, games, 0, 0), at(7, 1), "{games}");
+    }
+}
+
+/// A higher Elo is never a lower rank, whatever the games, for a young and
+/// an established record alike (owner, 28.11.2026).
+#[test]
+fn a_higher_elo_is_never_a_lower_rank() {
+    let key = |r: Rank| (r.league, -r.division);
+    for (age, idle) in [(0, 0), (183, 0), (184, 14), (400, 15)] {
+        let mut before = key(rank(0, 10, age, idle));
+        for elo in 1..=3200 {
+            let now = key(rank(elo, 10, age, idle));
+            assert!(now >= before, "{elo} at {age} days, idle {idle}");
+            before = now;
         }
-    );
-    assert_eq!(rank(1759, 700, 0, 0, entry), third);
-    assert_eq!(rank(1760, 619, 0, 0, third), third);
-    assert_eq!(rank(1760, 620, 0, 0, third), second);
-    assert_eq!(rank(1745, 700, 0, 0, second), second);
-    assert_eq!(rank(1744, 700, 0, 0, second), third);
-    assert_eq!(rank(1679, 700, 0, 0, entry).league, 4);
+    }
 }
 
 #[test]
-fn elite_requires_six_months_volume_and_recent_activity() {
-    let fresh = Rank::default();
-    for (games, days, tier) in [
-        (1999, 200, 7),
-        (2000, 183, 7),
-        (2000, 184, 8),
-        (2500, 184, 9),
+fn elite_requires_six_months_and_recent_activity() {
+    for (elo, days, idle, tier) in [
+        (2300, 183, 0, 7),
+        (2300, 184, 0, 8),
+        (2300, 184, 14, 8),
+        (2300, 184, 15, 7),
+        (2349, 300, 0, 8),
+        (2350, 300, 0, 9),
+        (2600, 300, 0, 9),
+        (2600, 300, 15, 7),
     ] {
-        assert_eq!(rank(2600, games, days, 14, fresh).league, tier);
+        assert_eq!(
+            rank(elo, 10, days, idle).league,
+            tier,
+            "{elo} {days} {idle}"
+        );
     }
-    assert_eq!(rank(2600, 3000, 300, 15, fresh).league, 7);
-    assert_eq!(rank(2600, 3000, 300, 0, fresh).league, 9);
     assert!(champion_eligible(
         CHAMPION_ELO,
-        CHAMPION_GAMES,
+        PLACED_AFTER,
         i64::from(ELITE_AGE_DAYS),
         i64::from(ELITE_IDLE_DAYS)
     ));
     for (elo, games, age, idle) in [
-        (2489, 3000, 184, 14),
-        (2490, 2999, 184, 14),
-        (2490, 3000, 183, 14),
-        (2490, 3000, 184, 15),
+        (2489, 10, 184, 14),
+        (2490, 9, 184, 14),
+        (2490, 10, 183, 14),
+        (2490, 10, 184, 15),
     ] {
         assert!(!champion_eligible(elo, games, age, idle));
     }
