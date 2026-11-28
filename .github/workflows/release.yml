@@ -9,6 +9,10 @@ on:
         description: Also build from a profile that matches nothing, which the check must refuse
         type: boolean
         default: false
+      portability-check:
+        description: Also build from the profile in a checkout and a Cargo home at other paths
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -138,6 +142,19 @@ jobs:
             echo "A profile that matches nothing was not refused"
             exit 1
           fi
+      # The server builds from a profile CI made, in a checkout and a Cargo
+      # home at other paths; the check must still find it taken there.
+      - name: Portability, the profile built from at other paths
+        if: github.event_name == 'workflow_dispatch' && inputs.portability-check
+        shell: bash
+        run: |
+          elsewhere="$RUNNER_TEMP/central-elsewhere"
+          git worktree add --detach "$elsewhere" HEAD
+          cp target/pgo-release/central.profdata target/pgo-release/central.profdata.rustc "$RUNNER_TEMP/"
+          cd "$elsewhere"
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home-elsewhere"
+          cargo fetch --locked
+          cargo xtask pgo --out target/pgo-elsewhere --target-cpu x86-64-v3 --profile-use "$RUNNER_TEMP/central.profdata"
 
   publish:
     needs: [build-pgo]
