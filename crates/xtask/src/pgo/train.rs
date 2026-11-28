@@ -43,10 +43,11 @@ pub(super) const LANGS: [&str; 11] = [
 /// never had (404). A page the sitemap lists is trained without being
 /// named here ([`listed`]); one it does not list has to be added here, or
 /// it is cold in the profiled build.
-pub(super) const SLUGS: [&str; 28] = [
+pub(super) const SLUGS: [&str; 29] = [
     "",
     "download",
     "gateways",
+    "ranked",
     "donate",
     "faq",
     "security",
@@ -753,7 +754,7 @@ mod tests {
         );
         assert_eq!(answered, 0);
         // a listed page the slugs name is asked once; a new one is asked too
-        let listed = [format!("{base}/de/faq"), format!("{base}/de/ranked")];
+        let listed = [format!("{base}/de/faq"), format!("{base}/de/echoes")];
         let (with_listed, _) = pages(&agent, &base, 0, &listed);
         assert_eq!(with_listed, asked + 1);
     }
