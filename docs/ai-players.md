@@ -1797,15 +1797,16 @@ writes on both sides of each bound; the bounds alike in the API, the
 operator's faults, the website, its eleven languages and the migration.
 
 **Evidence (28.11.2026),** on bigace (Ubuntu, x86-64), never this Mac, at
-the tree of `46f54e88` (the fixes of the adversarial pass; what followed
-changed docs alone): `cargo test` of `central-api` (202), `central-http`
+the tree of `46f54e88` (the fixes of the adversarial pass, `47038c59` after
+the rebase onto `main`'s `8a1c02b8`, which changed no Rust code; what
+followed changed docs alone): `cargo test` of `central-api` (202), `central-http`
 (182 and the transport suite's 7), `central-identity` (161),
 `central-migration` (10), `central-postgres` (lib 58), `central-service`
 (51, the CLI's 9) and `central-web` (182 and 7); `cargo clippy
 --all-targets -D warnings` over those seven crates and `cargo fmt --all
 --check`, clean; `cargo xtask postgres` green (the SDK suite 149 s, the
 store suite 106 s, both Tower suites 2 s). At the tree before the fixes
-(`46c2a634`) the same suites were green as well (SDK 160 s, store 97 s).
+(`46c2a634`, `ffbf30c1` after the rebase) the same suites were green as well (SDK 160 s, store 97 s).
 
 **Left.**
 
