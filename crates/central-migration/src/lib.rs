@@ -35,7 +35,7 @@ macro_rules! migrations {
 
 /// Every migration, in the order they are applied. Append only: a database records
 /// the names it ran, and one it ran is never run again or removed.
-const MIGRATIONS: [Migration; 54] = migrations![
+const MIGRATIONS: [Migration; 55] = migrations![
     "m20261019_000001_pending_accounts",
     "m20261019_000002_native_accounts",
     "m20261019_000003_ticket_purpose",
@@ -90,6 +90,7 @@ const MIGRATIONS: [Migration; 54] = migrations![
     "m20261126_000053_ai_players",
     "m20261126_000054_ai_runner_tokens",
     "m20261127_000055_ai_operator_fill_in",
+    "m20261128_000056_ranked_season_finish_awards",
 ];
 
 /// The history table exactly as `sea-orm-migration` 2.0.4 created it
@@ -213,7 +214,7 @@ mod tests {
 
     #[test]
     fn the_list_is_ordered_unique_and_shaped() {
-        assert_eq!(MIGRATIONS.len(), 54);
+        assert_eq!(MIGRATIONS.len(), 55);
         for pair in MIGRATIONS.windows(2) {
             // the history is read in this order, so the list must be in it too
             assert!(pair[0].name < pair[1].name, "{}", pair[1].name);
@@ -245,7 +246,7 @@ mod tests {
     #[test]
     fn only_the_list_s_beginning_is_a_history() {
         let all: Vec<&str> = MIGRATIONS.iter().map(|m| m.name).collect();
-        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(54));
+        assert_eq!(pending(&[], &MIGRATIONS).map(<[_]>::len), Some(55));
         assert_eq!(
             pending(&recorded(&all[..31]), &MIGRATIONS).map(|rest| rest[0].name),
             Some("m20261119_000033_presence")
@@ -390,8 +391,10 @@ mod tests {
     /// token without a maker, and fill-in's switch, on by default.
     #[test]
     fn ai_operator_migration_only_relaxes_the_maker_and_adds_the_switch() {
-        let m = MIGRATIONS.last().expect("AI operator migration is present");
-        assert_eq!(m.name, "m20261127_000055_ai_operator_fill_in");
+        let m = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "m20261127_000055_ai_operator_fill_in")
+            .expect("AI operator migration is present");
         for said in [
             "ALTER TABLE central_identity.ai_runner_tokens ALTER COLUMN created_by DROP NOT NULL",
             "ALTER TABLE central_identity.ai_settings ADD COLUMN fill_in boolean NOT NULL DEFAULT true",
@@ -401,5 +404,22 @@ mod tests {
         // The column's grant is ops/grants.sql's, as every grant is.
         assert!(!m.sql.contains("GRANT"));
         assert!(!m.sql.contains("DROP TABLE"));
+    }
+
+    /// A season may close without finish awards (the pre-season before
+    /// Season 0): one column, on unless an operator sets it off, and
+    /// nothing else.
+    #[test]
+    fn season_finish_awards_migration_only_adds_the_switch() {
+        let m = MIGRATIONS
+            .last()
+            .expect("season finish awards migration is present");
+        assert_eq!(m.name, "m20261128_000056_ranked_season_finish_awards");
+        assert!(m.sql.contains(
+            "ALTER TABLE central_identity.ranked_seasons\n    ADD COLUMN finish_awards boolean NOT NULL DEFAULT true"
+        ));
+        assert!(!m.sql.contains("GRANT"));
+        assert!(!m.sql.contains("DROP"));
+        assert!(!m.sql.contains("UPDATE"));
     }
 }
