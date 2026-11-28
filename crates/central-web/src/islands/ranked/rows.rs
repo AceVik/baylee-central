@@ -34,17 +34,20 @@ fn board_rank(choice: &Choice, league: League) -> Rank {
     }
 }
 
-/// "Season 2026-11 · since 25 November 2026" or with its end.
+/// "2026-11-25 · since 25 November 2026" or with its end. A name that is
+/// a date keeps together (non-breaking hyphens, docs/website-design.md
+/// §"Typography").
 fn season_line(lang: Lang, season: &Season) -> String {
     let from = time::format_unix_date_local(lang, season.starts);
+    let name = season.name.replace('-', "\u{2011}");
     match season.ends {
         Some(ends) => words::ranked_season_span(
             lang,
-            &season.name,
+            &name,
             &from,
             &time::format_unix_date_local(lang, ends.saturating_sub(1)),
         ),
-        None => words::ranked_season_since(lang, &season.name, &from),
+        None => words::ranked_season_since(lang, &name, &from),
     }
 }
 

@@ -74,7 +74,8 @@
 .ladder-seg .chip-btn {
   justify-content: center;
   min-inline-size: 0;
-  padding-inline: 0.5em;
+  padding-inline: 0.35em;
+  font-size: var(--text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -268,10 +269,13 @@
   min-inline-size: 0;
 }
 
-.ladder-handle,
+/* one line, the name cut before the tag (`.handle-link` of app.css comes
+   later and wraps, so these rules name the row) */
+.ladder-name .ladder-handle,
 .ladder-name .handle-text {
   flex: 0 1 auto;
   flex-wrap: nowrap;
+  gap: 0 0.35em;
   min-inline-size: 0;
   overflow: hidden;
 }
@@ -545,6 +549,16 @@
 
   .ladder-who {
     grid-area: who;
+  }
+
+  /* an AI player's badge goes under its name rather than squeezing both */
+  .ladder-name {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .ladder-name .ai-badge {
+    max-inline-size: 100%;
   }
 
   .ladder-record {
