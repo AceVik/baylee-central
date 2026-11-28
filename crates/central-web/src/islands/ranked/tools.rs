@@ -101,7 +101,7 @@ fn who(ladder: Ladder) -> impl IntoView {
 }
 
 /// An option of the league menu, selected while it is the choice.
-fn league_option(ladder: Ladder, value: String, label: String) -> impl IntoView {
+fn league_option(ladder: Ladder, value: String, label: String) -> AnyView {
     let choice = ladder.choice;
     let mine = value.clone();
     view! {
@@ -109,6 +109,7 @@ fn league_option(ladder: Ladder, value: String, label: String) -> impl IntoView 
             {label}
         </option>
     }
+    .into_any()
 }
 
 /// The league menu: the highest league with standings first, then every
@@ -128,7 +129,7 @@ fn leagues(ladder: Ladder) -> impl IntoView {
             let key = league_key(league);
             let count = divisions(league);
             if count == 0 {
-                return league_option(ladder, key.to_owned(), name.to_owned()).into_any();
+                return league_option(ladder, key.to_owned(), name.to_owned());
             }
             let all = league_option(ladder, key.to_owned(), words::ranked_league_all(lang, name));
             let each = (1..=count)

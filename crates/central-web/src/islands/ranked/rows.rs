@@ -276,7 +276,7 @@ fn quiet(
     view! {
         <div class="ladder-quiet" data-state=kind>
             <span class="ladder-quiet-mark" aria-hidden="true">
-                {if kind == "failed" { glyph(glyph::INFO) } else { glyph(glyph::TROPHY) }}
+                {if matches!(kind, "failed" | "busy") { glyph(glyph::INFO) } else { glyph(glyph::TROPHY) }}
             </span>
             <p class="ladder-quiet-title">{sentence}</p>
             {lead.map(|lead| view! { <p class="ladder-quiet-lead">{lead}</p> })}
