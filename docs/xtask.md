@@ -338,9 +338,27 @@ instrumented too and write counts while the build runs.
   server's own gain is larger than the figure shown.
 
 `release.yml` runs `cargo xtask pgo --compare` for every tag and by hand
-(`workflow_dispatch`); by hand, `negative-control` also builds from a
-profile of one function no build has, which step 5 must refuse, so the count
-is proved to see the compiler's report. The deploy hook does not use this
+(`workflow_dispatch`). Before it, a one-line program is built from a profile
+of one function it does not have, and the compiler's report must word a
+function without counts as step 5 reads it (`no profile data available for
+function`). By hand, `portability-check` builds from the profile again in a
+checkout and a Cargo home at other paths, as the server does, and
+`negative-control` builds the whole selection from that profile of one
+function, which step 5 must refuse.
+
+Measured on 28.11.2026 (release run 46102057709, ubuntu-26.04 with four
+vCPUs): 49 count files merged into a profile of 89 709 functions (55 MiB),
+of which the build from it reported none without counts. The instrumented
+build took 19 minutes, the training 8 seconds, the build from the profile
+with `central-service` beside it 21 minutes. Against the deploy hook's
+build, `--compare` gave 4 % less time for a pass over the website's 331
+addresses (214.2 against 205.1 ms, the client's time included) and 5 to 9 %
+less for a picture, each in a worker process of its own (`photo.jpg` 111.5
+against 105.2 ms, `screen.png` 88.2 against 80.2, `lossy.webp` 100.4 against
+91.6, `moving.gif` 103.6 against 96.6). The whole negative control ran for
+more than 80 minutes in that run and was stopped by the runner before it
+finished; why the build from a profile that matches nothing is so much
+slower is open, so it stays a check by hand. The deploy hook does not use this
 build yet: it builds `--release` for `x86-64-v3` on the server.
 
 No profile reaches the website's WebAssembly: the stable toolchain has no

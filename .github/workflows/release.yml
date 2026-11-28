@@ -84,6 +84,18 @@ jobs:
         with:
           name: central-site
           path: target/site
+      # The check below counts the compiler's report of functions without
+      # counts; this toolchain must word it as the check reads it.
+      - name: The compiler reports a function without counts as the check reads it
+        shell: bash
+        run: |
+          mkdir -p target/pgo-probe && cd target/pgo-probe
+          llvm_profdata="$(rustc --print target-libdir)/../bin/llvm-profdata"
+          printf ':ir\nno_such_function_in_central\n1\n1\n1\n' > unrelated.proftext
+          "$llvm_profdata" merge -o unrelated.profdata unrelated.proftext
+          printf 'fn main() { println!("{}", std::env::args().count()); }\n' > probe.rs
+          rustc -O -C profile-use="$PWD/unrelated.profdata" -C llvm-args=-pgo-warn-missing-function probe.rs 2> probe.log
+          grep -c 'no profile data available for function' probe.log
       - name: Train, build from the profile (FatLTO, x86-64-v3), check it took, measure
         run: cargo xtask pgo --out target/pgo-release --target-cpu x86-64-v3 --compare
       - name: Verify PGO central-service passes HTTP boundary and signal smoke test
@@ -124,25 +136,6 @@ jobs:
             target/pgo-release/central.profdata.rustc
           retention-days: 14
           if-no-files-found: error
-      # The check counts what the compiler reports; this proves the report
-      # reaches it. A profile of one function no build has must be refused.
-      - name: Negative control, a profile that matches nothing must be refused
-        if: github.event_name == 'workflow_dispatch' && inputs.negative-control
-        shell: bash
-        run: |
-          llvm_profdata="$(rustc --print target-libdir)/../bin/llvm-profdata"
-          printf ':ir\nno_such_function_in_central\n1\n1\n1\n' > target/unrelated.proftext
-          "$llvm_profdata" merge -o target/unrelated.profdata target/unrelated.proftext
-          rustc -vV > target/unrelated.profdata.rustc
-          set +e
-          failure=$(cargo xtask pgo --out target/pgo-negative --profile-use target/unrelated.profdata 2>&1 >/dev/null)
-          status=$?
-          set -e
-          printf '%s\n' "$failure" | tail -n 6
-          if [ "$status" -eq 0 ] || ! printf '%s' "$failure" | grep -q 'The PGO profile did not take'; then
-            echo "A profile that matches nothing was not refused"
-            exit 1
-          fi
       # The server builds from a profile CI made, in a checkout and a Cargo
       # home at other paths; the check must still find it taken there.
       - name: Portability, the profile built from at other paths
@@ -155,7 +148,33 @@ jobs:
           cd "$elsewhere"
           export CARGO_HOME="$RUNNER_TEMP/cargo-home-elsewhere"
           cargo fetch --locked
-          cargo xtask pgo --out target/pgo-elsewhere --target-cpu x86-64-v3 --profile-use "$RUNNER_TEMP/central.profdata"
+          timeout 50m cargo xtask pgo --out target/pgo-elsewhere --target-cpu x86-64-v3 --profile-use "$RUNNER_TEMP/central.profdata"
+      # The whole build from a profile of one function no build has, which
+      # the check must refuse. Its output goes to a file and only the
+      # build's milestones to the log, which carry the time each took.
+      - name: Negative control, a profile that matches nothing must be refused
+        if: github.event_name == 'workflow_dispatch' && inputs.negative-control
+        shell: bash
+        run: |
+          llvm_profdata="$(rustc --print target-libdir)/../bin/llvm-profdata"
+          printf ':ir\nno_such_function_in_central\n1\n1\n1\n' > target/unrelated.proftext
+          "$llvm_profdata" merge -o target/unrelated.profdata target/unrelated.proftext
+          rustc -vV > target/unrelated.profdata.rustc
+          set +e
+          timeout 50m cargo xtask pgo --out target/pgo-negative --profile-use target/unrelated.profdata > target/negative.log 2>&1 &
+          build=$!
+          while kill -0 "$build" 2> /dev/null; do
+            sleep 60
+            echo "$(date -u +%H:%M) $(wc -l < target/negative.log) lines, last: $(grep -E 'Compiling|Finished|PGO' target/negative.log | tail -n 1)"
+          done
+          wait "$build"
+          status=$?
+          set -e
+          tail -n 6 target/negative.log
+          if [ "$status" -eq 0 ] || ! grep -q 'The PGO profile did not take' target/negative.log; then
+            echo "A profile that matches nothing was not refused (status $status)"
+            exit 1
+          fi
 
   publish:
     needs: [build-pgo]
