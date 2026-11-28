@@ -24,6 +24,8 @@ pub enum Page {
     Download,
     /// `/{lang}/gateways`.
     Gateways,
+    /// `/{lang}/ranked`: the public leaderboards of ranked play.
+    Ranked,
     /// `/{lang}/donate`: the monthly goal and the places to give.
     Donate,
     /// `/{lang}/faq`.
@@ -62,10 +64,11 @@ pub enum Page {
 
 impl Page {
     /// Every page with an address, in the sitemap's order.
-    pub const LISTED: [Page; 11] = [
+    pub const LISTED: [Page; 12] = [
         Page::Home,
         Page::Download,
         Page::Gateways,
+        Page::Ranked,
         Page::Faq,
         Page::Security,
         Page::Contact,
@@ -94,6 +97,7 @@ impl Page {
             Page::Account(section) => section.slug(),
             Page::Download => "download",
             Page::Gateways => "gateways",
+            Page::Ranked => "ranked",
             Page::Faq => "faq",
             Page::Security => "security",
             Page::Contact => "contact",

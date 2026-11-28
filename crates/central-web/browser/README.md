@@ -9,7 +9,7 @@ checks for them. It was `web/` until 13.11.2026.
 
 | path | what |
 | --- | --- |
-| `e2e-site/` | the site in Chromium at a desktop's width (every spec) and at a phone's (only the specs whose subject depends on the layout: `site`, `languages`, `strip`, `dialogs`, `theme`, `chat`, `recovery`, `pwa`, `security`), against the development server of `central-web` and synthetic data; every page, both colour schemes, axe-core, targets, keyboard paths, the islands, and no request to another origin |
+| `e2e-site/` | the site in Chromium at a desktop's width (every spec) and at a phone's (only the specs whose subject depends on the layout: `site`, `languages`, `strip`, `dialogs`, `theme`, `chat`, `recovery`, `pwa`, `security`, `ranked`), against the development server of `central-web` and synthetic data; every page, both colour schemes, axe-core, targets, keyboard paths, the islands, and no request to another origin |
 | `e2e-real/` | the same site's account, reset, password and chat steps against a real Central, run by hand (its `README.md`) |
 | `e2e-real/front.ts` | the TLS stand-in for baylee.app's Caddy site block, for `e2e-real` only |
 | `e2e-real/mailer.ts` | the stand-in for `baylee-mailer`, for `e2e-real` only |
@@ -45,7 +45,7 @@ cd ../../.. && cargo build -p central-web-server && cargo xtask site && cd crate
 npm run e2e:site
 ```
 
-runs every spec in `e2e-site/` in the desktop project and, of them, the nine whose subject depends on the layout (`PHONE_SPECS` in `playwright.config.ts`) also in the phone project, on port 28792. A test that sets its own window sizes runs in the desktop project only (`onlyDesktop` in `check.ts`). A single spec runs
+runs every spec in `e2e-site/` in the desktop project and, of them, the ten whose subject depends on the layout (`PHONE_SPECS` in `playwright.config.ts`) also in the phone project, on port 28792. A test that sets its own window sizes runs in the desktop project only (`onlyDesktop` in `check.ts`). A single spec runs
 with `npx playwright test -c e2e-site/playwright.config.ts e2e-site/site.spec.ts`.
 If the port is in use, wait for the other run to finish; do not kill a process
 you did not start.

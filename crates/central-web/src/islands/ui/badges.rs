@@ -100,7 +100,9 @@ const fn tier_rank(tier: Option<Tier>) -> u8 {
     }
 }
 
-fn format_name(format: central_api::ranked::Format) -> &'static str {
+/// A format's name, the same in every language.
+#[must_use]
+pub const fn format_name(format: central_api::ranked::Format) -> &'static str {
     match format {
         central_api::ranked::Format::Standard => "Standard",
         central_api::ranked::Format::Highlander => "Highlander",
